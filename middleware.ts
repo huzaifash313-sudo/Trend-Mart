@@ -203,8 +203,15 @@ function hasValidSession(request: NextRequest): boolean {
  * after updateSession() refreshes tokens, preventing stale null entries
  * from poisoning role resolution.
  */
+type MiddlewareAuthUser = {
+  id: string;
+  email_confirmed_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+  app_metadata?: Record<string, unknown> | null;
+};
+
 interface CachedUser {
-  user: { id: string; email_confirmed_at?: string | null } | null;
+  user: MiddlewareAuthUser | null;
   timestamp: number;
 }
 
@@ -223,7 +230,7 @@ function invalidateUserCache(): void {
  */
 async function getAuthenticatedUser(
   request: NextRequest,
-): Promise<{ id: string; email_confirmed_at?: string | null } | null> {
+): Promise<MiddlewareAuthUser | null> {
   const accessToken = sanitizeSessionToken(
     request.cookies.get("sb-access-token")?.value,
   );
@@ -287,9 +294,11 @@ async function getAuthenticatedUser(
       return null;
     }
 
-    const result = {
+    const result: MiddlewareAuthUser = {
       id: user.id,
       email_confirmed_at: user.email_confirmed_at,
+      user_metadata: user.user_metadata ?? null,
+      app_metadata: user.app_metadata ?? null,
     };
     authDebug("getAuthenticatedUser: SUCCESS", {
       userId: user.id.slice(0, 8),
@@ -415,8 +424,12 @@ async function resolveUserRole(
 
     // 2) JWT metadata (signup role)
     const meta =
-      (user.user_metadata?.role as string | undefined) ||
-      (user.app_metadata?.role as string | undefined);
+      (typeof user.user_metadata?.role === "string"
+        ? user.user_metadata.role
+        : undefined) ||
+      (typeof user.app_metadata?.role === "string"
+        ? user.app_metadata.role
+        : undefined);
     if (meta === "admin" || meta === "merchant" || meta === "customer") {
       if (meta === "customer") {
         const { data: shop } = await supabase
