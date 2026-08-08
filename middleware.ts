@@ -128,13 +128,10 @@ const ROLE_HIERARCHY: Record<AppRole, number> = {
 };
 
 const ROLE_ROUTE_MAP = {
-  /** Routes that require at minimum an authenticated user (any role).
-   *  FIX: /dashboard moved here so new signups (customer role) can
-   *  create their first shop. The dashboard page handles the "no shop"
-   *  state gracefully and shows a shop creation form. */
-  customer: ["/auth/settings", "/account", "/dashboard"],
-  /** Routes that require merchant or higher (existing shop owners). */
-  merchant: ["/shop/manage"],
+  /** Routes that require at minimum an authenticated user (any role). */
+  customer: ["/auth/settings", "/account"],
+  /** Routes that require merchant or higher (store owners). */
+  merchant: ["/dashboard", "/shop/manage"],
   /** Routes that require admin role exclusively. */
   admin: ["/admin"],
 } as const;
@@ -702,7 +699,7 @@ export async function middleware(request: NextRequest) {
         requiredMinimum: "merchant",
         pathname,
       });
-      return buildRedirectWithLoopTracking(new URL("/", request.url), request);
+      return buildRedirectWithLoopTracking(new URL("/account", request.url), request);
     }
   }
 
@@ -734,7 +731,7 @@ export async function middleware(request: NextRequest) {
         request,
       );
     }
-    return buildRedirectWithLoopTracking(new URL("/", request.url), request);
+    return buildRedirectWithLoopTracking(new URL("/account", request.url), request);
   }
 
   // ── 9. Build response with security headers ────────────────────────────

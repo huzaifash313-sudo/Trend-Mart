@@ -35,6 +35,8 @@ function SearchIcon() {
 export default function Navbar() {
   const router = useRouter();
   const [session, setSession] = useState(false);
+  const [dashHref, setDashHref] = useState("/account");
+  const [dashLabel, setDashLabel] = useState("Account");
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
@@ -48,7 +50,25 @@ export default function Navbar() {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         if (!cancelled) setSession(!!data.session);
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => { if (!cancelled) setSession(!!s); });
+        if (data.session?.user && !cancelled) {
+          const { detectUserRole, getDashboardPath } = await import("@/services/authService");
+          const role = await detectUserRole(data.session.user);
+          setDashHref(getDashboardPath(role));
+          setDashLabel(role === "merchant" || role === "admin" ? "Dashboard" : "Account");
+        }
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_, s) => {
+          if (cancelled) return;
+          setSession(!!s);
+          if (s?.user) {
+            const { detectUserRole, getDashboardPath } = await import("@/services/authService");
+            const role = await detectUserRole(s.user);
+            setDashHref(getDashboardPath(role));
+            setDashLabel(role === "merchant" || role === "admin" ? "Dashboard" : "Account");
+          } else {
+            setDashHref("/account");
+            setDashLabel("Account");
+          }
+        });
         if (cancelled) subscription.unsubscribe();
       } catch { if (!cancelled) setSession(false); }
       finally { if (!cancelled) setLoading(false); }
@@ -94,8 +114,8 @@ export default function Navbar() {
         {loading ? (
           <div className="h-8 w-16 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
         ) : session ? (
-          <Link href="/dashboard" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-300 px-4 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800">
-            Dashboard
+          <Link href={dashHref} className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-300 px-4 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800">
+            {dashLabel}
           </Link>
         ) : (
           <Link href="/login" className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 transition-colors dark:bg-emerald-500 dark:hover:bg-emerald-600">

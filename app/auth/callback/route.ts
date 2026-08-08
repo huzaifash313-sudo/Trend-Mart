@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     if (!error) {
       // Determine where to redirect based on user role
-      let redirectTo = next ?? "/";
+      let redirectTo = next ?? "/account";
 
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -29,13 +29,15 @@ export async function GET(request: NextRequest) {
             .eq("user_id", user.id)
             .maybeSingle();
 
+          const metaRole = (user.user_metadata?.role as string | undefined) ?? "";
+
           if (roleData?.role === "admin") redirectTo = "/admin/dashboard";
-          else if (roleData?.role === "merchant") redirectTo = "/dashboard";
-          else redirectTo = "/"; // Customers go to home
+          else if (roleData?.role === "merchant" || metaRole === "merchant") redirectTo = "/dashboard";
+          else redirectTo = next ?? "/account";
         }
       } catch {
-        // Fallback to home if role detection fails
-        redirectTo = "/";
+        // Fallback to customer portal if role detection fails
+        redirectTo = next ?? "/account";
       }
 
       const forwardedHost = request.headers.get("x-forwarded-host");

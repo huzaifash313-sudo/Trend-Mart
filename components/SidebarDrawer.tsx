@@ -172,6 +172,7 @@ interface SidebarDrawerProps {
 export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const router = useRouter();
   const [session, setSession] = useState(false);
+  const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   // Refs for focus trapping
@@ -190,11 +191,22 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         if (!cancelled) setSession(!!data.session);
+        if (data.session?.user && !cancelled) {
+          const { detectUserRole } = await import("@/services/authService");
+          setUserRole(await detectUserRole(data.session.user));
+        }
 
         const {
           data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-          if (!cancelled) setSession(!!currentSession);
+        } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+          if (cancelled) return;
+          setSession(!!currentSession);
+          if (currentSession?.user) {
+            const { detectUserRole } = await import("@/services/authService");
+            setUserRole(await detectUserRole(currentSession.user));
+          } else {
+            setUserRole(null);
+          }
         });
 
         if (cancelled) {
@@ -496,7 +508,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             {/* Profile / Dashboard Settings */}
             <li>
               <Link
-                href={session ? "/dashboard/settings" : "/settings"}
+                href={session ? (userRole === "merchant" || userRole === "admin" ? "/dashboard/settings" : "/account") : "/settings"}
                 onClick={onClose}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
@@ -511,29 +523,41 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             <li>
             {session ? (
                 <>
-                  <Link
-                    href="/dashboard"
-                    onClick={onClose}
-                    className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
-                  >
-                    <DashboardIcon /> Merchant Dashboard
-                  </Link>
+                  {userRole === "merchant" || userRole === "admin" ? (
+                    <>
+                      <Link
+                        href="/dashboard"
+                        onClick={onClose}
+                        className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                      >
+                        <DashboardIcon /> Merchant Dashboard
+                      </Link>
 
-                  <Link
-                    href="/dashboard/settings"
-                    onClick={onClose}
-                    className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    <StoreIconMenu /> Store Settings
-                  </Link>
+                      <Link
+                        href="/dashboard/settings"
+                        onClick={onClose}
+                        className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        <StoreIconMenu /> Store Settings
+                      </Link>
 
-                  <Link
-                    href="/dashboard/analytics"
-                    onClick={onClose}
-                    className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center text-base leading-none">📊</span> Analytics
-                  </Link>
+                      <Link
+                        href="/dashboard/analytics"
+                        onClick={onClose}
+                        className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center text-base leading-none">📊</span> Analytics
+                      </Link>
+                    </>
+                  ) : (
+                    <Link
+                      href="/account"
+                      onClick={onClose}
+                      className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                    >
+                      <DashboardIcon /> My Account
+                    </Link>
+                  )}
 
                   <Link
                     href="/settings/appearance"

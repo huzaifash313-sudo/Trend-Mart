@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 export default function MerchantGuidelinesPage() {
   return (
     <LegalPageLayout title="Merchant Security Guidelines" icon="🛡️" lastUpdated="August 8, 2026">
-      <LegalSection heading="1. Store Approval">
+      <LegalSection heading="1. Going Live">
         <p>
-          Every new store submitted through &quot;Register Store&quot; enters a pending review
-          queue. A Super-Admin verifies the store details (name, category, contact number, logo)
-          before it becomes visible to customers on the homepage. Stores found to violate these
-          guidelines after approval may be suspended without notice.
+          When you register a store with a verified email, it goes live on the
+          marketplace immediately — there is no Super-Admin approval wait. Keep
+          your store details accurate (name, category, WhatsApp, logo). TrendMart
+          may still suspend stores that violate these guidelines without notice.
         </p>
       </LegalSection>
 

@@ -67,6 +67,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<"customer" | "merchant">("customer");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -120,7 +121,10 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
   );
 
   const validateAll = useCallback((): boolean => {
-    const data = { email, password, confirmPassword };
+    const data =
+      mode === "sign-in"
+        ? { email, password }
+        : { email, password, confirmPassword, role };
     const schema = mode === "sign-in" ? signInSchema : signUpSchema;
     const result = schema.safeParse(data);
 
@@ -138,7 +142,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
     }
     setFieldErrors(errors);
     return false;
-  }, [email, password, confirmPassword, mode]);
+  }, [email, password, confirmPassword, role, mode]);
 
   // ── Submit handler ─────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
@@ -146,7 +150,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
       e.preventDefault();
 
       // Mark all fields as touched
-      setTouched({ email: true, password: true, confirmPassword: true });
+      setTouched({ email: true, password: true, confirmPassword: true, role: true });
 
       if (!validateAll()) return;
 
@@ -155,13 +159,14 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         if (!agreedToTerms) return;
       }
 
-      const values = mode === "sign-in"
-        ? { email, password }
-        : { email, password, confirmPassword };
+      const values =
+        mode === "sign-in"
+          ? { email, password }
+          : { email, password, confirmPassword, role };
 
       await onSubmit(values);
     },
-    [email, password, confirmPassword, mode, onSubmit, validateAll, agreedToTerms],
+    [email, password, confirmPassword, role, mode, onSubmit, validateAll, agreedToTerms],
   );
 
   // ── Input change handler ───────────────────────────────────────────────────
@@ -221,6 +226,56 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         >
           {serverError}
         </motion.div>
+      )}
+
+      {/* Account type — signup only */}
+      {mode === "sign-up" && (
+        <div>
+          <p className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            I want to sign up as
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setRole("customer")}
+              disabled={isLoading}
+              className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                role === "customer"
+                  ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:bg-emerald-950/40"
+                  : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800/50"
+              }`}
+            >
+              <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-100">Customer</span>
+              <span className="mt-0.5 block text-[0.7rem] leading-snug text-zinc-500 dark:text-zinc-400">
+                Shop, track orders & wishlist
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole("merchant")}
+              disabled={isLoading}
+              className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                role === "merchant"
+                  ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:bg-emerald-950/40"
+                  : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800/50"
+              }`}
+            >
+              <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-100">Merchant</span>
+              <span className="mt-0.5 block text-[0.7rem] leading-snug text-zinc-500 dark:text-zinc-400">
+                Open a store & sell products
+              </span>
+            </button>
+          </div>
+          {role === "customer" ? (
+            <p className="mt-2 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+              Email verify once. Phone OTP only the first time you order with that number.
+            </p>
+          ) : (
+            <p className="mt-2 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+              Email verify once — then register your store and go live immediately.
+            </p>
+          )}
+        </div>
       )}
 
       {/* Email */}

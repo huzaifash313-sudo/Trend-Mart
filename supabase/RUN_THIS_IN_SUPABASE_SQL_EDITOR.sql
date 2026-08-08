@@ -1450,9 +1450,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  chosen text;
+  resolved public.app_role;
 BEGIN
+  chosen := lower(coalesce(NEW.raw_user_meta_data->>'role', 'customer'));
+  IF chosen = 'merchant' THEN
+    resolved := 'merchant';
+  ELSE
+    resolved := 'customer';
+  END IF;
+
   INSERT INTO public.user_roles (user_id, role)
-  VALUES (NEW.id, 'customer')
+  VALUES (NEW.id, resolved)
   ON CONFLICT (user_id) DO NOTHING;
   RETURN NEW;
 END;
@@ -2300,18 +2310,24 @@ COMMIT;
 
 
 -- #############################################################################
--- PART 5 — MERCHANT VERIFICATION QUEUE + DELIVERY SLABS
+-- PART 5 — SHOP VERIFICATION STATUS + DELIVERY SLABS
+-- (Approval queue disabled: default is 'approved'; stores go live on create.)
 -- #############################################################################
 
 BEGIN;
 
 ALTER TABLE public.shops
-  ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'pending'
+  ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'approved'
   CHECK (verification_status IN ('pending', 'approved', 'rejected'));
 
--- Backfill: shops that already exist predate this feature — grandfather them
--- in as 'approved' so this migration never hides a pre-existing store.
-UPDATE public.shops SET verification_status = 'approved' WHERE verification_status = 'pending';
+-- Ensure default is approved even if the column already existed as pending
+ALTER TABLE public.shops
+  ALTER COLUMN verification_status SET DEFAULT 'approved';
+
+-- Backfill: any leftover pending rows become approved + live (auto-live policy)
+UPDATE public.shops
+SET verification_status = 'approved', is_live = true
+WHERE verification_status = 'pending';
 
 CREATE INDEX IF NOT EXISTS idx_shops_verification_status ON public.shops(verification_status);
 CREATE INDEX IF NOT EXISTS idx_shops_public_visible ON public.shops(is_live, verification_status)
@@ -2725,6 +2741,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS full_name text;
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS address text;
+ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS phone_verified_at timestamptz DEFAULT NULL;
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 

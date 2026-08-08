@@ -36,6 +36,7 @@ import { getDistanceToShop } from "@/services/geoRadiusService";
 import {
   normalizePhoneE164,
   isPhoneAlreadyVerified,
+  markCheckoutPhoneVerified,
   sendCheckoutPhoneOtp,
   verifyCheckoutPhoneOtp,
 } from "@/services/authService";
@@ -114,8 +115,8 @@ const INITIAL_SHIPPING: ShippingDetails = {
 const OTP_LENGTH = 6;
 const OTP_RESEND_COOLDOWN_SECONDS = 30;
 const VERIFIED_PHONES_STORAGE_KEY = "tm_verified_checkout_phones";
-/** How long a phone stays "trusted" in this browser session before re-verification is required. */
-const VERIFIED_PHONE_TTL_MS = 60 * 60 * 1000; // 1 hour
+/** Session cache TTL — account-level verification (auth/profile) has no expiry. */
+const VERIFIED_PHONE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours for guest/session cache
 
 /* -------------------------------------------------------------------------- */
 /*  Session-Scoped Phone Verification Cache                                   */
@@ -588,6 +589,7 @@ export default function WhatsAppCheckoutModal({
     if (result.success) {
       const normalized = normalizePhoneE164(shipping.customerPhone);
       if (normalized) markPhoneVerifiedThisSession(normalized);
+      void markCheckoutPhoneVerified(shipping.customerPhone);
       setPhoneVerified(true);
       setTimeout(() => setStep("confirm"), 400);
     } else {
@@ -824,7 +826,7 @@ export default function WhatsAppCheckoutModal({
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
               {step === "review" && `Sending order to ${shop.name}`}
               {step === "shipping" && "Enter your delivery information"}
-              {step === "verify" && "Required once per session, for order safety"}
+              {step === "verify" && "One-time phone check — skipped next time for this number"}
               {step === "confirm" && "Review everything before sending"}
               {step === "success" && "Opening WhatsApp for you..."}
             </p>

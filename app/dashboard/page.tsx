@@ -28,6 +28,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "@/services/productService";
+import { formatRupees } from "@/lib/formatters";
 import { getOthersSubCategoryId } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
 import { recordLegalAcceptance } from "@/services/legalService";
@@ -203,14 +204,17 @@ function ProductRow({
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
 }) {
-  const priceLabel = new Intl.NumberFormat("en-PK", {
-    style: "currency",
-    currency: product.currency || "PKR",
-    minimumFractionDigits: 0,
-  }).format(product.price);
+  const priceLabel = formatRupees(product.price);
+  const categoryLabel = product.category_id?.trim() || null;
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 transition-shadow hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div
+      className={`flex items-center gap-3 rounded-xl border bg-white px-4 py-3 transition-shadow hover:shadow-sm dark:bg-zinc-900 ${
+        product.is_available
+          ? "border-zinc-200 dark:border-zinc-800"
+          : "border-zinc-200 opacity-70 dark:border-zinc-800"
+      }`}
+    >
       {onToggleSelect && (
         <input
           type="checkbox"
@@ -220,34 +224,64 @@ function ProductRow({
           aria-label={`Select ${product.name}`}
         />
       )}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
+
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
         {product.image_url ? (
-          <img src={product.image_url} alt="" className="h-full w-full rounded-lg object-cover" />
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={product.image_url} alt="" className="h-full w-full object-cover" />
         ) : (
-          <span className="text-lg font-bold text-zinc-400">P</span>
+          <span className="text-sm font-bold text-zinc-400">
+            {product.name.charAt(0).toUpperCase() || "P"}
+          </span>
         )}
       </div>
+
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{product.name}</p>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">{priceLabel}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">
+            {product.name}
+          </span>
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${
+              product.is_available
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+            }`}
+          >
+            {product.is_available ? "In Stock" : "Out of Stock"}
+          </span>
+        </div>
+        <p className="mt-0.5 whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">{priceLabel}</span>
+          {categoryLabel ? ` · ${categoryLabel}` : ""}
+        </p>
       </div>
-      {/* Instant availability toggle — pause/resume selling without deleting */}
-      <button
-        type="button"
-        onClick={() => onToggleAvailability(product)}
-        aria-pressed={product.is_available}
-        aria-label={`${product.is_available ? "Mark out of stock" : "Mark in stock"}: ${product.name}`}
-        className={`shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold transition-colors ${
-          product.is_available
-            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
-            : "bg-zinc-200 text-zinc-500 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-        }`}
-      >
-        {product.is_available ? "✓ In Stock" : "Out of Stock"}
-      </button>
-      <div className="flex gap-1">
-        <button type="button" onClick={() => onEdit(product)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Edit</button>
-        <button type="button" onClick={() => onDelete(product.id)} disabled={deleting} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-40"><TrashIcon /></button>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onToggleAvailability(product)}
+          aria-pressed={product.is_available}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        >
+          {product.is_available ? "Mark Out" : "Mark In"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onEdit(product)}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(product.id)}
+          disabled={deleting}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-900/20"
+          aria-label={`Delete ${product.name}`}
+        >
+          <TrashIcon />
+        </button>
       </div>
     </div>
   );
@@ -300,11 +334,8 @@ export default function DashboardPage() {
   // ── Live Status Indicator ─────────────────────────────────────────────────
   const liveStatus = useMemo(() => {
     if (!shop) return { label: "No Shop", color: "text-zinc-400", bg: "bg-zinc-100" };
-    if (shop.verification_status === "pending") {
-      return { label: "⏳ Pending Review", color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20" };
-    }
     if (shop.verification_status === "rejected") {
-      return { label: "🚫 Rejected", color: "text-red-600", bg: "bg-red-50 dark:bg-red-900/20" };
+      return { label: "🚫 Suspended", color: "text-red-600", bg: "bg-red-50 dark:bg-red-900/20" };
     }
     return shop.is_live
       ? { label: "🟢 Live", color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" }
@@ -536,6 +567,11 @@ export default function DashboardPage() {
       return;
     }
 
+    if (!shop && userEmailVerified === false) {
+      addToast("Verify your email first — then your store goes live immediately.", "error");
+      return;
+    }
+
     setShopSaving(true);
     const result = shop ? await updateShop(activeShopId!, shopForm) : await createShop(shopForm);
     if (result.success) {
@@ -561,10 +597,10 @@ export default function DashboardPage() {
       if (!shop) {
         recordLegalAcceptance(userId, ["merchant_guidelines"]);
       }
-      addToast(shop ? "Shop updated successfully!" : "Store registered! It's now pending Super-Admin review — you'll be notified once it's approved and visible to customers.", "success");
+      addToast(shop ? "Shop updated successfully!" : "Store registered — it's live on the marketplace now!", "success");
     } else { addToast(result.error, "error"); }
     setShopSaving(false);
-  }, [shopForm, shop, addToast, userId, activeShopId, agreedMerchantGuidelines]);
+  }, [shopForm, shop, addToast, userId, activeShopId, agreedMerchantGuidelines, userEmailVerified]);
 
   const handleSaveProduct = useCallback(async (e: FormEvent) => {
     e.preventDefault();
@@ -767,7 +803,7 @@ export default function DashboardPage() {
                   Email Not Verified
                 </p>
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Please check your inbox and verify your email to unlock all features.
+                  Verify your email to register a store — once verified, new stores go live immediately.
                 </p>
               </div>
             </div>
@@ -830,7 +866,7 @@ export default function DashboardPage() {
               Create your first shop below to get started.
             </p>
             <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-400/80">
-              Homepage pe jo doosre logos dikhte hain woh demo / approved stores hain — aapki apni shop yahan save hogi.
+              Store register hote hi marketplace pe live ho jayega (email verified hona zaroori hai).
             </p>
           </section>
         )}
@@ -1059,20 +1095,13 @@ export default function DashboardPage() {
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Clicks Today</p>
               </div>
             </div>
-            {/* Verification queue banner */}
-            {shop && shop.verification_status === "pending" && (
-              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                ⏳ <strong>Your store is pending Super-Admin review.</strong>{" "}
-                It won&apos;t appear on the customer-facing marketplace until it&apos;s approved. You can keep setting up products and details in the meantime.
-              </div>
-            )}
+            {/* Suspended / rejected banner (admin abuse action) */}
             {shop && shop.verification_status === "rejected" && (
               <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
-                🚫 <strong>Your store registration was not approved.</strong>{" "}
-                Please <Link href="/support" className="underline font-medium">contact support</Link> for details or to request another review.
+                🚫 <strong>Your store has been suspended.</strong>{" "}
+                Please <Link href="/support" className="underline font-medium">contact support</Link> for details.
               </div>
             )}
-
             {/* Quick stat cards */}
             {shop && (
               <>

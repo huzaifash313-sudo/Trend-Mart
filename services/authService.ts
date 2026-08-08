@@ -13,7 +13,7 @@ export interface AuthResult {
   success: boolean;
   user?: User | null;
   error?: string;
-  role?: AuthRole;
+  role?: AuthRole | "admin";
 }
 
 export interface OtpVerificationResult {
@@ -80,12 +80,12 @@ export async function signInWithEmail(
 
 /**
  * Sign up with email and password.
- * For localhost, bypasses email confirmation and returns the user immediately.
- * For production, Supabase sends a confirmation email.
+ * Pass `role` so the account is created as customer or merchant from day one.
  */
 export async function signUpWithEmail(
   email: string,
   password: string,
+  role: AuthRole = "customer",
 ): Promise<AuthResult & { needsOtpVerification: boolean }> {
   try {
     const isLocalhost =
@@ -93,17 +93,18 @@ export async function signUpWithEmail(
       (window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1");
 
+    const signupRole: AuthRole = role === "merchant" ? "merchant" : "customer";
+
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
       options: {
-        // For localhost: don't use email redirects (they often break)
-        // For production: use the callback URL
         emailRedirectTo: isLocalhost
           ? undefined
           : `${window.location.origin}/auth/callback`,
-        // If Supabase is configured to auto-confirm on localhost, this works
-        // Otherwise, we fall back to email confirmation or OTP
+        data: {
+          role: signupRole,
+        },
       },
     });
 
@@ -115,23 +116,26 @@ export async function signUpWithEmail(
       };
     }
 
-    // If the user is already confirmed (localhost auto-confirm or identity exists)
+    // Persist role into user_roles (trigger also reads metadata; this is a safety net).
+    if (data.user) {
+      await claimSignupRole(signupRole);
+    }
+
     if (data.user && data.session) {
-      const role = await detectUserRole(data.user);
+      const resolved = await detectUserRole(data.user);
       return {
         success: true,
         user: data.user,
-        role,
+        role: resolved,
         needsOtpVerification: false,
       };
     }
 
-    // User needs email verification or OTP
-    // On localhost, the user identity exists but may not be confirmed
     if (data.user) {
       return {
         success: true,
         user: data.user,
+        role: signupRole,
         needsOtpVerification: !!data.user.identities?.length && !data.session,
       };
     }
@@ -148,6 +152,34 @@ export async function signUpWithEmail(
         err instanceof Error ? err.message : "An unexpected error occurred.",
       needsOtpVerification: false,
     };
+  }
+}
+
+/**
+ * Write the chosen signup role into `user_roles`.
+ * Prefer the SECURITY DEFINER RPC when available; fall back to upsert.
+ */
+export async function claimSignupRole(role: AuthRole): Promise<void> {
+  try {
+    const { error: rpcError } = await supabase.rpc("set_my_signup_role", {
+      desired_role: role,
+    });
+    if (!rpcError) return;
+  } catch {
+    /* RPC may not exist yet — fall through */
+  }
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("user_roles").upsert(
+      { user_id: user.id, role },
+      { onConflict: "user_id" },
+    );
+  } catch {
+    /* non-fatal — detectUserRole still has metadata fallback */
   }
 }
 
@@ -301,15 +333,87 @@ function isProviderUnavailableError(message: string): boolean {
 
 /**
  * Check whether the currently authenticated user already has this exact
- * phone number verified on file — if so, checkout can skip the OTP step.
+ * phone number verified — if so, checkout skips the OTP step permanently
+ * (not just for one hour).
  */
 export async function isPhoneAlreadyVerified(rawPhone: string): Promise<boolean> {
   const phone = normalizePhoneE164(rawPhone);
   if (!phone) return false;
+  const digits = phone.replace(/\D/g, "");
+
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.phone || !user.phone_confirmed_at) return false;
-    return user.phone.replace(/\D/g, "") === phone.replace(/\D/g, "");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    // Auth phone already confirmed for this number
+    if (
+      user.phone &&
+      user.phone_confirmed_at &&
+      user.phone.replace(/\D/g, "") === digits
+    ) {
+      return true;
+    }
+
+    // Profile phone marked verified after a prior successful checkout OTP
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("phone, phone_verified_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (
+      profile?.phone_verified_at &&
+      profile.phone &&
+      profile.phone.replace(/\D/g, "") === digits
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Persist a verified checkout phone onto the user profile so future orders
+ * never re-prompt for OTP for the same number.
+ */
+export async function markCheckoutPhoneVerified(rawPhone: string): Promise<void> {
+  const phone = normalizePhoneE164(rawPhone);
+  if (!phone) return;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from("user_profiles").upsert(
+      {
+        user_id: user.id,
+        phone,
+        phone_verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/**
+ * True when the signed-in user already completed email verification —
+ * checkout must not force another email check.
+ */
+export async function isEmailAlreadyVerified(): Promise<boolean> {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return !!user?.email_confirmed_at;
   } catch {
     return false;
   }
@@ -426,12 +530,12 @@ export async function getCurrentUser(): Promise<User | null> {
 
 /**
  * Map a role to its dashboard path.
- * Merchants/admins go to /dashboard; customers go to home page.
+ * Merchants/admins → store dashboard; customers → account portal.
  */
 export function getDashboardPath(role: AuthRole | "admin"): string {
   if (role === "admin") return "/admin/dashboard";
   if (role === "merchant") return "/dashboard";
-  return "/"; // Customers go to home page (browsing marketplace)
+  return "/account";
 }
 
 /**
@@ -451,7 +555,7 @@ export function redirectToDashboard(role: AuthRole | "admin"): void {
  * Detect the user's role.
  * Checks the user_roles table first, then metadata, then falls back to shop ownership.
  */
-async function detectUserRole(user: User | null): Promise<AuthRole> {
+export async function detectUserRole(user: User | null): Promise<AuthRole | "admin"> {
   if (!user) return "customer";
 
   // 1. Check user_roles table (authoritative source)
@@ -465,7 +569,7 @@ async function detectUserRole(user: User | null): Promise<AuthRole> {
     if (roleData?.role) {
       const validRoles: string[] = ["customer", "merchant", "admin"];
       if (validRoles.includes(roleData.role)) {
-        return roleData.role as AuthRole;
+        return roleData.role as AuthRole | "admin";
       }
     }
   } catch { /* fall through to metadata check */ }

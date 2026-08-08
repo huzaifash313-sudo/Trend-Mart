@@ -39,11 +39,48 @@ function isInvalidUuidSyntaxError(err: unknown): boolean {
   return /22P02|invalid input syntax for type uuid/i.test(msg);
 }
 
+const CATEGORY_ID_UUID_FLAG = "tm_products_category_id_is_uuid";
+const CATEGORY_ID_TEXT_FLAG = "tm_products_category_id_is_text";
+
+/** True only when we know category_id is text (safe to store names). */
+function shouldSendCategoryName(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    if (window.localStorage?.getItem(CATEGORY_ID_UUID_FLAG) === "1") return false;
+    return window.localStorage?.getItem(CATEGORY_ID_TEXT_FLAG) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markCategoryIdColumnAsUuid(): void {
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage?.setItem(CATEGORY_ID_UUID_FLAG, "1");
+      window.localStorage?.removeItem(CATEGORY_ID_TEXT_FLAG);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function markCategoryIdColumnAsText(): void {
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage?.setItem(CATEGORY_ID_TEXT_FLAG, "1");
+      window.localStorage?.removeItem(CATEGORY_ID_UUID_FLAG);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Build a clean insert/update row from form data.
  * - Drops empty UUID fields (PostgREST rejects "" for uuid columns)
  * - Normalises optional pricing / gallery fields
- * - `category_id` stores the main category NAME (text), not a UUID
+ * - `category_id` stores the main category NAME (text) on correct schemas;
+ *   legacy uuid-typed columns are detected once and then skipped (no noisy 400s)
  */
 function buildProductRow(
   form: ProductFormData,
@@ -65,15 +102,22 @@ function buildProductRow(
     row.images = sanitized.images ?? null;
     row.stock_status = sanitized.stock_status || "in_stock";
     row.currency = "PKR";
-    // Main category is a human-readable name ("Tech & IT Services"), NOT a UUID.
-    // Only omit when retrying against a legacy uuid-typed column.
-    if (!opts?.omitCategoryId) {
-      const cat = sanitized.category_id?.trim() || null;
-      // Never send a non-UUID string into a field that some DBs typed as uuid —
-      // callers that need uuid-only should pass omitCategoryId. For text columns
-      // we always send the category name.
-      row.category_id = cat;
+
+    // category_id: intended schema stores the category NAME (text). Live DBs that
+    // still type it as uuid reject names with 400/22P02. Never POST a non-UUID
+    // name — that was the noisy console error despite the success toast (retry
+    // without category_id). Taxonomy is kept via sub_category_id.
+    // After FIX_category_id_uuid_to_text.sql, set localStorage
+    // tm_products_category_id_is_text=1 (or we detect below) to store names again.
+    const cat = sanitized.category_id?.trim() || null;
+    if (!opts?.omitCategoryId && cat) {
+      if (isValidUUID(cat)) {
+        row.category_id = cat;
+      } else if (shouldSendCategoryName()) {
+        row.category_id = cat;
+      }
     }
+
     const subId = sanitized.sub_category_id;
     row.sub_category_id =
       typeof subId === "string" && isValidUUID(subId) ? subId : null;
@@ -204,9 +248,10 @@ export async function createProduct(
       .single();
 
     // Legacy DBs typed category_id as uuid — category NAMES like
-    // "Tech & IT Services" then fail with 22P02. Retry without category_id
-    // (sub_category_id still carries the taxonomy link).
+    // "Tech & IT Services" then fail with 22P02. Remember that and retry
+    // without category_id so the console stays clean on later adds.
     if (error && isInvalidUuidSyntaxError(error)) {
+      markCategoryIdColumnAsUuid();
       const withoutCat: Record<string, unknown> = {
         ...buildProductRow(form, { omitCategoryId: true }),
         shop_id: shopId,
@@ -251,6 +296,13 @@ export async function createProduct(
     }
 
     if (error) throw error;
+    if (
+      data &&
+      typeof fullRow.category_id === "string" &&
+      !isValidUUID(fullRow.category_id)
+    ) {
+      markCategoryIdColumnAsText();
+    }
     return { success: true, data: data as Product };
   } catch (err) {
     logError(err, { module: "productService.createProduct", meta: { shopId, form } });
@@ -299,6 +351,7 @@ export async function updateProduct(
       .single();
 
     if (error && isInvalidUuidSyntaxError(error)) {
+      markCategoryIdColumnAsUuid();
       const withoutCat = { ...row };
       delete withoutCat.category_id;
       ({ data, error } = await supabase

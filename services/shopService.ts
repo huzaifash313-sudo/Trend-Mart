@@ -442,6 +442,8 @@ function sanitizeShopForm(form: ShopFormData): Omit<
 
 /**
  * Create a new shop for the currently-authenticated user.
+ * New stores go live immediately (no Super-Admin approval queue).
+ * Email must be verified first.
  */
 export async function createShop(
   form: ShopFormData,
@@ -454,20 +456,49 @@ export async function createShop(
     } = await supabase.auth.getUser();
 
     if (!user) return { success: false, error: "Not authenticated." };
+    if (!user.email_confirmed_at) {
+      return {
+        success: false,
+        error: "Please verify your email before registering a store.",
+      };
+    }
 
     const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
+    // Auto-approve + live on create — no admin gate.
+    const insertPayload: Record<string, unknown> = {
+      ...sanitized,
+      owner_id: user.id,
+      verification_status: "approved",
+      is_live: true,
+    };
+
     let { data, error } = await supabase
       .from("shops")
-      .insert({ ...sanitized, owner_id: user.id })
+      .insert(insertPayload)
       .select()
       .single();
 
     if (error && isMissingColumnError(error)) {
+      // Older schemas may lack geo/delivery/verification columns — retry core fields.
+      const core: Record<string, unknown> = {
+        ...stripExtendedShopFields(sanitized),
+        owner_id: user.id,
+        is_live: true,
+        verification_status: "approved",
+      };
       ({ data, error } = await supabase
         .from("shops")
-        .insert({ ...stripExtendedShopFields(sanitized), owner_id: user.id })
+        .insert(core)
         .select()
         .single());
+      if (error && isMissingColumnError(error)) {
+        delete core.verification_status;
+        ({ data, error } = await supabase
+          .from("shops")
+          .insert(core)
+          .select()
+          .single());
+      }
     }
 
     if (error) throw error;

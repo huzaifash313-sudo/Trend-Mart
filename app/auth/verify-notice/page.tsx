@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { resendOtp } from "@/services/authService";
+import { resendOtp, detectUserRole, getDashboardPath } from "@/services/authService";
 import { useToast } from "@/components/Toast";
 
 /** Skip static prerender — this page reads search params at request time. */
@@ -37,7 +37,7 @@ function CheckCircleIcon() {
 function VerifyNoticeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/";
+  const redirectParam = searchParams.get("redirect");
   const { addToast } = useToast();
 
   const [email, setEmail] = useState<string | null>(null);
@@ -104,8 +104,14 @@ function VerifyNoticeInner() {
       if (session?.user?.email_confirmed_at) {
         setVerified(true);
         addToast("Email verified! Redirecting...", "success");
+        const role = await detectUserRole(session.user);
+        const fallback = getDashboardPath(role);
+        const target =
+          redirectParam && redirectParam !== "/"
+            ? redirectParam
+            : fallback;
         setTimeout(() => {
-          router.replace(redirectTo);
+          router.replace(target);
         }, 1500);
       } else {
         addToast("Email not yet verified. Please check your inbox and click the confirmation link.", "info");
@@ -114,7 +120,7 @@ function VerifyNoticeInner() {
       addToast("Could not check verification status.", "error");
     }
     setChecking(false);
-  }, [redirectTo, router, addToast]);
+  }, [redirectParam, router, addToast]);
 
   const handleSignOut = useCallback(async () => {
     const supabase = createClient();

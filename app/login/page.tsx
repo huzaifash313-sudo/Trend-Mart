@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
-import { signInWithEmail, redirectToDashboard } from "@/services/authService";
+import { signInWithEmail, redirectToDashboard, getCurrentUser, detectUserRole } from "@/services/authService";
 import { useToast } from "@/components/Toast";
 import type { SignInFormValues, SignUpFormValues } from "@/lib/validations";
 
@@ -117,7 +117,7 @@ export default function LoginPage() {
           // Email not verified — redirect to verify-notice page
           setServerError(null);
           addToast("Please verify your email to continue.", "info");
-          const verifyUrl = `/auth/verify-notice?redirect=${encodeURIComponent("/")}`;
+          const verifyUrl = `/auth/verify-notice?redirect=${encodeURIComponent("/account")}`;
           window.location.href = verifyUrl;
           return;
         }
@@ -136,11 +136,13 @@ export default function LoginPage() {
     [addToast],
   );
 
-  const handleOtpVerified = useCallback(() => {
+  const handleOtpVerified = useCallback(async () => {
     setShowOtpModal(false);
     setOtpEmail(null);
     addToast("Verification successful! Signing you in...", "success");
-    redirectToDashboard("customer");
+    const user = await getCurrentUser();
+    const role = await detectUserRole(user);
+    redirectToDashboard(role);
   }, [addToast]);
 
   return (

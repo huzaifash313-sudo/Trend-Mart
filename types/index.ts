@@ -59,10 +59,9 @@ export interface Shop {
   /** Additional delivery fee (PKR) charged per km of customer distance, on top of the flat fee. */
   delivery_fee_per_km?: number | null;
   /**
-   * Super-Admin review status — distinct from `is_live` (which merchants
-   * control themselves to open/close for business). A store is only visible
-   * to customers when `is_live = true` AND `verification_status = 'approved'`.
-   * New stores default to 'pending' until reviewed.
+   * Review status. New stores are auto-approved on create (no admin queue).
+   * Admins may still set `rejected` or flip `is_live` for abuse cases.
+   * Public visibility: `is_live = true` AND status is `approved` (or unset).
    */
   verification_status?: ShopVerificationStatus;
 }

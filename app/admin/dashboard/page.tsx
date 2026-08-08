@@ -784,19 +784,20 @@ export default function AdminDashboardPage() {
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
               <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                ⏳ New Store Approval Queue
+                Store queue (legacy)
               </h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                New merchant registrations stay hidden from customers until you
-                approve them here.
+                New stores go live automatically after email verification — no
+                approval wait. This list only shows rare leftover pending rows.
+                Use Merchants → Suspend for abuse.
               </p>
             </div>
             {pendingMerchants.length === 0 ? (
               <div className="px-5 py-16 text-center text-zinc-400">
                 <div className="text-3xl mb-3">✅</div>
-                <p>No stores waiting for review.</p>
+                <p>No pending stores.</p>
                 <p className="text-xs mt-2">
-                  New merchant sign-ups will appear here automatically.
+                  New merchant stores publish immediately when created.
                 </p>
               </div>
             ) : (

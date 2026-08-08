@@ -6,6 +6,11 @@
 --
 -- Paste into Supabase → SQL Editor → Run once.
 -- Safe to re-run.
+--
+-- After this succeeds, open the TrendMart site console once and run:
+--   localStorage.setItem('tm_products_category_id_is_text', '1');
+--   localStorage.removeItem('tm_products_category_id_is_uuid');
+-- so new products store the category name again (no more 400 retries).
 -- =============================================================================
 
 DO $$

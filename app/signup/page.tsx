@@ -5,10 +5,11 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
-import { signUpWithEmail, redirectToDashboard, getCurrentUser } from "@/services/authService";
+import { signUpWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole } from "@/services/authService";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { useToast } from "@/components/Toast";
 import type { SignInFormValues, SignUpFormValues } from "@/lib/validations";
+import type { AuthRole } from "@/services/authService";
 
 /* -------------------------------------------------------------------------- */
 /*  Pre-computed particle configurations                                      */
@@ -97,6 +98,7 @@ export default function SignupPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [pendingRole, setPendingRole] = useState<AuthRole>("customer");
 
   const handleSubmit = useCallback(
     async (values: SignInFormValues | SignUpFormValues) => {
@@ -104,14 +106,23 @@ export default function SignupPage() {
       setIsLoading(true);
       setServerError(null);
 
-      const result = await signUpWithEmail(signupValues.email, signupValues.password);
+      const result = await signUpWithEmail(
+        signupValues.email,
+        signupValues.password,
+        signupValues.role,
+      );
 
       if (result.success && !result.needsOtpVerification && result.role) {
         setIsLoading(false);
         if (result.user?.id) {
           recordLegalAcceptance(result.user.id, ["terms", "privacy"]);
         }
-        addToast("Account created! Welcome to TrendMart.", "success");
+        addToast(
+          signupValues.role === "merchant"
+            ? "Merchant account created! Set up your store next."
+            : "Account created! Welcome to TrendMart.",
+          "success",
+        );
         redirectToDashboard(result.role);
         return;
       }
@@ -119,6 +130,7 @@ export default function SignupPage() {
       if (result.success && result.needsOtpVerification) {
         setIsLoading(false);
         setOtpEmail(signupValues.email);
+        setPendingRole(signupValues.role);
         setShowOtpModal(true);
         addToast("Please verify your email to continue.", "info");
         return;
@@ -134,14 +146,19 @@ export default function SignupPage() {
   const handleOtpVerified = useCallback(async () => {
     setShowOtpModal(false);
     setOtpEmail(null);
-    // A session now exists post-verification — safe to record the acceptance.
     const user = await getCurrentUser();
     if (user?.id) {
       recordLegalAcceptance(user.id, ["terms", "privacy"]);
+      await claimSignupRole(pendingRole);
     }
-    addToast("Email verified! Welcome to TrendMart.", "success");
-    redirectToDashboard("customer");
-  }, [addToast]);
+    addToast(
+      pendingRole === "merchant"
+        ? "Email verified! Set up your store next."
+        : "Email verified! Welcome to TrendMart.",
+      "success",
+    );
+    redirectToDashboard(pendingRole);
+  }, [addToast, pendingRole]);
 
   return (
     <div className="relative flex min-h-screen overflow-hidden">
@@ -179,27 +196,26 @@ export default function SignupPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.6 }}
         >
-          <h2 className="mb-4 text-4xl font-bold leading-tight text-white">
-            Start selling in minutes.
-          </h2>
-          <p className="max-w-md text-indigo-100/80 leading-relaxed">
-            Join 500+ local merchants who use TrendMart to reach customers,
-            manage orders, and grow their business — all through a single
-            WhatsApp-connected platform.
-          </p>
+              <h2 className="mb-4 text-4xl font-bold leading-tight text-white">
+                Join TrendMart today.
+              </h2>
+              <p className="max-w-md text-indigo-100/80 leading-relaxed">
+                Shop local as a customer — or open your store as a merchant.
+                One platform for browsing, ordering, and selling in your neighborhood.
+              </p>
 
-          {/* Feature highlights */}
-          <motion.div
-            className="mt-8 space-y-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.9, duration: 0.6 }}
-          >
-            {[
-              { icon: "📱", text: "Orders come directly to your WhatsApp" },
-              { icon: "📊", text: "Real-time analytics and insights" },
-              { icon: "⚡", text: "Set up your store in under 2 minutes" },
-            ].map((feature) => (
+              {/* Feature highlights */}
+              <motion.div
+                className="mt-8 space-y-3"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9, duration: 0.6 }}
+              >
+                {[
+                  { icon: "🛒", text: "Customers: orders, tracking & wishlist" },
+                  { icon: "🏪", text: "Merchants: store dashboard & WhatsApp orders" },
+                  { icon: "✅", text: "Verify once — never again at checkout" },
+                ].map((feature) => (
               <motion.div
                 key={feature.text}
                 className="flex items-center gap-3 text-white/90"
