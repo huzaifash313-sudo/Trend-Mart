@@ -328,6 +328,7 @@ const VERIFY_EXEMPT_PATHS = [
   "/auth/callback",
   "/settings",
   "/dashboard", // FIX: Allow unverified users to access dashboard (shows warning client-side)
+  "/account", // Customer portal shows its own verify banner; avoid account↔verify loops
   "/wishlist",
   "/orders",
   "/search",
@@ -527,14 +528,17 @@ export async function middleware(request: NextRequest) {
   );
 
   if (redirectLoopCount >= 3) {
-    authDebug("REDIRECT LOOP DETECTED — short-circuiting all redirects", {
+    authDebug("REDIRECT LOOP DETECTED — breaking to a safe landing", {
       pathname,
       redirectCount: redirectLoopCount,
     });
-    // Clear the loop cookie and proceed
-    const loopResponse = NextResponse.next({
-      request: { headers: request.headers },
-    });
+    // Never serve protected pages unauthenticated just to stop a loop —
+    // that caused /account to show "My Account" while the navbar said Sign In.
+    const safePath = isAuthRoute(pathname) ? pathname : "/login";
+    const loopResponse =
+      safePath === pathname
+        ? NextResponse.next({ request: { headers: request.headers } })
+        : NextResponse.redirect(new URL(safePath, request.url));
     loopResponse.cookies.set(REDIRECT_LOOP_COOKIE, "", {
       maxAge: 0,
       path: "/",

@@ -149,9 +149,12 @@ export default function Navbar() {
             {dashLabel}
           </Link>
         ) : (
-          <Link href="/login" className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 transition-colors dark:bg-emerald-500 dark:hover:bg-emerald-600">
+          <a
+            href="/login"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 transition-colors dark:bg-emerald-500 dark:hover:bg-emerald-600"
+          >
             Sign In
-          </Link>
+          </a>
         )}
       </div>
 

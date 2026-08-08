@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   detectUserRole,
   claimSignupRole,
@@ -35,9 +34,9 @@ function StatCard({
 }
 
 export default function CustomerAccountPage() {
-  const router = useRouter();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -73,9 +72,9 @@ export default function CustomerAccountPage() {
         const user = session?.user ?? null;
 
         if (!user) {
+          // Never paint the portal for guests — hard redirect breaks soft-nav loops.
           if (!cancelled) {
-            setLoading(false);
-            router.replace("/login?redirect=/account");
+            window.location.replace("/login?redirect=/account");
           }
           return;
         }
@@ -92,6 +91,7 @@ export default function CustomerAccountPage() {
         setEmail(user.email ?? null);
         setEmailVerified(!!user.email_confirmed_at);
         setPhoneVerified(!!user.phone_confirmed_at);
+        setAuthed(true);
 
         try {
           const { data: profile } = await supabase
@@ -107,7 +107,7 @@ export default function CustomerAccountPage() {
         }
       } catch {
         if (!cancelled) {
-          router.replace("/login?redirect=/account");
+          window.location.replace("/login?redirect=/account");
         }
       } finally {
         if (!cancelled && !keepSkeleton) setLoading(false);
@@ -117,7 +117,7 @@ export default function CustomerAccountPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   const handleBecomeMerchant = async () => {
     setUpgrading(true);
@@ -131,12 +131,16 @@ export default function CustomerAccountPage() {
     }
   };
 
-  if (loading) {
+  // Guests must never see portal chrome (orders from localStorage looked "logged in").
+  if (loading || !authed) {
     return (
       <div className="mx-auto max-w-3xl space-y-4 px-4 py-10">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="h-24 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
         ))}
+        <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+          Checking your account…
+        </p>
       </div>
     );
   }
