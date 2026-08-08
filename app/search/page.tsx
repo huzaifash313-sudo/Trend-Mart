@@ -8,7 +8,7 @@ import { SHOP_CATEGORIES, CATEGORY_ICONS, CATEGORY_GRADIENTS } from "@/types";
 import { fetchShops } from "@/services/shopService";
 import { globalSearch, autocomplete, type GlobalSearchItem, type SearchSuggestion } from "@/services/globalSearchService";
 import { ErrorState } from "@/components/ErrorState";
-import ShopMediaHeader from "@/components/ShopMediaHeader";
+import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -601,19 +601,30 @@ function SearchResultsInner() {
                           Store
                         </span>
                       </ShopMediaHeader>
-                      <div className="space-y-1.5 p-2.5 pt-1 sm:space-y-2 sm:p-4 sm:pt-1.5">
-                        <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-lg dark:text-zinc-100">{item.name}</h3>
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 sm:gap-2 sm:text-sm dark:text-zinc-400">
-                          {item.category && (
-                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs dark:bg-zinc-800">
-                              {item.category}
-                            </span>
-                          )}
-                          {item.location && (
-                            <span className="inline-flex items-center gap-1 truncate">
-                              <PinIcon />{item.location}
-                            </span>
-                          )}
+                      <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
+                        <div className="flex items-start gap-2">
+                          <ShopLogoAvatar
+                            shopName={item.name}
+                            logoUrl={item.logoUrl ?? item.imageUrl}
+                            useNextImage={false}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-base dark:text-zinc-100">
+                              {item.name}
+                            </h3>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 sm:gap-2 sm:text-sm dark:text-zinc-400">
+                              {item.category && (
+                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs dark:bg-zinc-800">
+                                  {item.category}
+                                </span>
+                              )}
+                              {item.location && (
+                                <span className="inline-flex items-center gap-1 truncate">
+                                  <PinIcon />{item.location}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         {item.snippet && (
                           <p className="hidden truncate text-xs text-zinc-400 sm:block dark:text-zinc-500">{item.snippet}</p>
@@ -695,19 +706,28 @@ function SearchResultsInner() {
                   )}
                 </ShopMediaHeader>
 
-                {/* Info */}
-                <div className="space-y-1.5 p-2.5 pt-1 sm:space-y-2 sm:p-4 sm:pt-1.5">
-                  <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-lg dark:text-zinc-100">
-                    {shop.name}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 sm:gap-2 sm:text-sm dark:text-zinc-400">
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs dark:bg-zinc-800">
-                      {shop.category}
-                    </span>
-                    <span className="inline-flex items-center gap-1 truncate">
-                      <PinIcon />
-                      {shop.location}
-                    </span>
+                {/* Info — logo beside name */}
+                <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
+                  <div className="flex items-start gap-2">
+                    <ShopLogoAvatar
+                      shopName={shop.name}
+                      logoUrl={shop.logo_url}
+                      useNextImage={false}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-base dark:text-zinc-100">
+                        {shop.name}
+                      </h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 sm:gap-2 sm:text-sm dark:text-zinc-400">
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs dark:bg-zinc-800">
+                          {shop.category}
+                        </span>
+                        <span className="inline-flex items-center gap-1 truncate">
+                          <PinIcon />
+                          {shop.location}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   {shop.business_hours && (
                     <p className="hidden text-xs text-zinc-400 sm:block dark:text-zinc-500">{shop.business_hours}</p>

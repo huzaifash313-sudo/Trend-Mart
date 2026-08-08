@@ -14,7 +14,7 @@ import ContactModal from "@/components/ContactModal";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
-import ShopMediaHeader from "@/components/ShopMediaHeader";
+import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { getStoreTheme, type StoreTheme, isServiceTheme } from "@/lib/storeThemes";
@@ -327,13 +327,14 @@ function ShopDetailInner({ id }: { id: string }) {
           </section>
         )}
 
-        {/* Hero — banner (wide) + logo (avatar), never mixed */}
+        {/* Hero — banner wide; logo beside shop name */}
         <section className="trend-card overflow-hidden">
           <ShopMediaHeader
             shopName={shop.name}
             bannerUrl={shop.banner_url}
             logoUrl={shop.logo_url}
             size="hero"
+            logoPlacement="hidden"
           >
             {shop.is_live && (
               <span className="absolute left-3 top-3 z-[1] animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-[0.65rem] font-semibold text-white shadow">
@@ -358,12 +359,17 @@ function ShopDetailInner({ id }: { id: string }) {
               {theme.icon} {shop.category}
             </span>
           </ShopMediaHeader>
-          <div className="space-y-2 p-3 pt-9 sm:p-4 sm:pt-10">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">{shop.name}</h2>
-              <span className={`rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold ${theme.badgeClass}`}>{shop.category}</span>
+          <div className="space-y-2 p-3 sm:p-4">
+            <div className="flex items-start gap-3">
+              <ShopLogoAvatar shopName={shop.name} logoUrl={shop.logo_url} size="md" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">{shop.name}</h2>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold ${theme.badgeClass}`}>{shop.category}</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><PinIcon />{shop.location}</div>
+              </div>
             </div>
-            <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><PinIcon />{shop.location}</div>
             {shop.store_bio && (<p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{shop.store_bio}</p>)}
             {((shop.min_order_amount ?? 0) > 0 || (shop.free_delivery_threshold ?? 0) > 0) && (
               <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -380,7 +386,7 @@ function ShopDetailInner({ id }: { id: string }) {
               </div>
             )}
             <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={() => setShowContactModal(true)} disabled={!shop.whatsapp_number} className={`inline-flex items-center gap-1.5 rounded-full ${theme.buttonClass} px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50`}><WhatsAppIcon />Send Inquiry</button>
+              <button type="button" onClick={() => setShowContactModal(true)} disabled={!shop.whatsapp_number} className={`inline-flex items-center gap-1.5 rounded-full ${theme.buttonClass} px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50`}><WhatsAppIcon />Chat with seller</button>
             </div>
             {(shop.instagram_handle || shop.facebook_url || shop.secondary_phone) && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">

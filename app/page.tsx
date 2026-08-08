@@ -20,7 +20,7 @@ import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import CategoryGrid from "@/components/CategoryGrid";
 import PromoAdsCarousel from "@/components/PromoAdsCarousel";
-import ShopMediaHeader from "@/components/ShopMediaHeader";
+import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons (inline SVGs)                                                        */
@@ -377,36 +377,52 @@ function HomeInner() {
                   </ShopMediaHeader>
                 </Link>
 
-                {/* Info — leave room under overlapping logo */}
-                <div className="space-y-1.5 p-2 pt-1 sm:p-3 sm:pt-1.5">
-                  <div className="flex items-start justify-between gap-1 sm:gap-2">
-                    <Link href={`/shop/${shop.id}`} className="block truncate text-[0.7rem] font-semibold leading-snug text-zinc-900 hover:text-emerald-600 sm:text-sm dark:text-zinc-100 dark:hover:text-emerald-400">
-                      {shop.name}
+                {/* Info — logo beside name */}
+                <div className="space-y-1.5 p-2 sm:p-3">
+                  <div className="flex items-start gap-2">
+                    <Link href={`/shop/${shop.id}`} className="shrink-0">
+                      <ShopLogoAvatar
+                        shopName={shop.name}
+                        logoUrl={shop.logo_url}
+                        logoBroken={logoBroken}
+                        onLogoError={() =>
+                          setBrokenImgs((prev) => new Set(prev).add(`logo:${shop.id}`))
+                        }
+                      />
                     </Link>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.preventDefault();
-                        const nowFav = await toggleFav(shop.id, "shop", shop.name, shop.logo_url ?? undefined);
-                        setFavorites((prev) => {
-                          const next = new Set(prev);
-                          if (nowFav) next.add(shop.id); else next.delete(shop.id);
-                          return next;
-                        });
-                        addToast(nowFav ? "Added to favorites ❤️" : "Removed from favorites", "info");
-                      }}
-                      className="shrink-0 -mr-1 rounded-full p-1 transition-transform hover:scale-110"
-                      aria-label={favorites.has(shop.id) ? "Remove from favorites" : "Add to favorites"}
-                    >
-                      <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill={favorites.has(shop.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[0.55rem] font-medium leading-none sm:px-2 sm:text-[0.6rem] dark:bg-zinc-800">{shop.category}</span>
-                    <span className="inline-flex items-center gap-0.5 text-[0.55rem] sm:text-xs"><PinIcon />{shop.location}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-1">
+                        <Link
+                          href={`/shop/${shop.id}`}
+                          className="block truncate text-[0.7rem] font-semibold leading-snug text-zinc-900 hover:text-emerald-600 sm:text-sm dark:text-zinc-100 dark:hover:text-emerald-400"
+                        >
+                          {shop.name}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            const nowFav = await toggleFav(shop.id, "shop", shop.name, shop.logo_url ?? undefined);
+                            setFavorites((prev) => {
+                              const next = new Set(prev);
+                              if (nowFav) next.add(shop.id); else next.delete(shop.id);
+                              return next;
+                            });
+                            addToast(nowFav ? "Added to favorites ❤️" : "Removed from favorites", "info");
+                          }}
+                          className="shrink-0 -mr-1 rounded-full p-1 transition-transform hover:scale-110"
+                          aria-label={favorites.has(shop.id) ? "Remove from favorites" : "Add to favorites"}
+                        >
+                          <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill={favorites.has(shop.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[0.55rem] font-medium leading-none sm:px-2 sm:text-[0.6rem] dark:bg-zinc-800">{shop.category}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[0.55rem] sm:text-xs"><PinIcon />{shop.location}</span>
+                      </div>
+                    </div>
                   </div>
 
                   <Link
