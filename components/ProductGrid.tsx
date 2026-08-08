@@ -52,7 +52,7 @@ interface ProductGridProps {
   loading?: boolean;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
-  onFavoriteToggle?: (productId: string, isFav: boolean) => void;
+  onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
   favorites?: Set<string>;
   emptyState?: ReactNode;
   columns?: "2" | "3" | "4" | "auto";
@@ -77,7 +77,7 @@ function ProductCard({
   categoryLabel?: string;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
-  onFavoriteToggle?: (productId: string, isFav: boolean) => void;
+  onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const priceLabel = formatPrice(product.price, { currency: (product.currency as "PKR" | "USD" | "EUR" | "GBP" | "INR") || "PKR" });
@@ -97,9 +97,9 @@ function ProductCard({
   const handleFavorite = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      onFavoriteToggle?.(product.id, !isFavorite);
+      onFavoriteToggle?.(product, !isFavorite);
     },
-    [product.id, isFavorite, onFavoriteToggle],
+    [product, isFavorite, onFavoriteToggle],
   );
 
   const { hasDiscount, originalPrice } = getProductDiscount(product);

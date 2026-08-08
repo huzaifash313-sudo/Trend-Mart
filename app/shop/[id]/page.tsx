@@ -17,6 +17,7 @@ import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
+import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { getStoreTheme, type StoreTheme, isServiceTheme } from "@/lib/storeThemes";
 import { formatRupees } from "@/lib/formatters";
 import {
@@ -219,6 +220,7 @@ function ShopDetailInner({ id }: { id: string }) {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const { addToast } = useToast();
   const { addItem } = useCart();
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
   // Quick view modal state — cart-first: no single-item checkout
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
@@ -277,6 +279,27 @@ function ShopDetailInner({ id }: { id: string }) {
 
   useEffect(() => () => { unsubscribeAll(); }, []);
 
+  // ── Wishlist product IDs ──────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    getAllFavorites().then((items) => {
+      if (cancelled) return;
+      setWishlistIds(new Set(items.filter((i) => i.type === "product").map((i) => i.id)));
+    });
+    const refresh = () => {
+      getAllFavorites().then((items) => {
+        if (!cancelled) {
+          setWishlistIds(new Set(items.filter((i) => i.type === "product").map((i) => i.id)));
+        }
+      });
+    };
+    window.addEventListener("favoritesUpdated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("favoritesUpdated", refresh);
+    };
+  }, []);
+
   // ── Service Data Fetching ─────────────────────────────────────────────────
   useEffect(() => {
     if (!shop || !isService) return;
@@ -311,6 +334,31 @@ function ShopDetailInner({ id }: { id: string }) {
     addItem(product, { id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number });
     addToast(`"${product.name}" added to cart`, "success");
   }, [shop, addItem, addToast]);
+
+  const handleWishlistToggle = useCallback(
+    async (product: Product) => {
+      if (!shop) return;
+      const nowInWishlist = await toggleFavorite(
+        product.id,
+        "product",
+        product.name,
+        product.image_url ?? undefined,
+        shop.id,
+        shop.name,
+      );
+      setWishlistIds((prev) => {
+        const next = new Set(prev);
+        if (nowInWishlist) next.add(product.id);
+        else next.delete(product.id);
+        return next;
+      });
+      addToast(
+        nowInWishlist ? `"${product.name}" added to wishlist` : `"${product.name}" removed from wishlist`,
+        "info",
+      );
+    },
+    [shop, addToast],
+  );
 
   const gridColumns = theme.productColumns;
 
@@ -508,6 +556,8 @@ function ShopDetailInner({ id }: { id: string }) {
                 categoryLabel={shop.category}
                 onProductClick={handleProductClick}
                 onAddToCart={handleAddToCart}
+                onFavoriteToggle={handleWishlistToggle}
+                favorites={wishlistIds}
               />
             )}
           </section>
@@ -535,6 +585,8 @@ function ShopDetailInner({ id }: { id: string }) {
           product={quickViewProduct}
           shop={{ id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number }}
           onClose={() => setQuickViewProduct(null)}
+          isWishlisted={wishlistIds.has(quickViewProduct.id)}
+          onWishlistToggle={() => handleWishlistToggle(quickViewProduct)}
         />
       )}
 

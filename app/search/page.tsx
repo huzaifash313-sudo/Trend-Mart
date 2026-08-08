@@ -9,6 +9,8 @@ import { fetchShops } from "@/services/shopService";
 import { globalSearch, autocomplete, type GlobalSearchItem, type SearchSuggestion } from "@/services/globalSearchService";
 import { ErrorState } from "@/components/ErrorState";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
+import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
+import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -72,6 +74,7 @@ function PackageIcon() {
 function SearchResultsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { addToast } = useToast();
 
   // Read from URL
   const query = searchParams.get("q") ?? "";
@@ -90,6 +93,7 @@ function SearchResultsInner() {
 
   // --- Legacy shop-only fallback ---
   const [shops, setShops] = useState<Shop[]>([]);
+  const [wishlistProductIds, setWishlistProductIds] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +102,47 @@ function SearchResultsInner() {
   const [localQuery, setLocalQuery] = useState(query);
   const [showFilters, setShowFilters] = useState(false);
   const [searchMode, setSearchMode] = useState<"global" | "shops_only">("global");
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      getAllFavorites().then((items) => {
+        if (!cancelled) {
+          setWishlistProductIds(new Set(items.filter((i) => i.type === "product").map((i) => i.id)));
+        }
+      });
+    };
+    refresh();
+    window.addEventListener("favoritesUpdated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("favoritesUpdated", refresh);
+    };
+  }, []);
+
+  const handleProductWishlist = useCallback(
+    async (item: GlobalSearchItem, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (item.type !== "product") return;
+      const nowIn = await toggleFavorite(
+        item.id,
+        "product",
+        item.name,
+        item.imageUrl ?? undefined,
+        item.shopId ?? undefined,
+        item.shopName ?? undefined,
+      );
+      setWishlistProductIds((prev) => {
+        const next = new Set(prev);
+        if (nowIn) next.add(item.id);
+        else next.delete(item.id);
+        return next;
+      });
+      addToast(nowIn ? "Added to wishlist" : "Removed from wishlist", "info");
+    },
+    [addToast],
+  );
 
   // Build URL-friendly query string from filter state
   const updateUrl = useCallback(
@@ -635,6 +680,7 @@ function SearchResultsInner() {
                 }
 
                 // Product card
+                const productWishlisted = wishlistProductIds.has(item.id);
                 return (
                   <Link
                     key={`product-${item.id}`}
@@ -652,6 +698,20 @@ function SearchResultsInner() {
                       <span className="absolute left-2 top-2 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 sm:left-3 sm:top-3 sm:text-xs dark:bg-violet-900/60 dark:text-violet-300">
                         Product
                       </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleProductWishlist(item, e)}
+                        className={`absolute right-2 top-2 z-10 rounded-full p-1.5 backdrop-blur-sm transition-colors ${
+                          productWishlisted
+                            ? "bg-red-500/90 text-white"
+                            : "bg-white/85 text-zinc-500 hover:text-red-500"
+                        }`}
+                        aria-label={productWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                      >
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill={productWishlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                      </button>
                     </div>
                     <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
                       <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-base dark:text-zinc-100">{item.name}</h3>
