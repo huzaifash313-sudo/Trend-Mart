@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { resendOtp } from "@/services/authService";
 import { useToast } from "@/components/Toast";
 
+/** Skip static prerender — this page reads search params at request time. */
+export const dynamic = "force-dynamic";
+
 /* -------------------------------------------------------------------------- */
 /*  Email Verification Notice Page                                             */
 /*  Shown to users who haven't confirmed their email yet.                      */

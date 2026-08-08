@@ -138,13 +138,31 @@ function hasSecretIndicator(name: string): boolean {
 }
 
 /**
- * Validate that a URL is properly formed and uses HTTPS in production.
+ * Database connection strings use postgres(ql):// — not https://.
+ * These must be accepted by the audit even in production.
+ */
+function isDatabaseConnectionUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "postgresql:" || parsed.protocol === "postgres:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate that a URL is properly formed.
+ * - Web / API URLs must use HTTPS in production.
+ * - Database URLs (`postgresql://` / `postgres://`) are allowed as-is.
  */
 function isValidUrl(url: string): boolean {
   try {
+    if (isDatabaseConnectionUrl(url)) {
+      return true;
+    }
     const parsed = new URL(url);
     if (parsed.protocol !== "https:" && process.env.NODE_ENV === "production") {
-      return false; // Production URLs must use HTTPS
+      return false; // Production web URLs must use HTTPS
     }
     return true;
   } catch {
