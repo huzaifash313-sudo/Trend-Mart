@@ -22,10 +22,9 @@ export interface ShopMediaHeaderProps {
 
 /**
  * Banner and logo are separate slots:
- * - Banner = wide storefront cover (never falls back to logo)
+ * - Banner = wide cover (object-cover, fixed heights — full width, not huge on desktop)
  * - Logo = circular avatar overlaid on the banner
  * Empty banner → green gradient. Empty logo → initial letter.
- * Banner uses object-contain so the full image shows on mobile + desktop.
  */
 export default function ShopMediaHeader({
   shopName,
@@ -47,20 +46,22 @@ export default function ShopMediaHeader({
   const initial = shopName.charAt(0).toUpperCase() || "S";
 
   const isHero = size === "hero";
+  // Fixed heights (not aspect-ratio + contain) so banners always fill width
+  // and stay compact on laptops instead of growing with tall posters.
   const frameClass = isHero
-    ? "relative aspect-[2/1] w-full sm:aspect-[21/9] min-h-[9rem] sm:min-h-[12rem]"
-    : "relative aspect-[16/10] w-full min-h-[5.5rem] sm:min-h-[7.5rem]";
+    ? "relative h-36 w-full sm:h-44 md:h-48 lg:h-52"
+    : "relative h-28 w-full sm:h-32";
 
   const logoBoxClass = isHero
-    ? "absolute -bottom-7 left-3 z-10 h-14 w-14 sm:-bottom-8 sm:left-4 sm:h-20 sm:w-20"
-    : "absolute bottom-2 left-2 z-10 h-9 w-9 sm:bottom-2.5 sm:left-2.5 sm:h-11 sm:w-11";
+    ? "absolute -bottom-7 left-3 z-10 h-14 w-14 sm:-bottom-8 sm:left-4 sm:h-[4.5rem] sm:w-[4.5rem]"
+    : "absolute bottom-2 left-2 z-10 h-9 w-9 sm:h-11 sm:w-11";
 
   return (
     <div className={`relative ${className}`}>
       <div
         className={`${frameClass} overflow-hidden ${
           showBanner
-            ? "bg-zinc-100 dark:bg-zinc-800"
+            ? "bg-zinc-200 dark:bg-zinc-800"
             : "bg-gradient-to-br from-emerald-400 to-emerald-600"
         }`}
       >
@@ -70,7 +71,7 @@ export default function ShopMediaHeader({
               src={getSafeImageUrl(banner, "shop")}
               alt={`${shopName} banner`}
               fill
-              className="object-contain"
+              className="object-cover object-center"
               sizes={
                 isHero
                   ? "100vw"
@@ -84,7 +85,7 @@ export default function ShopMediaHeader({
             <img
               src={banner}
               alt={`${shopName} banner`}
-              className="h-full w-full object-contain"
+              className="absolute inset-0 h-full w-full object-cover object-center"
               loading={isHero ? "eager" : "lazy"}
               onError={onBannerError}
             />
@@ -105,7 +106,7 @@ export default function ShopMediaHeader({
 
       {/* Logo — separate from banner */}
       <div
-        className={`relative ${logoBoxClass} overflow-hidden rounded-full border-2 border-white bg-white shadow-md dark:border-zinc-900 dark:bg-zinc-900`}
+        className={`${logoBoxClass} overflow-hidden rounded-full border-2 border-white bg-white shadow-md dark:border-zinc-900 dark:bg-zinc-900`}
       >
         {showLogo ? (
           useNextImage ? (
@@ -114,7 +115,7 @@ export default function ShopMediaHeader({
               alt={`${shopName} logo`}
               fill
               className="object-cover"
-              sizes={isHero ? "80px" : "44px"}
+              sizes={isHero ? "72px" : "44px"}
               onError={onLogoError}
             />
           ) : (
