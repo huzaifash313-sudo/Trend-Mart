@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -31,7 +31,7 @@ function CheckCircleIcon() {
   );
 }
 
-export default function VerifyNoticePage() {
+function VerifyNoticeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") ?? "/";
@@ -208,5 +208,19 @@ export default function VerifyNoticePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyNoticePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+        </div>
+      }
+    >
+      <VerifyNoticeInner />
+    </Suspense>
   );
 }
