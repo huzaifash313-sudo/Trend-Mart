@@ -28,6 +28,7 @@ const SHOP_EXTENDED_KEYS = [
   "latitude",
   "longitude",
   "service_radius_km",
+  "delivery_zones",
   "address_display",
   "min_order_amount",
   "free_delivery_threshold",
@@ -356,6 +357,16 @@ function sanitizeDbRadiusKm(input: unknown): number {
   return Math.round(Math.max(1, Math.min(500, n)));
 }
 
+/** Sanitize coverage / delivery zone markers (max 10 entries). */
+function sanitizeDeliveryZones(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((z): z is string => typeof z === "string")
+    .map((z) => z.trim().slice(0, 80))
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
 /**
  * Sanitize an Instagram handle. Returns empty string for invalid handles.
  */
@@ -411,7 +422,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
   return {
     name: sanitizeDbString(form.name, 100),
     category: sanitizeDbString(form.category, 50),
-    location: sanitizeDbString(form.location, 100),
+    location: sanitizeDbString(form.location, 200),
     whatsapp_number: sanitizeDbPhone(form.whatsapp_number),
     logo_url: sanitizeDbUrl(form.logo_url),
     banner_url: sanitizeDbUrl(form.banner_url),
@@ -432,7 +443,8 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     latitude,
     longitude,
     service_radius_km: sanitizeDbRadiusKm(form.service_radius_km),
-    address_display: sanitizeDbString(form.address_display, 300),
+    delivery_zones: sanitizeDeliveryZones(form.delivery_zones),
+    address_display: sanitizeDbString(form.address_display, 400),
     min_order_amount: sanitizeDbNumeric(form.min_order_amount, 0, 999_999) ?? 0,
     free_delivery_threshold: sanitizeDbNumeric(form.free_delivery_threshold, 0, 999_999),
     delivery_fee_flat: sanitizeDbNumeric(form.delivery_fee_flat, 0, 99_999) ?? 0,

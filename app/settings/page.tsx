@@ -177,23 +177,34 @@ export default function SettingsPage() {
 
         {/* ── Preferences ──────────────────────────────────────────── */}
         <section aria-label="Preferences">
-          <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-1">
+          <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-600 px-1">
             Preferences
           </h2>
-          <div className="trend-card divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
-            {/* Appearance */}
-            <Link href="/settings/appearance" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+          <div className="trend-card divide-y divide-zinc-100 dark:divide-emerald-900/40 overflow-hidden dark:bg-zinc-950">
+            <Link href="/settings/appearance" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
               <span className="flex items-center gap-3">
-                <span className="text-zinc-400"><PaletteIcon /></span>
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">Appearance</span>
+                <span className="text-zinc-400 dark:text-emerald-500"><PaletteIcon /></span>
+                <span>
+                  <span className="block text-sm text-zinc-700 dark:text-emerald-300">Appearance</span>
+                  <span className="block text-[0.65rem] text-zinc-400 dark:text-emerald-700">Theme, font size, storefront display</span>
+                </span>
               </span>
               <ChevronRightIcon />
             </Link>
-            {/* Notifications */}
-            <Link href="/settings/notifications" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+            <Link href="/settings/notifications" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
               <span className="flex items-center gap-3">
-                <span className="text-zinc-400"><BellIcon /></span>
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">Notifications</span>
+                <span className="text-zinc-400 dark:text-emerald-500"><BellIcon /></span>
+                <span>
+                  <span className="block text-sm text-zinc-700 dark:text-emerald-300">Notifications</span>
+                  <span className="block text-[0.65rem] text-zinc-400 dark:text-emerald-700">Orders, promos, merchant alerts</span>
+                </span>
+              </span>
+              <ChevronRightIcon />
+            </Link>
+            <Link href="/settings/privacy" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
+              <span className="flex items-center gap-3">
+                <span className="text-zinc-400 dark:text-emerald-500"><ShieldIcon /></span>
+                <span className="text-sm text-zinc-700 dark:text-emerald-300">Privacy &amp; Security</span>
               </span>
               <ChevronRightIcon />
             </Link>
@@ -202,33 +213,35 @@ export default function SettingsPage() {
 
         {/* ── Account ──────────────────────────────────────────────── */}
         <section aria-label="Account">
-          <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-1">
+          <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-600 px-1">
             Account
           </h2>
-          <div className="trend-card divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
-            {/* My Shop */}
+          <div className="trend-card divide-y divide-zinc-100 dark:divide-emerald-900/40 overflow-hidden dark:bg-zinc-950">
             {session && (
-              <Link href="/dashboard" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                <span className="flex items-center gap-3">
-                  <span className="text-zinc-400"><StoreIcon /></span>
-                  <span className="text-sm text-zinc-700 dark:text-zinc-300">My Dashboard</span>
-                </span>
-                <ChevronRightIcon />
-              </Link>
+              <>
+                <Link href="/dashboard" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
+                  <span className="flex items-center gap-3">
+                    <span className="text-zinc-400 dark:text-emerald-500"><StoreIcon /></span>
+                    <span className="text-sm text-zinc-700 dark:text-emerald-300">Merchant Dashboard</span>
+                  </span>
+                  <ChevronRightIcon />
+                </Link>
+                <Link href="/dashboard/settings" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
+                  <span className="flex items-center gap-3">
+                    <span className="text-zinc-400 dark:text-emerald-500"><SettingsIcon /></span>
+                    <span>
+                      <span className="block text-sm text-zinc-700 dark:text-emerald-300">Store Settings</span>
+                      <span className="block text-[0.65rem] text-zinc-400 dark:text-emerald-700">Name, location, delivery, visibility</span>
+                    </span>
+                  </span>
+                  <ChevronRightIcon />
+                </Link>
+              </>
             )}
-            {/* Wishlist */}
-            <Link href="/wishlist" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+            <Link href="/wishlist" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
               <span className="flex items-center gap-3">
-                <span className="text-zinc-400"><HeartIcon /></span>
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">My Wishlist</span>
-              </span>
-              <ChevronRightIcon />
-            </Link>
-            {/* Privacy */}
-            <Link href="/settings/privacy" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-              <span className="flex items-center gap-3">
-                <span className="text-zinc-400"><ShieldIcon /></span>
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">Privacy & Security</span>
+                <span className="text-zinc-400 dark:text-emerald-500"><HeartIcon /></span>
+                <span className="text-sm text-zinc-700 dark:text-emerald-300">My Wishlist</span>
               </span>
               <ChevronRightIcon />
             </Link>

@@ -3,6 +3,8 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --tm-accent: #10b981;
+  --tm-accent-soft: #059669;
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
@@ -16,10 +18,27 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Class-based dark mode (ThemeProvider) — black surfaces + emerald accents */
+html.dark {
+  --background: #000000;
+  --foreground: #d1fae5;
+  color-scheme: dark;
+}
+
+html.dark body {
+  background: #000000;
+  color: #ecfdf5;
+}
+
+html.dark .trend-card {
+  background-color: #0a0a0a;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not(.light) {
+    --background: #000000;
+    --foreground: #d1fae5;
   }
 }
 

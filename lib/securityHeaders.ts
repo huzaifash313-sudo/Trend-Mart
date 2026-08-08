@@ -53,8 +53,8 @@ export function buildStrictCspPolicy(nonce: string): string {
     // Fonts: self-hosted only
     "font-src 'self' data:",
 
-    // Connections: Supabase API + realtime websockets
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in",
+    // Connections: Supabase API + realtime websockets + OSM reverse geocode
+    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org",
 
     // Frames: none (prevents clickjacking via iframes)
     "frame-src 'none'",
@@ -123,7 +123,7 @@ export function getBaseSecurityHeaders(): Record<string, string> {
     "X-Content-Type-Options": "nosniff",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
     "X-Permitted-Cross-Domain-Policies": "none",
     "X-Download-Options": "noopen",
     "X-DNS-Prefetch-Control": "on",

@@ -112,6 +112,11 @@ export interface ShopFormData {
   longitude: number | null;
   /** Delivery/service radius in km (e.g. 3, 5, 10). */
   service_radius_km: number;
+  /**
+   * Coverage markers for discovery:
+   * `__pk_nationwide__` | `__pk_city__:Lahore` | [] (custom radius around pin).
+   */
+  delivery_zones: string[];
   /** Reverse-geocoded, human-readable address for the pinned location. */
   address_display: string;
   /** Minimum order subtotal (PKR, form input string) required before checkout. */

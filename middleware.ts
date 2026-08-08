@@ -483,7 +483,7 @@ function applySecurityHeaders(response: NextResponse): void {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=self",
+    "camera=(), microphone=(), geolocation=(self)",
   );
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("X-XSS-Protection", "1; mode=block");
@@ -497,7 +497,7 @@ function applySecurityHeaders(response: NextResponse): void {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     // Always allow Supabase HTTPS + Realtime WebSockets (prod was missing wss://)
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in",
+    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org",
     "font-src 'self'",
     "frame-src 'none'",
     "object-src 'none'",
@@ -506,7 +506,7 @@ function applySecurityHeaders(response: NextResponse): void {
   ];
   if (process.env.NODE_ENV !== "production") {
     cspDirectives[4] =
-      "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in";
+      "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org";
   }
   headers.set("Content-Security-Policy", cspDirectives.join("; "));
 }

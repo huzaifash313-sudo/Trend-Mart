@@ -28,10 +28,13 @@ export interface ShopWithDistance extends Shop {
 
 export interface GeoFilterOptions {
   coordinates?: GeoCoordinates | null;
+  /** Customer browse radius. `0` / negative / Infinity = no customer distance cap. */
   maxDistanceKm?: number;
   enforceServiceRadius?: boolean;
   sortByProximity?: boolean;
   deliveryZone?: string;
+  /** Customer city (from GPS or manual picker) — used for merchant city-only coverage. */
+  customerCity?: string;
 }
 
 export interface GeoFilterResult {
@@ -47,6 +50,48 @@ export interface ReverseGeocodeResult {
   deliveryZone: string | null;
   displayName: string | null;
   address?: string | null;
+  neighbourhood?: string | null;
+}
+
+/** Merchant delivery coverage: pin radius, one city, or all of Pakistan. */
+export type ServiceCoverageMode = "radius" | "city" | "nationwide";
+
+const COVERAGE_NATIONWIDE = "__pk_nationwide__";
+const COVERAGE_CITY_PREFIX = "__pk_city__:";
+
+export function encodeDeliveryZones(
+  mode: ServiceCoverageMode,
+  city?: string | null,
+): string[] {
+  if (mode === "nationwide") return [COVERAGE_NATIONWIDE];
+  if (mode === "city") {
+    const c = (city ?? "").trim();
+    return c ? [`${COVERAGE_CITY_PREFIX}${c}`] : [];
+  }
+  return [];
+}
+
+export function parseCoverageFromZones(
+  zones?: string[] | null,
+): { mode: ServiceCoverageMode; city: string | null } {
+  const list = zones ?? [];
+  for (const z of list) {
+    if (z === COVERAGE_NATIONWIDE || z.toLowerCase() === "pakistan") {
+      return { mode: "nationwide", city: null };
+    }
+    if (z.startsWith(COVERAGE_CITY_PREFIX)) {
+      const city = z.slice(COVERAGE_CITY_PREFIX.length).trim();
+      return { mode: "city", city: city || null };
+    }
+  }
+  return { mode: "radius", city: null };
+}
+
+function cityNamesMatch(a: string, b: string): boolean {
+  const left = a.toLowerCase().trim();
+  const right = b.toLowerCase().trim();
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -247,6 +292,7 @@ export async function filterShopsByProximity(
     enforceServiceRadius = true,
     sortByProximity = true,
     deliveryZone,
+    customerCity,
   } = opts ?? {};
 
   let allShops: Shop[] = shops ?? [];
@@ -277,8 +323,30 @@ export async function filterShopsByProximity(
 
   const totalBeforeFilter = allShops.length;
   const userCoords = coordinates ?? (await getCachedUserLocation());
+  const resolvedCustomerCity = (customerCity || deliveryZone || "").trim();
+  const unlimitedBrowse =
+    !Number.isFinite(maxDistanceKm) || maxDistanceKm <= 0;
 
   if (!userCoords) {
+    // Without GPS, still honor nationwide + city-only coverage when city is known.
+    if (enforceServiceRadius && resolvedCustomerCity) {
+      const cityFiltered = allShops.filter((shop) => {
+        const coverage = parseCoverageFromZones(shop.delivery_zones);
+        if (coverage.mode === "nationwide") return true;
+        if (coverage.mode === "city") {
+          const target = coverage.city || shop.location || "";
+          return cityNamesMatch(target, resolvedCustomerCity);
+        }
+        return true;
+      });
+      return {
+        shops: cityFiltered.map((s) => ({ ...s, within_radius: true })),
+        locationAvailable: false,
+        userCoordinates: null,
+        totalBeforeFilter,
+        totalAfterFilter: cityFiltered.length,
+      };
+    }
     return {
       shops: allShops.map((s) => ({ ...s })),
       locationAvailable: false,
@@ -288,11 +356,14 @@ export async function filterShopsByProximity(
     };
   }
 
+  const skipDistanceCapIds = new Set<string>();
+
   let enriched: ShopWithDistance[] = allShops.map((shop) => {
     const shopLat = shop.latitude ?? null;
     const shopLng = shop.longitude ?? null;
     const hasCoords =
       shopLat != null && shopLng != null && !isNaN(shopLat) && !isNaN(shopLng);
+    const coverage = parseCoverageFromZones(shop.delivery_zones);
 
     let distance_km: number | undefined | null;
 
@@ -306,12 +377,25 @@ export async function filterShopsByProximity(
     }
 
     const serviceRadius = shop.service_radius_km ?? null;
-
     let within_radius = true;
-    if (enforceServiceRadius && hasCoords && distance_km != null && serviceRadius != null) {
+
+    if (coverage.mode === "nationwide") {
+      within_radius = true;
+      skipDistanceCapIds.add(shop.id);
+    } else if (coverage.mode === "city") {
+      const target = coverage.city || shop.location || "";
+      if (resolvedCustomerCity) {
+        within_radius = cityNamesMatch(target, resolvedCustomerCity);
+      } else if (hasCoords && distance_km != null) {
+        // No explicit city — approximate with ~35 km of city/store pin.
+        within_radius = distance_km <= 35;
+      } else {
+        within_radius = true;
+      }
+      skipDistanceCapIds.add(shop.id);
+    } else if (enforceServiceRadius && hasCoords && distance_km != null && serviceRadius != null) {
       within_radius = distance_km <= serviceRadius;
-    }
-    if (serviceRadius == null) {
+    } else if (serviceRadius == null) {
       within_radius = true;
     }
 
@@ -326,15 +410,21 @@ export async function filterShopsByProximity(
     enriched = enriched.filter((s) => s.within_radius === true);
   }
 
-  enriched = enriched.filter(
-    (s) => s.distance_km == null || s.distance_km <= maxDistanceKm,
-  );
+  enriched = enriched.filter((s) => {
+    if (skipDistanceCapIds.has(s.id) || unlimitedBrowse) return true;
+    return s.distance_km == null || s.distance_km <= maxDistanceKm;
+  });
 
+  // Soft zone match for legacy free-text delivery_zones (ignore our coverage markers).
   if (deliveryZone && deliveryZone.trim()) {
     const zone = deliveryZone.toLowerCase().trim();
     enriched = enriched.filter((s) => {
-      const zones = s.delivery_zones ?? [];
-      if (!zones || zones.length === 0) return true;
+      const coverage = parseCoverageFromZones(s.delivery_zones);
+      if (coverage.mode !== "radius") return true;
+      const zones = (s.delivery_zones ?? []).filter(
+        (z) => z !== COVERAGE_NATIONWIDE && !z.startsWith(COVERAGE_CITY_PREFIX),
+      );
+      if (!zones.length) return true;
       return zones.some(
         (z) => z.toLowerCase().includes(zone) || zone.includes(z.toLowerCase()),
       );
@@ -343,7 +433,14 @@ export async function filterShopsByProximity(
 
   if (sortByProximity) {
     enriched.sort((a, b) => {
-      if (a.distance_km == null && b.distance_km == null) return 0;
+      const aCov = parseCoverageFromZones(a.delivery_zones);
+      const bCov = parseCoverageFromZones(b.delivery_zones);
+      if (a.distance_km == null && b.distance_km == null) {
+        if (aCov.mode === bCov.mode) return 0;
+        if (aCov.mode === "radius") return -1;
+        if (bCov.mode === "radius") return 1;
+        return 0;
+      }
       if (a.distance_km == null) return 1;
       if (b.distance_km == null) return -1;
       return a.distance_km - b.distance_km;
@@ -484,20 +581,65 @@ export function findNearestCity(
  * (free, no API key required; rate-limited to 1 req/sec — we use a single
  * call on demand). Falls back to nearest-city centroid matching.
  */
+function formatOsmStreetAddress(addr: {
+  house_number?: string;
+  road?: string;
+  pedestrian?: string;
+  neighbourhood?: string;
+  suburb?: string;
+  quarter?: string;
+  city_district?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  county?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+}): { shortAddress: string; neighbourhood: string | null; cityCandidate: string | null } {
+  const street = [addr.house_number, addr.road || addr.pedestrian]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const neighbourhood =
+    addr.neighbourhood || addr.suburb || addr.quarter || addr.city_district || null;
+  const cityCandidate =
+    addr.city ||
+    addr.town ||
+    addr.municipality ||
+    addr.village ||
+    addr.county ||
+    null;
+
+  const parts = [street, neighbourhood, cityCandidate, addr.state]
+    .map((p) => (typeof p === "string" ? p.trim() : ""))
+    .filter(Boolean);
+
+  // Prefer a readable local address over the ultra-long OSM display_name.
+  const shortAddress = parts.length > 0 ? parts.join(", ") : "";
+  return { shortAddress, neighbourhood, cityCandidate };
+}
+
 export async function reverseGeocode(
   lat: number,
   lng: number,
 ): Promise<ReverseGeocodeResult> {
   // Attempt OSM Nominatim reverse geocoding
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`;
+    const url =
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
+      `&lat=${encodeURIComponent(String(lat))}` +
+      `&lon=${encodeURIComponent(String(lng))}` +
+      `&zoom=18&addressdetails=1&accept-language=en`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "TrendMart/1.0 (local-shopping-platform)",
+        Accept: "application/json",
+        "User-Agent": "TrendMart/1.0 (https://trend-marts.vercel.app)",
       },
     });
     clearTimeout(timeout);
@@ -505,46 +647,64 @@ export async function reverseGeocode(
     if (res.ok) {
       const data = (await res.json()) as {
         address?: {
+          house_number?: string;
+          road?: string;
+          pedestrian?: string;
+          neighbourhood?: string;
+          suburb?: string;
+          quarter?: string;
+          city_district?: string;
           city?: string;
           town?: string;
-          city_district?: string;
+          village?: string;
+          municipality?: string;
           county?: string;
           state?: string;
-          village?: string;
-          suburb?: string;
+          postcode?: string;
+          country?: string;
         };
         display_name?: string;
+        name?: string;
       };
 
       const addr = data.address ?? {};
-      // Extract the best city-level match
-      const cityCandidate =
-        addr.city ||
-        addr.town ||
-        addr.city_district ||
-        addr.county ||
-        addr.village ||
-        addr.suburb ||
-        null;
+      const { shortAddress, neighbourhood, cityCandidate } = formatOsmStreetAddress(addr);
 
       // Check if the resolved city matches a supported city (case-insensitive)
       let matchedCity: string | null = null;
-      if (cityCandidate) {
-        const lowerCandidate = cityCandidate.toLowerCase();
+      const candidates = [cityCandidate, neighbourhood, data.display_name].filter(Boolean) as string[];
+      for (const candidate of candidates) {
+        const lowerCandidate = candidate.toLowerCase();
         for (const sc of SUPPORTED_CITIES) {
-          if (lowerCandidate.includes(sc.toLowerCase()) || sc.toLowerCase().includes(lowerCandidate)) {
+          if (
+            lowerCandidate.includes(sc.toLowerCase()) ||
+            sc.toLowerCase().includes(lowerCandidate)
+          ) {
             matchedCity = sc;
             break;
           }
         }
+        if (matchedCity) break;
       }
 
-      const displayName = data.display_name ?? null;
+      // If Nominatim city is outside our list, still keep nearest supported city as zone.
+      if (!matchedCity) {
+        const nearest = findNearestCity(lat, lng, 40);
+        if (nearest) matchedCity = nearest.city;
+      }
+
+      const displayName = shortAddress || data.display_name || null;
+      const address =
+        shortAddress ||
+        data.display_name ||
+        (matchedCity ? `${matchedCity}, Pakistan` : null);
+
       return {
         city: matchedCity ?? cityCandidate,
         deliveryZone: matchedCity,
         displayName,
-        address: displayName, // full street-level address from OSM
+        address,
+        neighbourhood,
       };
     }
   } catch {
@@ -554,16 +714,26 @@ export async function reverseGeocode(
   // Fallback: nearest-city centroid matching
   const nearest = findNearestCity(lat, lng, 75); // wider radius for fallback
   if (nearest) {
-    const fallbackDisplay = `${nearest.city} (approx. ${nearest.distanceKm} km away)`;
+    const nearLabel =
+      nearest.distanceKm < 2
+        ? `${nearest.city}, Pakistan`
+        : `Near ${nearest.city} (approx. ${nearest.distanceKm} km), Pakistan`;
     return {
       city: nearest.city,
       deliveryZone: nearest.city,
-      displayName: fallbackDisplay,
-      address: fallbackDisplay,
+      displayName: nearLabel,
+      address: nearLabel,
+      neighbourhood: null,
     };
   }
 
-  return { city: null, deliveryZone: null, displayName: null, address: null };
+  return {
+    city: null,
+    deliveryZone: null,
+    displayName: null,
+    address: null,
+    neighbourhood: null,
+  };
 }
 
 /**

@@ -69,6 +69,7 @@ const INITIAL_SHOP_FORM: ShopFormData = {
   latitude: null,
   longitude: null,
   service_radius_km: 10,
+  delivery_zones: [],
   address_display: "",
   min_order_amount: "",
   free_delivery_threshold: "",
@@ -112,6 +113,7 @@ function shopToFormData(s: Shop): ShopFormData {
     latitude: s.latitude ?? null,
     longitude: s.longitude ?? null,
     service_radius_km: s.service_radius_km ?? 10,
+    delivery_zones: s.delivery_zones ?? [],
     address_display: s.address_display ?? "",
     min_order_amount: s.min_order_amount != null && s.min_order_amount > 0 ? String(s.min_order_amount) : "",
     free_delivery_threshold: s.free_delivery_threshold != null ? String(s.free_delivery_threshold) : "",
@@ -933,6 +935,8 @@ export default function DashboardPage() {
                   longitude: shopForm.longitude,
                   service_radius_km: shopForm.service_radius_km,
                   address_display: shopForm.address_display,
+                  location: shopForm.location,
+                  delivery_zones: shopForm.delivery_zones,
                 }}
                 onChange={(patch) => setShopForm((f) => ({ ...f, ...patch }))}
               />

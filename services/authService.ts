@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { getAuthCallbackUrl } from "@/lib/appUrl";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -88,20 +89,14 @@ export async function signUpWithEmail(
   role: AuthRole = "customer",
 ): Promise<AuthResult & { needsOtpVerification: boolean }> {
   try {
-    const isLocalhost =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1");
-
     const signupRole: AuthRole = role === "merchant" ? "merchant" : "customer";
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
       options: {
-        emailRedirectTo: isLocalhost
-          ? undefined
-          : `${window.location.origin}/auth/callback`,
+        // Always send users to the public app URL (never stale Supabase Site URL / localhost).
+        emailRedirectTo: getAuthCallbackUrl(),
         data: {
           role: signupRole,
         },
@@ -257,6 +252,9 @@ export async function resendOtp(
     const { error } = await supabase.auth.resend({
       email: email.trim().toLowerCase(),
       type: "signup",
+      options: {
+        emailRedirectTo: getAuthCallbackUrl(),
+      },
     });
 
     if (error) {

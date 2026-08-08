@@ -157,13 +157,15 @@ function HomeInner() {
       try {
         const result = await filterShopsByProximity(filteredShops, {
           coordinates: coords,
-          maxDistanceKm: geoFilter.maxDistanceKm > 0 ? geoFilter.maxDistanceKm : 50,
+          // 0 / Any = no customer distance cap (nationwide shops stay visible).
+          maxDistanceKm: geoFilter.maxDistanceKm > 0 ? geoFilter.maxDistanceKm : 0,
           // Shops without a pinned location/radius are always shown (see
           // filterShopsByProximity); this only hides shops that have opted
           // into a specific delivery radius once the customer is outside it.
           enforceServiceRadius: true,
           sortByProximity: true,
           deliveryZone: globalLocation?.deliveryZone ?? undefined,
+          customerCity: globalLocation?.city ?? undefined,
         });
         if (!cancelled) {
           setGeoFilteredShops(result.shops);

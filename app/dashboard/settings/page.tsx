@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { fetchShops, updateShop } from "@/services/shopService";
+import { updateShop } from "@/services/shopService";
 import ImageUpload from "@/components/ImageUpload";
 import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
@@ -68,22 +68,6 @@ function PhoneIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-    </svg>
-  );
-}
-
-function PaletteIcon() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" /><path d="M10 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" /><path d="M17 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" /><path d="M7 13.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" /><path d="M17 13.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
-    </svg>
-  );
-}
-
-function LayoutIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
     </svg>
   );
 }
@@ -165,6 +149,7 @@ interface ShopSettingsForm {
   latitude: number | null;
   longitude: number | null;
   service_radius_km: number;
+  delivery_zones: string[];
   address_display: string;
   min_order_amount: string;
   free_delivery_threshold: string;
@@ -172,10 +157,8 @@ interface ShopSettingsForm {
   delivery_fee_per_km: string;
 }
 
-const CARD_VIEW_OPTIONS = [
-  { id: "compact", label: "Compact Grid", description: "Small cards, more products visible (4 columns)", icon: "⊞" },
-  { id: "standard", label: "Standard Grid", description: "Default card size (3 columns)", icon: "▦" },
-] as const;
+/** Platform accent — constant TrendMart emerald (no custom color picker). */
+const THEME_ACCENT = "#10b981";
 
 /* -------------------------------------------------------------------------- */
 /*  Component                                                                  */
@@ -191,13 +174,11 @@ export default function DashboardSettingsPage() {
     accent_color: "", store_bio: "", announcement: "", is_live: false,
     service_area: "", hourly_rate: "", call_out_charge: "",
     emergency_available: false, shop_type: "retail",
-    latitude: null, longitude: null, service_radius_km: 10, address_display: "",
+    latitude: null, longitude: null, service_radius_km: 10, delivery_zones: [], address_display: "",
     min_order_amount: "", free_delivery_threshold: "", delivery_fee_flat: "", delivery_fee_per_km: "",
   });
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [saving, setSaving] = useState(false);
-  const [cardView, setCardView] = useState<"compact" | "standard">("standard");
-  const [dbPrefsLoaded, setDbPrefsLoaded] = useState(false);
   const { addToast } = useToast();
 
   // ── Auth Check ───────────────────────────────────────────────────────────
@@ -247,7 +228,7 @@ export default function DashboardSettingsPage() {
             operating_status: myShop.operating_status ?? "",
             instagram_handle: myShop.instagram_handle ?? "",
             facebook_url: myShop.facebook_url ?? "",
-            accent_color: myShop.accent_color ?? "",
+            accent_color: THEME_ACCENT,
             store_bio: myShop.store_bio ?? "",
             announcement: myShop.announcement ?? "",
             is_live: myShop.is_live,
@@ -259,29 +240,13 @@ export default function DashboardSettingsPage() {
             latitude: myShop.latitude ?? null,
             longitude: myShop.longitude ?? null,
             service_radius_km: myShop.service_radius_km ?? 10,
+            delivery_zones: myShop.delivery_zones ?? [],
             address_display: myShop.address_display ?? "",
             min_order_amount: myShop.min_order_amount != null && myShop.min_order_amount > 0 ? String(myShop.min_order_amount) : "",
             free_delivery_threshold: myShop.free_delivery_threshold != null ? String(myShop.free_delivery_threshold) : "",
             delivery_fee_flat: myShop.delivery_fee_flat != null && myShop.delivery_fee_flat > 0 ? String(myShop.delivery_fee_flat) : "",
             delivery_fee_per_km: myShop.delivery_fee_per_km != null && myShop.delivery_fee_per_km > 0 ? String(myShop.delivery_fee_per_km) : "",
           });
-
-          // Load theme prefs from merchant_theme_preferences table
-          try {
-            const { data: prefs } = await supabase
-              .from("merchant_theme_preferences")
-              .select("layout_style, product_card_style")
-              .eq("shop_id", myShop.id)
-              .single();
-            if (prefs) {
-              if (prefs.layout_style === "compact" || prefs.layout_style === "list") {
-                setCardView("compact");
-              } else {
-                setCardView("standard");
-              }
-            }
-          } catch { /* table may not exist yet */ }
-          setDbPrefsLoaded(true);
         } else if (!result.success) {
           addToast(result.error || "Could not load your store settings.", "error");
         } else {
@@ -326,7 +291,7 @@ export default function DashboardSettingsPage() {
         secondary_phone: form.secondary_phone,
         business_hours: form.business_hours,
         operating_status: form.operating_status,
-        accent_color: form.accent_color,
+        accent_color: THEME_ACCENT,
         store_bio: form.store_bio,
         announcement: form.announcement,
         service_area: form.service_area,
@@ -337,6 +302,7 @@ export default function DashboardSettingsPage() {
         latitude: form.latitude,
         longitude: form.longitude,
         service_radius_km: form.service_radius_km,
+        delivery_zones: form.delivery_zones,
         address_display: form.address_display,
         min_order_amount: form.min_order_amount,
         free_delivery_threshold: form.free_delivery_threshold,
@@ -362,7 +328,7 @@ export default function DashboardSettingsPage() {
           operating_status: saved.operating_status ?? "",
           instagram_handle: saved.instagram_handle ?? "",
           facebook_url: saved.facebook_url ?? "",
-          accent_color: saved.accent_color ?? "",
+          accent_color: THEME_ACCENT,
           store_bio: saved.store_bio ?? "",
           announcement: saved.announcement ?? "",
           is_live: saved.is_live,
@@ -374,27 +340,14 @@ export default function DashboardSettingsPage() {
           latitude: saved.latitude ?? null,
           longitude: saved.longitude ?? null,
           service_radius_km: saved.service_radius_km ?? 10,
+          delivery_zones: saved.delivery_zones ?? [],
           address_display: saved.address_display ?? "",
           min_order_amount: saved.min_order_amount != null && saved.min_order_amount > 0 ? String(saved.min_order_amount) : "",
           free_delivery_threshold: saved.free_delivery_threshold != null ? String(saved.free_delivery_threshold) : "",
           delivery_fee_flat: saved.delivery_fee_flat != null && saved.delivery_fee_flat > 0 ? String(saved.delivery_fee_flat) : "",
           delivery_fee_per_km: saved.delivery_fee_per_km != null && saved.delivery_fee_per_km > 0 ? String(saved.delivery_fee_per_km) : "",
         });
-        
-        // Sync card view preference to merchant_theme_preferences table
-        const supabase = createClient();
-        const layoutStyle = cardView === "compact" ? "compact" : "grid";
-        try {
-          await supabase.from("merchant_theme_preferences").upsert({
-            shop_id: shop.id,
-            layout_style: layoutStyle,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "shop_id" });
-        } catch {
-          // Table may not exist yet — store fallback in localStorage
-          localStorage.setItem(`trendmart_layout_${shop.id}`, layoutStyle);
-        }
-        
+
         addToast("Store settings saved successfully! ✅", "success");
       } else {
         addToast(result.error, "error");
@@ -403,7 +356,7 @@ export default function DashboardSettingsPage() {
       addToast(err instanceof Error ? err.message : "Failed to save settings.", "error");
     }
     setSaving(false);
-  }, [shop, form, cardView, addToast]);
+  }, [shop, form, addToast]);
 
   if (loading) {
     return (
@@ -593,8 +546,8 @@ export default function DashboardSettingsPage() {
           </h2>
           <div className="trend-card p-4">
             <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-              Pin your exact store location and set how far you deliver. Customers
-              outside this radius won&apos;t see your store on the homepage.
+              Pin your store, then choose custom radius, one city, or all over Pakistan.
+              Pinning also fills City / Area with the detected address.
             </p>
             <ShopLocationRadiusPicker
               value={{
@@ -602,6 +555,8 @@ export default function DashboardSettingsPage() {
                 longitude: form.longitude,
                 service_radius_km: form.service_radius_km,
                 address_display: form.address_display,
+                location: form.location,
+                delivery_zones: form.delivery_zones,
               }}
               onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
             />
@@ -689,75 +644,6 @@ export default function DashboardSettingsPage() {
             <ShopQrCode shopId={shop.id} shopName={shop.name} />
           </section>
         )}
-
-        {/* ── Visual Layout Preferences ────────────────────────────────── */}
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            <LayoutIcon /> Visual Layout
-          </h2>
-          <div className="trend-card p-4">
-            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-              Choose how product cards appear on your storefront.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {CARD_VIEW_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setCardView(option.id)}
-                  className={`flex flex-col items-center rounded-xl border-2 p-4 text-center transition-all ${
-                    cardView === option.id
-                      ? "border-emerald-500 bg-emerald-50 dark:border-emerald-400 dark:bg-emerald-900/20"
-                      : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
-                  }`}
-                >
-                  <span className="mb-1 text-2xl">{option.icon}</span>
-                  <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{option.label}</span>
-                  <span className="text-[0.6rem] text-zinc-400 dark:text-zinc-500">{option.description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Accent Color ────────────────────────────────────────────── */}
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            <PaletteIcon /> Accent Color
-          </h2>
-          <div className="trend-card p-4">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { hex: "#10b981", label: "Emerald" },
-                { hex: "#3b82f6", label: "Blue" },
-                { hex: "#f59e0b", label: "Amber" },
-                { hex: "#8b5cf6", label: "Violet" },
-                { hex: "#ec4899", label: "Pink" },
-                { hex: "#ef4444", label: "Red" },
-                { hex: "#06b6d4", label: "Cyan" },
-                { hex: "#f97316", label: "Orange" },
-              ].map((color) => (
-                <button
-                  key={color.hex}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, accent_color: color.hex }))}
-                  className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:scale-110 ${
-                    form.accent_color === color.hex ? "ring-2 ring-offset-2 ring-zinc-900 dark:ring-offset-zinc-900 dark:ring-zinc-100" : ""
-                  }`}
-                  style={{ backgroundColor: color.hex }}
-                  aria-label={`Select ${color.label} accent color`}
-                  title={color.label}
-                >
-                  {form.accent_color === color.hex && (
-                    <svg className="h-4 w-4 text-white drop-shadow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
 
         {/* ── Live Toggle ─────────────────────────────────────────────── */}
         <section>

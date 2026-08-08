@@ -12,9 +12,14 @@ import { EmptyState } from "@/components/EmptyState";
 import { ProductGridSkeleton, ShopBannerSkeleton } from "@/components/Skeletons";
 import ContactModal from "@/components/ContactModal";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
+import {
+  fetchStorefrontDisplayPrefs,
+  type StorefrontDisplayPrefs,
+} from "@/services/themePrefsService";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
@@ -230,11 +235,16 @@ function ShopDetailInner({ id }: { id: string }) {
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [availabilityDays, setAvailabilityDays] = useState<AvailabilityDay[]>([]);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [displayPrefs, setDisplayPrefs] = useState<StorefrontDisplayPrefs>({
+    showAnnouncementBanner: true,
+    showWhatsappFloatingButton: true,
+  });
   const supabase = useMemo(() => createClient(), []);
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const theme: StoreTheme = useMemo(() => getStoreTheme(shop?.category), [shop?.category]);
   const isService = isServiceTheme(shop?.category);
+  const THEME_ACCENT = "#10b981";
 
   // ── Data Loading ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -244,8 +254,14 @@ function ShopDetailInner({ id }: { id: string }) {
       setError(null);
       const result = await fetchShopById(id);
       if (!cancelled) {
-        if (result.success) { setShop(result.data.shop); setProducts(result.data.products); }
-        else { setError(result.error); }
+        if (result.success) {
+          setShop(result.data.shop);
+          setProducts(result.data.products);
+          const prefs = await fetchStorefrontDisplayPrefs(id);
+          if (!cancelled) setDisplayPrefs(prefs);
+        } else {
+          setError(result.error);
+        }
       }
       if (!cancelled) setLoading(false);
     }
@@ -360,18 +376,16 @@ function ShopDetailInner({ id }: { id: string }) {
     [shop, addToast],
   );
 
-  const gridColumns = theme.productColumns;
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 space-y-3 px-3 py-3 pb-24 md:space-y-4 md:px-4 md:py-5 md:pb-8">
       {loading && (<div className="space-y-4"><ShopBannerSkeleton /><ProductGridSkeleton count={4} /></div>)}
       {!loading && error && (<ErrorState title="Failed to load shop" message={error} onRetry={() => window.location.reload()} />)}
       {!loading && !error && shop && (<>
-        {/* Announcement Banner */}
-        {shop.announcement && (
+        {/* Announcement Banner — gated by merchant Appearance toggle */}
+        {shop.announcement?.trim() && displayPrefs.showAnnouncementBanner && (
           <section className="section-spacing-sm">
-            <AnnouncementBanner text={shop.announcement} variant="marquee" accentColor={shop.accent_color ?? theme.accentHex} dismissible />
+            <AnnouncementBanner text={shop.announcement} variant="marquee" accentColor={THEME_ACCENT} dismissible />
           </section>
         )}
 
@@ -551,7 +565,7 @@ function ShopDetailInner({ id }: { id: string }) {
             ) : (
               <ProductGrid
                 products={filteredProducts}
-                columns={gridColumns}
+                columns="auto"
                 compact={true}
                 categoryLabel={shop.category}
                 onProductClick={handleProductClick}
@@ -594,6 +608,12 @@ function ShopDetailInner({ id }: { id: string }) {
       {showBookingModal && shop && (
         <ServiceBookingModal shop={shop} packages={servicePackages} onClose={() => setShowBookingModal(false)} onBookingPlaced={() => { setShowBookingModal(false); addToast("Booking request sent!", "success"); }} />
       )}
+
+      {/* ── WhatsApp float — gated by merchant Appearance toggle ──────── */}
+      {shop?.whatsapp_number &&
+        displayPrefs.showWhatsappFloatingButton && (
+          <WhatsAppFloatButton phone={shop.whatsapp_number} shopName={shop.name} />
+        )}
     </div>
   );
 }

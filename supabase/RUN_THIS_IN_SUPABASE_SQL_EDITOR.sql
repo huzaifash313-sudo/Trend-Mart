@@ -2125,6 +2125,12 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Public can read theme preferences" ON public.merchant_theme_preferences;
+CREATE POLICY "Public can read theme preferences"
+ON public.merchant_theme_preferences
+FOR SELECT
+USING (true);
+
 -- 5. Function: Aggregate daily revenue snapshot
 CREATE OR REPLACE FUNCTION public.generate_daily_revenue_snapshot(
   p_shop_id UUID,

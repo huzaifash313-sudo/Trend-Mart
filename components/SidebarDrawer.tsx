@@ -505,14 +505,36 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             {/* Divider */}
             <li className="my-2 border-t border-zinc-100 dark:border-zinc-800" role="separator" />
 
-            {/* Profile / Dashboard Settings */}
+            {/* Settings hub — Appearance, Notifications, Privacy */}
             <li>
               <Link
-                href={session ? (userRole === "merchant" || userRole === "admin" ? "/dashboard/settings" : "/account") : "/settings"}
+                href="/settings"
                 onClick={onClose}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                <CogIcon /> Settings
+                <CogIcon /> Settings &amp; Preferences
+              </Link>
+            </li>
+
+            <li>
+              <Link
+                href="/settings/notifications"
+                onClick={onClose}
+                className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <span className="flex h-5 w-5 items-center justify-center text-base leading-none" aria-hidden="true">🔔</span>
+                Notifications
+              </Link>
+            </li>
+
+            <li>
+              <Link
+                href="/settings/appearance"
+                onClick={onClose}
+                className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <span className="flex h-5 w-5 items-center justify-center text-base leading-none" aria-hidden="true">🎨</span>
+                Appearance
               </Link>
             </li>
 
@@ -558,14 +580,6 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                       <DashboardIcon /> My Account
                     </Link>
                   )}
-
-                  <Link
-                    href="/settings/appearance"
-                    onClick={onClose}
-                    className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center text-base leading-none">🎨</span> Appearance
-                  </Link>
 
                   {/* Sign Out */}
                   <button

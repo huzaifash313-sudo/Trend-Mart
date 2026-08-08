@@ -133,8 +133,10 @@ function applyThemeClass(resolved: "light" | "dark"): void {
   const root = document.documentElement;
   if (resolved === "dark") {
     root.classList.add("dark");
+    root.classList.remove("light");
   } else {
     root.classList.remove("dark");
+    root.classList.add("light");
   }
 }
 
@@ -227,11 +229,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = useCallback(() => {
     setPrefs((prev) => {
-      // Cycle: light → dark → system → light
-      const cycle: ThemeMode[] = ["light", "dark", "system"];
-      const idx = cycle.indexOf(prev.mode);
-      const next = cycle[(idx + 1) % cycle.length];
-      return { ...prev, mode: next };
+      // Simple light ↔ dark (professional emerald theme stays constant)
+      const resolvedNow = resolveTheme(prev.mode);
+      return { ...prev, mode: resolvedNow === "dark" ? "light" : "dark" };
     });
   }, []);
 

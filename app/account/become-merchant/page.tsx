@@ -9,6 +9,7 @@ import { claimSignupRole, detectUserRole } from "@/services/authService";
 import { createShop } from "@/services/shopService";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 
 const CATEGORIES = SHOP_CATEGORIES.filter((c) => c !== "All");
 
@@ -37,6 +38,7 @@ function emptyShopForm(): ShopFormData {
     latitude: null,
     longitude: null,
     service_radius_km: 10,
+    delivery_zones: [],
     address_display: "",
     min_order_amount: "",
     free_delivery_threshold: "",
@@ -259,6 +261,23 @@ export default function BecomeMerchantPage() {
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             {errors.location ? <p className="mt-1 text-xs text-red-500">{errors.location}</p> : null}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Store pin &amp; delivery area
+            </label>
+            <ShopLocationRadiusPicker
+              value={{
+                latitude: form.latitude,
+                longitude: form.longitude,
+                service_radius_km: form.service_radius_km,
+                address_display: form.address_display,
+                location: form.location,
+                delivery_zones: form.delivery_zones,
+              }}
+              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            />
           </div>
 
           <div>
