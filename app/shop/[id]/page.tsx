@@ -330,12 +330,31 @@ function ShopDetailInner({ id }: { id: string }) {
 
         {/* Hero Banner — Compact */}
         <section className="trend-card overflow-hidden">
-          <div className={`relative flex h-36 items-center justify-center overflow-hidden sm:h-48 bg-gradient-to-br ${theme.bannerGradient}`}>
-            {shop.banner_url ? (
-              <Image src={getSafeImageUrl(shop.banner_url, "shop")} alt={`${shop.name} banner`} fill className="object-cover mix-blend-overlay opacity-80" sizes="100vw" priority />
+          {(() => {
+            const coverUrl = (shop.banner_url || shop.logo_url || "").trim();
+            const hasCover = coverUrl.length > 0;
+            return (
+          <div
+            className={`relative flex h-36 items-center justify-center overflow-hidden sm:h-48 ${
+              hasCover
+                ? "bg-zinc-100 dark:bg-zinc-800"
+                : `bg-gradient-to-br ${theme.bannerGradient}`
+            }`}
+          >
+            {hasCover ? (
+              <Image
+                src={getSafeImageUrl(coverUrl, "shop")}
+                alt={`${shop.name} banner`}
+                fill
+                className="object-cover"
+                sizes="100vw"
+                priority
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
-                <span className="select-none text-5xl font-bold text-white/60">{shop.name.charAt(0).toUpperCase()}</span>
+                <span className="select-none text-5xl font-bold text-white/60">
+                  {shop.name.charAt(0).toUpperCase()}
+                </span>
               </div>
             )}
             {shop.is_live && (<span className="absolute left-3 top-3 animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-[0.65rem] font-semibold text-white shadow">● LIVE</span>)}
@@ -343,6 +362,8 @@ function ShopDetailInner({ id }: { id: string }) {
               {theme.icon} {shop.category}
             </span>
           </div>
+            );
+          })()}
           <div className="space-y-2 p-3 sm:p-4">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">{shop.name}</h2>

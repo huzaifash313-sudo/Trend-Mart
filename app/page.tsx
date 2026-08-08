@@ -343,12 +343,29 @@ function HomeInner() {
         {/* Shop cards grid — optimized for mobile with proportional spacing */}
         {!loading && !error && displayShops.length > 0 && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {displayShops.map((shop) => (
+            {displayShops.map((shop) => {
+              const coverUrl = (shop.banner_url || shop.logo_url || "").trim();
+              const showCover = coverUrl.length > 0 && !brokenImgs.has(shop.id);
+              return (
               <article key={shop.id} className="trend-card overflow-hidden">
-                {/* Banner — mobile: h-24, tablet+: h-32 */}
-                <Link href={`/shop/${shop.id}`} className="relative flex h-24 items-center justify-center bg-gradient-to-br from-emerald-400 to-emerald-600 sm:h-32">
-                  {shop.logo_url && !brokenImgs.has(shop.id) ? (
-                    <Image src={getSafeImageUrl(shop.logo_url, "shop")} alt={`${shop.name} logo`} fill className="object-cover" sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw" onError={() => setBrokenImgs((prev) => new Set(prev).add(shop.id))} />
+                {/* Banner — green only when no image */}
+                <Link
+                  href={`/shop/${shop.id}`}
+                  className={`relative flex h-24 items-center justify-center sm:h-32 ${
+                    showCover
+                      ? "bg-zinc-100 dark:bg-zinc-800"
+                      : "bg-gradient-to-br from-emerald-400 to-emerald-600"
+                  }`}
+                >
+                  {showCover ? (
+                    <Image
+                      src={getSafeImageUrl(coverUrl, "shop")}
+                      alt={`${shop.name} logo`}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+                      onError={() => setBrokenImgs((prev) => new Set(prev).add(shop.id))}
+                    />
                   ) : (
                     <span className="select-none text-2xl font-bold text-white/70 sm:text-5xl">{shop.name.charAt(0).toUpperCase()}</span>
                   )}
@@ -372,7 +389,7 @@ function HomeInner() {
                       type="button"
                       onClick={async (e) => {
                         e.preventDefault();
-                        const nowFav = await toggleFav(shop.id, "shop", shop.name, shop.logo_url ?? undefined);
+                        const nowFav = await toggleFav(shop.id, "shop", shop.name, shop.logo_url ?? shop.banner_url ?? undefined);
                         setFavorites((prev) => {
                           const next = new Set(prev);
                           if (nowFav) next.add(shop.id); else next.delete(shop.id);
@@ -403,7 +420,8 @@ function HomeInner() {
                   </Link>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

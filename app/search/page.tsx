@@ -591,7 +591,13 @@ function SearchResultsInner() {
                       href={`/shop/${item.id}`}
                       className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
                     >
-                      <div className="relative flex h-28 items-center justify-center bg-gradient-to-br from-emerald-400 to-emerald-600 sm:h-40">
+                      <div
+                        className={`relative flex h-28 items-center justify-center sm:h-40 ${
+                          item.imageUrl
+                            ? "bg-zinc-100 dark:bg-zinc-800"
+                            : "bg-gradient-to-br from-emerald-400 to-emerald-600"
+                        }`}
+                      >
                         {item.imageUrl ? (
                           <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
                         ) : (
@@ -676,10 +682,16 @@ function SearchResultsInner() {
                 className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
               >
                 {/* Banner */}
-                <div className="relative flex h-28 items-center justify-center bg-gradient-to-br from-emerald-400 to-emerald-600 sm:h-40">
-                  {shop.logo_url ? (
+                <div
+                  className={`relative flex h-28 items-center justify-center sm:h-40 ${
+                    shop.logo_url || shop.banner_url
+                      ? "bg-zinc-100 dark:bg-zinc-800"
+                      : "bg-gradient-to-br from-emerald-400 to-emerald-600"
+                  }`}
+                >
+                  {(shop.banner_url || shop.logo_url) ? (
                     <img
-                      src={shop.logo_url}
+                      src={shop.banner_url || shop.logo_url || ""}
                       alt={`${shop.name} logo`}
                       className="h-full w-full object-cover"
                       loading="lazy"
