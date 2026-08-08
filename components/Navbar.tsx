@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import SidebarDrawer from "@/components/SidebarDrawer";
 import LocationPicker from "@/components/LocationPicker";
@@ -34,6 +34,8 @@ function SearchIcon() {
 
 export default function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const onSearchPage = pathname === "/search" || pathname.startsWith("/search/");
   const [session, setSession] = useState(false);
   const [dashHref, setDashHref] = useState("/account");
   const [dashLabel, setDashLabel] = useState("Account");
@@ -128,18 +130,31 @@ export default function Navbar() {
           <LocationPicker />
         </div>
 
-        {/* Search — desktop */}
-        <button type="button" onClick={navigateToSearch} className="hidden sm:flex flex-1 items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-400 hover:border-zinc-300 hover:bg-white transition-colors dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-600 lg:max-w-md" tabIndex={0}>
-          <SearchIcon />
-          <span>Search shops…</span>
-        </button>
-
-        <div className="flex-1 sm:hidden" />
-
-        {/* Mobile search */}
-        <button type="button" onClick={navigateToSearch} className="shrink-0 rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 sm:hidden dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Search">
-          <SearchIcon />
-        </button>
+        {/* Search shortcut — hide on /search (that page has the real input) */}
+        {!onSearchPage ? (
+          <>
+            <button
+              type="button"
+              onClick={navigateToSearch}
+              className="hidden sm:flex flex-1 items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-400 hover:border-zinc-300 hover:bg-white transition-colors dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-600 lg:max-w-md"
+              tabIndex={0}
+            >
+              <SearchIcon />
+              <span>Search shops…</span>
+            </button>
+            <div className="flex-1 sm:hidden" />
+            <button
+              type="button"
+              onClick={navigateToSearch}
+              className="shrink-0 rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 sm:hidden dark:text-zinc-400 dark:hover:bg-zinc-800"
+              aria-label="Search"
+            >
+              <SearchIcon />
+            </button>
+          </>
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {/* Auth */}
         {loading ? (

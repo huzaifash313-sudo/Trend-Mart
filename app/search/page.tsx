@@ -303,24 +303,22 @@ function SearchResultsInner() {
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto max-w-6xl px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="shrink-0 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-              TrendMart
-            </Link>
-            <form onSubmit={handleSearch} className="flex flex-1 max-w-md">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
+      {/* Search toolbar — sits under global Navbar (no second logo / fake search) */}
+      <header className="sticky top-[3.25rem] z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95 sm:top-[3.5rem]">
+        <div className="mx-auto max-w-6xl px-4 py-2.5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <form onSubmit={handleSearch} className="flex min-w-0 flex-1">
+              <div className="relative w-full">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
                   <SearchIcon />
                 </span>
                 <input
                   type="search"
-                  placeholder="Search products & shops (e.g., 'zinger burger', 'aata')..."
+                  autoFocus
+                  placeholder="Search products & shops…"
                   value={localQuery}
                   onChange={(e) => setLocalQuery(e.target.value)}
-                  className="w-full rounded-full border border-zinc-200 bg-zinc-50 py-2 pl-10 pr-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   aria-label="Search products and shops"
                 />
               </div>
