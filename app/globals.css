@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
 }
 
 @theme inline {
@@ -19,8 +23,602 @@
   }
 }
 
+/* ── Base Reset & Global Styles ─────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  min-height: 100dvh;
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: var(--safe-area-inset-bottom);
+  padding-left: var(--safe-area-inset-left);
+  padding-right: var(--safe-area-inset-right);
+}
+
+/* ── Scrollbar Styling ──────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 113, 122, 0.6);
+}
+
+/* ── Horizontal Overflow Guard ──────────────────────────────────────────────── */
+
+/* Prevent all container elements from overflowing horizontally on mobile. */
+img,
+video,
+canvas,
+svg,
+iframe,
+embed,
+object {
+  max-width: 100%;
+  height: auto;
+}
+
+table {
+  width: 100%;
+  overflow-x: auto;
+  display: block;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent long unbreakable strings (URLs, codes, phone numbers) from overflowing. */
+p,
+span,
+a,
+li,
+td,
+th,
+label,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* Ensure pre/code blocks are scrollable on mobile instead of overflowing. */
+pre,
+code {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* ── Touch Target & Interaction Optimizations ───────────────────────────────── */
+
+/* Minimum touch target size for interactive elements (AA standard: 44x44px). */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+[role="link"],
+[role="tab"],
+[role="menuitem"] {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+/* Exclude inline icon buttons from large min-size when wrapped in larger containers. */
+button.icon-only,
+a.icon-only {
+  min-height: unset;
+  min-width: unset;
+}
+
+/* Disable pull-to-refresh on mobile to prevent accidental navigation. */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Remove 300ms tap delay on mobile. */
+a,
+button,
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
+}
+
+/* Active state feedback for touch devices (replaces :hover on mobile). */
+@media (hover: none) and (pointer: coarse) {
+  button:active,
+  a:active,
+  [role="button"]:active {
+    opacity: 0.7;
+    transition: opacity 0.1s ease;
+  }
+}
+
+/* Improve tap target spacing between adjacent links/buttons in tight layouts. */
+.flex.gap-1 > button,
+.flex.gap-1 > a,
+.grid.gap-1 > button,
+.grid.gap-1 > a {
+  margin: 2px;
+}
+
+/* ── Focus Visible (Accessibility) ──────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Smooth Scrolling ───────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Responsive Image Handling ──────────────────────────────────────────────── */
+
+/* Ensure product/service images don't push layouts out of viewport. */
+.product-image,
+.gallery-image,
+.store-banner,
+.service-portfolio-img {
+  max-width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+/* ── Modal / Drawer Safe Area ───────────────────────────────────────────────── */
+
+/* Modals should account for the bottom safe area / home indicator on iPhones. */
+.modal-content,
+.drawer-content,
+.bottom-sheet {
+  padding-bottom: calc(1rem + var(--safe-area-inset-bottom));
+}
+
+/* ── Fixed Bottom Navigation Safe Area ──────────────────────────────────────── */
+
+.bottom-nav,
+.mobile-nav {
+  padding-bottom: var(--safe-area-inset-bottom);
+  height: calc(56px + var(--safe-area-inset-bottom));
+}
+
+/* ── Marquee Animation (AnnouncementBanner) ─────────────────────────────────── */
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+  will-change: transform;
+}
+
+/* Pause marquee on hover for readability (touch devices skip this). */
+@media (hover: hover) {
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+}
+
+/* ── Shimmer Animation (OptimizedImage skeleton loading) ────────────────────── */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* ── Skeleton Loading Pulse ─────────────────────────────────────────────────── */
+
+@keyframes pulse-skeleton {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-pulse-skeleton {
+  animation: pulse-skeleton 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ── Mobile Viewport Grid Fixes ─────────────────────────────────────────────── */
+
+/* Fix grid gaps on narrow mobile viewports (iPhone SE, etc.). */
+@media (max-width: 375px) {
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+}
+
+/* ── Responsive Typography Scale (Mobile-First Polish) ─────────────────────── */
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+  }
+  h2 {
+    font-size: 1.125rem;
+    line-height: 1.35;
+  }
+  h3 {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  h4 {
+    font-size: 0.9375rem;
+  }
+  /* Compact product grid text */
+  .product-name-mobile {
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+  .price-mobile {
+    font-size: 0.8125rem;
+  }
+}
+
+/* ── Compact Card System (replaces bulky padding on mobile) ───────────────── */
+
+@media (max-width: 640px) {
+  .card-compact {
+    padding: 0.75rem !important;
+  }
+  .card-compact-xs {
+    padding: 0.5rem !important;
+  }
+  .section-spacing-sm {
+    margin-bottom: 0.75rem !important;
+  }
+  .section-spacing-md {
+    margin-bottom: 1rem !important;
+  }
+}
+
+/* ── Professional Card Base ────────────────────────────────────────────────── */
+
+.trend-card {
+  border-radius: 0.75rem;
+  border: 1px solid #e4e4e7;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.15s ease;
+}
+.dark .trend-card {
+  border-color: #27272a;
+  background: #18181b;
+}
+.trend-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Product Image Standard ────────────────────────────────────────────────── */
+
+.product-img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+}
+.product-img-container {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f4f4f5, #e4e4e7);
+}
+.dark .product-img-container {
+  background: linear-gradient(135deg, #27272a, #3f3f46);
+}
+
+/* ── Print Styles ───────────────────────────────────────────────────────────── */
+
+@media print {
+  .no-print,
+  nav,
+  footer,
+  .bottom-nav,
+  button,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+    font-size: 12pt;
+  }
+
+  a {
+    color: black;
+    text-decoration: underline;
+  }
+}
+
+/* ── iOS Input Zoom Fix ─────────────────────────────────────────────────────── */
+
+/* Prevent iOS from zooming in on input fields with font-size < 16px. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Utility Classes ────────────────────────────────────────────────────────── */
+
+/* Prevent content from being hidden behind the bottom nav bar. */
+.safe-bottom {
+  padding-bottom: calc(80px + var(--safe-area-inset-bottom));
+}
+
+/* Prevent content from being hidden behind sticky headers. */
+.safe-top {
+  padding-top: calc(56px + var(--safe-area-inset-top));
+}
+
+/* Ensure modals appear above all other content. */
+.modal-z {
+  z-index: 1000;
+}
+
+/* ── ToggleSwitch Ripple Animation ─────────────────────────────────────────── */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* ── Dynamic Theme: Grid Layout Classes ────────────────────────────────────── */
+/* Applied to <html> via ThemeContext. These classes control the product grid appearance. */
+
+/* Default: 2-col on mobile, 3-col on tablet, 4-col on desktop */
+html.layout-grid .product-grid,
+html.layout-grid .shop-grid {
+  --grid-cols: 2;
+  grid-template-columns: repeat(var(--grid-cols), minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  html.layout-grid .product-grid,
+  html.layout-grid .shop-grid {
+    --grid-cols: 3;
+  }
+}
+@media (min-width: 1024px) {
+  html.layout-grid .product-grid,
+  html.layout-grid .shop-grid {
+    --grid-cols: 4;
+  }
+}
+
+/* Compact: tighter spacing, 3-col on mobile, 4-col tablet, 5-col desktop */
+html.layout-compact .product-grid,
+html.layout-compact .shop-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+@media (min-width: 640px) {
+  html.layout-compact .product-grid,
+  html.layout-compact .shop-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  html.layout-compact .product-grid,
+  html.layout-compact .shop-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Large Cards: 1-col mobile, 2-col tablet, 3-col desktop with larger cards */
+html.layout-cards .product-grid,
+html.layout-cards .shop-grid {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+@media (min-width: 640px) {
+  html.layout-cards .product-grid,
+  html.layout-cards .shop-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  html.layout-cards .product-grid,
+  html.layout-cards .shop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* List: single column, horizontal card layout */
+html.layout-list .product-grid,
+html.layout-list .shop-grid {
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+/* Gallery: prominent hero image layout with smaller secondary rows */
+html.layout-gallery .product-grid,
+html.layout-gallery .shop-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+html.layout-gallery .product-grid > :first-child,
+html.layout-gallery .shop-grid > :first-child {
+  grid-column: span 2;
+}
+@media (min-width: 768px) {
+  html.layout-gallery .product-grid > :first-child,
+  html.layout-gallery .shop-grid > :first-child {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+}
+
+/* ── Dynamic Theme: Card Style Classes ─────────────────────────────────────── */
+
+/* Default card style — standard rounded corners, subtle shadow */
+html.card-default .product-card,
+html.card-default .shop-card {
+  border-radius: 0.75rem;
+  border: 1px solid #e4e4e7;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.dark html.card-default .product-card,
+.dark html.card-default .shop-card {
+  border-color: #27272a;
+  background: #18181b;
+}
+
+/* Minimal — no borders, no shadow, clean edges */
+html.card-minimal .product-card,
+html.card-minimal .shop-card {
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Detailed — prominent shadow, larger padding for rich info display */
+html.card-detailed .product-card,
+html.card-detailed .shop-card {
+  border-radius: 1rem;
+  border: 1px solid #e4e4e7;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 1rem;
+}
+.dark html.card-detailed .product-card,
+.dark html.card-detailed .shop-card {
+  border-color: #27272a;
+  background: #18181b;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Service — accent-colored left border for service-provider cards */
+html.card-service .product-card,
+html.card-service .shop-card {
+  border-radius: 0.75rem;
+  border: 1px solid #e4e4e7;
+  border-left: 4px solid #10b981;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.dark html.card-service .product-card,
+.dark html.card-service .shop-card {
+  border-color: #27272a;
+  border-left-color: #059669;
+  background: #18181b;
+}
+
+/* ── Theme Transition ──────────────────────────────────────────────────────── */
+/* Smooth transition for background/text colors on theme changes */
+html,
+body,
+button,
+a,
+input,
+select,
+textarea {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
+}
+/* Exclude elements where transitions would hurt performance */
+html.layout-grid,
+html.layout-compact,
+html.layout-cards,
+html.layout-list,
+html.layout-gallery,
+.animate-marquee,
+.animate-shimmer,
+.animate-pulse-skeleton {
+  transition: none;
 }

@@ -1,0 +1,203 @@
+/* -------------------------------------------------------------------------- */
+/*  TrendMart — Role Service                                                   */
+/*  Provides role lookup utilities for middleware, server components,          */
+/*  and client-side RBAC checks.                                              */
+/* -------------------------------------------------------------------------- */
+
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
+
+// ─── Role Types ─────────────────────────────────────────────────────────────
+
+export type AppRole = "customer" | "merchant" | "admin";
+
+export const ROLE_HIERARCHY: Record<AppRole, number> = {
+  customer: 0,
+  merchant: 1,
+  admin: 2,
+};
+
+export interface UserRoleRecord {
+  id: string;
+  user_id: string;
+  role: AppRole;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Server-side Role Fetch ─────────────────────────────────────────────────
+
+/**
+ * Fetch the role for the currently authenticated user from the server.
+ * Returns null if user is not authenticated or role not found.
+ */
+export async function getUserRole(): Promise<AppRole | null> {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) return null;
+
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (error || !data) return null;
+    return data.role as AppRole;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if the current user has at least the required role level.
+ * Uses role hierarchy: customer < merchant < admin
+ */
+export async function hasMinRole(minimumRole: AppRole): Promise<boolean> {
+  const role = await getUserRole();
+  if (!role) return false;
+  return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minimumRole];
+}
+
+/**
+ * Fetch the user's role and associated shop IDs (if merchant).
+ * Returns both the role and the list of shop IDs they own.
+ */
+export async function getUserRoleAndShopIds(): Promise<{
+  role: AppRole | null;
+  shopIds: string[];
+  userId: string | null;
+}> {
+  try {
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return { role: null, shopIds: [], userId: null };
+    }
+
+    // Fetch role
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    const role = (roleData?.role as AppRole) ?? "customer";
+
+    // Fetch owned shop IDs if merchant or admin
+    let shopIds: string[] = [];
+    if (role === "merchant" || role === "admin") {
+      const { data: shops } = await supabase
+        .from("shops")
+        .select("id")
+        .eq(role === "admin" ? "id" : "owner_id", role === "admin" ? undefined! : user.id);
+
+      // For admin, we would fetch all shops - but we use a different query
+      if (role === "admin") {
+        const { data: allShops } = await supabase.from("shops").select("id");
+        shopIds = (allShops ?? []).map((s: { id: string }) => s.id);
+      } else {
+        shopIds = (shops ?? []).map((s: { id: string }) => s.id);
+      }
+    }
+
+    return { role, shopIds, userId: user.id };
+  } catch {
+    return { role: null, shopIds: [], userId: null };
+  }
+}
+
+// ─── Client-side Role Hook (to be used in components) ───────────────────────
+
+/**
+ * Fetch the current user's role from the browser client.
+ * Suitable for use in "use client" components and hooks.
+ */
+export async function getClientUserRole(): Promise<AppRole | null> {
+  try {
+    const supabase = createBrowserClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) return null;
+
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (error || !data) return null;
+    return data.role as AppRole;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Route Access Definitions ──────────────────────────────────────────────
+
+/**
+ * Route segments grouped by minimum required role.
+ * - public:     Anyone can access (no auth required)
+ * - customer:   Must be authenticated (any role)
+ * - merchant:   Must be a merchant or admin
+ * - admin:      Must be an admin
+ */
+export const ROLE_ROUTE_MAP = {
+  public: [
+    "/",
+    "/search",
+    "/shop/",
+    "/login",
+    "/signup",
+    "/auth",
+    "/auth/callback",
+    "/api/health",
+  ],
+  customer: [
+    "/orders",
+    "/wishlist",
+    "/auth/settings",
+  ],
+  merchant: [
+    "/dashboard",
+    "/dashboard/products",
+    "/shop/manage",
+  ],
+  admin: [
+    "/admin",
+    "/admin/users",
+    "/admin/shops",
+  ],
+} as const;
+
+/**
+ * Determine the minimum required role for a given pathname.
+ */
+export function getRequiredRole(pathname: string): AppRole | "public" {
+  if (ROLE_ROUTE_MAP.admin.some((route) => pathname.startsWith(route))) return "admin";
+  if (ROLE_ROUTE_MAP.merchant.some((route) => pathname.startsWith(route))) return "merchant";
+  if (ROLE_ROUTE_MAP.customer.some((route) => pathname.startsWith(route))) return "customer";
+  return "public";
+}
+
+/**
+ * Verify a route is accessible by the given role.
+ */
+export function canAccessRoute(role: AppRole | null, pathname: string): boolean {
+  const required = getRequiredRole(pathname);
+  if (required === "public") return true;
+  if (!role) return false;
+  return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[required];
+}

@@ -1,0 +1,92 @@
+🛒 TrendMart — Master Feature & Requirements Documentation
+Platform Type: Hyper-Local Multi-Vendor Marketplace & WhatsApp Ordering System
+Target Goal: Production-Ready E-Commerce Ecosystem
+1. Core Access & User Roles Architecture
+Guest Browsing (Unauthenticated Access)
+•	Guests can freely browse all shops, categories, sub-categories, and products without mandatory sign-up or verification.
+•	Cart management and item selection are available locally until checkout.
+Customer Portal
+•	Requires phone number/OTP authentication and mandatory verification strictly at the time of order placement/checkout.
+•	Dedicated dashboard for profile management, saved delivery addresses, past orders, live order tracking, and wishlist.
+Merchant Portal
+•	Separate registration flow for business owners ("Register Store" with name, category, phone, logo, banner).
+•	Strict Admin Approval queue: New merchant accounts remain pending until approved by the Super-Admin.
+•	Full dashboard for rapid product listing, sales metrics, and order monitoring.
+Super-Admin Panel
+•	Master platform control to approve/reject merchant stores, view global analytics (total revenue, active shops), manage platform-wide categories, and moderate users/shops.
+2. Homepage & Storefront Discovery
+•	X-Axis Mobile Horizontal Categories: Clean, compact, swipeable category pills on mobile viewports to prevent excessive vertical scrolling.
+•	Dynamic Search & Filtering: Global cross-store search bar, proximity/radius sorting, and category-based filtering.
+•	Stories & Highlights: Active promotional stories tray for local boutiques and stores right on the homepage.
+•	Responsive Multi-Device Views:
+o	Mobile: Compact 2-column shop grid and streamlined UI elements.
+o	Tablet: Optimized 3-column layouts.
+o	Desktop / Laptop: 4 to 5-column expansive grid views and professional sidebar layouts.
+3. Lightning-Fast Merchant Product Addition & Storage Engine
+•	Streamlined Form: Stripped-down, ultra-fast product creation interface focusing strictly on essential fields: Product Name, Category, Price, and Image.
+•	Bulk Addition: Designed to let merchants upload multiple items rapidly without complex stock counting or variant matrices.
+•	Instant Availability Toggle: A simple "In Stock / Out of Stock" toggle button on each product to instantly pause or resume selling an item without deleting it.
+•	Optimized Cloudinary Image Storage Engine:
+o	Automatic Compression & WebP Conversion: Media files uploaded by merchants are automatically compressed and converted into lightweight WebP format.
+o	Long-Term Free Tier Scaling: Compressing heavy mobile/DSLR images down to ~100KB allows thousands of product images to fit within the Cloudinary Free Tier (25 GB), preventing cloud storage exhaustion and ensuring high-speed loading.
+4. Merchant Control: Radius, Delivery Slabs & Markdown Pricing
+•	Custom Store Radius & Service Area Control:
+o	Kese Kaam Karega: Har merchant apne dashboard se apna specific delivery radius (jaise 3km, 5km, ya 10km) set kar sakega.
+o	Logic: System customer ki location match karke sirf unhi shops ko dikhayega ya order accept karega jo us specified radius ke andar aati hongi, jisse dukaandar apni delivery limits khud control kar sake.
+•	Smart Delivery & Minimum Order Conditions (Slabs):
+o	Minimum Order Amount: Ke itni amount se kam ka order place hi na ho sake.
+o	Free Delivery Threshold: Ke agar customer 2000 tak ki shopping kare toh delivery free ho jaye, warna standard delivery charges apply hon.
+o	Radius-Based Fees: Ke agar customer exact radius ke andar hai toh delivery free/kam hai, aur thora bahir hone par distance ke hisab se charges barh jayein.
+•	Direct Product Discount Pricing (Strikethrough / Markdown UI):
+o	Kese Kaam Karega: Dukaandar product add ya edit karte waqt Original Price (jiske upar halka sa cross/strikethrough hoga, misaal ke tor par Rs. 1000) aur Discounted Price (jaise Rs. 940) enter kar sakega.
+o	Badge System: App par automatically percentage discount ka badge (jaise "6% OFF") show hoga, jisse customer ko foran sale ya discount attract karega. (Yeh individual products par direct discount hoga, jabki global/code-based coupon system isse alag chalega).
+•	Custom Shop QR Code Generator & Downloader:
+o	Kese Kaam Karega: Har registered merchant ke liye dashboard par aik unique QR Code auto-generate hoga.
+o	Utility: Dukandar us QR code ko direct app se download karke print nikalwa sakega (jaise flex ya counter stand par lagane ke liye). Jab koi customer us QR ko scan karega, toh wo seedha us dukan ki specific web profile ya store link par land karega.
+5. Customer-Side Filtering, Sorting & "For You" Discovery System
+•	Distance / Radius Filtering ("Kitne KM mein dikhao"):
+o	Customer ke paas filter hoga ke woh exact radius select kar sake (jaise Within 3km, 5km, ya 10km), jisse sirf wahi shops aur products screen par aayein jo uske qareeb tareen hon.
+•	Smart Sorting & Popularity Algorithms (Daraz / "For You" Style):
+o	Popular / Trending: Jin shops ya products par sabse zyada views, clicks, ya orders aa rahe hon, woh automatically upar rank karein.
+o	Best Discounts: Jin items par dukaandaro ne behtreen discounts ya markdown pricing lagayi ho, unhein top par ya promotional sections mein highlight kiya jaye.
+o	Relevance & Keywords: Title, description, aur categories matching ke mutabiq best search results customer ko dikhaye jayein.
+6. Cart, Smart Checkout & WhatsApp Order Flow
+•	Multi-Item Hybrid Cart: LocalStorage persistence synced with authenticated user profiles.
+•	Smart Checkout Auto-Fill: Automatically pre-fills the customer's registered full name, phone number, and saved delivery address during checkout, with an override option for live locations.
+•	WhatsApp Batch Order Compiler: Compiles all cart items into a neatly formatted order message sent directly to the respective merchant's WhatsApp number.
+7. Promotional Ads Feature & PWA Support
+•	Promotional Ads Feature (Sponsored / Paid Ads Carousel):
+o	Kese Kaam Karega: Jaise categories horizontally scroll karti hain, waise hi aik dedicated "Promotional Ads / Sponsored Banners" ka section hoga jahan local shops ya merchants apne business ki paid ads ya special promotions lagwa sakenge.
+o	Monetization: Iska maqsad platform ke liye monthly subscription ya paid ad placement ka revenue model banana hai, jo app ke andar top ya featured positions par scroll karega.
+•	PWA (Progressive Web App) & Offline Support:
+o	Kese Kaam Karega: App ko PWA standard par build kiya jayega taake users aur merchants isko apne mobile par bina Play Store ke "Add to Home Screen" karke ek native app ki tarah smooth chala sakein, sath hi chote-mote network drops par basic functionality offline bhi maintain rahe.
+8. Communications, Branding & Legal Compliance
+•	Branded Email Infrastructure: Replacing default Supabase system emails with custom domain SMTP (e.g., via Resend or SendGrid) so all transactional emails (OTP, order confirmations, notifications) originate from official TrendMart domain addresses.
+•	Mandatory Terms & Conditions / Policies Acceptance on Registration:
+o	Kese Kaam Karega: Jab bhi koi naya customer ya merchant sign up karega, toh registration form ke andar "Terms & Conditions", "Privacy Policy", aur "Merchant Security Guidelines" ke check-boxes mandatory honge (jab tak user agree nahi karega, account create nahi hoga), jisse legal protection poori tarah secure rahegi.
+•	Support, Legal Policies & Guidance Systems:
+o	Direct Support Desk: Built-in contact and support system enabling customers and merchants to raise inquiries or directly connect with the TrendMart platform team.
+o	FAQ & New Business Owner Guide: Dedicated sections and interactive help systems to educate and guide new merchants on setting up digital stores.
+o	Legal & Security Policies: Dedicated pages for Terms & Conditions, Privacy Policy, Merchant Security Guidelines, and Refund/Order policies.
+9. UI Theme Engine & Customization
+•	Dynamic Theme Toggle: Real-time exchange of dark/light modes affecting text colors, backgrounds, borders, and card styling universally across the app without invisible or unreadable text bugs.
+•	Appearance Controls: User-adjustable font scaling, custom grid layout options, and card styling preferences.
+10. Status Checklist: What is Done vs. What is Pending
+✅ Completed & Coded Architecture
+•	Auth base (Sign up, Sign in, OTP, Role hierarchy setup).
+•	Storefront discovery layout, search bar, and active stories viewer.
+•	Mobile horizontal scrollable categories implementation.
+•	Merchant store settings base & product CRUD skeleton.
+•	Multi-item cart structure and WhatsApp order URL generator.
+•	Hybrid wishlist sync mechanism.
+•	Dark/light mode theme variables framework.
+❌ Remaining / To Be Fully Wired & Polished
+•	Super-Admin Panel: Complete admin approval queue, global category controls, and platform metrics.
+•	Precise GPS Proximity Engine: Exact street-level pin location and radius-based sorting.
+•	Smart Checkout Auto-Fill & Phone Verification: Strict mandatory phone validation at checkout.
+•	Live Order Tracking Module: Real-time status milestone updates (Pending → Processing → Dispatched → Delivered).
+•	Ultra-Fast Minimalist Product Form: Clean 4-field entry (Name, Category, Price, Image) with out-of-stock toggle.
+•	Custom SMTP Integration: Replacing default system emails with branded domain mail dispatchers.
+•	Support System & Legal Pages: FAQs, contact tickets, Terms & Conditions, and Privacy Policy views.
+•	Multi-Device Responsive Grid Tuning: Perfect spacing adjustments across mobile (2-col), tablet (3-col), and desktop (4/5-col).
+•	Advanced Merchant Controls & Monetization Integration: Geo-fencing radius enforcement, order slab calculation logic, Markdown pricing display with percentage badges, downloadable shop QR code generators, and sponsored ads carousel.

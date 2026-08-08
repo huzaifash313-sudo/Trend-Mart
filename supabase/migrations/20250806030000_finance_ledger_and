@@ -1,0 +1,140 @@
+/* -------------------------------------------------------------------------- */
+/*  TrendMart — Finance Entries & Customer Addresses Tables                    */
+/*                                                                             */
+/*  Creates tables to support the merchant financial ledger (Prompt 1) and     */
+/*  customer delivery address book (Prompt 4) features.                        */
+/*                                                                             */
+/*  Tables:                                                                    */
+/*   1. public.finance_entries — income/expense tracking for merchants         */
+/*   2. public.customer_addresses — saved delivery addresses for buyers       */
+/* -------------------------------------------------------------------------- */
+
+-- ============================================================================
+-- 1. FINANCE ENTRIES TABLE (Merchant Financial Ledger)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.finance_entries (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  shop_id UUID NOT NULL,
+  description TEXT NOT NULL,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
+  type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+  category TEXT NOT NULL DEFAULT 'Other',
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- FK to shops table
+  CONSTRAINT fk_finance_entries_shop
+    FOREIGN KEY (shop_id)
+    REFERENCES public.shops(id)
+    ON DELETE CASCADE
+);
+
+-- Performance indexes
+CREATE INDEX IF NOT EXISTS idx_finance_entries_shop_id ON public.finance_entries(shop_id);
+CREATE INDEX IF NOT EXISTS idx_finance_entries_date ON public.finance_entries(shop_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_finance_entries_type ON public.finance_entries(shop_id, type);
+
+-- Enable RLS
+ALTER TABLE public.finance_entries ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+-- Shop owners can manage their own finance entries
+CREATE POLICY "Owners can manage their finance entries"
+  ON public.finance_entries
+  FOR ALL
+  USING (
+    auth.uid() IN (
+      SELECT owner_id FROM public.shops WHERE id = finance_entries.shop_id
+    )
+  )
+  WITH CHECK (
+    auth.uid() IN (
+      SELECT owner_id FROM public.shops WHERE id = finance_entries.shop_id
+    )
+  );
+
+-- Admin users can view all finance entries
+CREATE POLICY "Admins can view all finance entries"
+  ON public.finance_entries
+  FOR SELECT
+  USING (is_admin(auth.uid()));
+
+-- ============================================================================
+-- 2. CUSTOMER ADDRESSES TABLE (Delivery Address Book)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.customer_addresses (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  label TEXT NOT NULL DEFAULT 'Home',
+  full_name TEXT NOT NULL,
+  phone_number TEXT NOT NULL,
+  address_line1 TEXT NOT NULL,
+  address_line2 TEXT,
+  city TEXT NOT NULL,
+  postal_code TEXT,
+  delivery_notes TEXT,
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- FK to auth.users
+  CONSTRAINT fk_customer_addresses_user
+    FOREIGN KEY (user_id)
+    REFERENCES auth.users(id)
+    ON DELETE CASCADE
+);
+
+-- Performance indexes
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_user_id ON public.customer_addresses(user_id);
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_default ON public.customer_addresses(user_id, is_default);
+
+-- Enable RLS
+ALTER TABLE public.customer_addresses ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+-- Users can manage only their own addresses
+CREATE POLICY "Users can manage own addresses"
+  ON public.customer_addresses
+  FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Admin users can view all addresses
+CREATE POLICY "Admins can view all addresses"
+  ON public.customer_addresses
+  FOR SELECT
+  USING (is_admin(auth.uid()));
+
+-- ============================================================================
+-- 3. TRIGGER: Auto-update updated_at for customer_addresses
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply trigger if not already present
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'trg_customer_addresses_updated_at'
+  ) THEN
+    CREATE TRIGGER trg_customer_addresses_updated_at
+      BEFORE UPDATE ON public.customer_addresses
+      FOR EACH ROW
+      EXECUTE FUNCTION public.set_updated_at();
+  END IF;
+END $$;
+
+-- ============================================================================
+-- 4. GRANT PERMISSIONS
+-- ============================================================================
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.finance_entries TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.customer_addresses TO authenticated;

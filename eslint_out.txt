@@ -1,0 +1,408 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+C:\Users\HAFIZ\Desktop\trendmart\__tests__\lib\typeGuards.test.ts
+   8:3  warning  'shopSchema' is defined but never used   @typescript-eslint/no-unused-vars
+   9:3  warning  'orderSchema' is defined but never used  @typescript-eslint/no-unused-vars
+  18:3  warning  'isShop' is defined but never used       @typescript-eslint/no-unused-vars
+  19:3  warning  'isOrder' is defined but never used      @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\admin\audit-logs\page.tsx
+  17:8  warning  'AuditTargetType' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\admin\dashboard\page.tsx
+  19:3  warning  'useCallback' is defined but never used    @typescript-eslint/no-unused-vars
+  21:8  warning  'KeyboardEvent' is defined but never used  @typescript-eslint/no-unused-vars
+  30:3  warning  'ShopCategory' is defined but never used   @typescript-eslint/no-unused-vars
+  31:3  warning  'Order' is defined but never used          @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\auth\verify-notice\page.tsx
+  156:86  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\HAFIZ\Desktop\trendmart\app\dashboard\analytics\page.tsx
+  225:20  warning  'o' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\dashboard\leads\page.tsx
+   7:8   warning  'FormEvent' is defined but never used  @typescript-eslint/no-unused-vars
+  49:10  warning  'EyeIcon' is defined but never used    @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\dashboard\page.tsx
+  174:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  228:10  warning  'newOrdersSinceRefresh' is assigned a value but never used                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  228:33  warning  'setNewOrdersSinceRefresh' is assigned a value but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  229:10  warning  'newInquiriesSinceRefresh' is assigned a value but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  229:36  warning  'setNewInquiriesSinceRefresh' is assigned a value but never used                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  230:10  warning  'connectionDot' is assigned a value but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  230:25  warning  'setConnectionDot' is assigned a value but never used                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  241:9   warning  'pendingOrderCount' is assigned a value but never used                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  246:9   warning  'liveRevenueToday' is assigned a value but never used                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  528:9   warning  'handleSignOut' is assigned a value but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\dashboard\products\new\page.tsx
+   20:3   warning  'useRef' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  615:37  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  615:44  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  742:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  778:55  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  778:59  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+
+C:\Users\HAFIZ\Desktop\trendmart\app\dashboard\products\page.tsx
+   150:10  warning  'PlusIcon' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   154:10  warning  'ChevronDownIcon' is defined but never used                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   155:10  warning  'DragIcon' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   219:9   warning  'fileInputRef' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  1376:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\app\dashboard\settings\page.tsx
+    6:10  warning  'fetchShops' is defined but never used              @typescript-eslint/no-unused-vars
+  162:10  warning  'dbPrefsLoaded' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  166:10  warning  'userId' is assigned a value but never used         @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\login\page.tsx
+    3:33  warning  'useMemo' is defined but never used                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  121:11  warning  Do not use `window.location.href` to navigate to internal Next.js pages. Use `redirect()` in the render phase, or `useRouter().push()` in Client Components' event handlers instead. See: https://nextjs.org/docs/messages/no-location-assign-relative-destination  @next/next/no-location-assign-relative-destination
+  278:18  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                     react/no-unescaped-entities
+
+C:\Users\HAFIZ\Desktop\trendmart\app\orders\tracking\page.tsx
+   15:33  warning  'useEffect' is defined but never used                @typescript-eslint/no-unused-vars
+   20:3   warning  'trackOrdersByPhoneAndId' is defined but never used  @typescript-eslint/no-unused-vars
+  325:9   warning  'whatsappNumber' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\page.tsx
+   27:10  warning  'SearchIcon' is defined but never used                    @typescript-eslint/no-unused-vars
+   43:10  warning  'WhatsAppIcon' is defined but never used                  @typescript-eslint/no-unused-vars
+   64:23  warning  'setSearchQuery' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  192:9   warning  'handleWhatsAppOrder' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\search\page.tsx
+    7:43  warning  'CATEGORY_GRADIENTS' is defined but never used                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+    9:24  warning  'autocomplete' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  595:27  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  634:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  680:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\app\settings\appearance\page.tsx
+  201:20  warning  'prev' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\settings\notifications\page.tsx
+  11:10  warning  'BellIcon' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  41:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HAFIZ\Desktop\trendmart\app\settings\notifications\page.tsx:41:9
+  39 |       if (saved) {
+  40 |         const parsed = JSON.parse(saved) as Record<string, boolean>;
+> 41 |         setToggles(
+     |         ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  42 |           DEFAULT_TOGGLES.map((t) => ({
+  43 |             ...t,
+  44 |             enabled: parsed[t.key] ?? t.enabled,  react-hooks/set-state-in-effect
+
+C:\Users\HAFIZ\Desktop\trendmart\app\settings\page.tsx
+  20:10  warning  'UserIcon' is defined but never used      @typescript-eslint/no-unused-vars
+  28:10  warning  'SettingsIcon' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\settings\privacy\page.tsx
+  31:10  warning  'session' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\shop\[id]\page.tsx
+   35:10  warning  'ChevronLeftIcon' is defined but never used            @typescript-eslint/no-unused-vars
+  210:9   warning  'router' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  229:10  warning  'portfolioItems' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  230:10  warning  'availabilityDays' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\app\wishlist\page.tsx
+  201:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\AdvancedInventoryMatrix.tsx
+  23:3   warning  'useCallback' is defined but never used     @typescript-eslint/no-unused-vars
+  36:38  warning  'ProductVariant' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\AnalyticsCharts.tsx
+    3:29  warning  'useCallback' is defined but never used       @typescript-eslint/no-unused-vars
+    5:3   warning  'LineChart' is defined but never used         @typescript-eslint/no-unused-vars
+    6:3   warning  'Line' is defined but never used              @typescript-eslint/no-unused-vars
+   20:3   warning  'RadarChart' is defined but never used        @typescript-eslint/no-unused-vars
+   21:3   warning  'Radar' is defined but never used             @typescript-eslint/no-unused-vars
+   22:3   warning  'PolarGrid' is defined but never used         @typescript-eslint/no-unused-vars
+   23:3   warning  'PolarAngleAxis' is defined but never used    @typescript-eslint/no-unused-vars
+   24:3   warning  'PolarRadiusAxis' is defined but never used   @typescript-eslint/no-unused-vars
+  112:14  warning  'product' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  127:13  warning  'product' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\AuthForm.tsx
+  5:10  warning  'z' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\AvailabilitySchedule.tsx
+  172:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HAFIZ\Desktop\trendmart\components\AvailabilitySchedule.tsx:172:5
+  170 |
+  171 |   useEffect(() => {
+> 172 |     loadSchedule();
+      |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  173 |   // eslint-disable-next-line react-hooks/exhaustive-deps
+  174 |   }, [shopId]);
+  175 |  react-hooks/set-state-in-effect
+
+C:\Users\HAFIZ\Desktop\trendmart\components\CartBar.tsx
+  178:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\CategoryGrid.tsx
+  17:3  warning  'PRODUCT_CATEGORIES' is defined but never used  @typescript-eslint/no-unused-vars
+  18:3  warning  'CATEGORY_ICONS' is defined but never used      @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\CheckoutModal.tsx
+  201:9   warning  'supabase' is assigned a value but never used                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  479:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\CouponManager.tsx
+  13:3  warning  'useRef' is defined but never used             @typescript-eslint/no-unused-vars
+  22:3  warning  'validateCoupon' is defined but never used     @typescript-eslint/no-unused-vars
+  89:9  warning  'supabase' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\GarmentVariantSelector.tsx
+  193:13  warning  '_currency' is assigned a value but never used              @typescript-eslint/no-unused-vars
+  198:25  warning  '_enforceCompatibility' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  269:32  warning  '_removed' is assigned a value but never used               @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\GeoRadiusFilter.tsx
+  4:73  warning  'formatDistance' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\ImageUpload.tsx
+  196:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\InventoryManager.tsx
+  19:3  warning  'useCallback' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\LocationPicker.tsx
+  45:10  warning  'PinIcon' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\NotificationListener.tsx
+   25:10  warning  'createClient' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  125:10  warning  'muteHydrated' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  137:32  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HAFIZ\Desktop\trendmart\components\NotificationListener.tsx:137:32
+  135 |       try {
+  136 |         const stored = localStorage.getItem("trendmart_notifications_muted");
+> 137 |         if (stored === "true") setIsMuted(true);
+      |                                ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  138 |       } catch {
+  139 |         // Ignore
+  140 |       }  react-hooks/set-state-in-effect
+  293:19  warning  The ref value 'channelRefs.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'channelRefs.current' to a variable inside the effect, and use that variable in the cleanup function                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/exhaustive-deps
+
+C:\Users\HAFIZ\Desktop\trendmart\components\OptimizedImage.tsx
+  230:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  244:9   warning  'isAbsoluteUrl' is assigned a value but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  255:9   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\OrderConfirmationModal.tsx
+  454:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\OtpVerificationModal.tsx
+  306:21  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\HAFIZ\Desktop\trendmart\components\ProductGallery.tsx
+  135:9   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  228:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  264:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  319:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\ServiceBookingModal.tsx
+   14:42  warning  'useEffect' is defined but never used           @typescript-eslint/no-unused-vars
+   69:10  warning  'ChevronLeftIcon' is defined but never used     @typescript-eslint/no-unused-vars
+  199:3   warning  'accentHex' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  201:9   warning  'supabase' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\ServicePortfolioManager.tsx
+   83:9   warning  The 'emptyForm' object makes the dependencies of useCallback Hook (at line 129) change on every render. To fix this, wrap the initialization of 'emptyForm' in its own useMemo() Hook                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/exhaustive-deps
+  112:14  warning  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+  120:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HAFIZ\Desktop\trendmart\components\ServicePortfolioManager.tsx:120:5
+  118 |
+  119 |   useEffect(() => {
+> 120 |     loadPortfolio();
+      |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  121 |   }, [loadPortfolio]);
+  122 |
+  123 |   // ── Form helpers ──────────────────────────────────────────────────────────  react-hooks/set-state-in-effect
+  265:6   warning  React Hook useCallback has a missing dependency: 'uploadImage'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               react-hooks/exhaustive-deps
+
+C:\Users\HAFIZ\Desktop\trendmart\components\StoriesViewer.tsx
+  88:5  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\components\StoryViewer.tsx
+  121:7   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  157:10  warning  'direction' is assigned a value but never used                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\components\WhatsAppCheckoutModal.tsx
+  273:3   warning  'accentHex' is assigned a value but never used                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  285:10  warning  'profileLoaded' is assigned a value but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  286:10  warning  'useLiveLocation' is assigned a value but never used                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  325:9   warning  'accentLight' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  326:9   warning  'accentBorder' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  327:9   warning  'accentText' is assigned a value but never used                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  328:9   warning  'accentTextDark' is assigned a value but never used                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  432:9   warning  'handleToggleLiveLocation' is assigned a value but never used                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  636:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\HAFIZ\Desktop\trendmart\context\LanguageContext.tsx
+  503:10  warning  'isLoadingFromStorage' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  509:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HAFIZ\Desktop\trendmart\context\LanguageContext.tsx:509:7
+  507 |     if (typeof window !== "undefined") {
+  508 |       const stored = loadLanguageFromStorage();
+> 509 |       setLangState(stored);
+      |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  510 |       setHydrated(true);
+  511 |       setIsLoadingFromStorage(false);
+  512 |     }  react-hooks/set-state-in-effect
+
+C:\Users\HAFIZ\Desktop\trendmart\context\LocationContext.tsx
+   85:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HAFIZ\Desktop\trendmart\context\LocationContext.tsx:85:9
+  83 |       const saved = getValidSavedLocation();
+  84 |       if (saved) {
+> 85 |         setLocation(saved);
+     |         ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  86 |         setIsInitialized(true);
+  87 |         // Mark auto-detect as already handled since we have a saved location
+  88 |         autoDetectAttempted.current = true;  react-hooks/set-state-in-effect
+  115:11  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HAFIZ\Desktop\trendmart\context\LocationContext.tsx:115:11
+  113 |           defaultLoc.source = "cached";
+  114 |           saveLocation(defaultLoc);
+> 115 |           setLocation(defaultLoc);
+      |           ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  116 |         }
+  117 |         return;
+  118 |       }                                                                                            react-hooks/set-state-in-effect
+
+C:\Users\HAFIZ\Desktop\trendmart\lib\context\AppContext.tsx
+   31:15  warning  'Product' is defined but never used                  @typescript-eslint/no-unused-vars
+  426:17  warning  'isNowFavorited' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\lib\domSanitizer.ts
+   41:7   warning  'getDefaultPurifier' is assigned a value but never used                                                @typescript-eslint/no-unused-vars
+   45:23  error    Unexpected any. Specify a different type                                                               @typescript-eslint/no-explicit-any
+  108:3   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+C:\Users\HAFIZ\Desktop\trendmart\lib\offlineSync.ts
+  146:7   warning  'DEFAULT_PREFERENCES_CONFIG' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  260:12  warning  'err' is defined but never used                                  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\lib\rateLimiterRedis.ts
+  137:5  warning  '_windowStart' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\lib\responseSanitizer.ts
+  9:30  warning  'Order' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\lib\sanitization.ts
+  233:7  warning  'ALLOWED_IMAGE_PROTOCOLS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  249:7  warning  'VALID_IMAGE_EXTENSIONS' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\lib\supabase\pool.ts
+  219:40  warning  'opts' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\middleware.ts
+  158:10  warning  'canAccessRoute' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\next.config.ts
+  159:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-require-imports')
+
+C:\Users\HAFIZ\Desktop\trendmart\services\analyticsService.ts
+  185:13  warning  'payload' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  274:3   warning  'callback' is defined but never used          @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\categoryService.ts
+  9:25  warning  'truncate' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\exportService.ts
+   7:31  warning  'OrderItem' is defined but never used     @typescript-eslint/no-unused-vars
+   8:10  warning  'formatRupees' is defined but never used  @typescript-eslint/no-unused-vars
+  14:3   warning  'truncate' is defined but never used      @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\inventoryService.ts
+  12:10  warning  'sanitizeNumeric' is defined but never used              @typescript-eslint/no-unused-vars
+  71:7   warning  'MIN_STOCK_QUANTITY' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\invoiceService.ts
+  860:9  warning  'tableTop' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  862:9  warning  'rightMargin' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\orderTrackingService.ts
+  10:15  warning  'Order' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\reviewService.ts
+  36:7  warning  'MAX_REVIEWS_PER_SHOP_5MIN' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\searchService.ts
+  232:13  warning  'shopConditions' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\storageService.ts
+  11:3   warning  'sanitizeLight' is defined but never used                @typescript-eslint/no-unused-vars
+  12:3   warning  'truncate' is defined but never used                     @typescript-eslint/no-unused-vars
+  52:7   warning  'MIME_EXTENSION_MAP' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  71:10  warning  'validateBucketName' is defined but never used           @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\subCategoryService.ts
+  9:25  warning  'truncate' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\services\subscriptionService.ts
+  740:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+C:\Users\HAFIZ\Desktop\trendmart\utils\imageUpload.ts
+  8:31  warning  'truncate' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HAFIZ\Desktop\trendmart\utils\seo.ts
+  22:7  warning  'SITE_DESCRIPTION' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 164 problems (15 errors, 149 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+
