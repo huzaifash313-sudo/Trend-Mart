@@ -176,7 +176,12 @@ export async function createProduct(
   }
 
   try {
-    const fullRow = { ...buildProductRow(form), shop_id: shopId };
+    const productFields = buildProductRow(form);
+    const productName = String(productFields.name ?? form.name.trim());
+    const fullRow: Record<string, unknown> = {
+      ...productFields,
+      shop_id: shopId,
+    };
     let { data, error } = await supabase
       .from("products")
       .insert(fullRow)
@@ -185,7 +190,7 @@ export async function createProduct(
 
     // Older DBs may be missing enhanced columns — retry with the core set.
     if (error && isMissingColumnError(error)) {
-      const coreRow = {
+      const coreRow: Record<string, unknown> = {
         ...pickKeys(buildProductRow(form, { coreOnly: true }), [
           ...PRODUCT_CORE_KEYS,
         ]),
@@ -205,7 +210,7 @@ export async function createProduct(
         .from("products")
         .select("*")
         .eq("shop_id", shopId)
-        .eq("name", fullRow.name as string)
+        .eq("name", productName)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -243,7 +248,7 @@ export async function updateProduct(
     let row: Record<string, unknown>;
     if (hasPartialShape) {
       const sanitized = sanitizeProductPricing(form);
-      row = { ...sanitized };
+      row = { ...(sanitized as Record<string, unknown>) };
       if (
         "sub_category_id" in row &&
         (typeof row.sub_category_id !== "string" ||
