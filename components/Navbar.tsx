@@ -45,36 +45,67 @@ export default function Navbar() {
 
   useEffect(() => {
     let cancelled = false;
+    let subscription: { unsubscribe: () => void } | null = null;
+
     async function check() {
       try {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
-        if (!cancelled) setSession(!!data.session);
-        if (data.session?.user && !cancelled) {
-          const { detectUserRole, getDashboardPath } = await import("@/services/authService");
-          const role = await detectUserRole(data.session.user);
-          setDashHref(getDashboardPath(role));
-          setDashLabel(role === "merchant" || role === "admin" ? "Dashboard" : "Account");
+        if (cancelled) return;
+
+        // Unblock the Sign In / Account button immediately
+        setSession(!!data.session);
+        setLoading(false);
+
+        if (data.session?.user) {
+          try {
+            const { detectUserRole, getDashboardPath } = await import("@/services/authService");
+            const role = await detectUserRole(data.session.user);
+            if (!cancelled) {
+              setDashHref(getDashboardPath(role));
+              setDashLabel(role === "merchant" || role === "admin" ? "Dashboard" : "Account");
+            }
+          } catch {
+            /* keep default /account */
+          }
         }
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_, s) => {
+
+        const { data: authSub } = supabase.auth.onAuthStateChange(async (_, s) => {
           if (cancelled) return;
           setSession(!!s);
           if (s?.user) {
-            const { detectUserRole, getDashboardPath } = await import("@/services/authService");
-            const role = await detectUserRole(s.user);
-            setDashHref(getDashboardPath(role));
-            setDashLabel(role === "merchant" || role === "admin" ? "Dashboard" : "Account");
+            try {
+              const { detectUserRole, getDashboardPath } = await import("@/services/authService");
+              const role = await detectUserRole(s.user);
+              if (!cancelled) {
+                setDashHref(getDashboardPath(role));
+                setDashLabel(role === "merchant" || role === "admin" ? "Dashboard" : "Account");
+              }
+            } catch {
+              if (!cancelled) {
+                setDashHref("/account");
+                setDashLabel("Account");
+              }
+            }
           } else {
             setDashHref("/account");
             setDashLabel("Account");
           }
         });
-        if (cancelled) subscription.unsubscribe();
-      } catch { if (!cancelled) setSession(false); }
-      finally { if (!cancelled) setLoading(false); }
+        subscription = authSub.subscription;
+      } catch {
+        if (!cancelled) {
+          setSession(false);
+          setLoading(false);
+        }
+      }
     }
+
     check();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const navigateToSearch = useCallback(() => router.push("/search"), [router]);

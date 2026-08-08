@@ -554,18 +554,29 @@ export function redirectToDashboard(role: AuthRole | "admin"): void {
 /**
  * Detect the user's role.
  * Checks the user_roles table first, then metadata, then falls back to shop ownership.
+ * DB lookups are time-boxed so a hung PostgREST call never freezes Sign-In /account.
  */
 export async function detectUserRole(user: User | null): Promise<AuthRole | "admin"> {
   if (!user) return "customer";
 
+  const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T | null> =>
+    Promise.race([
+      Promise.resolve(p),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+    ]);
+
   // 1. Check user_roles table (authoritative source)
   try {
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
+    const result = await withTimeout(
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle()
+        .then((r) => r),
+      4000,
+    );
+    const roleData = result && "data" in result ? result.data : null;
     if (roleData?.role) {
       const validRoles: string[] = ["customer", "merchant", "admin"];
       if (validRoles.includes(roleData.role)) {
@@ -588,12 +599,17 @@ export async function detectUserRole(user: User | null): Promise<AuthRole | "adm
 
   // 4. Fallback: query if user has a shop
   try {
-    const { data: shop } = await supabase
-      .from("shops")
-      .select("id")
-      .eq("owner_id", user.id)
-      .maybeSingle();
-
+    const result = await withTimeout(
+      supabase
+        .from("shops")
+        .select("id")
+        .eq("owner_id", user.id)
+        .limit(1)
+        .maybeSingle()
+        .then((r) => r),
+      4000,
+    );
+    const shop = result && "data" in result ? result.data : null;
     return shop ? "merchant" : "customer";
   } catch {
     return "customer";

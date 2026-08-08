@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  getCurrentUser,
   detectUserRole,
   claimSignupRole,
   redirectToDashboard,
@@ -60,38 +59,61 @@ export default function CustomerAccountPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const user = await getCurrentUser();
-      if (!user) {
-        router.replace("/login?redirect=/account");
-        return;
-      }
-      const role = await detectUserRole(user);
-      if (role === "merchant" || role === "admin") {
-        redirectToDashboard(role);
-        return;
-      }
-      if (cancelled) return;
-      setEmail(user.email ?? null);
-      setEmailVerified(!!user.email_confirmed_at);
-      setPhoneVerified(!!user.phone_confirmed_at);
 
+    (async () => {
+      let keepSkeleton = false;
       try {
         const { createClient } = await import("@/lib/supabase/client");
         const supabase = createClient();
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("phone_verified_at")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (!cancelled && profile?.phone_verified_at) {
-          setPhoneVerified(true);
+
+        // Prefer getSession (local/fast) over getUser so the portal doesn't hang.
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const user = session?.user ?? null;
+
+        if (!user) {
+          if (!cancelled) {
+            setLoading(false);
+            router.replace("/login?redirect=/account");
+          }
+          return;
+        }
+
+        const role = await detectUserRole(user);
+        if (cancelled) return;
+
+        if (role === "merchant" || role === "admin") {
+          keepSkeleton = true;
+          redirectToDashboard(role);
+          return;
+        }
+
+        setEmail(user.email ?? null);
+        setEmailVerified(!!user.email_confirmed_at);
+        setPhoneVerified(!!user.phone_confirmed_at);
+
+        try {
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("phone_verified_at")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (!cancelled && profile?.phone_verified_at) {
+            setPhoneVerified(true);
+          }
+        } catch {
+          /* ignore profile lookup failures */
         }
       } catch {
-        /* ignore */
+        if (!cancelled) {
+          router.replace("/login?redirect=/account");
+        }
+      } finally {
+        if (!cancelled && !keepSkeleton) setLoading(false);
       }
-      if (!cancelled) setLoading(false);
     })();
+
     return () => {
       cancelled = true;
     };
