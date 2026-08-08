@@ -20,6 +20,7 @@ import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import CategoryGrid from "@/components/CategoryGrid";
 import PromoAdsCarousel from "@/components/PromoAdsCarousel";
+import ShopMediaHeader from "@/components/ShopMediaHeader";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons (inline SVGs)                                                        */
@@ -344,43 +345,40 @@ function HomeInner() {
         {!loading && !error && displayShops.length > 0 && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {displayShops.map((shop) => {
-              const coverUrl = (shop.banner_url || shop.logo_url || "").trim();
-              const showCover = coverUrl.length > 0 && !brokenImgs.has(shop.id);
+              const bannerBroken = brokenImgs.has(`banner:${shop.id}`);
+              const logoBroken = brokenImgs.has(`logo:${shop.id}`);
               return (
               <article key={shop.id} className="trend-card overflow-hidden">
-                {/* Banner — green only when no image */}
-                <Link
-                  href={`/shop/${shop.id}`}
-                  className={`relative flex h-24 items-center justify-center sm:h-32 ${
-                    showCover
-                      ? "bg-zinc-100 dark:bg-zinc-800"
-                      : "bg-gradient-to-br from-emerald-400 to-emerald-600"
-                  }`}
-                >
-                  {showCover ? (
-                    <Image
-                      src={getSafeImageUrl(coverUrl, "shop")}
-                      alt={`${shop.name} logo`}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
-                      onError={() => setBrokenImgs((prev) => new Set(prev).add(shop.id))}
-                    />
-                  ) : (
-                    <span className="select-none text-2xl font-bold text-white/70 sm:text-5xl">{shop.name.charAt(0).toUpperCase()}</span>
-                  )}
-                  {shop.is_live && (
-                    <span className="absolute left-1.5 top-1.5 animate-pulse rounded-full bg-red-500 px-1 py-0.5 text-[0.5rem] font-semibold leading-none text-white sm:left-2 sm:px-1.5 sm:text-[0.6rem]">LIVE</span>
-                  )}
-                  {(shop as ShopWithDistance).distance_km != null && (
-                    <span className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-1 py-0.5 text-[0.5rem] font-semibold leading-none text-white backdrop-blur-sm sm:right-2 sm:px-1.5 sm:text-[0.6rem]">
-                      📍 {formatDistance((shop as ShopWithDistance).distance_km!)}
-                    </span>
-                  )}
+                <Link href={`/shop/${shop.id}`} className="block">
+                  <ShopMediaHeader
+                    shopName={shop.name}
+                    bannerUrl={shop.banner_url}
+                    logoUrl={shop.logo_url}
+                    size="card"
+                    bannerBroken={bannerBroken}
+                    logoBroken={logoBroken}
+                    onBannerError={() =>
+                      setBrokenImgs((prev) => new Set(prev).add(`banner:${shop.id}`))
+                    }
+                    onLogoError={() =>
+                      setBrokenImgs((prev) => new Set(prev).add(`logo:${shop.id}`))
+                    }
+                  >
+                    {shop.is_live && (
+                      <span className="absolute left-1.5 top-1.5 z-[1] animate-pulse rounded-full bg-red-500 px-1 py-0.5 text-[0.5rem] font-semibold leading-none text-white sm:left-2 sm:px-1.5 sm:text-[0.6rem]">
+                        LIVE
+                      </span>
+                    )}
+                    {(shop as ShopWithDistance).distance_km != null && (
+                      <span className="absolute right-1.5 top-1.5 z-[1] rounded-full bg-black/60 px-1 py-0.5 text-[0.5rem] font-semibold leading-none text-white backdrop-blur-sm sm:right-2 sm:px-1.5 sm:text-[0.6rem]">
+                        📍 {formatDistance((shop as ShopWithDistance).distance_km!)}
+                      </span>
+                    )}
+                  </ShopMediaHeader>
                 </Link>
 
-                {/* Info — tighter padding on mobile, normal on sm+ */}
-                <div className="space-y-1.5 p-2 sm:p-3">
+                {/* Info — leave room under overlapping logo */}
+                <div className="space-y-1.5 p-2 pt-1 sm:p-3 sm:pt-1.5">
                   <div className="flex items-start justify-between gap-1 sm:gap-2">
                     <Link href={`/shop/${shop.id}`} className="block truncate text-[0.7rem] font-semibold leading-snug text-zinc-900 hover:text-emerald-600 sm:text-sm dark:text-zinc-100 dark:hover:text-emerald-400">
                       {shop.name}
@@ -389,7 +387,7 @@ function HomeInner() {
                       type="button"
                       onClick={async (e) => {
                         e.preventDefault();
-                        const nowFav = await toggleFav(shop.id, "shop", shop.name, shop.logo_url ?? shop.banner_url ?? undefined);
+                        const nowFav = await toggleFav(shop.id, "shop", shop.name, shop.logo_url ?? undefined);
                         setFavorites((prev) => {
                           const next = new Set(prev);
                           if (nowFav) next.add(shop.id); else next.delete(shop.id);
@@ -411,7 +409,6 @@ function HomeInner() {
                     <span className="inline-flex items-center gap-0.5 text-[0.55rem] sm:text-xs"><PinIcon />{shop.location}</span>
                   </div>
 
-                  {/* Browse Products CTA — compact on mobile, regular on sm+ */}
                   <Link
                     href={`/shop/${shop.id}`}
                     className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-emerald-600 px-2 py-1.5 text-[0.65rem] font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-4 sm:py-2 sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"

@@ -39,8 +39,12 @@ export interface GlobalSearchItem {
   /** For products: price, currency */
   price?: number;
   currency?: string;
-  /** Image URL */
+  /** Image URL (products) or legacy shop thumb */
   imageUrl?: string | null;
+  /** Shop banner (wide cover) — never swap with logo */
+  bannerUrl?: string | null;
+  /** Shop logo (avatar) */
+  logoUrl?: string | null;
   /** Availability flag */
   isAvailable?: boolean;
   /** Relevance score (0-100) */
@@ -357,7 +361,7 @@ export async function globalSearch(
             // Try full-text search first using textSearch on Supabase
             const { data: ftShops, error: ftErr } = await supabase
               .from("shops")
-              .select("id, name, category, location, logo_url, is_live, store_bio")
+              .select("id, name, category, location, logo_url, banner_url, is_live, store_bio")
               .eq("is_live", true)
               .eq("verification_status", "approved")
               .or(
@@ -380,6 +384,8 @@ export async function globalSearch(
                 category: shop.category,
                 location: shop.location,
                 imageUrl: shop.logo_url,
+                logoUrl: shop.logo_url,
+                bannerUrl: shop.banner_url,
                 relevanceScore: score,
                 matchedField: determineShopMatchedField(q, shop),
                 snippet: (shop.store_bio || shop.location || "").slice(0, 100),
@@ -460,7 +466,7 @@ export async function globalSearch(
         if (!options?.productsOnly) {
           const { data: varShops } = await supabase
             .from("shops")
-            .select("id, name, category, location, logo_url, is_live, store_bio")
+            .select("id, name, category, location, logo_url, banner_url, is_live, store_bio")
             .eq("is_live", true)
             .eq("verification_status", "approved")
             .or(
@@ -479,6 +485,8 @@ export async function globalSearch(
               category: shop.category,
               location: shop.location,
               imageUrl: shop.logo_url,
+              logoUrl: shop.logo_url,
+              bannerUrl: shop.banner_url,
               relevanceScore: Math.round(score),
               matchedField: determineShopMatchedField(variant, shop),
               snippet: (shop.store_bio || shop.location || "").slice(0, 100),
@@ -536,7 +544,7 @@ export async function globalSearch(
       // then do client-side Levenshtein matching
       const { data: allShops } = await supabase
         .from("shops")
-        .select("id, name, category, location, logo_url, is_live, store_bio")
+        .select("id, name, category, location, logo_url, banner_url, is_live, store_bio")
         .eq("is_live", true)
         .eq("verification_status", "approved")
         .limit(50);
@@ -571,6 +579,8 @@ export async function globalSearch(
             category: shop.category,
             location: shop.location,
             imageUrl: shop.logo_url,
+            logoUrl: shop.logo_url,
+            bannerUrl: shop.banner_url,
             relevanceScore: Math.round((1 - distance) * 60), // Max 60 for fuzzy
             matchedField: "name",
             snippet: (shop.store_bio || shop.location || "").slice(0, 100),
@@ -681,7 +691,7 @@ export async function autocomplete(
     // Quick shop autocomplete
     const { data: shops } = await supabase
       .from("shops")
-      .select("id, name, category, location, logo_url")
+      .select("id, name, category, location, logo_url, banner_url")
       .eq("is_live", true)
       .eq("verification_status", "approved")
       .ilike("name", prefix)
@@ -695,6 +705,8 @@ export async function autocomplete(
         shopId: shop.id,
         category: shop.category,
         imageUrl: shop.logo_url,
+        logoUrl: shop.logo_url,
+        bannerUrl: shop.banner_url,
         relevanceScore: 95,
         matchedField: "name",
         snippet: shop.location || "",

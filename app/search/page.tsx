@@ -8,6 +8,7 @@ import { SHOP_CATEGORIES, CATEGORY_ICONS, CATEGORY_GRADIENTS } from "@/types";
 import { fetchShops } from "@/services/shopService";
 import { globalSearch, autocomplete, type GlobalSearchItem, type SearchSuggestion } from "@/services/globalSearchService";
 import { ErrorState } from "@/components/ErrorState";
+import ShopMediaHeader from "@/components/ShopMediaHeader";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -591,23 +592,18 @@ function SearchResultsInner() {
                       href={`/shop/${item.id}`}
                       className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
                     >
-                      <div
-                        className={`relative flex h-28 items-center justify-center sm:h-40 ${
-                          item.imageUrl
-                            ? "bg-zinc-100 dark:bg-zinc-800"
-                            : "bg-gradient-to-br from-emerald-400 to-emerald-600"
-                        }`}
+                      <ShopMediaHeader
+                        shopName={item.name}
+                        bannerUrl={item.bannerUrl}
+                        logoUrl={item.logoUrl ?? item.imageUrl}
+                        size="card"
+                        useNextImage={false}
                       >
-                        {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
-                        ) : (
-                          <span className="select-none text-4xl font-bold text-white/70 sm:text-5xl">{item.name.charAt(0).toUpperCase()}</span>
-                        )}
-                        <span className="absolute left-2 top-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 sm:left-3 sm:top-3 sm:text-xs dark:bg-emerald-900/60 dark:text-emerald-300">
+                        <span className="absolute left-2 top-2 z-[1] rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 sm:left-3 sm:top-3 sm:text-xs dark:bg-emerald-900/60 dark:text-emerald-300">
                           Store
                         </span>
-                      </div>
-                      <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
+                      </ShopMediaHeader>
+                      <div className="space-y-1.5 p-2.5 pt-1 sm:space-y-2 sm:p-4 sm:pt-1.5">
                         <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-lg dark:text-zinc-100">{item.name}</h3>
                         <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 sm:gap-2 sm:text-sm dark:text-zinc-400">
                           {item.category && (
@@ -681,40 +677,28 @@ function SearchResultsInner() {
                 href={`/shop/${shop.id}`}
                 className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
               >
-                {/* Banner */}
-                <div
-                  className={`relative flex h-28 items-center justify-center sm:h-40 ${
-                    shop.logo_url || shop.banner_url
-                      ? "bg-zinc-100 dark:bg-zinc-800"
-                      : "bg-gradient-to-br from-emerald-400 to-emerald-600"
-                  }`}
+                {/* Banner + logo — separate slots */}
+                <ShopMediaHeader
+                  shopName={shop.name}
+                  bannerUrl={shop.banner_url}
+                  logoUrl={shop.logo_url}
+                  size="card"
+                  useNextImage={false}
                 >
-                  {(shop.banner_url || shop.logo_url) ? (
-                    <img
-                      src={shop.banner_url || shop.logo_url || ""}
-                      alt={`${shop.name} logo`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className="select-none text-4xl font-bold text-white/70 sm:text-5xl">
-                      {shop.name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
                   {shop.is_live && (
-                    <span className="absolute left-2 top-2 animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white sm:left-3 sm:top-3 sm:text-xs">
+                    <span className="absolute left-2 top-2 z-[1] animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white sm:left-3 sm:top-3 sm:text-xs">
                       LIVE
                     </span>
                   )}
                   {shop.operating_status && (
-                    <span className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                    <span className="absolute bottom-2 right-2 z-[1] rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
                       {shop.operating_status}
                     </span>
                   )}
-                </div>
+                </ShopMediaHeader>
 
                 {/* Info */}
-                <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
+                <div className="space-y-1.5 p-2.5 pt-1 sm:space-y-2 sm:p-4 sm:pt-1.5">
                   <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-lg dark:text-zinc-100">
                     {shop.name}
                   </h3>

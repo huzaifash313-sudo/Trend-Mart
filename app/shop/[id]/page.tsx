@@ -2,7 +2,6 @@
 
 import { useState, useEffect, use, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import type { Shop, Product, Review } from "@/types";
 import { fetchShopById } from "@/services/shopService";
 import { fetchReviewsByShopId, submitReview, computeRatingStats } from "@/services/reviewService";
@@ -15,9 +14,9 @@ import ContactModal from "@/components/ContactModal";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
+import ShopMediaHeader from "@/components/ShopMediaHeader";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
-import { getSafeImageUrl } from "@/services/storageService";
 import { getStoreTheme, type StoreTheme, isServiceTheme } from "@/lib/storeThemes";
 import { formatRupees } from "@/lib/formatters";
 import {
@@ -328,43 +327,38 @@ function ShopDetailInner({ id }: { id: string }) {
           </section>
         )}
 
-        {/* Hero Banner — Compact */}
+        {/* Hero — banner (wide) + logo (avatar), never mixed */}
         <section className="trend-card overflow-hidden">
-          {(() => {
-            const coverUrl = (shop.banner_url || shop.logo_url || "").trim();
-            const hasCover = coverUrl.length > 0;
-            return (
-          <div
-            className={`relative flex h-36 items-center justify-center overflow-hidden sm:h-48 ${
-              hasCover
-                ? "bg-zinc-100 dark:bg-zinc-800"
-                : `bg-gradient-to-br ${theme.bannerGradient}`
-            }`}
+          <ShopMediaHeader
+            shopName={shop.name}
+            bannerUrl={shop.banner_url}
+            logoUrl={shop.logo_url}
+            size="hero"
           >
-            {hasCover ? (
-              <Image
-                src={getSafeImageUrl(coverUrl, "shop")}
-                alt={`${shop.name} banner`}
-                fill
-                className="object-cover"
-                sizes="100vw"
-                priority
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <span className="select-none text-5xl font-bold text-white/60">
-                  {shop.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
+            {shop.is_live && (
+              <span className="absolute left-3 top-3 z-[1] animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-[0.65rem] font-semibold text-white shadow">
+                ● LIVE
+              </span>
             )}
-            {shop.is_live && (<span className="absolute left-3 top-3 animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-[0.65rem] font-semibold text-white shadow">● LIVE</span>)}
-            <span className={`absolute right-3 top-3 rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold text-white backdrop-blur-sm ${shop.category === "Food" ? "bg-amber-500/80" : shop.category === "Boutique" ? "bg-pink-500/80" : shop.category === "Electronics" ? "bg-blue-500/80" : shop.category === "Grocery" ? "bg-emerald-500/80" : shop.category === "Cosmetics" ? "bg-fuchsia-500/80" : "bg-zinc-500/80"}`}>
+            <span
+              className={`absolute right-3 top-3 z-[1] rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold text-white backdrop-blur-sm ${
+                shop.category === "Food"
+                  ? "bg-amber-500/80"
+                  : shop.category === "Boutique"
+                    ? "bg-pink-500/80"
+                    : shop.category === "Electronics"
+                      ? "bg-blue-500/80"
+                      : shop.category === "Grocery"
+                        ? "bg-emerald-500/80"
+                        : shop.category === "Cosmetics"
+                          ? "bg-fuchsia-500/80"
+                          : "bg-zinc-500/80"
+              }`}
+            >
               {theme.icon} {shop.category}
             </span>
-          </div>
-            );
-          })()}
-          <div className="space-y-2 p-3 sm:p-4">
+          </ShopMediaHeader>
+          <div className="space-y-2 p-3 pt-9 sm:p-4 sm:pt-10">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">{shop.name}</h2>
               <span className={`rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold ${theme.badgeClass}`}>{shop.category}</span>
