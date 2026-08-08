@@ -5,7 +5,8 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { Product, ProductFormData } from "@/types";
-import { logError } from "@/services/errorService";
+import { logError, toServiceError } from "@/services/errorService";
+import { isValidUUID } from "@/lib/sanitization";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -14,7 +15,67 @@ type ServiceResult<T> =
   | { success: false; error: string };
 
 function toError(err: unknown): string {
-  return err instanceof Error ? err.message : "An unexpected error occurred.";
+  return toServiceError(err);
+}
+
+/** Core columns that exist on every TrendMart products table. */
+const PRODUCT_CORE_KEYS = [
+  "name",
+  "description",
+  "price",
+  "image_url",
+  "is_available",
+  "variants",
+] as const;
+
+function isMissingColumnError(err: unknown): boolean {
+  const msg = toServiceError(err);
+  return /column .* does not exist|PGRST204|schema cache|Could not find/i.test(msg);
+}
+
+/**
+ * Build a clean insert/update row from form data.
+ * - Drops empty UUID fields (PostgREST rejects "" for uuid columns)
+ * - Normalises optional pricing / gallery fields
+ */
+function buildProductRow(
+  form: ProductFormData,
+  opts?: { coreOnly?: boolean },
+): Record<string, unknown> {
+  const sanitized = sanitizeProductPricing(form);
+  const row: Record<string, unknown> = {
+    name: (sanitized.name ?? "").trim(),
+    description: sanitized.description ?? "",
+    price: sanitized.price ?? 0,
+    image_url: sanitized.image_url || null,
+    is_available: sanitized.is_available ?? true,
+    variants: sanitized.variants ?? null,
+  };
+
+  if (!opts?.coreOnly) {
+    row.title = sanitized.title?.trim() || sanitized.name?.trim() || null;
+    row.original_price = sanitized.original_price ?? null;
+    row.images = sanitized.images ?? null;
+    row.stock_status = sanitized.stock_status || "in_stock";
+    row.category_id = sanitized.category_id?.trim() || null;
+    row.currency = "PKR";
+    const subId = sanitized.sub_category_id;
+    row.sub_category_id =
+      typeof subId === "string" && isValidUUID(subId) ? subId : null;
+  }
+
+  return row;
+}
+
+function pickKeys(
+  row: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    if (key in row) out[key] = row[key];
+  }
+  return out;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────── */
@@ -104,13 +165,54 @@ export async function createProduct(
 ): Promise<ServiceResult<Product>> {
   const supabase = createClient();
 
+  if (!shopId || !isValidUUID(shopId)) {
+    return { success: false, error: "Invalid shop. Please re-open the dashboard and try again." };
+  }
+  if (!form.name?.trim()) {
+    return { success: false, error: "Product name is required." };
+  }
+  if (!(form.price > 0)) {
+    return { success: false, error: "Price must be greater than 0." };
+  }
+
   try {
-    const sanitized = sanitizeProductPricing(form);
-    const { data, error } = await supabase
+    const fullRow = { ...buildProductRow(form), shop_id: shopId };
+    let { data, error } = await supabase
       .from("products")
-      .insert({ ...sanitized, shop_id: shopId })
+      .insert(fullRow)
       .select()
       .single();
+
+    // Older DBs may be missing enhanced columns — retry with the core set.
+    if (error && isMissingColumnError(error)) {
+      const coreRow = {
+        ...pickKeys(buildProductRow(form, { coreOnly: true }), [
+          ...PRODUCT_CORE_KEYS,
+        ]),
+        shop_id: shopId,
+      };
+      ({ data, error } = await supabase
+        .from("products")
+        .insert(coreRow)
+        .select()
+        .single());
+    }
+
+    // Insert can succeed while `.select().single()` fails under strict RLS.
+    // Fall back to reading the newest product for this shop by name.
+    if (error && /PGRST116|0 rows|multiple \(or no\) rows/i.test(toError(error))) {
+      const { data: inserted, error: fetchErr } = await supabase
+        .from("products")
+        .select("*")
+        .eq("shop_id", shopId)
+        .eq("name", fullRow.name as string)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!fetchErr && inserted) {
+        return { success: true, data: inserted as Product };
+      }
+    }
 
     if (error) throw error;
     return { success: true, data: data as Product };
@@ -131,13 +233,46 @@ export async function updateProduct(
   const supabase = createClient();
 
   try {
-    const sanitized = sanitizeProductPricing(form);
-    const { data, error } = await supabase
+    // Preserve partial-update behaviour for callers that only send a few keys
+    // (e.g. availability toggle) — only include keys present on `form`.
+    const hasPartialShape =
+      !("name" in form) ||
+      !("description" in form) ||
+      !("price" in form);
+
+    let row: Record<string, unknown>;
+    if (hasPartialShape) {
+      const sanitized = sanitizeProductPricing(form);
+      row = { ...sanitized };
+      if (
+        "sub_category_id" in row &&
+        (typeof row.sub_category_id !== "string" ||
+          !isValidUUID(row.sub_category_id as string))
+      ) {
+        row.sub_category_id = null;
+      }
+    } else {
+      row = buildProductRow(form);
+    }
+
+    let { data, error } = await supabase
       .from("products")
-      .update(sanitized)
+      .update(row)
       .eq("id", productId)
       .select()
       .single();
+
+    if (error && isMissingColumnError(error) && !hasPartialShape) {
+      const coreRow = pickKeys(buildProductRow(form, { coreOnly: true }), [
+        ...PRODUCT_CORE_KEYS,
+      ]);
+      ({ data, error } = await supabase
+        .from("products")
+        .update(coreRow)
+        .eq("id", productId)
+        .select()
+        .single());
+    }
 
     if (error) throw error;
     return { success: true, data: data as Product };

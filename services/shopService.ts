@@ -5,7 +5,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { Shop, Product, ShopFormData } from "@/types";
-import { logError } from "@/services/errorService";
+import { logError, toServiceError } from "@/services/errorService";
 import { isValidLatitude, isValidLongitude } from "@/services/geoRadiusService";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -15,7 +15,47 @@ type ServiceResult<T> =
   | { success: false; error: string };
 
 function toError(err: unknown): string {
-  return err instanceof Error ? err.message : "An unexpected error occurred.";
+  return toServiceError(err);
+}
+
+function isMissingColumnError(err: unknown): boolean {
+  const msg = toServiceError(err);
+  return /column .* does not exist|PGRST204|schema cache|Could not find/i.test(msg);
+}
+
+/** Fields that may be missing if the merchant hasn't run the full SQL setup yet. */
+const SHOP_EXTENDED_KEYS = [
+  "latitude",
+  "longitude",
+  "service_radius_km",
+  "address_display",
+  "min_order_amount",
+  "free_delivery_threshold",
+  "delivery_fee_flat",
+  "delivery_fee_per_km",
+  "service_area",
+  "hourly_rate",
+  "call_out_charge",
+  "emergency_available",
+  "shop_type",
+  "announcement",
+  "accent_color",
+  "store_bio",
+  "instagram_handle",
+  "facebook_url",
+  "secondary_phone",
+  "business_hours",
+  "operating_status",
+] as const;
+
+function stripExtendedShopFields(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...payload };
+  for (const key of SHOP_EXTENDED_KEYS) {
+    delete out[key];
+  }
+  return out;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────── */
@@ -130,10 +170,14 @@ export async function fetchMyShop(): Promise<ServiceResult<Shop | null>> {
 
     if (!user) return { success: false, error: "Not authenticated." };
 
+    // Prefer the newest shop. `.maybeSingle()` errors when a merchant has
+    // more than one row — that made settings look "empty" after save.
     const { data, error } = await supabase
       .from("shops")
       .select("*")
       .eq("owner_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) throw error;
@@ -218,16 +262,21 @@ function sanitizeDbPhone(input: unknown): string {
 }
 
 /**
- * Sanitize a URL: ensure it's valid http/https. Returns empty string for invalid.
+ * Sanitize a URL: ensure it's valid http/https (or a data-URI image fallback).
+ * Returns empty string for invalid values — never throws.
  */
 function sanitizeDbUrl(input: unknown): string {
   if (typeof input !== "string") return "";
   const trimmed = input.trim();
   if (!trimmed) return "";
+  // Keep existing data-URI placeholders (storage fallback) instead of wiping them
+  if (trimmed.startsWith("data:image/")) {
+    return trimmed.slice(0, 2_000_000);
+  }
   try {
     const parsed = new URL(trimmed);
     if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-      return parsed.href.slice(0, 500);
+      return parsed.href.slice(0, 2000);
     }
   } catch {
     // Not a valid URL
@@ -377,12 +426,20 @@ export async function createShop(
 
     if (!user) return { success: false, error: "Not authenticated." };
 
-    const sanitized = sanitizeShopForm(form);
-    const { data, error } = await supabase
+    const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
+    let { data, error } = await supabase
       .from("shops")
       .insert({ ...sanitized, owner_id: user.id })
       .select()
       .single();
+
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await supabase
+        .from("shops")
+        .insert({ ...stripExtendedShopFields(sanitized), owner_id: user.id })
+        .select()
+        .single());
+    }
 
     if (error) throw error;
     return { success: true, data: data as Shop };
@@ -402,15 +459,32 @@ export async function updateShop(
   const supabase = createClient();
 
   try {
-    const sanitized = sanitizeShopForm(form);
-    const { data, error } = await supabase
+    const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
+    let { data, error } = await supabase
       .from("shops")
       .update(sanitized)
       .eq("id", shopId)
       .select()
       .single();
 
+    // If the DB is missing geo/delivery columns, retry with core shop fields
+    // so merchants can still save name/phone/logo/etc.
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await supabase
+        .from("shops")
+        .update(stripExtendedShopFields(sanitized))
+        .eq("id", shopId)
+        .select()
+        .single());
+    }
+
     if (error) throw error;
+    if (!data) {
+      return {
+        success: false,
+        error: "Update did not persist. Confirm you own this shop and try again.",
+      };
+    }
     return { success: true, data: data as Shop };
   } catch (err) {
     logError(err, { module: "shopService.updateShop", meta: { shopId, form } });

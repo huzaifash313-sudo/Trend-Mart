@@ -5,7 +5,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
-import { logError } from "@/services/errorService";
+import { logError, toServiceError } from "@/services/errorService";
 import {
   sanitizePathSegment,
   sanitizeLight,
@@ -19,7 +19,7 @@ type ServiceResult<T> =
   | { success: false; error: string };
 
 function toError(err: unknown): string {
-  return err instanceof Error ? err.message : "An unexpected error occurred.";
+  return toServiceError(err);
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────

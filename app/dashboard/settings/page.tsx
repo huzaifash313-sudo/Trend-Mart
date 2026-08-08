@@ -282,13 +282,24 @@ export default function DashboardSettingsPage() {
             }
           } catch { /* table may not exist yet */ }
           setDbPrefsLoaded(true);
+        } else if (!result.success) {
+          addToast(result.error || "Could not load your store settings.", "error");
+        } else {
+          // success + null data = no shop for this user
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        if (!cancelled) {
+          addToast(
+            err instanceof Error ? err.message : "Could not load store settings.",
+            "error",
+          );
+        }
+      }
       if (!cancelled) setLoading(false);
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [addToast]);
 
   const handleSave = useCallback(async () => {
     if (!shop) return;
@@ -335,7 +346,40 @@ export default function DashboardSettingsPage() {
 
       const result = await updateShop(shop.id, shopFormFields);
       if (result.success) {
-        setShop(result.data);
+        const saved = result.data;
+        setShop(saved);
+        // Rehydrate form from what actually persisted (after server-side
+        // sanitization) so a reload can't look like "everything vanished".
+        setForm({
+          name: saved.name,
+          category: saved.category,
+          location: saved.location,
+          whatsapp_number: saved.whatsapp_number,
+          secondary_phone: saved.secondary_phone ?? "",
+          logo_url: saved.logo_url ?? "",
+          banner_url: saved.banner_url ?? "",
+          business_hours: saved.business_hours ?? "",
+          operating_status: saved.operating_status ?? "",
+          instagram_handle: saved.instagram_handle ?? "",
+          facebook_url: saved.facebook_url ?? "",
+          accent_color: saved.accent_color ?? "",
+          store_bio: saved.store_bio ?? "",
+          announcement: saved.announcement ?? "",
+          is_live: saved.is_live,
+          service_area: saved.service_area ?? "",
+          hourly_rate: saved.hourly_rate != null ? String(saved.hourly_rate) : "",
+          call_out_charge: saved.call_out_charge != null ? String(saved.call_out_charge) : "",
+          emergency_available: saved.emergency_available ?? false,
+          shop_type: saved.shop_type ?? "retail",
+          latitude: saved.latitude ?? null,
+          longitude: saved.longitude ?? null,
+          service_radius_km: saved.service_radius_km ?? 10,
+          address_display: saved.address_display ?? "",
+          min_order_amount: saved.min_order_amount != null && saved.min_order_amount > 0 ? String(saved.min_order_amount) : "",
+          free_delivery_threshold: saved.free_delivery_threshold != null ? String(saved.free_delivery_threshold) : "",
+          delivery_fee_flat: saved.delivery_fee_flat != null && saved.delivery_fee_flat > 0 ? String(saved.delivery_fee_flat) : "",
+          delivery_fee_per_km: saved.delivery_fee_per_km != null && saved.delivery_fee_per_km > 0 ? String(saved.delivery_fee_per_km) : "",
+        });
         
         // Sync card view preference to merchant_theme_preferences table
         const supabase = createClient();

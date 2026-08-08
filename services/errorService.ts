@@ -43,13 +43,56 @@ function extractStack(err: unknown): string | undefined {
 
 /** Normalise any thrown value into a human-readable message. */
 function normaliseMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
+  if (err instanceof Error) {
+    const pg = err as Error & { code?: string; details?: string; hint?: string };
+    if (pg.code) {
+      return `${pg.message}${pg.details ? ` — ${pg.details}` : ""}${pg.hint ? ` (${pg.hint})` : ""}`;
+    }
+    return err.message;
+  }
   if (typeof err === "string") return err;
+  if (typeof err === "object" && err !== null) {
+    const obj = err as Record<string, unknown>;
+    // Supabase PostgrestError is a plain object (not always instanceof Error)
+    if (typeof obj.message === "string" && obj.message.trim()) {
+      const details = typeof obj.details === "string" && obj.details ? ` — ${obj.details}` : "";
+      const hint = typeof obj.hint === "string" && obj.hint ? ` (${obj.hint})` : "";
+      const code = typeof obj.code === "string" && obj.code ? `[${obj.code}] ` : "";
+      return `${code}${obj.message}${details}${hint}`;
+    }
+  }
   try {
     return JSON.stringify(err);
   } catch {
     return "An unknown error occurred.";
   }
+}
+
+/**
+ * Public helper for service layers: turn any thrown/returned error into a
+ * user-facing string. Prefer this over `instanceof Error` checks — Supabase
+ * PostgREST failures are plain objects and would otherwise become
+ * "An unexpected error occurred."
+ */
+export function toServiceError(err: unknown): string {
+  const msg = normaliseMessage(err);
+  if (!msg || msg === "{}" || msg === "null") {
+    return "An unexpected error occurred.";
+  }
+  // Friendlier copy for the most common merchant-dashboard failures
+  if (/row-level security|RLS|permission denied|42501/i.test(msg)) {
+    return "Permission denied. Make sure you own this shop and are signed in, then try again.";
+  }
+  if (/column .* does not exist|PGRST204|schema cache/i.test(msg)) {
+    return `Database schema is out of date: ${msg}. Run supabase/RUN_THIS_IN_SUPABASE_SQL_EDITOR.sql in the Supabase SQL Editor, then retry.`;
+  }
+  if (/foreign key|23503/i.test(msg)) {
+    return "Invalid category or related record. Re-select the category and try again.";
+  }
+  if (/check constraint|23514/i.test(msg)) {
+    return `Invalid value rejected by the database: ${msg}`;
+  }
+  return msg;
 }
 
 /** Push an entry into the ring buffer, trimming old entries if needed. */

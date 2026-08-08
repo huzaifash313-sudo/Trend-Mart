@@ -363,8 +363,11 @@ export default function NewProductPage() {
         } else {
           addToast(result.error ?? "Failed to create product.", "error");
         }
-      } catch {
-        addToast("An unexpected error occurred.", "error");
+      } catch (err) {
+        addToast(
+          err instanceof Error ? err.message : "Failed to create product. Please try again.",
+          "error",
+        );
       }
 
       setSaving(false);
