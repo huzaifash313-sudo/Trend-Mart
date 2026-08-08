@@ -46,6 +46,14 @@ type AddressLabel = "Home" | "Office" | "Other";
 
 const ADDRESS_LABELS: AddressLabel[] = ["Home", "Office", "Other"];
 
+function isValidPkPhone(raw: string): boolean {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("03")) return true;
+  if (digits.length === 12 && digits.startsWith("92")) return true;
+  if (digits.length === 10 && digits.startsWith("3")) return true;
+  return false;
+}
+
 const INITIAL_ADDRESS_FORM: Omit<CustomerAddress, "id" | "user_id" | "created_at" | "updated_at"> = {
   label: "Home",
   full_name: "",
@@ -160,7 +168,7 @@ export default function AddressesPage() {
       const { data } = await supabase.auth.getUser();
       if (!cancelled) {
         if (!data.user) {
-          router.replace("/auth");
+          router.replace("/login?redirect=/account/addresses");
         } else {
           setUserId(data.user.id);
         }
@@ -186,21 +194,33 @@ export default function AddressesPage() {
         .order("created_at", { ascending: false })
         .limit(20);
 
-      if (!cancelled && !error) {
-        setAddresses((data ?? []) as CustomerAddress[]);
+      if (!cancelled) {
+        if (error) {
+          addToast("Could not load addresses. Check your connection and try again.", "error");
+        } else {
+          setAddresses((data ?? []) as CustomerAddress[]);
+        }
       }
       setAddressesLoading(false);
     }
 
     loadAddresses();
     return () => { cancelled = true; };
-  }, [userId, supabase]);
+  }, [userId, supabase, addToast]);
 
   // ── Save address (create or update) ────────────────────────────────────────
   const handleSave = useCallback(async (e: FormEvent) => {
     e.preventDefault();
     if (!userId || !form.full_name.trim() || !form.address_line1.trim() || !form.city.trim() || !form.phone_number.trim()) {
       addToast("Please fill in all required fields.", "error");
+      return;
+    }
+    if (form.full_name.trim().length < 2) {
+      addToast("Full name must be at least 2 characters.", "error");
+      return;
+    }
+    if (!isValidPkPhone(form.phone_number)) {
+      addToast("Enter a valid Pakistani mobile (e.g. 03001234567).", "error");
       return;
     }
     setSaving(true);

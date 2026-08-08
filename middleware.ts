@@ -356,15 +356,15 @@ async function resolveUserRole(
   try {
     const user = await getAuthenticatedUser(request);
 
-    // FIX: If we can't get the user but session cookies exist,
-    // default to "customer" to prevent the redirect loop.
-    // The client-side will handle further authorization.
+    // If getUser fails but cookies exist, do NOT force "customer" for /dashboard —
+    // that caused account↔dashboard loops when the client still saw merchant/shop.
+    // Prefer metadata hints, else allow merchant-tier so the page can load.
     if (!user) {
       if (authenticated) {
         authDebug(
-          "resolveUserRole: getUser failed but cookies exist — defaulting to customer",
+          "resolveUserRole: getUser failed but cookies exist — using metadata / merchant fallback",
         );
-        return "customer";
+        return "merchant";
       }
       return null;
     }
@@ -373,7 +373,7 @@ async function resolveUserRole(
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
       authDebug("resolveUserRole: MISSING ENV VARS");
-      return authenticated ? "customer" : null;
+      return authenticated ? "merchant" : null;
     }
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -387,32 +387,73 @@ async function resolveUserRole(
       },
     });
 
-    const { data: roleData, error: roleError } = await supabase
+    // 1) Explicit role row (maybeSingle — missing row is normal for older accounts)
+    const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .single();
-
-    if (roleError || !roleData) {
-      authDebug("resolveUserRole: no role record — defaulting to customer", {
-        error: roleError?.message,
-      });
-      return "customer";
-    }
+      .maybeSingle();
 
     const VALID_ROLES: readonly string[] = ["customer", "merchant", "admin"];
-    if (!VALID_ROLES.includes(roleData.role)) {
-      authDebug("resolveUserRole: INVALID ROLE", { role: roleData.role });
-      return null;
+    if (roleData?.role && VALID_ROLES.includes(roleData.role)) {
+      // Shop owners must keep merchant access even if row still says "customer"
+      if (roleData.role === "customer") {
+        const { data: shop } = await supabase
+          .from("shops")
+          .select("id")
+          .eq("owner_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        if (shop?.id) {
+          authDebug("resolveUserRole: customer row but owns shop → merchant");
+          return "merchant";
+        }
+      }
+      authDebug("resolveUserRole: SUCCESS", { role: roleData.role });
+      return roleData.role as AppRole;
     }
 
-    authDebug("resolveUserRole: SUCCESS", { role: roleData.role });
-    return roleData.role as AppRole;
+    // 2) JWT metadata (signup role)
+    const meta =
+      (user.user_metadata?.role as string | undefined) ||
+      (user.app_metadata?.role as string | undefined);
+    if (meta === "admin" || meta === "merchant" || meta === "customer") {
+      if (meta === "customer") {
+        const { data: shop } = await supabase
+          .from("shops")
+          .select("id")
+          .eq("owner_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        if (shop?.id) {
+          authDebug("resolveUserRole: metadata customer but owns shop → merchant");
+          return "merchant";
+        }
+      }
+      authDebug("resolveUserRole: from metadata", { role: meta });
+      return meta;
+    }
+
+    // 3) Shop ownership — older merchants before user_roles existed
+    const { data: shop } = await supabase
+      .from("shops")
+      .select("id")
+      .eq("owner_id", user.id)
+      .limit(1)
+      .maybeSingle();
+    if (shop?.id) {
+      authDebug("resolveUserRole: shop owner → merchant");
+      return "merchant";
+    }
+
+    authDebug("resolveUserRole: default customer");
+    return "customer";
   } catch (err) {
     authDebug("resolveUserRole: EXCEPTION", {
       error: err instanceof Error ? err.message : String(err),
     });
-    return authenticated ? "customer" : null;
+    // Fail open to merchant tier when cookies exist so /dashboard isn't bounced to /account
+    return authenticated ? "merchant" : null;
   }
 }
 
@@ -532,9 +573,17 @@ export async function middleware(request: NextRequest) {
       pathname,
       redirectCount: redirectLoopCount,
     });
-    // Never serve protected pages unauthenticated just to stop a loop —
-    // that caused /account to show "My Account" while the navbar said Sign In.
-    const safePath = isAuthRoute(pathname) ? pathname : "/login";
+    // Stop bouncing account↔dashboard↔login. Prefer home for logged-in users;
+    // auth pages can still render; otherwise go home (not /login which restarts loops).
+    const hasSession = hasValidSession(request);
+    let safePath = pathname;
+    if (isAuthRoute(pathname)) {
+      safePath = pathname;
+    } else if (hasSession) {
+      safePath = "/";
+    } else {
+      safePath = "/login";
+    }
     const loopResponse =
       safePath === pathname
         ? NextResponse.next({ request: { headers: request.headers } })

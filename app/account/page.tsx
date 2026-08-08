@@ -2,13 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import {
-  detectUserRole,
-  claimSignupRole,
-  redirectToDashboard,
-} from "@/services/authService";
+import { detectUserRole } from "@/services/authService";
 import { getOrderHistory } from "@/services/orderHistoryService";
-import { useToast } from "@/components/Toast";
 
 function StatCard({
   label,
@@ -34,13 +29,11 @@ function StatCard({
 }
 
 export default function CustomerAccountPage() {
-  const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
 
   const localOrders = useMemo(() => {
     try {
@@ -82,9 +75,13 @@ export default function CustomerAccountPage() {
         const role = await detectUserRole(user);
         if (cancelled) return;
 
+        // Merchants land on dashboard — use replace (not href churn) and never
+        // leave the skeleton stuck if navigation is slow.
         if (role === "merchant" || role === "admin") {
           keepSkeleton = true;
-          redirectToDashboard(role);
+          window.location.replace(
+            role === "admin" ? "/admin/dashboard" : "/dashboard",
+          );
           return;
         }
 
@@ -119,18 +116,6 @@ export default function CustomerAccountPage() {
     };
   }, []);
 
-  const handleBecomeMerchant = async () => {
-    setUpgrading(true);
-    try {
-      await claimSignupRole("merchant");
-      addToast("You're now a merchant — set up your store.", "success");
-      window.location.href = "/dashboard";
-    } catch {
-      addToast("Could not switch to merchant. Try again.", "error");
-      setUpgrading(false);
-    }
-  };
-
   // Guests must never see portal chrome (orders from localStorage looked "logged in").
   if (loading || !authed) {
     return (
@@ -141,6 +126,20 @@ export default function CustomerAccountPage() {
         <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
           Checking your account…
         </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <a
+            href="/dashboard"
+            className="text-sm font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+          >
+            Open Dashboard →
+          </a>
+          <a
+            href="/"
+            className="text-sm font-medium text-zinc-500 hover:underline"
+          >
+            Home
+          </a>
+        </div>
       </div>
     );
   }
@@ -172,7 +171,7 @@ export default function CustomerAccountPage() {
         <section className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Verification</h2>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Once done, checkout won&apos;t ask again for the same email/phone.
+            Soft for testing — phone verifies at first order; we&apos;ll tighten this later.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span
@@ -222,7 +221,7 @@ export default function CustomerAccountPage() {
             label="Wishlist"
             value="→"
             href="/wishlist"
-            hint="Saved items"
+            hint="Shops & products"
           />
         </section>
 
@@ -232,7 +231,7 @@ export default function CustomerAccountPage() {
           {[
             { href: "/orders", title: "My Orders", desc: "Past orders & details" },
             { href: "/orders/tracking", title: "Live Order Tracking", desc: "Pending → Delivered timeline" },
-            { href: "/wishlist", title: "Wishlist", desc: "Saved products & shops" },
+            { href: "/wishlist", title: "Wishlist", desc: "Saved shops & products (separate tabs)" },
             { href: "/account/addresses", title: "Delivery Addresses", desc: "Saved checkout addresses" },
             { href: "/auth/settings", title: "Account Settings", desc: "Password & profile" },
           ].map((item) => (
@@ -252,22 +251,20 @@ export default function CustomerAccountPage() {
           ))}
         </section>
 
-        {/* Become merchant */}
+        {/* Become merchant — proper store registration (not instant role flip) */}
         <section className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
           <h2 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
             Want to sell on TrendMart?
           </h2>
           <p className="mt-1 text-xs text-emerald-800/80 dark:text-emerald-300/80">
-            Switch to a merchant account to open your store dashboard.
+            Register your store with name, category, and WhatsApp — then open the merchant dashboard.
           </p>
-          <button
-            type="button"
-            disabled={upgrading}
-            onClick={handleBecomeMerchant}
-            className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          <Link
+            href="/account/become-merchant"
+            className="mt-3 inline-flex rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
           >
-            {upgrading ? "Switching…" : "Become a Merchant"}
-          </button>
+            Become a Merchant →
+          </Link>
         </section>
       </main>
     </div>

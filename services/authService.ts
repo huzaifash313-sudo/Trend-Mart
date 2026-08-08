@@ -159,12 +159,18 @@ export async function signUpWithEmail(
  * Write the chosen signup role into `user_roles`.
  * Prefer the SECURITY DEFINER RPC when available; fall back to upsert.
  */
-export async function claimSignupRole(role: AuthRole): Promise<void> {
+export async function claimSignupRole(
+  role: AuthRole,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const { error: rpcError } = await supabase.rpc("set_my_signup_role", {
       desired_role: role,
     });
-    if (!rpcError) return;
+    if (!rpcError) {
+      // Keep auth metadata in sync for client-side role detection fallbacks
+      await supabase.auth.updateUser({ data: { role } }).catch(() => undefined);
+      return { success: true };
+    }
   } catch {
     /* RPC may not exist yet — fall through */
   }
@@ -173,13 +179,22 @@ export async function claimSignupRole(role: AuthRole): Promise<void> {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("user_roles").upsert(
+    if (!user) return { success: false, error: "You must be signed in." };
+
+    const { error } = await supabase.from("user_roles").upsert(
       { user_id: user.id, role },
       { onConflict: "user_id" },
     );
-  } catch {
-    /* non-fatal — detectUserRole still has metadata fallback */
+    if (error) {
+      return { success: false, error: error.message || "Could not update account role." };
+    }
+    await supabase.auth.updateUser({ data: { role } }).catch(() => undefined);
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Could not update account role.",
+    };
   }
 }
 
@@ -565,7 +580,26 @@ export async function detectUserRole(user: User | null): Promise<AuthRole | "adm
       new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
     ]);
 
-  // 1. Check user_roles table (authoritative source)
+  const ownsShop = async (): Promise<boolean> => {
+    try {
+      const result = await withTimeout(
+        supabase
+          .from("shops")
+          .select("id")
+          .eq("owner_id", user.id)
+          .limit(1)
+          .maybeSingle()
+          .then((r) => r),
+        4000,
+      );
+      const shop = result && "data" in result ? result.data : null;
+      return !!shop?.id;
+    } catch {
+      return false;
+    }
+  };
+
+  // 1. user_roles table
   try {
     const result = await withTimeout(
       supabase
@@ -580,40 +614,31 @@ export async function detectUserRole(user: User | null): Promise<AuthRole | "adm
     if (roleData?.role) {
       const validRoles: string[] = ["customer", "merchant", "admin"];
       if (validRoles.includes(roleData.role)) {
+        // Legacy / mismatched rows: shop owner must remain merchant
+        if (roleData.role === "customer" && (await ownsShop())) {
+          return "merchant";
+        }
         return roleData.role as AuthRole | "admin";
       }
     }
-  } catch { /* fall through to metadata check */ }
+  } catch { /* fall through */ }
 
-  // 2. Check user metadata for role
+  // 2. user metadata
   const metadataRole = user.user_metadata?.role as AuthRole | undefined;
   if (metadataRole === "merchant" || metadataRole === "customer") {
+    if (metadataRole === "customer" && (await ownsShop())) return "merchant";
     return metadataRole;
   }
 
-  // 3. Check app_metadata for role
+  // 3. app_metadata
   const appRole = user.app_metadata?.role as AuthRole | undefined;
   if (appRole === "merchant" || appRole === "customer") {
+    if (appRole === "customer" && (await ownsShop())) return "merchant";
     return appRole;
   }
 
-  // 4. Fallback: query if user has a shop
-  try {
-    const result = await withTimeout(
-      supabase
-        .from("shops")
-        .select("id")
-        .eq("owner_id", user.id)
-        .limit(1)
-        .maybeSingle()
-        .then((r) => r),
-      4000,
-    );
-    const shop = result && "data" in result ? result.data : null;
-    return shop ? "merchant" : "customer";
-  } catch {
-    return "customer";
-  }
+  // 4. Shop ownership (older accounts without user_roles)
+  return (await ownsShop()) ? "merchant" : "customer";
 }
 
 /**

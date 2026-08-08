@@ -488,7 +488,7 @@ export default function WhatsAppCheckoutModal({
     }
   }, [availableCoupons.length, shop.id]);
 
-  // ── Auto-fill user profile on mount ────────────────────────────────────
+  // ── Auto-fill from saved delivery address + profile ────────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -497,20 +497,43 @@ export default function WhatsAppCheckoutModal({
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || cancelled) return;
 
-        // Fetch profile from user_profiles table
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("full_name, phone, address")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const [{ data: profile }, { data: savedAddr }] = await Promise.all([
+          supabase
+            .from("user_profiles")
+            .select("full_name, phone, address")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("customer_addresses")
+            .select("full_name, phone_number, address_line1, address_line2, city, delivery_notes, is_default")
+            .eq("user_id", user.id)
+            .order("is_default", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
 
         if (cancelled) return;
 
+        const line = savedAddr
+          ? [savedAddr.address_line1, savedAddr.address_line2, savedAddr.city]
+              .filter(Boolean)
+              .join(", ")
+          : "";
+
         setShipping((prev) => ({
           ...prev,
-          customerName: profile?.full_name ?? user.user_metadata?.full_name ?? prev.customerName,
-          customerPhone: profile?.phone ?? user.user_metadata?.phone ?? prev.customerPhone,
-          shippingAddress: profile?.address ?? prev.shippingAddress,
+          customerName:
+            savedAddr?.full_name ||
+            profile?.full_name ||
+            user.user_metadata?.full_name ||
+            prev.customerName,
+          customerPhone:
+            savedAddr?.phone_number ||
+            profile?.phone ||
+            user.user_metadata?.phone ||
+            prev.customerPhone,
+          shippingAddress: line || profile?.address || prev.shippingAddress,
+          deliveryNotes: savedAddr?.delivery_notes || prev.deliveryNotes,
         }));
 
         setProfileLoaded(true);
