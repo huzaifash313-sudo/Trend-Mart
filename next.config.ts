@@ -411,6 +411,11 @@ const nextConfig: NextConfig = {
   // ── Build-Time Configuration ────────────────────────────────────────────────
   generateEtags: true,
 
+  // Next.js 16 defaults to Turbopack. A custom `webpack()` without any
+  // `turbopack` key aborts the Vercel build. An empty config opts in and
+  // keeps webpack available when you explicitly run `next build --webpack`.
+  turbopack: {},
+
   // ── Environment-specific overrides ──────────────────────────────────────────
   ...(!isProd && {
     logging: {
