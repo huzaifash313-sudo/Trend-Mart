@@ -1864,6 +1864,26 @@ ON CONFLICT (category, slug) DO NOTHING;
 ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS category_id text DEFAULT NULL;
 
+-- Older "fresh_consolidated" migrations created category_id as uuid, but the
+-- app stores main-category NAMES (e.g. "Tech & IT Services") here. Convert
+-- any leftover uuid column to text so inserts stop failing with 22P02.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'products'
+      AND column_name = 'category_id'
+      AND udt_name = 'uuid'
+  ) THEN
+    ALTER TABLE public.products
+      ALTER COLUMN category_id DROP DEFAULT;
+    ALTER TABLE public.products
+      ALTER COLUMN category_id TYPE text USING category_id::text;
+  END IF;
+END $$;
+
 ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS sub_category_id uuid DEFAULT NULL REFERENCES public.sub_categories(id) ON DELETE SET NULL;
 

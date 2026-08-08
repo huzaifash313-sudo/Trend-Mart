@@ -53,8 +53,8 @@ export function buildStrictCspPolicy(nonce: string): string {
     // Fonts: self-hosted only
     "font-src 'self' data:",
 
-    // Connections: Supabase API + realtime
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co",
+    // Connections: Supabase API + realtime websockets
+    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in",
 
     // Frames: none (prevents clickjacking via iframes)
     "frame-src 'none'",

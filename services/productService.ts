@@ -33,14 +33,21 @@ function isMissingColumnError(err: unknown): boolean {
   return /column .* does not exist|PGRST204|schema cache|Could not find/i.test(msg);
 }
 
+/** Postgres 22P02 — e.g. writing a category name into a uuid-typed category_id. */
+function isInvalidUuidSyntaxError(err: unknown): boolean {
+  const msg = toServiceError(err);
+  return /22P02|invalid input syntax for type uuid/i.test(msg);
+}
+
 /**
  * Build a clean insert/update row from form data.
  * - Drops empty UUID fields (PostgREST rejects "" for uuid columns)
  * - Normalises optional pricing / gallery fields
+ * - `category_id` stores the main category NAME (text), not a UUID
  */
 function buildProductRow(
   form: ProductFormData,
-  opts?: { coreOnly?: boolean },
+  opts?: { coreOnly?: boolean; omitCategoryId?: boolean },
 ): Record<string, unknown> {
   const sanitized = sanitizeProductPricing(form);
   const row: Record<string, unknown> = {
@@ -57,8 +64,16 @@ function buildProductRow(
     row.original_price = sanitized.original_price ?? null;
     row.images = sanitized.images ?? null;
     row.stock_status = sanitized.stock_status || "in_stock";
-    row.category_id = sanitized.category_id?.trim() || null;
     row.currency = "PKR";
+    // Main category is a human-readable name ("Tech & IT Services"), NOT a UUID.
+    // Only omit when retrying against a legacy uuid-typed column.
+    if (!opts?.omitCategoryId) {
+      const cat = sanitized.category_id?.trim() || null;
+      // Never send a non-UUID string into a field that some DBs typed as uuid —
+      // callers that need uuid-only should pass omitCategoryId. For text columns
+      // we always send the category name.
+      row.category_id = cat;
+    }
     const subId = sanitized.sub_category_id;
     row.sub_category_id =
       typeof subId === "string" && isValidUUID(subId) ? subId : null;
@@ -188,6 +203,22 @@ export async function createProduct(
       .select()
       .single();
 
+    // Legacy DBs typed category_id as uuid — category NAMES like
+    // "Tech & IT Services" then fail with 22P02. Retry without category_id
+    // (sub_category_id still carries the taxonomy link).
+    if (error && isInvalidUuidSyntaxError(error)) {
+      const withoutCat: Record<string, unknown> = {
+        ...buildProductRow(form, { omitCategoryId: true }),
+        shop_id: shopId,
+      };
+      delete withoutCat.category_id;
+      ({ data, error } = await supabase
+        .from("products")
+        .insert(withoutCat)
+        .select()
+        .single());
+    }
+
     // Older DBs may be missing enhanced columns — retry with the core set.
     if (error && isMissingColumnError(error)) {
       const coreRow: Record<string, unknown> = {
@@ -266,6 +297,17 @@ export async function updateProduct(
       .eq("id", productId)
       .select()
       .single();
+
+    if (error && isInvalidUuidSyntaxError(error)) {
+      const withoutCat = { ...row };
+      delete withoutCat.category_id;
+      ({ data, error } = await supabase
+        .from("products")
+        .update(withoutCat)
+        .eq("id", productId)
+        .select()
+        .single());
+    }
 
     if (error && isMissingColumnError(error) && !hasPartialShape) {
       const coreRow = pickKeys(buildProductRow(form, { coreOnly: true }), [

@@ -444,7 +444,8 @@ function applySecurityHeaders(response: NextResponse): void {
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in",
+    // Always allow Supabase HTTPS + Realtime WebSockets (prod was missing wss://)
+    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in",
     "font-src 'self'",
     "frame-src 'none'",
     "object-src 'none'",
@@ -453,7 +454,7 @@ function applySecurityHeaders(response: NextResponse): void {
   ];
   if (process.env.NODE_ENV !== "production") {
     cspDirectives[4] =
-      "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in";
+      "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in";
   }
   headers.set("Content-Security-Policy", cspDirectives.join("; "));
 }

@@ -214,8 +214,8 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
               isProd
-                ? "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co"
-                : "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in",
+                ? "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in"
+                : "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in",
               "frame-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",
