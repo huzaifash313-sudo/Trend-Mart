@@ -54,8 +54,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false, // Remove X-Powered-By to avoid version disclosure
 
   // ── Output Configuration ──────────────────────────────────────────────────
-  // Enable standalone output for containerized deployments (smaller, no node_modules)
-  output: isProd ? "standalone" : undefined,
+  // Do NOT set `output: "standalone"` for Vercel. On Vercel, the platform
+  // adapter skips generating `.next/next-server.js.nft.json`, and standalone
+  // mode then crashes with ENOENT when writeStandaloneDirectory tries to
+  // read that file. Use standalone only for Docker/self-host via env flag.
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "true" && !process.env.VERCEL
+    ? { output: "standalone" as const }
+    : {}),
 
   // ── Compression ────────────────────────────────────────────────────────────
   // Next.js auto-compresses responses with gzip/brotli. Ensure it's enabled.
@@ -388,16 +393,13 @@ const nextConfig: NextConfig = {
   },
 
   // ── Experimental Features ───────────────────────────────────────────────────
+  // Keep this lean for Vercel: avoid optimizeCss / adapter-conflicting flags.
   experimental: {
-    // Optimise bundle by enabling the package import optimisation
     optimizePackageImports: [
       "@supabase/supabase-js",
       "@supabase/ssr",
       "framer-motion",
     ],
-    // Disable CSS source maps in production to reduce build output size
-    ...(isProd && { optimizeCss: true }),
-    // Enable server actions for production (already default in Next 16)
     serverActions: {
       bodySizeLimit: "2mb",
       allowedOrigins: isProd
@@ -407,22 +409,10 @@ const nextConfig: NextConfig = {
   },
 
   // ── Build-Time Configuration ────────────────────────────────────────────────
-  // Generate ETag headers for efficient revalidation
   generateEtags: true,
-
-  // ── Turbopack Configuration (Next.js 16 default bundler) ────────────────────
-  turbopack: {
-    // Turbopack-specific optimizations
-    ...(isProd && {
-      resolveAlias: {
-        // No custom aliases needed, but the key is reserved for future use
-      },
-    }),
-  },
 
   // ── Environment-specific overrides ──────────────────────────────────────────
   ...(!isProd && {
-    // Development: enable more verbose logging
     logging: {
       fetches: {
         fullUrl: true,
@@ -430,27 +420,12 @@ const nextConfig: NextConfig = {
     },
   }),
 
-  // ── Production-specific overrides ───────────────────────────────────────────
-  ...(isProd && {
-    // Production: strict TypeScript and ESLint checks on build
-    typescript: {
-      // Don't ignore build errors in CI — fail the build on type errors
-      ignoreBuildErrors: false,
-    },
-    eslint: {
-      // Don't ignore lint errors in production builds
-      ignoreDuringBuilds: false,
-    },
-  }),
-
-  // ── CI-specific overrides ───────────────────────────────────────────────────
-  ...(isCI && {
-    // CI: fail fast on errors
+  // Fail the build on TypeScript errors in production / CI.
+  // Note: `eslint` is no longer a valid next.config key in Next.js 16 —
+  // lint via `npm run lint` / the ESLint CLI instead.
+  ...((isProd || isCI) && {
     typescript: {
       ignoreBuildErrors: false,
-    },
-    eslint: {
-      ignoreDuringBuilds: false,
     },
   }),
 };
