@@ -188,6 +188,35 @@ export async function fetchMyShop(): Promise<ServiceResult<Shop | null>> {
   }
 }
 
+/**
+ * Fetch every shop owned by the currently signed-in user.
+ * Prefer this over `fetchShops()` + client-side owner filtering — RLS + an
+ * explicit owner_id filter is the reliable way for the merchant dashboard.
+ */
+export async function fetchMyShops(): Promise<ServiceResult<Shop[]>> {
+  const supabase = createClient();
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return { success: false, error: "Not authenticated." };
+
+    const { data, error } = await supabase
+      .from("shops")
+      .select("*")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return { success: true, data: (data as Shop[]) ?? [] };
+  } catch (err) {
+    logError(err, { module: "shopService.fetchMyShops" });
+    return { success: false, error: toError(err) };
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Strict Server-Side Sanitization Helpers                                    */
 /*  Matches the robust pattern used across all shop services.                  */

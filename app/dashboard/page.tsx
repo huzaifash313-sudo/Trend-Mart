@@ -18,7 +18,7 @@ import {
 import type { Shop, Product, ShopFormData, ProductFormData, AnalyticsSummary } from "@/types";
 import { PRODUCT_CATEGORIES, CATEGORY_ICONS } from "@/types";
 import {
-  fetchShops,
+  fetchMyShops,
   createShop,
   updateShop,
 } from "@/services/shopService";
@@ -84,6 +84,40 @@ const INITIAL_PRODUCT_FORM: ProductFormData = {
   image_url: "",
   is_available: true,
 };
+
+/** Map a Shop row into the dashboard edit form so refresh keeps merchant data. */
+function shopToFormData(s: Shop): ShopFormData {
+  return {
+    name: s.name,
+    category: s.category,
+    location: s.location,
+    whatsapp_number: s.whatsapp_number,
+    logo_url: s.logo_url ?? "",
+    banner_url: s.banner_url ?? "",
+    is_live: s.is_live,
+    instagram_handle: s.instagram_handle ?? "",
+    facebook_url: s.facebook_url ?? "",
+    secondary_phone: s.secondary_phone ?? "",
+    business_hours: s.business_hours ?? "",
+    operating_status: s.operating_status ?? "",
+    accent_color: s.accent_color ?? "",
+    store_bio: s.store_bio ?? "",
+    announcement: s.announcement ?? "",
+    service_area: s.service_area ?? "",
+    hourly_rate: s.hourly_rate != null ? String(s.hourly_rate) : "",
+    call_out_charge: s.call_out_charge != null ? String(s.call_out_charge) : "",
+    emergency_available: s.emergency_available ?? false,
+    shop_type: s.shop_type ?? "retail",
+    latitude: s.latitude ?? null,
+    longitude: s.longitude ?? null,
+    service_radius_km: s.service_radius_km ?? 10,
+    address_display: s.address_display ?? "",
+    min_order_amount: s.min_order_amount != null && s.min_order_amount > 0 ? String(s.min_order_amount) : "",
+    free_delivery_threshold: s.free_delivery_threshold != null ? String(s.free_delivery_threshold) : "",
+    delivery_fee_flat: s.delivery_fee_flat != null && s.delivery_fee_flat > 0 ? String(s.delivery_fee_flat) : "",
+    delivery_fee_per_km: s.delivery_fee_per_km != null && s.delivery_fee_per_km > 0 ? String(s.delivery_fee_per_km) : "",
+  };
+}
 
 function PlusIcon() {
   return (
@@ -352,28 +386,40 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [supabase.auth, router]);
 
-  // Load all user-owned shops
+  // Load shops owned by this merchant (server-side owner_id filter)
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     async function loadShops() {
-      const result = await fetchShops();
+      const result = await fetchMyShops();
       if (cancelled) return;
-      if (result.success) {
-        const myShops = result.data.filter((s) => s.owner_id === userId);
-        setAllShops(myShops);
-        // Auto-select first shop or match from localStorage
-        const savedId = typeof window !== "undefined" ? localStorage.getItem("trendmart_active_shop") : null;
-        if (savedId && myShops.some((s) => s.id === savedId)) {
-          setActiveShopId(savedId);
-        } else if (myShops.length > 0) {
-          setActiveShopId(myShops[0].id);
-        }
+      if (!result.success) {
+        addToast(result.error || "Could not load your shops.", "error");
+        return;
+      }
+      const myShops = result.data;
+      setAllShops(myShops);
+      const savedId =
+        typeof window !== "undefined"
+          ? localStorage.getItem("trendmart_active_shop")
+          : null;
+      const nextId =
+        (savedId && myShops.some((s) => s.id === savedId) && savedId) ||
+        myShops[0]?.id ||
+        null;
+      setActiveShopId(nextId);
+      if (nextId) {
+        const current = myShops.find((s) => s.id === nextId);
+        if (current) setShopForm(shopToFormData(current));
+      } else {
+        setShopForm(INITIAL_SHOP_FORM);
       }
     }
     loadShops();
-    return () => { cancelled = true; };
-  }, [userId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, addToast]);
 
   // Persist active shop selection
   useEffect(() => {
@@ -391,36 +437,7 @@ export default function DashboardPage() {
     setSelectedProductIds(new Set());
     const currentShop = allShops.find((s) => s.id === shopId);
     if (currentShop) {
-      setShopForm({
-        name: currentShop.name,
-        category: currentShop.category,
-        location: currentShop.location,
-        whatsapp_number: currentShop.whatsapp_number,
-        logo_url: currentShop.logo_url ?? "",
-        banner_url: currentShop.banner_url ?? "",
-        is_live: currentShop.is_live,
-        instagram_handle: currentShop.instagram_handle ?? "",
-        facebook_url: currentShop.facebook_url ?? "",
-        secondary_phone: currentShop.secondary_phone ?? "",
-        business_hours: currentShop.business_hours ?? "",
-        operating_status: currentShop.operating_status ?? "",
-        accent_color: currentShop.accent_color ?? "",
-        store_bio: currentShop.store_bio ?? "",
-        announcement: currentShop.announcement ?? "",
-        service_area: currentShop.service_area ?? "",
-        hourly_rate: currentShop.hourly_rate != null ? String(currentShop.hourly_rate) : "",
-        call_out_charge: currentShop.call_out_charge != null ? String(currentShop.call_out_charge) : "",
-        emergency_available: currentShop.emergency_available ?? false,
-        shop_type: currentShop.shop_type ?? "retail",
-        latitude: currentShop.latitude ?? null,
-        longitude: currentShop.longitude ?? null,
-        service_radius_km: currentShop.service_radius_km ?? 10,
-        address_display: currentShop.address_display ?? "",
-        min_order_amount: currentShop.min_order_amount != null && currentShop.min_order_amount > 0 ? String(currentShop.min_order_amount) : "",
-        free_delivery_threshold: currentShop.free_delivery_threshold != null ? String(currentShop.free_delivery_threshold) : "",
-        delivery_fee_flat: currentShop.delivery_fee_flat != null && currentShop.delivery_fee_flat > 0 ? String(currentShop.delivery_fee_flat) : "",
-        delivery_fee_per_km: currentShop.delivery_fee_per_km != null && currentShop.delivery_fee_per_km > 0 ? String(currentShop.delivery_fee_per_km) : "",
-      });
+      setShopForm(shopToFormData(currentShop));
     } else {
       setShopForm(INITIAL_SHOP_FORM);
     }
@@ -522,12 +539,24 @@ export default function DashboardPage() {
     setShopSaving(true);
     const result = shop ? await updateShop(activeShopId!, shopForm) : await createShop(shopForm);
     if (result.success) {
-      // Refresh shops list
-      const refreshResult = await fetchShops();
+      // Refresh from owner-scoped query so we never mix in demo/public shops
+      const refreshResult = await fetchMyShops();
       if (refreshResult.success) {
-        const myShops = refreshResult.data.filter((s) => s.owner_id === userId);
-        setAllShops(myShops);
-        if (!shop) setActiveShopId(result.data.id);
+        setAllShops(refreshResult.data);
+        const nextId = result.data.id;
+        setActiveShopId(nextId);
+        setShopForm(shopToFormData(result.data));
+        if (typeof window !== "undefined") {
+          localStorage.setItem("trendmart_active_shop", nextId);
+        }
+      } else {
+        // Still keep the saved row in local state even if refresh fails
+        setAllShops((prev) => {
+          const others = prev.filter((s) => s.id !== result.data.id);
+          return [result.data, ...others];
+        });
+        setActiveShopId(result.data.id);
+        setShopForm(shopToFormData(result.data));
       }
       if (!shop) {
         recordLegalAcceptance(userId, ["merchant_guidelines"]);
@@ -796,8 +825,46 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-3xl space-y-8 px-4 py-6">
         {/* No shops message */}
         {allShops.length === 0 && (
-          <section className="py-12 text-center">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Create your first shop below to get started!</p>
+          <section className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 px-4 py-8 text-center dark:border-emerald-800 dark:bg-emerald-950/20">
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              Create your first shop below to get started.
+            </p>
+            <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-400/80">
+              Homepage pe jo doosre logos dikhte hain woh demo / approved stores hain — aapki apni shop yahan save hogi.
+            </p>
+          </section>
+        )}
+
+        {/* Active shop summary — so merchants always see THEIR store after refresh */}
+        {shop && (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400">Your store</p>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{shop.name}</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {shop.category}
+                  {shop.location ? ` · ${shop.location}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-[0.65rem] font-semibold ${liveStatus.bg} ${liveStatus.color}`}>
+                  {liveStatus.label}
+                </span>
+                <Link
+                  href={`/shop/${shop.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                >
+                  <EyeIcon /> View storefront
+                </Link>
+                <Link
+                  href="/dashboard/settings"
+                  className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Settings
+                </Link>
+              </div>
+            </div>
           </section>
         )}
 

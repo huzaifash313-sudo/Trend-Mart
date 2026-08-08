@@ -25,7 +25,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { ProductFormData, Shop, VariantGroup } from "@/types";
 import { PRODUCT_CATEGORIES, CATEGORY_ICONS } from "@/types";
-import { fetchShops } from "@/services/shopService";
+import { fetchMyShops } from "@/services/shopService";
 import { createProduct } from "@/services/productService";
 import {
   fetchSubCategories,
@@ -176,10 +176,10 @@ export default function NewProductPage() {
     if (!userId) return;
     let cancelled = false;
     async function loadShops() {
-      const result = await fetchShops();
+      const result = await fetchMyShops();
       if (cancelled) return;
       if (result.success) {
-        const myShops = result.data.filter((s) => s.owner_id === userId);
+        const myShops = result.data;
         setShops(myShops);
         if (myShops.length > 0 && !activeShopId) {
           const saved = typeof window !== "undefined" ? localStorage.getItem("trendmart_active_shop") : null;
@@ -187,7 +187,7 @@ export default function NewProductPage() {
           setActiveShopId(match?.id ?? myShops[0].id);
         }
       } else {
-        addToast("Failed to load your shops.", "error");
+        addToast(result.error || "Failed to load your shops.", "error");
       }
     }
     loadShops();
