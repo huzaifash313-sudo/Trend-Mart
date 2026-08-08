@@ -485,7 +485,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
                 setTermsTouched(true);
               }}
               disabled={isLoading}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 dark:border-zinc-600"
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-1 focus:ring-emerald-500 dark:border-zinc-600"
             />
             <span className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
               I agree to TrendMart&apos;s{" "}

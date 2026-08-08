@@ -135,7 +135,7 @@ export default function PrivacyPage() {
             <div>
               {showClearConfirm ? (
                 <div className="px-4 py-3">
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-3">Clear all locally stored data (favorites, cart, preferences)?</p>
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-3">Clear all locally stored data (wishlist, cart, preferences)?</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={handleClearCache} className="flex-1 rounded-lg bg-red-600 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors">
                       Yes, Clear Data

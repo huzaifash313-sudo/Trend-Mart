@@ -662,7 +662,7 @@ export async function addFavoriteStore(
   const sanitizedLogoUrl = sanitizeItemUrl(logoUrl);
 
   const userId = await getUserId();
-  if (!userId) return { success: false, error: "Sign in to favorite stores." };
+  if (!userId) return { success: false, error: "Sign in to add stores to your wishlist." };
 
   const supabase = createClient();
   try {
@@ -690,7 +690,7 @@ export async function addFavoriteStore(
       module: "wishlistService.addFavoriteStore",
       meta: { shopId: sanitizedShopId },
     });
-    return { success: false, error: "Failed to add favorite store." };
+    return { success: false, error: "Failed to add store to wishlist." };
   }
 }
 
@@ -704,7 +704,7 @@ export async function removeFavoriteStore(shopId: string): Promise<WishlistResul
   if (!sanitizedShopId) return { success: false, error: "Invalid shop ID." };
 
   const userId = await getUserId();
-  if (!userId) return { success: false, error: "Sign in to manage favorites." };
+  if (!userId) return { success: false, error: "Sign in to manage your wishlist." };
 
   const supabase = createClient();
   try {
@@ -721,7 +721,7 @@ export async function removeFavoriteStore(shopId: string): Promise<WishlistResul
       module: "wishlistService.removeFavoriteStore",
       meta: { shopId: sanitizedShopId },
     });
-    return { success: false, error: "Failed to remove favorite store." };
+    return { success: false, error: "Failed to remove store from wishlist." };
   }
 }
 

@@ -865,7 +865,7 @@ export default function AdvancedInventoryMatrix({
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleSelectAll}
-                  className="rounded"
+                  className="h-3.5 w-3.5 rounded border-zinc-300 text-emerald-600"
                   aria-label="Select all"
                 />
               </th>
@@ -909,7 +909,7 @@ export default function AdvancedInventoryMatrix({
                         type="checkbox"
                         checked={selectedKeys.has(cell.key)}
                         onChange={() => toggleSelect(cell.key)}
-                        className="rounded"
+                        className="h-3.5 w-3.5 rounded border-zinc-300 text-emerald-600"
                       />
                     </td>
 

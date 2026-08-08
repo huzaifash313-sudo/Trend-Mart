@@ -220,7 +220,7 @@ export default function SettingsPage() {
             <Link href="/wishlist" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
               <span className="flex items-center gap-3">
                 <span className="text-zinc-400"><HeartIcon /></span>
-                <span className="text-sm text-zinc-700 dark:text-zinc-300">My Favorites</span>
+                <span className="text-sm text-zinc-700 dark:text-zinc-300">My Wishlist</span>
               </span>
               <ChevronRightIcon />
             </Link>

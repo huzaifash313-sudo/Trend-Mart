@@ -244,7 +244,7 @@ function FavoriteCard({
           type="button"
           onClick={() => onRemove(item.id)}
           className="rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-          aria-label={`Remove ${item.name} from favorites`}
+          aria-label={`Remove ${item.name} from wishlist`}
         >
           <TrashIcon />
         </button>
@@ -286,20 +286,20 @@ export default function WishlistPage() {
     try {
       await removeFavorite(id);
       setFavorites((prev) => prev.filter((f) => f.id !== id));
-      if (item) showToast(`"${item.name}" removed from favorites.`, "info");
+      if (item) showToast(`"${item.name}" removed from wishlist.`, "info");
     } catch {
       showToast("Failed to remove item. Please try again.", "error");
     }
   }, [favorites]);
 
   const handleClearAll = useCallback(async () => {
-    if (!confirm("Remove all favorites?")) return;
+    if (!confirm("Clear your entire wishlist?")) return;
     try {
       await clearAllFavorites();
       setFavorites([]);
-      showToast("All favorites cleared.", "info");
+      showToast("Wishlist cleared.", "info");
     } catch {
-      showToast("Failed to clear favorites. Please try again.", "error");
+      showToast("Failed to clear wishlist. Please try again.", "error");
     }
   }, []);
 
@@ -317,7 +317,7 @@ export default function WishlistPage() {
               <ChevronLeftIcon />
             </Link>
             <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              My Favorites
+              My Wishlist
             </h1>
           </div>
         </header>
@@ -359,7 +359,7 @@ export default function WishlistPage() {
               <ChevronLeftIcon />
             </Link>
             <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              My Favorites
+              My Wishlist
             </h1>
           </div>
           {favorites.length > 0 && (
@@ -383,10 +383,10 @@ export default function WishlistPage() {
               <EmptyHeartIcon />
             </div>
             <h2 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              No favorites yet
+              Your wishlist is empty
             </h2>
             <p className="mb-6 text-sm text-zinc-500 dark:text-zinc-400">
-              Tap the heart icon on any shop or product to save it here.
+              Tap the heart icon on any shop or product to add it to your wishlist.
             </p>
             <Link
               href="/"
@@ -397,7 +397,7 @@ export default function WishlistPage() {
           </div>
         )}
 
-        {/* Favorites Grid */}
+        {/* Wishlist items */}
         {favorites.length > 0 && (
           <>
             <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">

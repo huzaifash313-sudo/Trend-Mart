@@ -509,7 +509,7 @@ export default function AddressesPage() {
                   type="checkbox"
                   checked={form.is_default}
                   onChange={(e) => setForm((f) => ({ ...f, is_default: e.target.checked }))}
-                  className="h-5 w-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 dark:border-zinc-600"
+                  className="h-4 w-4 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 dark:border-zinc-600"
                 />
                 <span className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
                   <StarIcon filled /> Set as default address

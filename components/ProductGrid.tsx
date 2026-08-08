@@ -158,7 +158,7 @@ function ProductCard({
           </span>
         )}
 
-        {/* Favorite button */}
+        {/* Wishlist button */}
         {onFavoriteToggle && (
           <button
             type="button"
@@ -168,7 +168,7 @@ function ProductCard({
                 ? "bg-red-500/90 text-white"
                 : "bg-white/80 text-zinc-400 hover:text-red-500 dark:bg-zinc-900/80 dark:text-zinc-400"
             }`}
-            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
           >
             <HeartIcon filled={isFavorite} />
           </button>

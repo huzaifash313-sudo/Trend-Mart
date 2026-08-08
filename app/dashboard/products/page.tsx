@@ -1428,7 +1428,7 @@ export default function ProductsDashboardPage() {
                       type="checkbox"
                       checked={selectedProductIds.has(product.id)}
                       onChange={() => handleToggleSelect(product.id)}
-                      className="h-4 w-4 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 dark:border-zinc-600"
+                      className="h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-1 focus:ring-emerald-500 dark:border-zinc-600"
                       aria-label={`Select ${product.name}`}
                     />
 

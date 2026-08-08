@@ -125,10 +125,12 @@ code {
 
 /* ── Touch Target & Interaction Optimizations ───────────────────────────────── */
 
-/* Minimum touch target size for interactive elements (AA standard: 44x44px). */
+/* Minimum touch target size for interactive elements (AA standard: 44x44px).
+   Skip checkboxes/radios/switches — forcing 44×44 turns toggles into circles
+   and makes tick boxes look oversized. Labels provide the hit area instead. */
 button,
 a,
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea,
 [role="button"],
@@ -140,11 +142,23 @@ textarea,
   touch-action: manipulation;
 }
 
-/* Exclude inline icon buttons from large min-size when wrapped in larger containers. */
+/* Exclude compact controls from the 44px floor. */
 button.icon-only,
-a.icon-only {
+a.icon-only,
+button[role="switch"],
+[role="switch"],
+input[type="checkbox"],
+input[type="radio"] {
   min-height: unset;
   min-width: unset;
+}
+
+/* Professional checkbox / radio size (used when no Tailwind size is set). */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1rem; /* 16px */
+  height: 1rem;
+  accent-color: #059669; /* emerald-600 */
 }
 
 /* Disable pull-to-refresh on mobile to prevent accidental navigation. */

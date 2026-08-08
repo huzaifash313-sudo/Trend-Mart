@@ -718,7 +718,7 @@ export default function InventoryManager({
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleSelectAll}
-                  className="rounded"
+                  className="h-3.5 w-3.5 rounded border-zinc-300 text-emerald-600"
                 />
               </th>
               <th className="px-4 py-3 text-left">Product / Variant</th>
@@ -765,7 +765,7 @@ export default function InventoryManager({
                         type="checkbox"
                         checked={selectedRows.has(snapshot.key)}
                         onChange={() => toggleSelectRow(snapshot.key)}
-                        className="rounded"
+                        className="h-3.5 w-3.5 rounded border-zinc-300 text-emerald-600"
                       />
                     </td>
 

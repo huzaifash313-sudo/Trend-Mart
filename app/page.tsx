@@ -408,10 +408,10 @@ function HomeInner() {
                               if (nowFav) next.add(shop.id); else next.delete(shop.id);
                               return next;
                             });
-                            addToast(nowFav ? "Added to favorites ❤️" : "Removed from favorites", "info");
+                            addToast(nowFav ? "Added to wishlist ❤️" : "Removed from wishlist", "info");
                           }}
                           className="shrink-0 -mr-1 rounded-full p-1 transition-transform hover:scale-110"
-                          aria-label={favorites.has(shop.id) ? "Remove from favorites" : "Add to favorites"}
+                          aria-label={favorites.has(shop.id) ? "Remove from wishlist" : "Add to wishlist"}
                         >
                           <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill={favorites.has(shop.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
