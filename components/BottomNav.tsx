@@ -125,10 +125,15 @@ export default function BottomNav() {
 
   const handleSearch = useCallback(() => router.push("/search"), [router]);
 
-  const accountHref = session ? "/dashboard" : "/auth";
+  // Merchants land on /dashboard; customers are redirected to /account by middleware
+  const accountHref = session ? "/dashboard" : "/login";
   const isHomeActive = pathname === "/";
   const isSearchActive = pathname === "/search";
-  const isAccountActive = pathname === "/dashboard" || pathname === "/auth";
+  const isAccountActive =
+    pathname === "/dashboard" ||
+    pathname.startsWith("/account") ||
+    pathname === "/login" ||
+    pathname === "/signup";
 
   const tabs: Tab[] = [
     { key: "home", label: "Home", icon: HomeIcon, href: "/" },
@@ -138,8 +143,8 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden" aria-label="Main navigation">
-      <div className="mx-auto flex max-w-lg items-center justify-around px-1 pb-safe">
+    <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden" aria-label="Main navigation">
+      <div className="mx-auto flex h-full max-w-lg items-center justify-around px-1">
         {tabs.map((tab) => {
           const active =
             tab.key === "home" ? isHomeActive

@@ -78,9 +78,6 @@ const REQUIRED_SERVER_VARS = [
   // Supabase service role (server-only, must NOT be NEXT_PUBLIC_)
   "SUPABASE_SERVICE_ROLE_KEY",
 
-  // Database (direct connection, if used)
-  "DATABASE_URL",
-
   // Storage
   "SUPABASE_STORAGE_BUCKET",
 
@@ -94,6 +91,8 @@ const REQUIRED_SERVER_VARS = [
  * Their absence generates a warning, not an error.
  */
 const RECOMMENDED_SERVER_VARS = [
+  // Direct Postgres URL only if you use migrations/psql outside Supabase client
+  "DATABASE_URL",
   "SENTRY_DSN",
   "SENTRY_ORG",
   "SENTRY_PROJECT",

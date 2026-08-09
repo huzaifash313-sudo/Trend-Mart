@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
-import { signInWithEmail, redirectToDashboard, getCurrentUser, detectUserRole } from "@/services/authService";
+import { signInWithEmail, getCurrentUser, detectUserRole, getDashboardPath } from "@/services/authService";
 import { useToast } from "@/components/Toast";
 import type { SignInFormValues, SignUpFormValues } from "@/lib/validations";
 
@@ -90,12 +91,28 @@ function GradientOrbs() {
 /*  Page                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export default function LoginPage() {
+function LoginPageInner() {
   const { addToast } = useToast();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
+
+  const finishLogin = useCallback(
+    async (role?: "customer" | "merchant" | "admin") => {
+      const user = await getCurrentUser();
+      const resolved = role ?? (await detectUserRole(user));
+      const fallback = getDashboardPath(resolved);
+      const target =
+        redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+          ? redirectTo
+          : fallback;
+      window.location.href = target;
+    },
+    [redirectTo],
+  );
 
   const handleSubmit = useCallback(
     async (values: SignInFormValues | SignUpFormValues) => {
@@ -107,18 +124,17 @@ export default function LoginPage() {
 
         if (result.success && result.role) {
           addToast("Welcome back!", "success");
-          // Small delay to let the session cookies propagate
           await new Promise((r) => setTimeout(r, 300));
-          redirectToDashboard(result.role);
+          await finishLogin(result.role);
           return;
         }
 
-        if (!result.success && "needsVerification" in result && result.needsVerification && result.user) {
-          // Email not verified — redirect to verify-notice page
+        if (!result.success && result.needsVerification) {
           setServerError(null);
           addToast("Please verify your email to continue.", "info");
-          const verifyUrl = `/auth/verify-notice?redirect=${encodeURIComponent("/account")}`;
-          window.location.href = verifyUrl;
+          // Prefer in-app OTP; also allow verify-notice with live session
+          setOtpEmail(values.email.trim().toLowerCase());
+          setShowOtpModal(true);
           return;
         }
 
@@ -133,17 +149,15 @@ export default function LoginPage() {
         setIsLoading(false);
       }
     },
-    [addToast],
+    [addToast, finishLogin],
   );
 
   const handleOtpVerified = useCallback(async () => {
     setShowOtpModal(false);
     setOtpEmail(null);
     addToast("Verification successful! Signing you in...", "success");
-    const user = await getCurrentUser();
-    const role = await detectUserRole(user);
-    redirectToDashboard(role);
-  }, [addToast]);
+    await finishLogin();
+  }, [addToast, finishLogin]);
 
   return (
     <div className="relative flex min-h-screen overflow-hidden">
@@ -315,5 +329,19 @@ export default function LoginPage() {
         onVerified={handleOtpVerified}
       />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   );
 }

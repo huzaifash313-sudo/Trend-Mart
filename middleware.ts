@@ -25,7 +25,7 @@ import { getDistributedRateLimiter } from "@/lib/rateLimiterRedis";
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Debug Mode (set to true during troubleshooting) ──────────────────────
-const DEBUG_AUTH = true; // Logs auth decisions to server console
+const DEBUG_AUTH = process.env.NODE_ENV !== "production";
 
 function authDebug(message: string, data?: Record<string, unknown>): void {
   if (!DEBUG_AUTH) return;
@@ -131,7 +131,7 @@ const ROLE_ROUTE_MAP = {
   /** Routes that require at minimum an authenticated user (any role). */
   customer: ["/auth/settings", "/account", "/orders"],
   /** Routes that require merchant or higher (store owners). */
-  merchant: ["/dashboard", "/shop/manage"],
+  merchant: ["/dashboard"],
   /** Routes that require admin role exclusively. */
   admin: ["/admin"],
 } as const;
@@ -338,11 +338,15 @@ const VERIFY_EXEMPT_PATHS = [
   "/auth/callback",
   "/settings",
   "/search",
-  "/shop",
   "/wishlist", // guest local wishlist; purchase still gated at checkout
 ];
 
 function isVerifyExempt(pathname: string): boolean {
+  // Public storefront shop pages only — not merchant tools
+  if (pathname === "/shop" || /^\/shop\/[^/]+/.test(pathname)) {
+    if (pathname.startsWith("/shop/manage")) return false;
+    return true;
+  }
   return VERIFY_EXEMPT_PATHS.some((p) => pathname.startsWith(p));
 }
 

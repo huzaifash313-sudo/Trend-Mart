@@ -801,7 +801,7 @@ export default function WhatsAppCheckoutModal({
                     Sign in
                   </Link>
                   <Link
-                    href="/signup?redirect=/"
+                    href="/signup"
                     className="rounded-full border border-zinc-200 px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                     onClick={onClose}
                   >

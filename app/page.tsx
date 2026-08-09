@@ -419,10 +419,42 @@ function HomeInner() {
 
         {/* Empty state */}
         {!loading && !error && displayShops.length === 0 && (
-          <div className="py-12 text-center">
-            <p className="text-sm text-zinc-400 dark:text-zinc-500">
-              {searchQuery || activeCategory !== "All" ? "No shops match your filters." : "No shops are live right now. Check back soon!"}
+          <div className="mx-auto max-w-md py-14 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-600/20">
+              <svg className="h-7 w-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                <path d="M3 9l1.12-5.6A1 1 0 0 1 5.1 3h13.8a1 1 0 0 1 .98.8L21 9" strokeLinecap="round" />
+                <path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9" strokeLinecap="round" />
+                <path d="M9 21V9h6v12" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
+              {searchQuery || activeCategory !== "All" ? "No shops match" : "Marketplace is warming up"}
+            </h3>
+            <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+              {searchQuery || activeCategory !== "All"
+                ? "Try another category, clear search, or widen your area filter."
+                : "Local stores will appear here as merchants go live. Browse freely — checkout needs a verified email account."}
             </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {(searchQuery || activeCategory !== "All") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCategoryChange("All");
+                    handleSubCategoryChange(null);
+                  }}
+                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                >
+                  Clear filters
+                </button>
+              )}
+              <Link
+                href="/signup"
+                className="rounded-full border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                Open a store
+              </Link>
+            </div>
           </div>
         )}
 

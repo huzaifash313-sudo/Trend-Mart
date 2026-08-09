@@ -50,15 +50,13 @@ export async function signInWithEmail(
       };
     }
 
-    // Check if email is confirmed
+    // Email not confirmed — keep the session so /auth/verify-notice can resend
+    // and check status. Middleware still blocks account/dashboard until verified.
     if (data.user && !data.user.email_confirmed_at) {
-      // User exists but hasn't verified email — sign them out immediately
-      // and redirect to the verify-notice page
-      await supabase.auth.signOut();
       return {
         success: false,
         user: data.user,
-        error: "Please verify your email before signing in. Check your inbox.",
+        error: "Please verify your email before continuing. Check your inbox.",
         needsVerification: true,
       };
     }

@@ -48,6 +48,7 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
     const withShop = await supabase
       .from("stories")
       .select("*, shops:shop_id ( name, logo_url )")
+      .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
 
     if (!withShop.error && withShop.data) {
@@ -61,6 +62,7 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
     const { data, error } = await supabase
       .from("stories")
       .select("*")
+      .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
 
     if (error) throw error;

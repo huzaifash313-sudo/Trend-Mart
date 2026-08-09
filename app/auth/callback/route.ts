@@ -22,14 +22,25 @@ export async function GET(request: NextRequest) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Check user_roles table for role
+          const metaRole = (user.user_metadata?.role as string | undefined) ?? "";
+          const desiredRole =
+            metaRole === "merchant" || metaRole === "customer" ? metaRole : "customer";
+
+          // Ensure role row exists after email-link confirmation
+          try {
+            await supabase.rpc("set_my_signup_role", { desired_role: desiredRole });
+          } catch {
+            await supabase.from("user_roles").upsert(
+              { user_id: user.id, role: desiredRole },
+              { onConflict: "user_id" },
+            );
+          }
+
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id)
             .maybeSingle();
-
-          const metaRole = (user.user_metadata?.role as string | undefined) ?? "";
 
           if (roleData?.role === "admin") redirectTo = "/admin/dashboard";
           else if (roleData?.role === "merchant" || metaRole === "merchant") redirectTo = "/dashboard";

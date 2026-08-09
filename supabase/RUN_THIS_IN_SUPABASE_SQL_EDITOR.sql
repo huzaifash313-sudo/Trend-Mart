@@ -8,8 +8,13 @@
 --   2. Paste this ENTIRE file, then click "Run"
 --   3. Wait for it to finish (a few seconds) — you should see
 --      "Success. No rows returned" with some NOTICE/WARNING lines above it.
---   4. Done. Every table, function, trigger, RLS policy, and starter/demo
---      data this app needs now exists in your database.
+--   4. Done. Every table, function, trigger, RLS policy this app needs exists.
+--
+-- IF YOU SEE: Failed to fetch (api.supabase.com)
+--   The dashboard timed out on this large paste (network / size). Do NOT panic.
+--   Instead run the smaller files in order from:
+--     supabase/sql-parts/   (see README.md there)
+--   Then run: supabase/RESET_CLEAN_START_4_MERCHANTS.sql
 --
 -- This script is 100% idempotent — every statement uses
 -- IF NOT EXISTS / CREATE OR REPLACE / DROP ... IF EXISTS, so it is

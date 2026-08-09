@@ -447,7 +447,11 @@ label {
 .bottom-nav,
 .mobile-nav {
   padding-bottom: var(--safe-area-inset-bottom);
-  height: calc(56px + var(--safe-area-inset-bottom));
+  min-height: calc(56px + var(--safe-area-inset-bottom));
+}
+
+.pb-safe {
+  padding-bottom: var(--safe-area-inset-bottom);
 }
 
 /* ── Marquee Animation (AnnouncementBanner) ─────────────────────────────────── */
