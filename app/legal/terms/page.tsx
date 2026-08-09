@@ -36,8 +36,8 @@ export default function TermsPage() {
               without creating an account.
             </>,
             <>
-              <strong>Customers</strong> must verify their phone number (OTP) at checkout before an
-              order is placed.
+              <strong>Customers</strong> must create an account and verify their email before an
+              order is placed. Phone numbers are delivery contact details only (no phone OTP).
             </>,
             <>
               <strong>Merchants</strong> must complete store registration and may be subject to

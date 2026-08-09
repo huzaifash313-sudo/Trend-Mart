@@ -39,6 +39,8 @@ import { isValidUUID } from "@/lib/sanitization";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import ImageUpload from "@/components/ImageUpload";
+import MultiImageUpload from "@/components/MultiImageUpload";
+import { getProductImages, normalizeProductGallery } from "@/lib/productImages";
 import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
@@ -50,6 +52,10 @@ import { fetchCouponsByShopId, createCoupon, updateCouponStatus, deleteCoupon } 
 import { downloadProductsCSV, downloadOrdersCSV } from "@/services/exportService";
 import type { Order, OrderStatus } from "@/types";
 import type { Coupon } from "@/services/couponService";
+import {
+  OFFER_DURATION_PRESETS,
+  expiresAtFromHours,
+} from "@/lib/shopOfferTicker";
 
 const INITIAL_SHOP_FORM: ShopFormData = {
   name: "",
@@ -67,6 +73,7 @@ const INITIAL_SHOP_FORM: ShopFormData = {
   accent_color: "",
   store_bio: "",
   announcement: "",
+  announcement_expires_at: "",
   service_area: "",
   hourly_rate: "",
   call_out_charge: "",
@@ -88,9 +95,11 @@ const INITIAL_PRODUCT_FORM: ProductFormData = {
   description: "",
   price: 0,
   original_price: null,
+  deal_expires_at: null,
   category_id: "",
   sub_category_id: "",
   image_url: "",
+  images: [],
   is_available: true,
 };
 
@@ -112,6 +121,7 @@ function shopToFormData(s: Shop): ShopFormData {
     accent_color: s.accent_color ?? "",
     store_bio: s.store_bio ?? "",
     announcement: s.announcement ?? "",
+    announcement_expires_at: s.announcement_expires_at ?? "",
     service_area: s.service_area ?? "",
     hourly_rate: s.hourly_rate != null ? String(s.hourly_rate) : "",
     call_out_charge: s.call_out_charge != null ? String(s.call_out_charge) : "",
@@ -127,6 +137,25 @@ function shopToFormData(s: Shop): ShopFormData {
     delivery_fee_flat: s.delivery_fee_flat != null && s.delivery_fee_flat > 0 ? String(s.delivery_fee_flat) : "",
     delivery_fee_per_km: s.delivery_fee_per_km != null && s.delivery_fee_per_km > 0 ? String(s.delivery_fee_per_km) : "",
   };
+}
+
+function durationKeyFromExpires(expiresAt: string | null | undefined): string {
+  if (!expiresAt?.trim()) return "none";
+  const end = new Date(expiresAt).getTime();
+  if (Number.isNaN(end)) return "custom";
+  const hoursLeft = (end - Date.now()) / (60 * 60 * 1000);
+  if (hoursLeft <= 0) return "custom";
+  const match = OFFER_DURATION_PRESETS.find(
+    (p) => p.hours != null && Math.abs(p.hours - hoursLeft) < 0.35,
+  );
+  return match?.key ?? "custom";
+}
+
+function toDatetimeLocalValue(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function PlusIcon() {
@@ -188,13 +217,8 @@ function MousePointerIcon() {
   );
 }
 
-function ClockIcon() {
-  return (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
+/** How many products per page — denser list so less scrolling. */
+const PRODUCTS_PAGE_SIZE = 40;
 
 function ProductRow({
   product,
@@ -214,11 +238,10 @@ function ProductRow({
   onToggleSelect?: (id: string) => void;
 }) {
   const priceLabel = formatRupees(product.price);
-  const categoryLabel = product.category_id?.trim() || null;
 
   return (
     <div
-      className={`flex items-center gap-3 rounded-xl border bg-white px-4 py-3 transition-shadow hover:shadow-sm dark:bg-zinc-900 ${
+      className={`flex items-center gap-2 rounded-lg border bg-white px-2.5 py-2 transition-colors hover:bg-zinc-50/80 dark:bg-zinc-900 dark:hover:bg-zinc-800/60 sm:gap-3 sm:px-3 ${
         product.is_available
           ? "border-zinc-200 dark:border-zinc-800"
           : "border-zinc-200 opacity-70 dark:border-zinc-800"
@@ -234,56 +257,53 @@ function ProductRow({
         />
       )}
 
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
         {product.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.image_url} alt="" className="h-full w-full object-cover" />
+          <img src={product.image_url} alt="" className="h-full w-full object-contain" />
         ) : (
-          <span className="text-sm font-bold text-zinc-400">
+          <span className="text-xs font-bold text-zinc-400">
             {product.name.charAt(0).toUpperCase() || "P"}
           </span>
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
             {product.name}
           </span>
           <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${
+            className={`hidden shrink-0 rounded-full px-1.5 py-0.5 text-[0.6rem] font-semibold sm:inline ${
               product.is_available
                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                 : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
             }`}
           >
-            {product.is_available ? "In Stock" : "Out of Stock"}
+            {product.is_available ? "In Stock" : "Out"}
           </span>
         </div>
-        <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">{priceLabel}</span>
-          {categoryLabel ? (
-            <span className="text-zinc-400"> · </span>
-          ) : null}
-          {categoryLabel ? (
-            <span className="truncate">{categoryLabel}</span>
+        <p className="truncate text-xs font-medium text-zinc-600 dark:text-zinc-400">
+          {priceLabel}
+          {!product.is_available ? (
+            <span className="ml-1.5 text-zinc-400 sm:hidden">· Out</span>
           ) : null}
         </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         <button
           type="button"
           onClick={() => onToggleAvailability(product)}
           aria-pressed={product.is_available}
-          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 sm:text-xs"
         >
           {product.is_available ? "Mark Out" : "Mark In"}
         </button>
         <button
           type="button"
           onClick={() => onEdit(product)}
-          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 sm:text-xs"
         >
           Edit
         </button>
@@ -291,7 +311,7 @@ function ProductRow({
           type="button"
           onClick={() => onDelete(product.id)}
           disabled={deleting}
-          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-900/20"
+          className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-900/20"
           aria-label={`Delete ${product.name}`}
         >
           <TrashIcon />
@@ -314,6 +334,8 @@ export default function DashboardPage() {
   const shop = allShops.find((s) => s.id === activeShopId) ?? null;
 
   const [shopForm, setShopForm] = useState<ShopFormData>(INITIAL_SHOP_FORM);
+  /** Preset key for offer duration select (`none` | `6h` | … | `custom`). */
+  const [offerDurationKey, setOfferDurationKey] = useState<string>("none");
   const [shopSaving, setShopSaving] = useState(false);
   const [agreedMerchantGuidelines, setAgreedMerchantGuidelines] = useState(false);
   const [merchantTermsTouched, setMerchantTermsTouched] = useState(false);
@@ -330,6 +352,8 @@ export default function DashboardPage() {
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const [productPage, setProductPage] = useState(1);
 
   const [storyImageUrl, setStoryImageUrl] = useState("");
   const [storyCaption, setStoryCaption] = useState("");
@@ -370,19 +394,6 @@ export default function DashboardPage() {
       .filter((o) => o.created_at?.startsWith(today) && o.status !== "Cancelled")
       .reduce((sum, o) => sum + (o.total_amount || 0), 0);
   }, [orders]);
-
-  // ── Activity Log ─────────────────────────────────────────────────────────
-  /** Build an activity log timeline from product creation/update timestamps. */
-  const activityLog = useMemo(() => {
-    const events: { label: string; timestamp: string; type: "created" | "updated" }[] = [];
-    for (const p of products) {
-      if (p.created_at) {
-        events.push({ label: `Added "${p.name}"`, timestamp: p.created_at, type: "created" });
-      }
-    }
-    // Sort newest first and take the last 10
-    return events.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 10);
-  }, [products]);
 
   // ── Auth Check (with debug logging) ──────────────────────────────────────
   // FIX: Removed hard redirect to /login — middleware handles auth.
@@ -457,9 +468,14 @@ export default function DashboardPage() {
       setActiveShopId(nextId);
       if (nextId) {
         const current = myShops.find((s) => s.id === nextId);
-        if (current) setShopForm(shopToFormData(current));
+        if (current) {
+          const form = shopToFormData(current);
+          setShopForm(form);
+          setOfferDurationKey(durationKeyFromExpires(form.announcement_expires_at));
+        }
       } else {
         setShopForm(INITIAL_SHOP_FORM);
+        setOfferDurationKey("none");
       }
     }
     loadShops();
@@ -514,8 +530,10 @@ export default function DashboardPage() {
     const currentShop = allShops.find((s) => s.id === shopId);
     if (currentShop) {
       setShopForm(shopToFormData(currentShop));
+      setOfferDurationKey(durationKeyFromExpires(currentShop.announcement_expires_at));
     } else {
       setShopForm(INITIAL_SHOP_FORM);
+      setOfferDurationKey("none");
     }
   }, [allShops]);
 
@@ -627,6 +645,7 @@ export default function DashboardPage() {
         const nextId = result.data.id;
         setActiveShopId(nextId);
         setShopForm(shopToFormData(result.data));
+        setOfferDurationKey(durationKeyFromExpires(result.data.announcement_expires_at));
         if (typeof window !== "undefined") {
           localStorage.setItem("trendmart_active_shop", nextId);
         }
@@ -671,10 +690,19 @@ export default function DashboardPage() {
       return;
     }
 
+    const gallery = normalizeProductGallery(
+      Array.isArray(productForm.images) && productForm.images.length > 0
+        ? productForm.images
+        : productForm.image_url
+          ? [productForm.image_url]
+          : [],
+    );
     const payload: ProductFormData = {
       ...productForm,
       category_id: mainCategory,
       sub_category_id: subId,
+      image_url: gallery.image_url,
+      images: gallery.images,
     };
 
     const result = editingProductId ? await updateProduct(editingProductId, payload) : await createProduct(activeShopId, payload);
@@ -695,14 +723,17 @@ export default function DashboardPage() {
 
   const handleEditProduct = useCallback((product: Product) => {
     setEditingProductId(product.id);
+    const gallery = getProductImages(product);
     setProductForm({
       name: product.name,
       description: product.description,
       price: product.price,
       original_price: product.original_price ?? null,
+      deal_expires_at: product.deal_expires_at ?? null,
       category_id: product.category_id ?? shop?.category ?? "",
       sub_category_id: product.sub_category_id ?? "",
-      image_url: product.image_url ?? "",
+      image_url: gallery[0] ?? "",
+      images: gallery,
       is_available: product.is_available,
     });
     setShowMoreProductOptions(true);
@@ -786,13 +817,38 @@ export default function DashboardPage() {
     });
   }, []);
 
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) => {
+      const name = p.name.toLowerCase();
+      const desc = (p.description ?? "").toLowerCase();
+      const price = String(p.price);
+      return name.includes(q) || desc.includes(q) || price.includes(q);
+    });
+  }, [products, productSearch]);
+
+  const productTotalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PAGE_SIZE));
+  const safeProductPage = Math.min(productPage, productTotalPages);
+  const pagedProducts = useMemo(() => {
+    const start = (safeProductPage - 1) * PRODUCTS_PAGE_SIZE;
+    return filteredProducts.slice(start, start + PRODUCTS_PAGE_SIZE);
+  }, [filteredProducts, safeProductPage]);
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearch, activeShopId]);
+
   const handleSelectAll = useCallback(() => {
-    if (selectedProductIds.size === products.length) {
+    const ids = filteredProducts.map((p) => p.id);
+    const allSelected =
+      ids.length > 0 && ids.every((id) => selectedProductIds.has(id));
+    if (allSelected) {
       setSelectedProductIds(new Set());
     } else {
-      setSelectedProductIds(new Set(products.map((p) => p.id)));
+      setSelectedProductIds(new Set(ids));
     }
-  }, [products, selectedProductIds.size]);
+  }, [filteredProducts, selectedProductIds]);
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedProductIds.size === 0) return;
@@ -875,7 +931,7 @@ export default function DashboardPage() {
       {/* ── Email Verification Warning ───────────────────────────────────── */}
       {userEmailVerified === false && (
         <div className="sticky top-0 z-30 border-b border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/30">
-          <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <span className="text-base" role="img" aria-label="Warning">⚠️</span>
               <div className="min-w-0">
@@ -897,21 +953,11 @@ export default function DashboardPage() {
         </div>
       )}
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h1 className="truncate text-base font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-lg">
               {shop ? shop.name : allShops.length > 0 ? "Dashboard" : "My Shop"}
             </h1>
-            {shop && (
-              <Link
-                href={`/shop/${shop.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="chip shrink-0 rounded-full bg-emerald-600 px-2.5 text-[0.65rem] font-semibold text-white hover:bg-emerald-700"
-              >
-                View My Store
-              </Link>
-            )}
             {shop && (
               <Link
                 href="/dashboard/settings"
@@ -948,7 +994,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="page-stack mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-5">
+      <main className="page-stack mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-5">
         {/* No shops message */}
         {allShops.length === 0 && (
           <section className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 px-3 py-5 text-center dark:border-emerald-800 dark:bg-emerald-950/20">
@@ -963,7 +1009,7 @@ export default function DashboardPage() {
 
         {/* Active shop summary — so merchants always see THEIR store after refresh */}
         {shop && (
-          <section className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] sm:p-3.5">
+          <section className="w-full rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] sm:p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-700">Your store</p>
@@ -990,15 +1036,15 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Shop Details Form */}
-        <section>
+        {/* Shop Details — full width, dense multi-column on laptop */}
+        <section className="w-full">
           <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">{shop ? "Edit Shop Details" : "Create Your Shop"}</h2>
           <form onSubmit={handleSaveShop} className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] sm:space-y-3.5 sm:p-4">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Shop Name *</label>
-              <input type="text" required value={shopForm.name} onChange={(e) => setShopForm((f) => ({ ...f, name: e.target.value }))} placeholder="My Trendy Store" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="sm:col-span-2 lg:col-span-2">
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Shop Name *</label>
+                <input type="text" required value={shopForm.name} onChange={(e) => setShopForm((f) => ({ ...f, name: e.target.value }))} placeholder="My Trendy Store" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Category *</label>
                 <select value={shopForm.category} onChange={(e) => setShopForm((f) => ({ ...f, category: e.target.value }))} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
@@ -1025,16 +1071,16 @@ export default function DashboardPage() {
                 onChange={(patch) => setShopForm((f) => ({ ...f, ...patch }))}
               />
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">WhatsApp Number</label>
                 <input type="text" value={shopForm.whatsapp_number} onChange={(e) => setShopForm((f) => ({ ...f, whatsapp_number: e.target.value }))} placeholder="923001234567" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
               </div>
               <ImageUpload label="Logo" currentUrl={shopForm.logo_url} onUploaded={(url) => setShopForm((f) => ({ ...f, logo_url: url }))} folder="shops" fileId={activeShopId ?? userId ?? "new-shop"} showPreview />
+              <ImageUpload label="Store Banner" currentUrl={shopForm.banner_url} onUploaded={(url) => setShopForm((f) => ({ ...f, banner_url: url }))} folder="shops" fileId={(activeShopId ?? userId ?? "new-shop") + "-banner"} showPreview />
             </div>
-            <ImageUpload label="Store Banner" currentUrl={shopForm.banner_url} onUploaded={(url) => setShopForm((f) => ({ ...f, banner_url: url }))} folder="shops" fileId={(activeShopId ?? userId ?? "new-shop") + "-banner"} showPreview />
             {/* Social Media Links */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                   <span className="inline-flex items-center gap-1">
@@ -1096,23 +1142,97 @@ export default function DashboardPage() {
                 <input type="text" value={shopForm.operating_status} onChange={(e) => setShopForm((f) => ({ ...f, operating_status: e.target.value }))} placeholder="Open Today: 9 AM - 10 PM" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
               </div>
             </div>
-            {/* Announcement Banner (Prompt 97) */}
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                <span className="inline-flex items-center gap-1">
-                  📢 Promotional Announcement
-                  <span className="text-zinc-400 font-normal">(optional)</span>
-                </span>
-              </label>
-              <input
-                type="text"
-                value={shopForm.announcement}
-                onChange={(e) => setShopForm((f) => ({ ...f, announcement: e.target.value }))}
-                placeholder="Free delivery on orders above Rs. 2000!"
-                maxLength={200}
-                className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-              />
-              <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">This will appear as a sliding marquee banner at the top of your storefront page.</p>
+            {/* Promo + free delivery — full-width dense row on laptop */}
+            <div className="rounded-xl border border-dashed border-teal-200/80 bg-teal-50/40 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
+                <div className="lg:col-span-5">
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    Promotional offer
+                  </label>
+                  <input
+                    type="text"
+                    value={shopForm.announcement}
+                    onChange={(e) => {
+                      const announcement = e.target.value;
+                      setShopForm((f) => ({
+                        ...f,
+                        announcement,
+                        announcement_expires_at: announcement.trim() ? f.announcement_expires_at : "",
+                      }));
+                      if (!announcement.trim()) setOfferDurationKey("none");
+                    }}
+                    placeholder="e.g. 20% OFF this weekend!"
+                    maxLength={200}
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div className="lg:col-span-3">
+                  <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                    Offer end date
+                  </label>
+                  <select
+                    value={offerDurationKey}
+                    onChange={(e) => {
+                      const key = e.target.value;
+                      setOfferDurationKey(key);
+                      if (key === "custom") return;
+                      const preset = OFFER_DURATION_PRESETS.find((p) => p.key === key);
+                      setShopForm((f) => ({
+                        ...f,
+                        announcement_expires_at: expiresAtFromHours(preset?.hours ?? null) ?? "",
+                      }));
+                    }}
+                    disabled={!shopForm.announcement.trim()}
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    {OFFER_DURATION_PRESETS.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {p.label}
+                      </option>
+                    ))}
+                    <option value="custom">Pick end date &amp; time</option>
+                  </select>
+                  {offerDurationKey === "custom" && (
+                    <input
+                      type="datetime-local"
+                      value={
+                        shopForm.announcement_expires_at
+                          ? toDatetimeLocalValue(shopForm.announcement_expires_at)
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setOfferDurationKey(v ? "custom" : "none");
+                        setShopForm((f) => ({
+                          ...f,
+                          announcement_expires_at: v ? new Date(v).toISOString() : "",
+                        }));
+                      }}
+                      disabled={!shopForm.announcement.trim()}
+                      className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  )}
+                </div>
+                <div className="lg:col-span-4">
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    Free delivery above (PKR)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={shopForm.free_delivery_threshold}
+                    onChange={(e) =>
+                      setShopForm((f) => ({ ...f, free_delivery_threshold: e.target.value }))
+                    }
+                    placeholder="e.g. 2000"
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+                Offer + free delivery shop page ke upar banner mein dikhenge.
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <ToggleSwitch
@@ -1163,7 +1283,7 @@ export default function DashboardPage() {
 
         {/* Analytics Summary Cards */}
         {activeShopId && (
-          <section>
+          <section className="w-full">
             <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">Analytics Overview</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
@@ -1248,40 +1368,6 @@ export default function DashboardPage() {
               </>
             )}
 
-            {/* ── Activity Timeline ─────────────────────────────────────── */}
-            {shop && activityLog.length > 0 && (
-              <div className="mt-5">
-                <h3 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  <ClockIcon />
-                  Recent Activity
-                </h3>
-                <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                  <table className="w-full text-left text-sm" role="table" aria-label="Recent product activity log">
-                    <thead className="border-b border-zinc-100 dark:border-zinc-800">
-                      <tr>
-                        <th scope="col" className="px-4 py-2.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">Action</th>
-                        <th scope="col" className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-500 dark:text-zinc-400">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activityLog.map((entry, i) => (
-                        <tr key={i} className="border-t border-zinc-50 dark:border-zinc-800/50">
-                          <td className="px-4 py-2.5">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className={`h-1.5 w-1.5 rounded-full ${entry.type === "created" ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden="true" />
-                              {entry.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-xs text-zinc-400 dark:text-zinc-500">
-                            {new Date(entry.timestamp).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </section>
         )}
 
@@ -1355,9 +1441,10 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Product Management — Sub-Category only (store type is fixed) + bulk add */}
+        {/* Product Management — full width; dense fields on laptop */}
         {activeShopId && shop && (
           <section id="product-form" className="space-y-4">
+            <div className="w-full">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
@@ -1370,21 +1457,21 @@ export default function DashboardPage() {
                 </p>
               </div>
               {!editingProductId && (
-                <Link
-                  href="/dashboard/products/new"
+                <a
+                  href="#bulk-products"
                   className="text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
                 >
-                  Batch add many →
-                </Link>
+                  Batch add many ↓
+                </a>
               )}
             </div>
 
-            <form onSubmit={handleSaveProduct} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Product Name *</label>
-                <input type="text" required value={productForm.name} onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Zinger Burger" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <form onSubmit={handleSaveProduct} className="mt-3 space-y-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] sm:p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="sm:col-span-2 lg:col-span-2">
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Product Name *</label>
+                  <input type="text" required value={productForm.name} onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Zinger Burger" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+                </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Sub-Category *</label>
                   <select
@@ -1415,7 +1502,26 @@ export default function DashboardPage() {
                   <input type="number" required min={0} step={1} value={productForm.price || ""} onChange={(e) => setProductForm((f) => ({ ...f, price: Number(e.target.value) }))} placeholder="450" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
                 </div>
               </div>
-              <ImageUpload label="Product Image" currentUrl={productForm.image_url} onUploaded={(url) => setProductForm((f) => ({ ...f, image_url: url }))} folder="products" fileId={editingProductId ?? "new-product"} showPreview />
+              <MultiImageUpload
+                label="Product photos"
+                urls={
+                  Array.isArray(productForm.images) && productForm.images.length > 0
+                    ? productForm.images
+                    : productForm.image_url
+                      ? [productForm.image_url]
+                      : []
+                }
+                onChange={(urls) => {
+                  const g = normalizeProductGallery(urls);
+                  setProductForm((f) => ({
+                    ...f,
+                    image_url: g.image_url,
+                    images: g.images,
+                  }));
+                }}
+                folder="products"
+                fileIdPrefix={editingProductId ?? activeShopId ?? "new-product"}
+              />
 
               <button
                 type="button"
@@ -1444,9 +1550,34 @@ export default function DashboardPage() {
                     />
                     {!!productForm.original_price && productForm.original_price > productForm.price && (
                       <p className="mt-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                        🏷️ {Math.round(((productForm.original_price - productForm.price) / productForm.original_price) * 100)}% OFF badge will show on this product.
+                        {Math.round(((productForm.original_price - productForm.price) / productForm.original_price) * 100)}% OFF badge will show on this product.
                       </p>
                     )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                      Deal ends (optional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={
+                        productForm.deal_expires_at
+                          ? toDatetimeLocalValue(productForm.deal_expires_at)
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setProductForm((f) => ({
+                          ...f,
+                          deal_expires_at: v ? new Date(v).toISOString() : null,
+                        }));
+                      }}
+                      disabled={!productForm.original_price || productForm.original_price <= productForm.price}
+                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <p className="mt-1 text-[11px] text-zinc-400">
+                      Is waqt ke baad % OFF badge hide ho jayega. Pehle original price set karein.
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <ToggleSwitch
@@ -1471,13 +1602,14 @@ export default function DashboardPage() {
                 )}
               </div>
             </form>
+            </div>
 
             {!editingProductId && (
-              <details className="rounded-2xl border border-zinc-200 open:shadow-sm dark:border-[color:var(--tm-border)]">
+              <details id="bulk-products" className="rounded-2xl border border-zinc-200 open:shadow-sm dark:border-[color:var(--tm-border)]">
                 <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
                   Add multiple products at once (batch table)
                 </summary>
-                <div className="border-t border-zinc-100 p-3 dark:border-[color:var(--tm-border)] sm:p-4">
+                <div className="overflow-x-auto border-t border-zinc-100 p-2 dark:border-[color:var(--tm-border)] sm:p-3">
                   <BulkProductCreator
                     shopId={activeShopId}
                     shopCategory={shop.category}
@@ -1490,21 +1622,56 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Product List */}
+        {/* Product List — search + pagination (no endless scroll) */}
         {activeShopId && (
           <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Your Products ({products.length})</h2>
-              {!productsLoading && products.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Your Products ({products.length})
+                </h2>
+                {productSearch.trim() && !productsLoading && (
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    {filteredProducts.length} match{filteredProducts.length === 1 ? "" : "es"}
+                  </p>
+                )}
+              </div>
+              {!productsLoading && filteredProducts.length > 0 && (
                 <button
                   type="button"
                   onClick={handleSelectAll}
                   className="text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
                 >
-                  {selectedProductIds.size === products.length ? "Deselect All" : "Select All"}
+                  {filteredProducts.length > 0 &&
+                  filteredProducts.every((p) => selectedProductIds.has(p.id))
+                    ? "Deselect All"
+                    : "Select All"}
                 </button>
               )}
             </div>
+
+            {!productsLoading && products.length > 0 && (
+              <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center">
+                <div className="relative min-w-0 flex-1">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                  </span>
+                  <input
+                    type="search"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Search products by name or price…"
+                    className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                  />
+                </div>
+                <p className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                  Page {safeProductPage}/{productTotalPages} · {PRODUCTS_PAGE_SIZE} per page · next/prev se aage
+                </p>
+              </div>
+            )}
+
             {/* Batch Action Toolbar */}
             {selectedProductIds.size > 0 && (
               <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-800 dark:bg-emerald-900/20">
@@ -1531,9 +1698,106 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
-            {productsLoading && <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (<div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"><div className="h-10 rounded bg-zinc-200 dark:bg-zinc-800" /></div>))}</div>}
-            {!productsLoading && products.length === 0 && (<div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center dark:border-zinc-700 dark:bg-zinc-900"><div className="mb-2 flex justify-center"><ShoppingBagIcon /></div><p className="text-sm text-zinc-500 dark:text-zinc-400">No products yet. Add your first product above!</p></div>)}
-            {!productsLoading && products.length > 0 && (<div className="space-y-2">{products.map((product) => (<ProductRow key={product.id} product={product} onEdit={handleEditProduct} onDelete={handleDeleteProduct} onToggleAvailability={handleToggleAvailability} deleting={deletingProductId === product.id} selected={selectedProductIds.has(product.id)} onToggleSelect={handleToggleSelect} />))}</div>)}
+            {productsLoading && (
+              <div className="space-y-1.5">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <div className="h-8 rounded bg-zinc-200 dark:bg-zinc-800" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {!productsLoading && products.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
+                <div className="mb-2 flex justify-center"><ShoppingBagIcon /></div>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">No products yet. Add your first product above!</p>
+              </div>
+            )}
+            {!productsLoading && products.length > 0 && filteredProducts.length === 0 && (
+              <div className="rounded-xl border border-dashed border-zinc-300 bg-white py-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  No products match &quot;{productSearch.trim()}&quot;
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setProductSearch("")}
+                  className="mt-2 text-xs font-semibold text-emerald-600 hover:underline"
+                >
+                  Clear search
+                </button>
+              </div>
+            )}
+            {!productsLoading && pagedProducts.length > 0 && (
+              <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-2">
+                {pagedProducts.map((product) => (
+                  <ProductRow
+                    key={product.id}
+                    product={product}
+                    onEdit={handleEditProduct}
+                    onDelete={handleDeleteProduct}
+                    onToggleAvailability={handleToggleAvailability}
+                    deleting={deletingProductId === product.id}
+                    selected={selectedProductIds.has(product.id)}
+                    onToggleSelect={handleToggleSelect}
+                  />
+                ))}
+              </div>
+            )}
+            {!productsLoading && filteredProducts.length > PRODUCTS_PAGE_SIZE && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  disabled={safeProductPage <= 1}
+                  onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                  className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                >
+                  ← Prev
+                </button>
+                <div className="flex flex-wrap items-center gap-1">
+                  {Array.from({ length: productTotalPages }, (_, i) => i + 1)
+                    .filter((n) => {
+                      if (productTotalPages <= 7) return true;
+                      if (n === 1 || n === productTotalPages) return true;
+                      return Math.abs(n - safeProductPage) <= 1;
+                    })
+                    .map((n, idx, arr) => {
+                      const prev = arr[idx - 1];
+                      const showEllipsis = prev != null && n - prev > 1;
+                      return (
+                        <span key={n} className="inline-flex items-center gap-1">
+                          {showEllipsis ? (
+                            <span className="px-1 text-xs text-zinc-400">…</span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setProductPage(n)}
+                            className={`min-w-[1.75rem] rounded-md px-2 py-1 text-xs font-semibold ${
+                              n === safeProductPage
+                                ? "bg-emerald-600 text-white"
+                                : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        </span>
+                      );
+                    })}
+                </div>
+                <button
+                  type="button"
+                  disabled={safeProductPage >= productTotalPages}
+                  onClick={() =>
+                    setProductPage((p) => Math.min(productTotalPages, p + 1))
+                  }
+                  className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </section>
         )}
 

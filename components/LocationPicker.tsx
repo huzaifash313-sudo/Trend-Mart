@@ -24,7 +24,7 @@ const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
 });
 
 /* -------------------------------------------------------------------------- */
-/*  Daraz-style full-screen map + area search (header entry point)             */
+/*  Full-screen map + area search (Settings → Location; auto GPS elsewhere)    */
 /* -------------------------------------------------------------------------- */
 
 function LocateIcon() {

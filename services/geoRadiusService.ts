@@ -542,11 +542,18 @@ export async function filterShopsByProximity(
     });
   }
 
-  enriched = enriched.filter((s) => {
-    if (browseScope === "pakistan" || browseScope === "city") return true;
-    if (skipDistanceCapIds.has(s.id) || unlimitedBrowse) return true;
-    return s.distance_km == null || s.distance_km <= maxDistanceKm;
-  });
+  // Near me + explicit km (5/10/20/50): HARD cut — only shops with a pin inside range.
+  // "Any" (maxDistanceKm <= 0) keeps sorting by proximity without cutting the list.
+  // City / All Pakistan browse ignore this km cap (they use city/nationwide rules above).
+  if (browseScope === "radius" && !unlimitedBrowse) {
+    enriched = enriched.filter(
+      (s) => s.distance_km != null && s.distance_km <= maxDistanceKm,
+    );
+  } else if (browseScope === "radius") {
+    // "Any" — still drop shops that fail merchant service-radius when enforced
+    // (already filtered above); keep the rest sorted by distance.
+  }
+  // city / pakistan: no customer km-cap here
 
   // Soft zone match for legacy free-text delivery_zones (ignore our coverage markers).
   if (deliveryZone && deliveryZone.trim()) {
@@ -709,8 +716,69 @@ export function findNearestCity(
   return bestCity ? { city: bestCity, distanceKm: Math.round(bestDistance * 10) / 10 } : null;
 }
 
+/** Extra PK city names OSM sometimes returns that aren't in SUPPORTED_CITIES. */
+const PK_CITY_ALIASES = [
+  "Peshawar",
+  "Quetta",
+  "Hyderabad",
+  "Abbottabad",
+  "Mardan",
+  "Bahawalpur",
+  "Sargodha",
+  "Sukkur",
+  "Larkana",
+  "Mingora",
+  "Islamabad Capital Territory",
+  "Rawalpindi District",
+] as const;
+
+function normalizeCityToken(raw: string): string {
+  return raw
+    .replace(/\b(district|division|tehsil|capital territory|province)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** True when the whole token is a Pakistani city name (not "Peshawar Highway"). */
+function looksLikeCityName(text: string): boolean {
+  const t = normalizeCityToken(text).toLowerCase();
+  if (t.length < 3) return false;
+  for (const sc of SUPPORTED_CITIES) {
+    if (t === sc.toLowerCase()) return true;
+  }
+  for (const alias of PK_CITY_ALIASES) {
+    const a = alias.toLowerCase();
+    if (t === a) return true;
+    // Allow "Islamabad Capital Territory" style aliases only
+    if (a.includes(" ") && t === a) return true;
+  }
+  return false;
+}
+
+/**
+ * Match a supported city from free text — whole-name match only.
+ * Avoids false hits like `sc.includes("abad")` → Islamabad.
+ */
+function matchSupportedCityFromText(text: string | null | undefined): string | null {
+  if (!text?.trim()) return null;
+  const lower = normalizeCityToken(text).toLowerCase();
+  if (lower.length < 3) return null;
+
+  // Prefer longer city names first (Sheikhupura before ... etc.)
+  const ranked = [...SUPPORTED_CITIES].sort((a, b) => b.length - a.length);
+  for (const sc of ranked) {
+    const scLower = sc.toLowerCase();
+    if (lower === scLower) return sc;
+    // Word-boundary style: "…, Islamabad" / "Islamabad, …"
+    const re = new RegExp(`(?:^|[,\\s])${scLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[,\\s])`, "i");
+    if (re.test(lower) || lower.includes(scLower)) return sc;
+  }
+  return null;
+}
+
 /**
  * Build a human street / colony / landmark label from Nominatim address parts.
+ * City is resolved separately from GPS — local parts only here.
  */
 function formatOsmStreetAddress(addr: {
   house_number?: string;
@@ -729,6 +797,7 @@ function formatOsmStreetAddress(addr: {
   municipality?: string;
   county?: string;
   state?: string;
+  state_district?: string;
   postcode?: string;
   country?: string;
   amenity?: string;
@@ -746,7 +815,7 @@ function formatOsmStreetAddress(addr: {
   cityCandidate: string | null;
   landmark: string | null;
 } {
-  const landmark =
+  const landmarkRaw =
     addr.amenity ||
     addr.building ||
     addr.shop ||
@@ -757,6 +826,10 @@ function formatOsmStreetAddress(addr: {
     addr.college ||
     addr.university ||
     null;
+
+  // Don't treat another city name as a "landmark" (causes "Peshawar, E-8, Islamabad")
+  const landmark =
+    landmarkRaw && !looksLikeCityName(landmarkRaw) ? landmarkRaw : null;
 
   const street = [addr.house_number, addr.road || addr.pedestrian || addr.path]
     .filter(Boolean)
@@ -772,24 +845,40 @@ function formatOsmStreetAddress(addr: {
     addr.city_district ||
     null;
 
+  // Never fall back to county/state — those mix wrong cities in Pakistan OSM data
   const cityCandidate =
-    addr.city ||
-    addr.town ||
-    addr.municipality ||
-    addr.village ||
-    addr.county ||
-    null;
+    addr.city || addr.town || addr.municipality || addr.village || null;
 
-  const parts = [landmark, street, neighbourhood, cityCandidate]
+  // Local line only — city appended later from GPS-authoritative match
+  const parts = [landmark, street, neighbourhood]
     .map((p) => (typeof p === "string" ? p.trim() : ""))
     .filter(Boolean)
-    // Drop accidental duplicates (e.g. road name repeated)
-    .filter((part, idx, arr) =>
-      arr.findIndex((x) => x.toLowerCase() === part.toLowerCase()) === idx,
+    .filter((part) => !looksLikeCityName(part))
+    .filter(
+      (part, idx, arr) =>
+        arr.findIndex((x) => x.toLowerCase() === part.toLowerCase()) === idx,
     );
 
   const shortAddress = parts.length > 0 ? parts.join(", ") : "";
   return { shortAddress, neighbourhood, cityCandidate, landmark };
+}
+
+/** Remove other-city tokens so we never show "Peshawar, E-8, Islamabad". */
+function scrubConflictingCities(label: string, resolvedCity: string | null): string {
+  if (!label.trim()) return "";
+  const keep = resolvedCity ? normalizeCityToken(resolvedCity).toLowerCase() : "";
+  return label
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .filter((part) => {
+      const lower = normalizeCityToken(part).toLowerCase();
+      if (lower === "pakistan") return false;
+      if (keep && lower === keep) return true;
+      if (looksLikeCityName(part) && lower !== keep) return false;
+      return true;
+    })
+    .join(", ");
 }
 
 export interface PlaceSearchResult {
@@ -896,63 +985,60 @@ export async function reverseGeocode(
       const { shortAddress, neighbourhood, cityCandidate, landmark } =
         formatOsmStreetAddress(addr);
 
-      const namedPlace =
+      // GPS nearest city is authoritative (prevents OSM mixing distant cities)
+      const nearest = findNearestCity(lat, lng, 45);
+      let matchedCity: string | null = nearest?.city ?? null;
+
+      if (!matchedCity) {
+        matchedCity =
+          matchSupportedCityFromText(cityCandidate) ||
+          matchSupportedCityFromText(neighbourhood) ||
+          matchSupportedCityFromText(data.display_name) ||
+          null;
+      }
+
+      // If OSM city conflicts with GPS nearest city, trust GPS
+      const osmCity = matchSupportedCityFromText(cityCandidate);
+      if (nearest && osmCity && osmCity !== nearest.city) {
+        matchedCity = nearest.city;
+      }
+
+      const namedPlaceRaw =
         data.name ||
         data.namedetails?.["name:en"] ||
         data.namedetails?.name ||
         landmark ||
         null;
+      const namedPlace =
+        namedPlaceRaw && !looksLikeCityName(namedPlaceRaw)
+          ? namedPlaceRaw
+          : landmark;
 
-      // Prefer named place (school/colony/shop) at the front of the label
-      let composed = shortAddress;
-      if (namedPlace && !composed.toLowerCase().includes(namedPlace.toLowerCase())) {
-        composed = [namedPlace, composed].filter(Boolean).join(", ");
+      let localLine = shortAddress;
+      if (
+        namedPlace &&
+        localLine &&
+        !localLine.toLowerCase().includes(namedPlace.toLowerCase())
+      ) {
+        localLine = `${namedPlace}, ${localLine}`;
+      } else if (namedPlace && !localLine) {
+        localLine = namedPlace;
       }
 
-      // Check if the resolved city matches a supported city (case-insensitive)
-      let matchedCity: string | null = null;
-      const candidates = [
-        cityCandidate,
-        neighbourhood,
-        composed,
-        data.display_name,
-      ].filter(Boolean) as string[];
-      for (const candidate of candidates) {
-        const lowerCandidate = candidate.toLowerCase();
-        for (const sc of SUPPORTED_CITIES) {
-          if (
-            lowerCandidate.includes(sc.toLowerCase()) ||
-            sc.toLowerCase().includes(lowerCandidate)
-          ) {
-            matchedCity = sc;
-            break;
-          }
-        }
-        if (matchedCity) break;
-      }
+      // Strip roads like "Peshawar Highway" city-token false positives carefully:
+      // only drop parts that ARE a city name, not roads containing a city word.
+      localLine = scrubConflictingCities(localLine, matchedCity);
 
-      if (!matchedCity) {
-        const nearest = findNearestCity(lat, lng, 40);
-        if (nearest) matchedCity = nearest.city;
-      }
-
-      const displayName =
-        composed ||
-        data.display_name ||
-        (matchedCity ? `${matchedCity}, Pakistan` : null);
-
-      // Keep address readable — prefer local parts over ultra-long OSM dump
+      // Final: "E-8, Islamabad" — one city only
+      const merged = [localLine, matchedCity].filter(Boolean).join(", ");
       const address =
-        composed ||
-        (data.display_name
-          ? data.display_name.split(",").slice(0, 5).join(",").trim()
-          : null) ||
+        scrubConflictingCities(merged, matchedCity) ||
         (matchedCity ? `${matchedCity}, Pakistan` : null);
 
       return {
-        city: matchedCity ?? cityCandidate,
+        city: matchedCity ?? (osmCity || cityCandidate),
         deliveryZone: matchedCity ?? neighbourhood ?? cityCandidate,
-        displayName,
+        displayName: address,
         address,
         neighbourhood,
         landmark: namedPlace,

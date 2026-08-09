@@ -44,10 +44,11 @@ import { fetchShops } from "@/services/shopService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import { downloadProductsCSV } from "@/services/exportService";
 import { getProductDiscount } from "@/lib/formatters";
-import ImageUpload from "@/components/ImageUpload";
+import MultiImageUpload from "@/components/MultiImageUpload";
 import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import Link from "next/link";
+import { getProductImages, normalizeProductGallery } from "@/lib/productImages";
 import {
   fetchSubCategories,
   getOthersSubCategoryId,
@@ -80,6 +81,8 @@ interface ProductFormState {
   basePrice: number;
   /** Original ("before discount") price as a string form field. Empty = no markdown badge. */
   originalPrice: string;
+  /** ISO deal end; empty = no expiry on discount. */
+  dealExpiresAt: string;
   imageUrl: string;
   isAvailable: boolean;
   /** SKU prefix auto-generated from product name */
@@ -109,6 +112,7 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   description: "",
   basePrice: 0,
   originalPrice: "",
+  dealExpiresAt: "",
   imageUrl: "",
   isAvailable: true,
   skuPrefix: "",
@@ -570,12 +574,27 @@ export default function ProductsDashboardPage() {
       subId = isValidUUID(othersId) ? othersId : "";
     }
 
+    const gallery = normalizeProductGallery(
+      form.galleryImages.length > 0
+        ? form.galleryImages
+        : form.imageUrl
+          ? [form.imageUrl]
+          : [],
+    );
+    const original = form.originalPrice ? parseFloat(form.originalPrice) : null;
+    const hasDeal =
+      original != null && Number.isFinite(original) && original > form.basePrice;
     const productData: ProductFormData = {
       name: form.name.trim(),
       description: form.description.trim(),
       price: form.basePrice,
-      original_price: form.originalPrice ? parseFloat(form.originalPrice) : null,
-      image_url: form.imageUrl,
+      original_price: hasDeal ? original : null,
+      deal_expires_at:
+        hasDeal && form.dealExpiresAt.trim()
+          ? new Date(form.dealExpiresAt).toISOString()
+          : null,
+      image_url: gallery.image_url,
+      images: gallery.images,
       is_available: form.isAvailable,
       variants: form.variantGroups.length > 0 ? form.variantGroups : null,
       category_id: shopCat || null,
@@ -614,19 +633,21 @@ export default function ProductsDashboardPage() {
 
   const handleEdit = useCallback((product: Product) => {
     setEditingProductId(product.id);
+    const gallery = getProductImages(product);
     setForm({
       name: product.name,
       description: product.description,
       basePrice: product.price,
       originalPrice:
         product.original_price != null ? String(product.original_price) : "",
-      imageUrl: product.image_url ?? "",
+      dealExpiresAt: product.deal_expires_at ?? "",
+      imageUrl: gallery[0] ?? "",
       isAvailable: product.is_available,
       skuPrefix: generateSkuPrefix(product.name),
       variantGroups: product.variants ?? [],
       skuRecords: [],
       priceTiers: [],
-      galleryImages: [],
+      galleryImages: gallery,
       tags: [],
       stockQuantity: 0,
       subCategoryId: product.sub_category_id ?? "",
@@ -1024,9 +1045,42 @@ export default function ProductsDashboardPage() {
                 )}
                 {form.originalPrice && form.basePrice > 0 && parseFloat(form.originalPrice) > form.basePrice && (
                   <p className="mt-1 text-[0.65rem] font-semibold text-emerald-600 dark:text-emerald-400">
-                    🏷️ Badge preview: -{Math.round(((parseFloat(form.originalPrice) - form.basePrice) / parseFloat(form.originalPrice)) * 100)}% OFF
+                    Badge preview: -{Math.round(((parseFloat(form.originalPrice) - form.basePrice) / parseFloat(form.originalPrice)) * 100)}% OFF
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  Deal ends{" "}
+                  <span className="font-normal text-zinc-400">— optional</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={
+                    form.dealExpiresAt
+                      ? (() => {
+                          const d = new Date(form.dealExpiresAt);
+                          if (Number.isNaN(d.getTime())) return "";
+                          const pad = (n: number) => n.toString().padStart(2, "0");
+                          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                        })()
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      dealExpiresAt: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : "",
+                    }))
+                  }
+                  disabled={
+                    !form.originalPrice ||
+                    parseFloat(form.originalPrice) <= form.basePrice
+                  }
+                  className="w-full max-w-xs rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                />
               </div>
 
               {/* Description */}
@@ -1041,35 +1095,26 @@ export default function ProductsDashboardPage() {
                 />
               </div>
 
-              {/* Image Upload with Drag & Drop */}
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Product Image</label>
-                <ImageUpload
-                  label="Product Image"
-                  currentUrl={form.imageUrl}
-                  onUploaded={(url) => setForm(f => ({ ...f, imageUrl: url }))}
-                  folder="products"
-                  fileId={editingProductId ?? "new"}
-                  showPreview
-                />
-                {/* Drag & Drop Zone */}
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={`mt-2 rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
-                    isDragging
-                      ? "border-emerald-400 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-900/20"
-                      : "border-zinc-300 bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800/50"
-                  }`}
-                >
-                  <UploadIcon />
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    Drag & drop an image here, or use the upload button above
-                  </p>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500">PNG, JPG, WebP up to 5MB</p>
-                </div>
-              </div>
+              <MultiImageUpload
+                label="Product photos"
+                urls={
+                  form.galleryImages.length > 0
+                    ? form.galleryImages
+                    : form.imageUrl
+                      ? [form.imageUrl]
+                      : []
+                }
+                onChange={(urls) => {
+                  const g = normalizeProductGallery(urls);
+                  setForm((f) => ({
+                    ...f,
+                    imageUrl: g.image_url,
+                    galleryImages: g.images,
+                  }));
+                }}
+                folder="products"
+                fileIdPrefix={editingProductId ?? activeShopId ?? "new"}
+              />
 
               {/* Multi-Attribute Variant Builder */}
               <div>

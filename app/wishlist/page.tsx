@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { FavoriteItem } from "@/services/wishlistService";
 import {
   getAllFavorites,
+  markWishlistSeen,
   removeFavorite,
 } from "@/services/wishlistService";
 import { logError } from "@/services/errorService";
@@ -182,6 +183,9 @@ export default function WishlistPage() {
 
     async function load() {
       try {
+        // Clear red nav badge — user has opened wishlist
+        markWishlistSeen();
+
         const all = await getAllFavorites();
         if (cancelled) return;
         setItems(all);

@@ -127,6 +127,45 @@ export async function deleteCoupon(
   }
 }
 
+/**
+ * Batch-fetch active, non-expired coupons for many shops (homepage ticker).
+ * Returns a map of shop_id → coupons (max a few per shop for the card strip).
+ */
+export async function fetchActiveCouponsForShops(
+  shopIds: string[],
+): Promise<ServiceResult<Record<string, Coupon[]>>> {
+  const supabase = createClient();
+  const unique = [...new Set(shopIds.filter(Boolean))];
+  if (unique.length === 0) return { success: true, data: {} };
+
+  try {
+    const now = Date.now();
+    const { data, error } = await supabase
+      .from("coupons")
+      .select("*")
+      .in("shop_id", unique)
+      .eq("is_active", true);
+
+    if (error) throw error;
+
+    const map: Record<string, Coupon[]> = {};
+    for (const row of (data as Coupon[]) ?? []) {
+      if (row.expiry_date) {
+        const end = new Date(row.expiry_date).getTime();
+        if (!Number.isNaN(end) && end <= now) continue;
+      }
+      const list = map[row.shop_id] ?? [];
+      if (list.length >= 3) continue;
+      list.push(row);
+      map[row.shop_id] = list;
+    }
+    return { success: true, data: map };
+  } catch (err) {
+    logError(err, { module: "couponService.fetchActiveCouponsForShops", meta: { count: unique.length } });
+    return { success: false, error: toError(err) };
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Validation                                                                 */
 /* -------------------------------------------------------------------------- */

@@ -87,8 +87,7 @@ export function ShopLogoAvatar({
 }
 
 /**
- * Wide banner slot. Circular logo for cards belongs next to the name via
- * `ShopLogoAvatar` — not overlaid on the banner.
+ * Wide banner slot. Card logos sit on the banner (left) via logoPlacement="overlay".
  */
 export default function ShopMediaHeader({
   shopName,
@@ -118,9 +117,10 @@ export default function ShopMediaHeader({
     : // Compact marketplace banner (px so font-scale doesn't inflate cards)
       "shop-card-banner relative h-[88px] w-full sm:h-[100px]";
 
+  // Card: DP on banner left, slightly lifted over the banner edge
   const logoBoxClass = isHero
     ? "absolute -bottom-7 left-3 z-10 h-14 w-14 sm:-bottom-8 sm:left-4 sm:h-[4.5rem] sm:w-[4.5rem]"
-    : "absolute bottom-2 left-2 z-10 h-9 w-9 sm:h-11 sm:w-11";
+    : "absolute bottom-2 left-2 z-10 h-10 w-10 sm:bottom-2.5 sm:left-2.5 sm:h-11 sm:w-11";
 
   return (
     <div className={`relative ${className}`}>
@@ -176,11 +176,11 @@ export default function ShopMediaHeader({
                   {initial}
                 </span>
               </div>
-            ) : (
+            ) : placement !== "overlay" ? (
               <div className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/70 bg-white/85 text-[0.7rem] font-bold text-teal-800 shadow-sm backdrop-blur-[1px] dark:border-white/10 dark:bg-black/35 dark:text-teal-200">
                 {initial}
               </div>
-            )}
+            ) : null}
           </div>
         )}
         {children}
@@ -188,7 +188,7 @@ export default function ShopMediaHeader({
 
       {placement === "overlay" ? (
         <div
-          className={`${logoBoxClass} overflow-hidden rounded-full border-2 border-white bg-white shadow-md dark:border-zinc-900 dark:bg-zinc-900`}
+          className={`${logoBoxClass} overflow-hidden rounded-full border-2 border-white bg-white shadow-md ring-2 ring-emerald-400/25 dark:border-zinc-900 dark:bg-zinc-900 dark:ring-teal-400/30`}
         >
           {showLogo ? (
             useNextImage ? (

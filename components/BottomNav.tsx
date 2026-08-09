@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getFavoriteCount } from "@/services/wishlistService";
+import {
+  getUnseenFavoriteCount,
+  markWishlistSeen,
+} from "@/services/wishlistService";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons (compact)                                                */
@@ -92,24 +95,39 @@ export default function BottomNav() {
     return () => { cancelled = true; };
   }, []);
 
+  const isWishlistActive = pathname === "/wishlist";
+
+  // On wishlist page: clear badge and keep it cleared while viewing
+  useEffect(() => {
+    if (isWishlistActive) markWishlistSeen();
+  }, [isWishlistActive]);
+
   useEffect(() => {
     let cancelled = false;
     const updateCount = async () => {
-      const count = await getFavoriteCount();
+      // Red badge = new adds since last wishlist visit (not total wishlist size)
+      if (pathname === "/wishlist") {
+        if (!cancelled) setWishlistCount(0);
+        return;
+      }
+      const count = await getUnseenFavoriteCount();
       if (!cancelled) setWishlistCount(count);
     };
     updateCount();
     window.addEventListener("storage", updateCount);
     window.addEventListener("favoritesUpdated", updateCount);
-    return () => { cancelled = true; window.removeEventListener("storage", updateCount); window.removeEventListener("favoritesUpdated", updateCount); };
-  }, []);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", updateCount);
+      window.removeEventListener("favoritesUpdated", updateCount);
+    };
+  }, [pathname]);
 
   const handleSearch = useCallback(() => router.push("/search"), [router]);
 
   const accountHref = session ? "/dashboard" : "/auth";
   const isHomeActive = pathname === "/";
   const isSearchActive = pathname === "/search";
-  const isWishlistActive = pathname === "/wishlist";
   const isAccountActive = pathname === "/dashboard" || pathname === "/auth";
 
   const tabs: Tab[] = [

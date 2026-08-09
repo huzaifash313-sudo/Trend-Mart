@@ -265,8 +265,9 @@ export function getStoreTheme(category?: string): StoreTheme {
 }
 
 /**
- * Determine if a category should render as a service provider storefront.
- * Service categories display packages, availability, portfolio — not product grids.
+ * Determine if a category should render service-provider chrome
+ * (booking, availability, packages). Product grids still show when the
+ * shop has catalog items — many IT/service merchants sell courses or kits.
  */
 export function isServiceTheme(category?: string): boolean {
   if (!category) return false;

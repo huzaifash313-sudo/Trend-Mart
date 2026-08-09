@@ -137,7 +137,15 @@ export default function GeoRadiusFilter({
     (km: number) => {
       setMaxDistanceKm(km);
       setScope("radius");
+      // Real-time: emit immediately so homepage refilters to shops within `km`
       emit(globalCoords, km, "radius");
+      if (km > 0 && !globalCoords) {
+        setLocationError("Turn on location (or refresh GPS) to filter by km.");
+      } else {
+        setLocationError(null);
+        // Close sheet so the filtered list is visible right away
+        if (km > 0) setExpanded(false);
+      }
     },
     [emit, globalCoords],
   );
@@ -330,6 +338,11 @@ export default function GeoRadiusFilter({
                   </button>
                 ))}
               </div>
+              {maxDistanceKm > 0 && (
+                <p className="mt-1.5 text-[0.6rem] font-medium text-teal-700 dark:text-teal-300">
+                  Only shops within {maxDistanceKm} km of your pin (live).
+                </p>
+              )}
             </div>
           )}
 
@@ -362,7 +375,9 @@ export default function GeoRadiusFilter({
               ? "Showing shops across Pakistan — closest to your pin first when GPS is on."
               : scope === "city"
                 ? "Showing shops in the selected city — nearest first."
-                : "Closest shops appear first. “Any” still sorts by proximity."}
+                : maxDistanceKm > 0
+                  ? `Filtering live: stores farther than ${maxDistanceKm} km are hidden.`
+                  : "“Any” shows all nearby shops sorted by distance (no km cut-off)."}
           </p>
         </div>
       )}

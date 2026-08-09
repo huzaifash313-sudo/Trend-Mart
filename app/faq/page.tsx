@@ -17,11 +17,11 @@ interface FaqItem {
 const CUSTOMER_FAQS: FaqItem[] = [
   {
     q: "Do I need an account to browse shops?",
-    a: "No — you can freely browse shops, categories, and products, and even build a cart, without signing up. You'll only need to verify your phone number via OTP when you're ready to place an order.",
+    a: "No — you can freely browse shops, categories, and products, and even build a cart, without signing up. To place an order you need an account with a verified email (phone OTP is not required).",
   },
   {
     q: "How do I place an order?",
-    a: "Add items to your cart, tap Checkout, verify your phone number if prompted, confirm your delivery address, and submit. Your order is sent to the merchant, and you can track its status (Pending → Processing → Dispatched → Delivered) from the Orders page.",
+    a: "Create an account and verify your email, add items to your cart, tap Checkout, enter your delivery details (name, phone, address), and submit. Your order is sent to the merchant on WhatsApp, and you can track status from the Orders page.",
   },
   {
     q: "Why can't I see a shop that I know exists nearby?",

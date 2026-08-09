@@ -542,6 +542,17 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
 
             <li>
               <Link
+                href="/settings/location"
+                onClick={onClose}
+                className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <span className="flex h-5 w-5 items-center justify-center text-base leading-none" aria-hidden="true">📍</span>
+                Location
+              </Link>
+            </li>
+
+            <li>
+              <Link
                 href="/settings/notifications"
                 onClick={onClose}
                 className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"

@@ -580,6 +580,58 @@ export async function getFavoriteCount(): Promise<number> {
   }
 }
 
+/** localStorage key — last time user opened the wishlist page (badge cleared). */
+const WISHLIST_SEEN_AT_KEY = "trendmart_wishlist_seen_at";
+
+/**
+ * Timestamp of last wishlist page visit. First read seeds "now" so old items
+ * don't show a red badge until the user adds something new.
+ */
+export function getWishlistSeenAt(): number {
+  if (typeof window === "undefined") return Date.now();
+  try {
+    const raw = localStorage.getItem(WISHLIST_SEEN_AT_KEY);
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const now = Date.now();
+    localStorage.setItem(WISHLIST_SEEN_AT_KEY, String(now));
+    return now;
+  } catch {
+    return Date.now();
+  }
+}
+
+/**
+ * Call when the user opens /wishlist — clears the red nav badge until they
+ * add something new again.
+ */
+export function markWishlistSeen(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(WISHLIST_SEEN_AT_KEY, String(Date.now()));
+  } catch {
+    /* no-op */
+  }
+  notifyFavoritesChanged();
+}
+
+/**
+ * Count of wishlist items added after the last time the user opened wishlist.
+ * Powers the red badge on BottomNav (not total wishlist size).
+ */
+export async function getUnseenFavoriteCount(): Promise<number> {
+  try {
+    const seenAt = getWishlistSeenAt();
+    const all = await getAllFavorites();
+    return all.filter((item) => item.addedAt > seenAt).length;
+  } catch (err) {
+    logError(err, { module: "wishlistService.getUnseenFavoriteCount" });
+    return 0;
+  }
+}
+
 /**
  * Remove a specific item by id.
  *

@@ -10,9 +10,13 @@ import { fetchShops } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import type { Story } from "@/types";
 import StoriesViewer from "@/components/StoriesViewer";
+import {
+  isStoryViewed,
+  sortStoriesUnseenFirst,
+} from "@/lib/storyViewed";
 import { toggleFavorite as toggleFav } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
-import { fetchCategoryCounts, getCategoryMeta, type CategoryWithCount } from "@/services/categoryService";
+import { fetchCategoryCounts, type CategoryWithCount } from "@/services/categoryService";
 import { getSafeImageUrl } from "@/services/storageService";
 import { filterShopsByProximity } from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
@@ -22,6 +26,7 @@ import ShopCard from "@/components/ShopCard";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { fetchShopIdsBySubCategory } from "@/services/productService";
+import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
 
 /* -------------------------------------------------------------------------- */
 /*  HomeInner Component                                                        */
@@ -33,6 +38,7 @@ function HomeInner() {
   const initialCategory = (searchParams.get("category") as ShopCategory) ?? "All";
 
   const [shops, setShops] = useState<Shop[]>([]);
+  const [shopCoupons, setShopCoupons] = useState<Record<string, Coupon[]>>({});
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +78,7 @@ function HomeInner() {
     coordinates: null,
     maxDistanceKm: 0,
     locationAvailable: false,
-    scope: "pakistan",
+    scope: "radius",
   });
 
   /* Fetch shops once on mount */
@@ -89,9 +95,16 @@ function HomeInner() {
         ]);
         const [shopsResult, storiesResult] = result;
         if (!cancelled) {
-          if (shopsResult.success) setShops(shopsResult.data);
-          else setError(shopsResult.error);
-          if (storiesResult.success) setStories(storiesResult.data);
+          if (shopsResult.success) {
+            setShops(shopsResult.data);
+            const ids = shopsResult.data.map((s) => s.id);
+            fetchActiveCouponsForShops(ids).then((cRes) => {
+              if (!cancelled && cRes.success) setShopCoupons(cRes.data);
+            });
+          } else setError(shopsResult.error);
+          if (storiesResult.success) {
+            setStories(sortStoriesUnseenFirst(storiesResult.data));
+          }
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data.");
@@ -231,33 +244,26 @@ function HomeInner() {
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-24 md:px-4 md:py-5 md:pb-8">
-      {/* ── Category Pills ────────────────────────────────────────── */}
-      <section aria-label="Category filters">
-        <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 scrollbar-none">
+      {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
+      <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
+        <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
           {SHOP_CATEGORIES.map((category) => {
             const isActive = activeCategory === category;
             const catCount = categoryCounts.find((c) => c.key === category)?.count;
-            const meta = getCategoryMeta(category);
             return (
               <button
                 key={category}
                 type="button"
                 onClick={() => handleCategoryChange(category)}
-                className={`chip inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1.5 text-[0.68rem] font-medium leading-none transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:px-3 sm:text-[0.7rem] ${
-                  isActive
-                    ? "border-emerald-600 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-600/20"
-                    : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] dark:text-[color:var(--tm-muted)] dark:hover:bg-[color:var(--tm-elevated)]"
-                }`}
+                className={`tm-cat-tab${isActive ? " is-active" : ""}`}
                 aria-label={`${category}${catCount !== undefined ? ` — ${catCount} shop${catCount !== 1 ? "s" : ""}` : ""}`}
                 aria-pressed={isActive}
               >
-                <span aria-hidden="true">{meta.icon}</span>
-                <span>{category}</span>
-                {catCount !== undefined && (
-                  <span className={`ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[0.58rem] font-bold ${
-                    isActive ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-400 dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-muted)]"
-                  }`}>{catCount}</span>
-                )}
+                <span className="tm-cat-tab-label">{category}</span>
+                {catCount !== undefined ? (
+                  <span className="tm-cat-tab-count">{catCount}</span>
+                ) : null}
+                <span className="tm-cat-tab-line" aria-hidden="true" />
               </button>
             );
           })}
@@ -276,28 +282,75 @@ function HomeInner() {
       {/* ── Stories Section ───────────────────────────────────────── */}
       <section aria-label="Merchant stories">
         <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Stories</h2>
-        <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-1">
+        <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-1 scrollbar-none">
           {stories.length === 0 ? (
             <p className="px-3 text-xs text-zinc-400 dark:text-zinc-500">No active stories right now.</p>
           ) : (
-            stories.map((story, i) => (
-              <button key={story.id} type="button" onClick={() => { setSelectedStoryIndex(i); setStoryViewerOpen(true); }} className="flex shrink-0 flex-col items-center gap-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                <div className="relative h-14 w-14 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 p-[2px]">
-                  {story.image_url && !brokenStoryImgs.has(story.id) ? (
-                    <Image src={getSafeImageUrl(story.image_url, "product")} alt="" fill className="rounded-full object-cover" sizes="3.5rem" onError={() => setBrokenStoryImgs((prev) => new Set(prev).add(story.id))} />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-base font-bold text-emerald-600 dark:bg-zinc-800 dark:text-emerald-400">{story.caption?.charAt(0) ?? "?"}</div>
-                  )}
-                </div>
-                <span className="max-w-[60px] truncate text-center text-[0.6rem] text-zinc-500 dark:text-zinc-400">{story.caption || "Story"}</span>
-              </button>
-            ))
+            stories.map((story, i) => {
+              const seen = isStoryViewed(story.id);
+              const label =
+                story.shop_name?.trim() ||
+                story.caption?.trim() ||
+                "Store";
+              const initial = label.charAt(0).toUpperCase() || "?";
+              return (
+                <button
+                  key={story.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedStoryIndex(i);
+                    setStoryViewerOpen(true);
+                  }}
+                  className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  aria-label={`${label} story${seen ? " (viewed)" : ""}`}
+                >
+                  <div
+                    className={`rounded-full p-[2.5px] ${
+                      seen
+                        ? "bg-zinc-300 dark:bg-zinc-600"
+                        : "bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600"
+                    }`}
+                  >
+                    <div className="relative h-[3.35rem] w-[3.35rem] overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
+                      {story.image_url && !brokenStoryImgs.has(story.id) ? (
+                        <Image
+                          src={getSafeImageUrl(story.image_url, "product")}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="3.35rem"
+                          onError={() =>
+                            setBrokenStoryImgs((prev) => new Set(prev).add(story.id))
+                          }
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-base font-bold text-emerald-600 dark:text-emerald-400">
+                          {initial}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+                    {label}
+                  </span>
+                </button>
+              );
+            })
           )}
         </div>
       </section>
 
       {/* ── Stories Viewer ────────────────────────────────────────── */}
-      {storyViewerOpen && (<StoriesViewer initialIndex={selectedStoryIndex} onClose={() => setStoryViewerOpen(false)} />)}
+      {storyViewerOpen && (
+        <StoriesViewer
+          stories={stories}
+          initialIndex={selectedStoryIndex}
+          onClose={() => {
+            setStoryViewerOpen(false);
+            setStories((prev) => sortStoriesUnseenFirst(prev));
+          }}
+        />
+      )}
 
       {/* ── Sponsored / Promotional Ads Carousel ───────────────────── */}
       <PromoAdsCarousel placement="homepage_top" />
@@ -394,6 +447,10 @@ function HomeInner() {
                     distance_km: withDistance.distance_km,
                     business_hours: shop.business_hours,
                     operating_status: shop.operating_status,
+                    announcement: shop.announcement,
+                    announcement_expires_at: shop.announcement_expires_at,
+                    free_delivery_threshold: shop.free_delivery_threshold,
+                    coupons: shopCoupons[shop.id],
                   }}
                   favorited={favorites.has(shop.id)}
                   showDistance={showProximityBadges}

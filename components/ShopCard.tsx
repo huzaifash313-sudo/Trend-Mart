@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
+import ShopMediaHeader from "@/components/ShopMediaHeader";
+import ShopOfferTicker from "@/components/ShopOfferTicker";
 import { formatDistance } from "@/services/geoRadiusService";
+import {
+  buildShopOfferSlides,
+  type ShopOfferSlide,
+} from "@/lib/shopOfferTicker";
 
 export interface ShopCardData {
   id: string;
@@ -15,6 +20,19 @@ export interface ShopCardData {
   distance_km?: number | null;
   business_hours?: string | null;
   operating_status?: string | null;
+  announcement?: string | null;
+  announcement_expires_at?: string | null;
+  free_delivery_threshold?: number | null;
+  /** Pre-built slides; if omitted, built from announcement / free delivery / coupons */
+  offerSlides?: ShopOfferSlide[];
+  coupons?: Array<{
+    id: string;
+    code: string;
+    discount_percent?: number | null;
+    discount_amount?: number | null;
+    expiry_date?: string | null;
+    is_active?: boolean;
+  }>;
 }
 
 interface ShopCardProps {
@@ -64,7 +82,7 @@ function PinIcon() {
 }
 
 /**
- * Premium marketplace shop card — name fills logo→heart, wraps cleanly.
+ * Shop card — logo DP on banner (left); name starts clean from body left.
  */
 export default function ShopCard({
   shop,
@@ -83,6 +101,15 @@ export default function ShopCard({
       ? formatDistance(shop.distance_km)
       : null;
   const category = (shop.category || "Store").trim();
+  const offerSlides =
+    shop.offerSlides ??
+    buildShopOfferSlides({
+      shopId: shop.id,
+      announcement: shop.announcement,
+      announcementExpiresAt: shop.announcement_expires_at,
+      freeDeliveryThreshold: shop.free_delivery_threshold,
+      coupons: shop.coupons,
+    });
 
   return (
     <article className="shop-card trend-card group flex h-full flex-col overflow-hidden">
@@ -96,6 +123,7 @@ export default function ShopCard({
           bannerUrl={shop.banner_url}
           logoUrl={shop.logo_url}
           size="card"
+          logoPlacement="overlay"
           bannerBroken={bannerBroken}
           logoBroken={logoBroken}
           onBannerError={onBannerError}
@@ -125,30 +153,12 @@ export default function ShopCard({
       </Link>
 
       <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2 sm:px-2.5 sm:pb-2.5">
-        {/*
-          Logo | Name (wraps to heart) | Heart
-          CSS grid keeps name width exact between logo and wishlist.
-        */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5">
-          <Link
-            href={href}
-            className="shop-card-logo mt-0.5 shrink-0 focus:outline-none"
-            tabIndex={-1}
-          >
-            <ShopLogoAvatar
-              shopName={shop.name}
-              logoUrl={shop.logo_url}
-              logoBroken={logoBroken}
-              onLogoError={onLogoError}
-              size="xs"
-              className="ring-2 ring-emerald-400/35 ring-offset-1 ring-offset-white dark:ring-teal-400/40 dark:ring-offset-[color:var(--tm-surface)]"
-            />
-          </Link>
-
+        {/* Name from the start + wishlist */}
+        <div className="flex min-w-0 items-start gap-1.5">
           <Link
             href={href}
             title={shop.name}
-            className="tm-shop-name col-start-2 text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
+            className="tm-shop-name min-w-0 flex-1 text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
           >
             {shop.name}
           </Link>
@@ -161,7 +171,7 @@ export default function ShopCard({
                 e.stopPropagation();
                 onToggleFavorite();
               }}
-              className={`icon-only col-start-3 -mr-0.5 -mt-0.5 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
+              className={`icon-only -mr-0.5 -mt-0.5 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
                 favorited
                   ? "text-rose-500"
                   : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
@@ -170,10 +180,14 @@ export default function ShopCard({
             >
               <HeartIcon filled={favorited} />
             </button>
-          ) : (
-            <span className="col-start-3 inline-block w-6" aria-hidden="true" />
-          )}
+          ) : null}
         </div>
+
+        {offerSlides.length > 0 ? (
+          <div className="mt-1.5">
+            <ShopOfferTicker slides={offerSlides} />
+          </div>
+        ) : null}
 
         <p
           title={category}

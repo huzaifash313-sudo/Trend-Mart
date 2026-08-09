@@ -156,6 +156,7 @@ ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS operating_status text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS accent_color text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS store_bio text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS announcement text;
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS announcement_expires_at timestamptz DEFAULT NULL;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS service_area text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS hourly_rate numeric(10, 2);
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS call_out_charge numeric(10, 2);
@@ -2982,9 +2983,14 @@ COMMIT;
 
 
 -- #############################################################################
--- PART 10 — OPTIONAL DEMO SEED DATA (only inserted on an empty database)
+-- PART 10 — DEMO SEED DATA (DISABLED)
 -- #############################################################################
--- Safe to re-run: this entire block is a no-op once at least one shop exists.
+-- Fake/demo shops are intentionally NOT inserted anymore.
+-- After schema setup, run:
+--   supabase/RESET_CLEAN_START_4_MERCHANTS.sql
+-- to wipe data and create only the 4 verified merchant logins (no shops).
+--
+-- Legacy demo block kept below but hard-disabled (always returns).
 
 DO $$
 DECLARE
@@ -2995,6 +3001,9 @@ DECLARE
   shop_khi_beauty uuid;
   shop_lhr_books uuid;
 BEGIN
+  -- DISABLED: keep DB empty for real merchant onboarding
+  RETURN;
+
   IF EXISTS (SELECT 1 FROM public.shops LIMIT 1) THEN
     RETURN;
   END IF;

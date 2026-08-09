@@ -185,10 +185,20 @@ export function getProductDiscount(product: {
   price: number;
   original_price?: number | null;
   compare_at_price?: number | null;
+  /** When set and in the past, discount badge is treated as inactive. */
+  deal_expires_at?: string | null;
 }): ProductDiscountInfo {
   const candidate = product.original_price ?? product.compare_at_price ?? null;
+  let dealActive = true;
+  if (product.deal_expires_at) {
+    const end = new Date(product.deal_expires_at).getTime();
+    if (!Number.isNaN(end) && end <= Date.now()) dealActive = false;
+  }
   const hasDiscount =
-    candidate != null && Number.isFinite(candidate) && candidate > product.price;
+    dealActive &&
+    candidate != null &&
+    Number.isFinite(candidate) &&
+    candidate > product.price;
 
   return {
     hasDiscount,

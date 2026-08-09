@@ -87,11 +87,24 @@ function buildProductRow(
   opts?: { coreOnly?: boolean; omitCategoryId?: boolean },
 ): Record<string, unknown> {
   const sanitized = sanitizeProductPricing(form);
+  // Gallery: prefer `images[]`, keep `image_url` as cover (first photo)
+  const galleryRaw = Array.isArray(sanitized.images)
+    ? sanitized.images
+    : sanitized.image_url
+      ? [sanitized.image_url]
+      : [];
+  const gallery = galleryRaw
+    .filter((u): u is string => typeof u === "string" && !!u.trim())
+    .map((u) => u.trim())
+    .filter((u, i, arr) => arr.indexOf(u) === i)
+    .slice(0, 6);
+  const cover = gallery[0] || sanitized.image_url?.trim() || null;
+
   const row: Record<string, unknown> = {
     name: (sanitized.name ?? "").trim(),
     description: sanitized.description ?? "",
     price: sanitized.price ?? 0,
-    image_url: sanitized.image_url || null,
+    image_url: cover,
     is_available: sanitized.is_available ?? true,
     variants: sanitized.variants ?? null,
   };
@@ -99,7 +112,16 @@ function buildProductRow(
   if (!opts?.coreOnly) {
     row.title = sanitized.title?.trim() || sanitized.name?.trim() || null;
     row.original_price = sanitized.original_price ?? null;
-    row.images = sanitized.images ?? null;
+    if ("deal_expires_at" in sanitized) {
+      const raw = sanitized.deal_expires_at;
+      if (raw == null || raw === "") {
+        row.deal_expires_at = null;
+      } else {
+        const t = new Date(raw).getTime();
+        row.deal_expires_at = Number.isNaN(t) ? null : new Date(t).toISOString();
+      }
+    }
+    row.images = gallery.length > 0 ? gallery : [];
     row.stock_status = sanitized.stock_status || "in_stock";
     row.currency = "PKR";
 
@@ -260,6 +282,24 @@ export async function createProduct(
       ({ data, error } = await supabase
         .from("products")
         .insert(withoutCat)
+        .select()
+        .single());
+    }
+
+    // Newer optional columns (deal_expires_at, images, …) — strip then retry.
+    if (error && isMissingColumnError(error)) {
+      const msg = toError(error);
+      const stripped: Record<string, unknown> = {
+        ...buildProductRow(form, { omitCategoryId: true }),
+        shop_id: shopId,
+      };
+      delete stripped.category_id;
+      if (/deal_expires_at/i.test(msg)) delete stripped.deal_expires_at;
+      if (/images/i.test(msg)) delete stripped.images;
+      if (/original_price/i.test(msg)) delete stripped.original_price;
+      ({ data, error } = await supabase
+        .from("products")
+        .insert(stripped)
         .select()
         .single());
     }
@@ -426,6 +466,20 @@ export async function updateProduct(
       ({ data, error } = await supabase
         .from("products")
         .update(withoutCat)
+        .eq("id", productId)
+        .select()
+        .single());
+    }
+
+    if (error && isMissingColumnError(error) && !hasPartialShape) {
+      const msg = toError(error);
+      const stripped = { ...row };
+      if (/deal_expires_at/i.test(msg)) delete stripped.deal_expires_at;
+      if (/images/i.test(msg)) delete stripped.images;
+      if (/original_price/i.test(msg)) delete stripped.original_price;
+      ({ data, error } = await supabase
+        .from("products")
+        .update(stripped)
         .eq("id", productId)
         .select()
         .single());

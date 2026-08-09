@@ -768,6 +768,9 @@ function SearchResultsInner() {
                   is_live: shop.is_live,
                   business_hours: shop.business_hours,
                   operating_status: shop.operating_status,
+                  announcement: shop.announcement,
+                  announcement_expires_at: shop.announcement_expires_at,
+                  free_delivery_threshold: shop.free_delivery_threshold,
                 }}
               />
             ))}

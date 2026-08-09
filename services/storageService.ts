@@ -215,6 +215,101 @@ export function validateImage(file: File | null | undefined): ImageValidationRes
   return { valid: true, file };
 }
 
+// ─── Client-side compression (WebP / JPEG) ───────────────────────────────────
+
+const COMPRESS_MAX_EDGE = 1400;
+/** Aim for small uploads while keeping storefront-quality sharpness. */
+const COMPRESS_TARGET_BYTES = 140 * 1024;
+const COMPRESS_MIN_QUALITY = 0.62;
+const COMPRESS_START_QUALITY = 0.84;
+
+function loadImageElement(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read image for compression."));
+    };
+    img.src = url;
+  });
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number,
+): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
+
+/**
+ * Compress + convert to WebP (JPEG fallback) before upload.
+ * Keeps visual quality high while shrinking typical phone photos to ~80–140 KB.
+ */
+export async function compressImageForUpload(file: File): Promise<File> {
+  if (typeof window === "undefined") return file;
+  // Already tiny — skip work
+  if (file.size > 0 && file.size <= 48 * 1024) return file;
+
+  try {
+    const img = await loadImageElement(file);
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return file;
+
+    const scale = Math.min(1, COMPRESS_MAX_EDGE / Math.max(w, h));
+    const tw = Math.max(1, Math.round(w * scale));
+    const th = Math.max(1, Math.round(h * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = tw;
+    canvas.height = th;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, tw, th);
+
+    const preferWebp = canvas.toDataURL("image/webp").startsWith("data:image/webp");
+    const mime = preferWebp ? "image/webp" : "image/jpeg";
+    const ext = preferWebp ? "webp" : "jpg";
+
+    let quality = COMPRESS_START_QUALITY;
+    let best: Blob | null = await canvasToBlob(canvas, mime, quality);
+
+    while (
+      best &&
+      best.size > COMPRESS_TARGET_BYTES &&
+      quality > COMPRESS_MIN_QUALITY
+    ) {
+      quality = Math.max(COMPRESS_MIN_QUALITY, quality - 0.08);
+      const next = await canvasToBlob(canvas, mime, quality);
+      if (!next) break;
+      best = next;
+    }
+
+    if (!best || best.size === 0) return file;
+    // Don't upload a "compressed" file that somehow got larger
+    if (best.size >= file.size && file.type.startsWith("image/")) return file;
+
+    const base = file.name.replace(/\.[^.]+$/, "") || "image";
+    return new File([best], `${base}.${ext}`, {
+      type: mime,
+      lastModified: Date.now(),
+    });
+  } catch (err) {
+    logError(err, { module: "storageService.compressImageForUpload" });
+    return file;
+  }
+}
+
 // ─── Upload ──────────────────────────────────────────────────────────────────
 
 /**
@@ -250,18 +345,23 @@ export async function uploadImage(
   }
 
   try {
+    const optimized = await compressImageForUpload(file);
+
     // Sanitize the original filename to create a safe storage path
-    const extension = MIME_TO_EXT[file.type] ?? file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-    const sanitizedBase = sanitizeFilename(file.name.replace(/\.[^.]+$/, ""));
+    const extension =
+      MIME_TO_EXT[optimized.type] ??
+      optimized.name.split(".").pop()?.toLowerCase() ??
+      "jpg";
+    const sanitizedBase = sanitizeFilename(optimized.name.replace(/\.[^.]+$/, ""));
     // Build path: folder/fileId_sanitizedName_timestamp.extension
     const safeName = `${folder}/${fileId}_${sanitizedBase}_${Date.now()}.${extension}`;
 
     // Race the upload against a timeout
     const uploadPromise = supabase.storage
       .from(BUCKET_NAME)
-      .upload(safeName, file, {
+      .upload(safeName, optimized, {
         cacheControl: "31536000", // 1 year
-        contentType: file.type,
+        contentType: optimized.type || file.type,
         upsert: true, // Allow overwriting if the same path is re-used
       });
 

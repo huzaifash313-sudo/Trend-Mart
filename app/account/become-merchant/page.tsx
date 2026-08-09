@@ -30,6 +30,7 @@ function emptyShopForm(): ShopFormData {
     accent_color: "",
     store_bio: "",
     announcement: "",
+    announcement_expires_at: "",
     service_area: "",
     hourly_rate: "",
     call_out_charge: "",

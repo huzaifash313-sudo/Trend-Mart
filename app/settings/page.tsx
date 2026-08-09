@@ -89,6 +89,15 @@ function ShieldIcon() {
   );
 }
 
+function PinIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Settings Page                                                              */
 /* -------------------------------------------------------------------------- */
@@ -181,6 +190,16 @@ export default function SettingsPage() {
             Preferences
           </h2>
           <div className="trend-card divide-y divide-zinc-100 dark:divide-[color:var(--tm-border)] overflow-hidden dark:bg-[color:var(--tm-surface)]">
+            <Link href="/settings/location" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
+              <span className="flex items-center gap-3">
+                <span className="text-zinc-400 dark:text-emerald-500"><PinIcon /></span>
+                <span>
+                  <span className="block text-sm text-zinc-700 dark:text-emerald-300">Location</span>
+                  <span className="block text-[0.65rem] text-zinc-400 dark:text-emerald-700">Area, city, GPS pin for nearby shops</span>
+                </span>
+              </span>
+              <ChevronRightIcon />
+            </Link>
             <Link href="/settings/appearance" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
               <span className="flex items-center gap-3">
                 <span className="text-zinc-400 dark:text-emerald-500"><PaletteIcon /></span>

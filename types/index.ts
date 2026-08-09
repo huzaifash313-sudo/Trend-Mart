@@ -30,6 +30,8 @@ export interface Shop {
   store_bio?: string | null;
   /** Optional promotional announcement text displayed as a marquee banner (Prompt 97). */
   announcement?: string | null;
+  /** When the promotional announcement / offer expires (shop-card ticker countdown). */
+  announcement_expires_at?: string | null;
   /** Service provider: areas covered (e.g., "Gulberg, DHA — Lahore"). */
   service_area?: string | null;
   /** Service provider: hourly rate in PKR. */
@@ -96,6 +98,8 @@ export interface ShopFormData {
   store_bio: string;
   /** Promotional announcement text for storefront banner marquee (Prompt 97) */
   announcement: string;
+  /** ISO timestamp when the announcement offer ends; empty = no expiry */
+  announcement_expires_at: string;
   /** Service provider: areas covered (comma-separated). */
   service_area: string;
   /** Service provider: hourly rate as string (form input). */
@@ -233,6 +237,8 @@ export interface Product {
    * badge. Always read pricing via `getProductDiscount()`.
    */
   compare_at_price?: number | null;
+  /** ISO timestamp when the discount/deal ends; after this, % OFF is hidden. */
+  deal_expires_at?: string | null;
   currency: string;
   image_url?: string | null;
   /** JSON array of image URLs for product gallery */
@@ -258,6 +264,8 @@ export interface ProductFormData {
   price: number;
   /** Original ("before discount") price. Set > `price` to show a markdown badge. */
   original_price?: number | null;
+  /** When the deal/% OFF ends (ISO string or empty). */
+  deal_expires_at?: string | null;
   image_url: string;
   images?: string[] | null;
   is_available: boolean;
@@ -308,6 +316,9 @@ export interface Story {
   /** Stories expire after 24 hours */
   expires_at?: string;
   created_at?: string;
+  /** Joined from shops — shown on tray + viewer header */
+  shop_name?: string | null;
+  shop_logo_url?: string | null;
 }
 
 // ─── User Profile (derived from Supabase auth.users) ───────────────────────

@@ -41,6 +41,7 @@ const SHOP_EXTENDED_KEYS = [
   "emergency_available",
   "shop_type",
   "announcement",
+  "announcement_expires_at",
   "accent_color",
   "store_bio",
   "instagram_handle",
@@ -49,6 +50,15 @@ const SHOP_EXTENDED_KEYS = [
   "business_hours",
   "operating_status",
 ] as const;
+
+/** Persist offer end time; empty / invalid → null (no countdown). */
+function sanitizeAnnouncementExpires(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  const t = new Date(v).getTime();
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toISOString();
+}
 
 function stripExtendedShopFields(
   payload: Record<string, unknown>,
@@ -406,6 +416,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
   | "free_delivery_threshold"
   | "delivery_fee_flat"
   | "delivery_fee_per_km"
+  | "announcement_expires_at"
 > & {
   hourly_rate: number | null;
   call_out_charge: number | null;
@@ -415,6 +426,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
   free_delivery_threshold: number | null;
   delivery_fee_flat: number;
   delivery_fee_per_km: number;
+  announcement_expires_at: string | null;
 } {
   const { latitude, longitude } = sanitizeDbCoordinates(form.latitude, form.longitude);
   return {
@@ -433,6 +445,9 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     accent_color: sanitizeDbHexColor(form.accent_color),
     store_bio: sanitizeDbString(form.store_bio, 500),
     announcement: sanitizeDbString(form.announcement, 200),
+    announcement_expires_at: form.announcement?.trim()
+      ? sanitizeAnnouncementExpires(form.announcement_expires_at)
+      : null,
     service_area: sanitizeDbString(form.service_area, 200),
     hourly_rate: sanitizeDbNumeric(form.hourly_rate, 0, 999_999),
     call_out_charge: sanitizeDbNumeric(form.call_out_charge, 0, 999_999),

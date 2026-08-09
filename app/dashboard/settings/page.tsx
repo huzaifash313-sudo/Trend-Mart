@@ -294,6 +294,7 @@ export default function DashboardSettingsPage() {
         accent_color: THEME_ACCENT,
         store_bio: form.store_bio,
         announcement: form.announcement,
+        announcement_expires_at: shop.announcement_expires_at ?? "",
         service_area: form.service_area,
         hourly_rate: form.hourly_rate,
         call_out_charge: form.call_out_charge,
@@ -660,6 +661,27 @@ export default function DashboardSettingsPage() {
               label="Toggle store visibility"
             />
           </div>
+        </section>
+
+        {/* ── Preferences / Audit Logs ─────────────────────────────────── */}
+        <section>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Settings &amp; Preferences
+          </h2>
+          <Link
+            href="/dashboard/settings/audit-logs"
+            className="trend-card flex items-center justify-between gap-3 p-4 transition-colors hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Audit Logs</p>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Product add history — search &amp; paginated so dashboard stays clean.
+              </p>
+            </div>
+            <span className="shrink-0 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              Open →
+            </span>
+          </Link>
         </section>
 
         {/* ── Save Button ─────────────────────────────────────────────── */}

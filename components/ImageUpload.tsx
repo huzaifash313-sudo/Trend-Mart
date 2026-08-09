@@ -13,9 +13,9 @@ import {
 /* -------------------------------------------------------------------------- */
 
 export interface ImageUploadProps {
-  /** Current image URL (from Supabase Storage or external). */
+  /** Current image URL (from Supabase Storage). */
   currentUrl: string;
-  /** Called with the public URL after a successful upload. */
+  /** Called with the public URL after a successful upload (or "" when cleared). */
   onUploaded: (url: string) => void;
   /** Subfolder inside the bucket (e.g. "shops" or "products"). */
   folder: string;
@@ -25,20 +25,25 @@ export interface ImageUploadProps {
   label?: string;
   /** If true, disable the picker. */
   disabled?: boolean;
-  /** If true, show a small preview of the current image. */
+  /** If true, show a preview of the current image. */
   showPreview?: boolean;
-  /** Fallback type for missing images (determines placeholder style). */
+  /** Fallback type for missing images. */
   fallbackType?: "shop" | "product" | "generic";
+  /**
+   * compact: single-row upload control (bulk table / tight layouts).
+   * default: stacked preview + full-width upload button.
+   */
+  variant?: "default" | "compact";
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Inline Icons                                                               */
+/*  Icons                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function UploadIcon() {
+function UploadIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg
-      className="h-4 w-4"
+      className={className}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -54,22 +59,10 @@ function UploadIcon() {
   );
 }
 
-function Spinner() {
+function Spinner({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg
-      className="h-4 w-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="3"
-        className="opacity-25"
-      />
+    <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
       <path
         d="M4 12a8 8 0 0 1 8-8"
         stroke="currentColor"
@@ -99,20 +92,19 @@ function AlertIcon() {
   );
 }
 
+function XIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
-/*  Component                                                                 */
+/*  Component — file upload only (no manual URL field)                        */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Image file upload + URL fallback input.
- *
- * Shows a file picker button. On selection, validates then uploads the file
- * to Supabase Storage and calls `onUploaded` with the resulting public URL.
- * Also includes a text input for manual URL entry.
- *
- * Synchronises accepted MIME types with `ALLOWED_IMAGE_TYPES` from
- * the storage service to ensure consistent validation.
- */
 export default function ImageUpload({
   currentUrl,
   onUploaded,
@@ -122,6 +114,7 @@ export default function ImageUpload({
   disabled = false,
   showPreview = true,
   fallbackType = "generic",
+  variant = "default",
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -129,101 +122,176 @@ export default function ImageUpload({
   const [validationError, setValidationError] =
     useState<ImageValidationResult | null>(null);
 
-  /** Resolve a safely usable preview URL (fallback if current is empty/invalid). */
-  const previewUrl =
-    currentUrl && currentUrl.trim() !== "" ? currentUrl : FALLBACK_URLS[fallbackType];
-
-  /** Build accept string from allowed types. */
+  const hasImage = !!(currentUrl && currentUrl.trim());
+  const previewUrl = hasImage ? currentUrl : FALLBACK_URLS[fallbackType];
   const acceptTypes = "image/jpeg,image/png,image/webp,image/avif";
 
-  /* ── File picker handler ───────────────────────────────────────────────── */
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // Clear previous errors
       setUploadError(null);
       setValidationError(null);
 
-      // Client-side validation before upload
       const validation = validateImage(file);
       if (!validation.valid) {
         setValidationError(validation);
-        // Reset input so the same file can be re-selected after fixing
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
       setUploading(true);
-
       const result = await uploadImage(file, folder, fileId);
-
       if (result.success) {
         onUploaded(result.data);
       } else {
         setUploadError(result.error);
       }
-
       setUploading(false);
-
-      // Reset so the same file can be re-selected
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [folder, fileId, onUploaded],
   );
 
-  /* ── Render ─────────────────────────────────────────────────────────────── */
+  const handleClear = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onUploaded("");
+      setUploadError(null);
+      setValidationError(null);
+    },
+    [onUploaded],
+  );
+
+  const openPicker = () => {
+    if (!disabled && !uploading) fileInputRef.current?.click();
+  };
+
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept={acceptTypes}
+      onChange={handleFileChange}
+      className="hidden"
+      aria-label={`Upload ${label.toLowerCase()}`}
+    />
+  );
+
+  /* ── Compact: single horizontal line (bulk desktop / tight UIs) ─────────── */
+  if (variant === "compact") {
+    return (
+      <div className="tm-img-upload tm-img-upload--compact">
+        {fileInput}
+        <button
+          type="button"
+          onClick={openPicker}
+          disabled={disabled || uploading}
+          className="tm-img-upload__btn tm-img-upload__btn--compact"
+        >
+          {uploading ? (
+            <>
+              <Spinner className="h-3.5 w-3.5" />
+              <span>…</span>
+            </>
+          ) : hasImage ? (
+            <>
+              {showPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewUrl}
+                  alt=""
+                  className="tm-img-upload__thumb"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
+                  }}
+                />
+              ) : null}
+              <span>Change</span>
+            </>
+          ) : (
+            <>
+              <UploadIcon className="h-3.5 w-3.5" />
+              <span>Upload</span>
+            </>
+          )}
+        </button>
+        {hasImage ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="tm-img-upload__clear"
+            aria-label="Remove image"
+            disabled={disabled || uploading}
+          >
+            <XIcon />
+          </button>
+        ) : null}
+        {(uploadError || validationError) && (
+          <p className="tm-img-upload__err">
+            {uploadError || validationError?.message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  /* ── Default: stacked, mobile-friendly ──────────────────────────────────── */
   return (
-    <div className="space-y-2">
-      {/* Label + error summary */}
-      <div className="flex items-center justify-between">
+    <div className="tm-img-upload tm-img-upload--stack space-y-2">
+      <div className="flex items-center justify-between gap-2">
         <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
           {label}
         </label>
-        {uploadError && (
-          <span className="text-xs text-red-500">{uploadError}</span>
-        )}
+        {uploadError ? <span className="text-xs text-red-500">{uploadError}</span> : null}
       </div>
 
-      {/* Preview (optional) — always shows a valid image, never broken */}
-      {showPreview && (
+      {showPreview ? (
         <div className="flex items-center gap-3">
-          <img
-            src={previewUrl}
-            alt={`${label} preview`}
-            className="h-12 w-12 rounded-lg border border-zinc-200 object-cover dark:border-zinc-700"
-            onError={(e) => {
-              // Last-resort fallback if even the fallback URL fails
-              (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
-            }}
-          />
-          <span className="text-xs text-zinc-400 truncate max-w-[180px]">
-            {currentUrl || "No image set"}
-          </span>
+          <div className="tm-img-upload__preview">
+            {hasImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt={`${label} preview`}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
+                }}
+              />
+            ) : (
+              <span className="text-[10px] font-medium text-teal-700/50 dark:text-teal-300/40">
+                No image
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              {hasImage ? "Image ready" : "Tap upload to add a photo"}
+            </p>
+            <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+              JPG, PNG or WebP · auto-compressed
+            </p>
+          </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Validation error banner */}
-      {validationError && (
+      {validationError ? (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
           <AlertIcon />
           <span>{validationError.message}</span>
         </div>
-      )}
+      ) : null}
 
-      {/* File picker + URL input */}
-      <div className="flex gap-2">
-        {/* Upload button */}
+      {fileInput}
+
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={openPicker}
           disabled={disabled || uploading}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          className="tm-img-upload__btn w-full sm:w-auto sm:min-w-[9.5rem]"
         >
           {uploading ? (
             <>
@@ -233,29 +301,21 @@ export default function ImageUpload({
           ) : (
             <>
               <UploadIcon />
-              Upload
+              {hasImage ? "Change photo" : "Upload photo"}
             </>
           )}
         </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={acceptTypes}
-          onChange={handleFileChange}
-          className="hidden"
-          aria-label={`Upload ${label.toLowerCase()}`}
-        />
-
-        {/* URL fallback */}
-        <input
-          type="url"
-          value={currentUrl}
-          onChange={(e) => onUploaded(e.target.value)}
-          placeholder="https://example.com/image.jpg"
-          disabled={disabled}
-          className="flex-1 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 disabled:opacity-50"
-        />
+        {hasImage ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={disabled || uploading}
+            className="tm-img-upload__clear-btn"
+            aria-label="Remove image"
+          >
+            Remove
+          </button>
+        ) : null}
       </div>
     </div>
   );

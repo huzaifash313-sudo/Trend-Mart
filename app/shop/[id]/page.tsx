@@ -18,6 +18,8 @@ import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import { getShopHoursSummary } from "@/lib/shopHours";
+import { buildShopOfferSlides, formatOfferRemaining } from "@/lib/shopOfferTicker";
+import { fetchCouponsByShopId, type Coupon } from "@/services/couponService";
 import {
   fetchStorefrontDisplayPrefs,
   type StorefrontDisplayPrefs,
@@ -251,11 +253,19 @@ function ShopDetailInner({ id }: { id: string }) {
     showAnnouncementBanner: true,
     showWhatsappFloatingButton: true,
   });
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
   const supabase = useMemo(() => createClient(), []);
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const theme: StoreTheme = useMemo(() => getStoreTheme(shop?.category), [shop?.category]);
-  const isService = isServiceTheme(shop?.category);
+  /** Service chrome (booking / packages) — category OR explicit shop_type. */
+  const isServiceCategory = isServiceTheme(shop?.category) || shop?.shop_type === "service";
+  /**
+   * Always show a product grid when the shop has catalog items.
+   * Service categories used to hide products entirely — merchants adding
+   * courses/packages via the product form then saw an empty storefront.
+   */
+  const showProductCatalog = !isServiceCategory || products.length > 0;
   const THEME_ACCENT = "#10b981";
 
   // ── Data Loading ──────────────────────────────────────────────────────────
@@ -283,8 +293,25 @@ function ShopDetailInner({ id }: { id: string }) {
       if (!cancelled && r.success) setReviews(r.data);
       if (!cancelled) setReviewsLoading(false);
     });
+    fetchCouponsByShopId(id).then((r) => {
+      if (!cancelled && r.success) setCoupons(r.data);
+    });
     return () => { cancelled = true; };
   }, [id]);
+
+  const promoBannerSegments = useMemo(() => {
+    if (!shop) return [];
+    return buildShopOfferSlides({
+      shopId: shop.id,
+      announcement: shop.announcement,
+      announcementExpiresAt: shop.announcement_expires_at,
+      freeDeliveryThreshold: shop.free_delivery_threshold,
+      coupons,
+    }).map((s) => {
+      const timer = formatOfferRemaining(s.expiresAt);
+      return timer ? `${s.label}  ·  ${timer}` : s.label;
+    });
+  }, [shop, coupons]);
 
   // ── Real-time Subscriptions ──────────────────────────────────────────────
   useEffect(() => {
@@ -330,7 +357,7 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // ── Service Data Fetching ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!shop || !isService) return;
+    if (!shop || !isServiceCategory) return;
     const fetchServiceData = async () => {
       try {
         const { data: pkgData } = await supabase.from("service_packages").select("*").eq("shop_id", shop.id).eq("is_active", true).order("sort_order", { ascending: true });
@@ -340,7 +367,7 @@ function ShopDetailInner({ id }: { id: string }) {
       } catch { /* ignore */ }
     };
     fetchServiceData();
-  }, [shop, isService, supabase]);
+  }, [shop, isServiceCategory, supabase]);
 
   // Sub-categories that actually have products in this shop (for cleaner pills)
   const productSubCategoryIds = useMemo(() => {
@@ -406,10 +433,15 @@ function ShopDetailInner({ id }: { id: string }) {
       {loading && (<div className="space-y-4"><ShopBannerSkeleton /><ProductGridSkeleton count={4} /></div>)}
       {!loading && error && (<ErrorState title="Failed to load shop" message={error} onRetry={() => window.location.reload()} />)}
       {!loading && !error && shop && (<>
-        {/* Announcement Banner — gated by merchant Appearance toggle */}
-        {shop.announcement?.trim() && displayPrefs.showAnnouncementBanner && (
-          <section className="section-spacing-sm">
-            <AnnouncementBanner text={shop.announcement} variant="marquee" accentColor={THEME_ACCENT} dismissible />
+        {/* Promo strip — offer + free delivery + coupons in one marquee */}
+        {displayPrefs.showAnnouncementBanner && promoBannerSegments.length > 0 && (
+          <section className="-mx-3 md:-mx-4">
+            <AnnouncementBanner
+              segments={promoBannerSegments}
+              variant="marquee"
+              accentColor={THEME_ACCENT}
+              dismissible={false}
+            />
           </section>
         )}
 
@@ -553,7 +585,7 @@ function ShopDetailInner({ id }: { id: string }) {
         </div>
 
         {/* ── SERVICE Section ──────────────────────────────────────── */}
-        {isService && (
+        {isServiceCategory && (
           <section className="space-y-3">
             <AvailabilitySchedule shopId={shop.id} compact showLiveStatus onDataLoaded={setAvailabilityDays} />
             <div className="grid grid-cols-2 gap-2">
@@ -583,7 +615,7 @@ function ShopDetailInner({ id }: { id: string }) {
         )}
 
         {/* ── SERVICE: Packages Grid ──────────────────────────────── */}
-        {isService && servicePackages.length > 0 && (
+        {isServiceCategory && servicePackages.length > 0 && (
           <section aria-label="Service Packages">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">📋 Service Packages</h2>
@@ -604,8 +636,8 @@ function ShopDetailInner({ id }: { id: string }) {
           </section>
         )}
 
-        {/* ── RETAIL: Sub-categories + Search + Sort ──────────────────────────────── */}
-        {!isService && (
+        {/* Catalog — retail always; service shops also when they have products */}
+        {showProductCatalog && (
           <section className="space-y-3">
             <SubCategoryPills
               mainCategory={shop.category}
@@ -632,8 +664,7 @@ function ShopDetailInner({ id }: { id: string }) {
           </section>
         )}
 
-        {/* ── RETAIL: Products Grid ──────────────────────────────── */}
-        {!isService && (
+        {showProductCatalog && (
           <section aria-label="Products">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-100"><GridIcon /> Products</h2>

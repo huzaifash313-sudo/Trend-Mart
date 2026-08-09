@@ -129,7 +129,7 @@ const ROLE_HIERARCHY: Record<AppRole, number> = {
 
 const ROLE_ROUTE_MAP = {
   /** Routes that require at minimum an authenticated user (any role). */
-  customer: ["/auth/settings", "/account"],
+  customer: ["/auth/settings", "/account", "/orders"],
   /** Routes that require merchant or higher (store owners). */
   merchant: ["/dashboard", "/shop/manage"],
   /** Routes that require admin role exclusively. */
@@ -325,9 +325,10 @@ async function isEmailConfirmed(request: NextRequest): Promise<boolean> {
 }
 
 /**
- * Paths that unverified users ARE allowed to access.
- * FIX: Added /dashboard so unverified users can access their dashboard
- * with a warning instead of being completely blocked.
+ * Paths unverified users may access.
+ * Browse/search/shop stay public via the public fast-path; auth pages stay
+ * open so email OTP / magic-link confirm can finish. Dashboard, account, and
+ * orders require a verified email (enforced below).
  */
 const VERIFY_EXEMPT_PATHS = [
   "/login",
@@ -336,12 +337,9 @@ const VERIFY_EXEMPT_PATHS = [
   "/auth/verify-notice",
   "/auth/callback",
   "/settings",
-  "/dashboard", // FIX: Allow unverified users to access dashboard (shows warning client-side)
-  "/account", // Customer portal shows its own verify banner; avoid account↔verify loops
-  "/wishlist",
-  "/orders",
   "/search",
   "/shop",
+  "/wishlist", // guest local wishlist; purchase still gated at checkout
 ];
 
 function isVerifyExempt(pathname: string): boolean {
@@ -780,24 +778,40 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 8. Redirect authenticated users away from auth pages ────────────────
+  //    Unverified sessions must stay on /auth/* (OTP / verify-notice).
   if (isAuthRoute(pathname) && authenticatedAfterRefresh && userRole) {
-    authDebug("Auth page visited while logged in — redirecting", {
-      userRole,
-      from: pathname,
-    });
-    if (userRole === "admin") {
-      return buildRedirectWithLoopTracking(
-        new URL("/admin/dashboard", request.url),
-        request,
-      );
+    const emailConfirmed = await isEmailConfirmed(request);
+    if (!emailConfirmed) {
+      if (pathname.startsWith("/auth/")) {
+        authDebug("Unverified session on /auth/* — allowing", { pathname });
+      } else {
+        authDebug("Unverified session on login/signup → verify-notice", {
+          from: pathname,
+        });
+        return buildRedirectWithLoopTracking(
+          new URL("/auth/verify-notice", request.url),
+          request,
+        );
+      }
+    } else {
+      authDebug("Auth page visited while logged in — redirecting", {
+        userRole,
+        from: pathname,
+      });
+      if (userRole === "admin") {
+        return buildRedirectWithLoopTracking(
+          new URL("/admin/dashboard", request.url),
+          request,
+        );
+      }
+      if (userRole === "merchant") {
+        return buildRedirectWithLoopTracking(
+          new URL("/dashboard", request.url),
+          request,
+        );
+      }
+      return buildRedirectWithLoopTracking(new URL("/account", request.url), request);
     }
-    if (userRole === "merchant") {
-      return buildRedirectWithLoopTracking(
-        new URL("/dashboard", request.url),
-        request,
-      );
-    }
-    return buildRedirectWithLoopTracking(new URL("/account", request.url), request);
   }
 
   // ── 9. Build response with security headers ────────────────────────────

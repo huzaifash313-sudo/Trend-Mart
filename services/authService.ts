@@ -112,32 +112,38 @@ export async function signUpWithEmail(
     }
 
     // Persist role into user_roles (trigger also reads metadata; this is a safety net).
-    if (data.user) {
+    // Only when a session exists — otherwise claim after email OTP verifies.
+    if (data.user && data.session) {
       await claimSignupRole(signupRole);
     }
 
-    if (data.user && data.session) {
-      const resolved = await detectUserRole(data.user);
+    if (!data.user) {
       return {
-        success: true,
-        user: data.user,
-        role: resolved,
+        success: false,
+        error: "Sign-up failed. Please try again.",
         needsOtpVerification: false,
       };
     }
 
-    if (data.user) {
+    // Email confirmation is mandatory. Never treat signup as complete until verified.
+    // If Supabase auto-created a session (confirm-email disabled), sign out and force OTP UI.
+    if (!data.user.email_confirmed_at) {
+      if (data.session) {
+        await supabase.auth.signOut();
+      }
       return {
         success: true,
         user: data.user,
         role: signupRole,
-        needsOtpVerification: !!data.user.identities?.length && !data.session,
+        needsOtpVerification: true,
       };
     }
 
+    const resolved = await detectUserRole(data.user);
     return {
-      success: false,
-      error: "Sign-up failed. Please try again.",
+      success: true,
+      user: data.user,
+      role: resolved,
       needsOtpVerification: false,
     };
   } catch (err) {
@@ -275,37 +281,14 @@ export async function resendOtp(
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Checkout Phone Verification — Mandatory OTP at Order Placement            */
-/*                                                                             */
-/*  Guests can browse freely, but placing an order requires proving they      */
-/*  own the phone number the merchant will be delivering to. This reuses     */
-/*  Supabase's native phone-auth OTP flow (SMS) rather than a bespoke        */
-/*  gateway integration:                                                      */
-/*   - Guests: `signInWithOtp({ phone })` creates/authenticates a lightweight */
-/*     phone-based session once the code is confirmed.                       */
-/*   - Logged-in customers without a verified phone on file: the number is   */
-/*     linked to their existing account via `updateUser({ phone })` +        */
-/*     `verifyOtp({ type: "phone_change" })`, so future checkouts skip OTP.   */
-/*                                                                             */
-/*  NOTE: This requires the Phone provider + an SMS provider (Twilio,        */
-/*  MessageBird, Vonage, etc.) to be enabled in the Supabase Dashboard        */
-/*  (Authentication → Providers → Phone). Until that's configured, sends     */
-/*  fail gracefully and checkout proceeds without blocking commerce — see    */
-/*  `sendCheckoutPhoneOtp`'s returned `providerUnavailable` flag.             */
+/*  Checkout access — email verification only                                 */
+/*  Phone is a delivery contact field only (no OTP). Browse as guest;         */
+/*  checkout / account actions need a signed-in, email-verified user.         */
 /* -------------------------------------------------------------------------- */
 
-export interface PhoneOtpSendResult {
-  success: boolean;
-  error?: string;
-  phoneE164?: string;
-  /** True when Supabase's phone provider isn't configured — callers should degrade gracefully. */
-  providerUnavailable?: boolean;
-}
-
 /**
- * Normalize a phone number to E.164 format for Supabase phone auth.
- * Defaults to Pakistan's country code (+92) since that's TrendMart's primary market,
- * but passes through any number that already includes a country code.
+ * Normalize a phone number to E.164 (default +92 for Pakistan).
+ * Used for display / WhatsApp payloads — not for phone OTP auth.
  */
 export function normalizePhoneE164(raw: string, defaultCountryCode = "92"): string | null {
   const trimmed = raw.trim();
@@ -331,95 +314,8 @@ export function normalizePhoneE164(raw: string, defaultCountryCode = "92"): stri
   return digitsOnly.length >= 8 ? `+${digitsOnly}` : null;
 }
 
-/** Detect whether an error message indicates the SMS/phone provider isn't configured. */
-function isProviderUnavailableError(message: string): boolean {
-  const lowered = message.toLowerCase();
-  return (
-    lowered.includes("sms") ||
-    lowered.includes("phone provider") ||
-    lowered.includes("unsupported phone") ||
-    lowered.includes("signups not allowed") ||
-    lowered.includes("phone_provider_disabled") ||
-    lowered.includes("provider is not enabled")
-  );
-}
-
 /**
- * Check whether the currently authenticated user already has this exact
- * phone number verified — if so, checkout skips the OTP step permanently
- * (not just for one hour).
- */
-export async function isPhoneAlreadyVerified(rawPhone: string): Promise<boolean> {
-  const phone = normalizePhoneE164(rawPhone);
-  if (!phone) return false;
-  const digits = phone.replace(/\D/g, "");
-
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return false;
-
-    // Auth phone already confirmed for this number
-    if (
-      user.phone &&
-      user.phone_confirmed_at &&
-      user.phone.replace(/\D/g, "") === digits
-    ) {
-      return true;
-    }
-
-    // Profile phone marked verified after a prior successful checkout OTP
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("phone, phone_verified_at")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (
-      profile?.phone_verified_at &&
-      profile.phone &&
-      profile.phone.replace(/\D/g, "") === digits
-    ) {
-      return true;
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Persist a verified checkout phone onto the user profile so future orders
- * never re-prompt for OTP for the same number.
- */
-export async function markCheckoutPhoneVerified(rawPhone: string): Promise<void> {
-  const phone = normalizePhoneE164(rawPhone);
-  if (!phone) return;
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase.from("user_profiles").upsert(
-      {
-        user_id: user.id,
-        phone,
-        phone_verified_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
-  } catch {
-    /* non-fatal */
-  }
-}
-
-/**
- * True when the signed-in user already completed email verification —
- * checkout must not force another email check.
+ * True when the signed-in user already completed email verification.
  */
 export async function isEmailAlreadyVerified(): Promise<boolean> {
   try {
@@ -433,82 +329,21 @@ export async function isEmailAlreadyVerified(): Promise<boolean> {
 }
 
 /**
- * Send a 6-digit SMS OTP to verify a customer's phone number at checkout.
- * Links to the existing account if logged in, otherwise starts a guest
- * phone-auth session.
+ * Checkout / account actions: must be signed in with a confirmed email.
  */
-export async function sendCheckoutPhoneOtp(rawPhone: string): Promise<PhoneOtpSendResult> {
-  const phone = normalizePhoneE164(rawPhone);
-  if (!phone) {
-    return { success: false, error: "Enter a valid phone number to continue." };
-  }
-
+export async function requireVerifiedEmailSession(): Promise<
+  | { ok: true; user: User }
+  | { ok: false; reason: "unauthenticated" | "unverified" }
+> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // Logged-in user with no verified phone on file (or a different one) → link + verify.
-    if (user && (!user.phone || !user.phone_confirmed_at || user.phone.replace(/\D/g, "") !== phone.replace(/\D/g, ""))) {
-      const { error } = await supabase.auth.updateUser({ phone });
-      if (error) {
-        return {
-          success: false,
-          error: mapSupabaseError(error.message),
-          phoneE164: phone,
-          providerUnavailable: isProviderUnavailableError(error.message),
-        };
-      }
-      return { success: true, phoneE164: phone };
-    }
-
-    // Guest checkout — start (or resend) a phone-auth OTP session.
-    const { error } = await supabase.auth.signInWithOtp({ phone });
-    if (error) {
-      return {
-        success: false,
-        error: mapSupabaseError(error.message),
-        phoneE164: phone,
-        providerUnavailable: isProviderUnavailableError(error.message),
-      };
-    }
-    return { success: true, phoneE164: phone };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Could not send verification code.",
-      phoneE164: phone,
-    };
-  }
-}
-
-/**
- * Verify the 6-digit code sent via `sendCheckoutPhoneOtp`.
- */
-export async function verifyCheckoutPhoneOtp(
-  rawPhone: string,
-  token: string,
-): Promise<OtpVerificationResult> {
-  const phone = normalizePhoneE164(rawPhone);
-  if (!phone) return { success: false, error: "Invalid phone number." };
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    const isLinkingExisting = !!user && (!user.phone || user.phone.replace(/\D/g, "") !== phone.replace(/\D/g, ""));
-
-    const { error } = await supabase.auth.verifyOtp({
-      phone,
-      token,
-      type: isLinkingExisting ? "phone_change" : "sms",
-    });
-
-    if (error) {
-      return { success: false, error: mapSupabaseError(error.message) };
-    }
-    return { success: true };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Verification failed.",
-    };
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, reason: "unauthenticated" };
+    if (!user.email_confirmed_at) return { ok: false, reason: "unverified" };
+    return { ok: true, user };
+  } catch {
+    return { ok: false, reason: "unauthenticated" };
   }
 }
 

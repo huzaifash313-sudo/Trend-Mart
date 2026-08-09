@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -48,8 +48,13 @@ function CloseIcon() {
 /* -------------------------------------------------------------------------- */
 
 export interface AnnouncementBannerProps {
-  /** The announcement text to display. */
-  text: string;
+  /** Single announcement text (legacy). Prefer `segments` for multi-promo strips. */
+  text?: string;
+  /**
+   * Promo pieces shown in one strip with spacing between them
+   * (e.g. free delivery · coupon · offer).
+   */
+  segments?: string[];
   /** Visual variant — marquee slides horizontally, alert is a static highlighted bar. */
   variant?: "marquee" | "alert";
   /** Accent color used for the border / highlight. Defaults to emerald. */
@@ -60,31 +65,50 @@ export interface AnnouncementBannerProps {
   className?: string;
 }
 
+function normalizeSegments(text?: string, segments?: string[]): string[] {
+  const fromSegments = (segments ?? []).map((s) => s.trim()).filter(Boolean);
+  if (fromSegments.length > 0) return fromSegments;
+  const t = text?.trim();
+  return t ? [t] : [];
+}
+
+function SegmentRow({ items }: { items: string[] }) {
+  return (
+    <span className="inline-flex items-center whitespace-nowrap">
+      {items.map((item, i) => (
+        <span key={`${item}-${i}`} className="inline-flex items-center">
+          {i > 0 ? (
+            <span className="mx-3 inline-block text-emerald-400/70 dark:text-emerald-500/60" aria-hidden="true">
+              ·
+            </span>
+          ) : null}
+          <span>{item}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Component                                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * AnnouncementBanner — A customizable merchant announcement banner.
- *
- * Supports two visual variants:
- * - `marquee`: A horizontally-scrolling ticker (using CSS animation).
- * - `alert`: A static highlighted bar with an icon and the message.
- *
- * If `dismissible` is true, the banner can be closed and won't reappear
- * for the remainder of the browser session.
+ * AnnouncementBanner — merchant promo strip (offer / free delivery / coupon).
+ * Marquee variant scrolls; multiple segments sit in one line with spacing.
  */
 export default function AnnouncementBanner({
   text,
+  segments,
   variant = "marquee",
   accentColor = "#10b981",
   dismissible = false,
   className = "",
 }: AnnouncementBannerProps) {
-  // Session-level dismiss key — unique per text so a new announcement still shows
-  const sessionKey = `announcement-dismissed:${text.slice(0, 40)}`;
+  const items = useMemo(() => normalizeSegments(text, segments), [text, segments]);
+  const joinedKey = items.join("|");
+  const sessionKey = `announcement-dismissed:${joinedKey.slice(0, 60)}`;
 
-  // Lazy initial state: check sessionStorage on first render (avoids cascading effect)
   const [dismissed, setDismissed] = useState(() => {
     if (!dismissible) return false;
     try {
@@ -104,10 +128,9 @@ export default function AnnouncementBanner({
     }
   }, [sessionKey]);
 
-  // Don't render if no text or already dismissed
-  if (!text || !text.trim() || dismissed) return null;
+  if (items.length === 0 || dismissed) return null;
 
-  // Shared base styling
+  const displayText = items.join(" · ");
   const baseClasses =
     "relative w-full overflow-hidden flex items-center gap-2 px-4 py-2.5 text-sm font-medium";
 
@@ -119,7 +142,7 @@ export default function AnnouncementBanner({
         style={{ borderLeftColor: accentColor, borderLeftWidth: "3px" }}
       >
         <MegaphoneIcon />
-        <span className="flex-1 truncate">{text}</span>
+        <span className="flex-1 truncate">{displayText}</span>
         {dismissible && (
           <button
             type="button"
@@ -134,7 +157,6 @@ export default function AnnouncementBanner({
     );
   }
 
-  // Marquee variant (default)
   return (
     <div
       className={`${baseClasses} bg-gradient-to-r from-emerald-50 via-white to-emerald-50 text-emerald-800 border-b border-emerald-200 dark:from-emerald-900/20 dark:via-zinc-900 dark:to-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 ${className}`}
@@ -144,9 +166,13 @@ export default function AnnouncementBanner({
     >
       <MegaphoneIcon />
       <div className="relative flex-1 overflow-hidden" ref={marqueeRef}>
-        <div className="animate-marquee whitespace-nowrap inline-block">
-          <span className="inline-block pr-8">{text}</span>
-          <span className="inline-block pr-8">{text}</span>
+        <div className="animate-marquee inline-block whitespace-nowrap">
+          <span className="inline-block pr-12">
+            <SegmentRow items={items} />
+          </span>
+          <span className="inline-block pr-12" aria-hidden="true">
+            <SegmentRow items={items} />
+          </span>
         </div>
       </div>
       {dismissible && (

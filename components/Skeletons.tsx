@@ -8,10 +8,11 @@
 export function ShopCardSkeleton() {
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-teal-100 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="h-[88px] w-full animate-pulse bg-zinc-200 dark:bg-zinc-800 sm:h-[100px]" />
+      <div className="relative h-[88px] w-full animate-pulse bg-zinc-200 dark:bg-zinc-800 sm:h-[100px]">
+        <div className="absolute bottom-2 left-2 h-10 w-10 rounded-full border-2 border-white bg-zinc-300 dark:border-zinc-900 dark:bg-zinc-700" />
+      </div>
       <div className="flex flex-1 flex-col px-2 pb-2 pt-2 sm:px-2.5">
         <div className="flex items-start gap-1.5">
-          <div className="h-[22px] w-[22px] shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
           <div className="h-8 flex-1 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           <div className="h-5 w-5 shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
         </div>

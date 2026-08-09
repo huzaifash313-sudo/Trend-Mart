@@ -21,9 +21,8 @@ import {
   useMemo,
   useRef,
   type FormEvent,
-  type KeyboardEvent,
-  type ClipboardEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createOrder } from "@/services/orderService";
 import { validateCoupon, fetchCouponsByShopId } from "@/services/couponService";
@@ -33,13 +32,7 @@ import { formatRupees } from "@/lib/formatters";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
 import { getDistanceToShop, locationErrorMessage } from "@/services/geoRadiusService";
-import {
-  normalizePhoneE164,
-  isPhoneAlreadyVerified,
-  markCheckoutPhoneVerified,
-  sendCheckoutPhoneOtp,
-  verifyCheckoutPhoneOtp,
-} from "@/services/authService";
+import { requireVerifiedEmailSession } from "@/services/authService";
 import { toWhatsAppDigits, normalizePkPhoneDigits } from "@/lib/sanitization";
 import Link from "next/link";
 
@@ -112,46 +105,6 @@ const INITIAL_SHIPPING: ShippingDetails = {
   shippingAddress: "",
   deliveryNotes: "",
 };
-
-const OTP_LENGTH = 6;
-const OTP_RESEND_COOLDOWN_SECONDS = 30;
-const VERIFIED_PHONES_STORAGE_KEY = "tm_verified_checkout_phones";
-/** Session cache TTL — account-level verification (auth/profile) has no expiry. */
-const VERIFIED_PHONE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours for guest/session cache
-
-/* -------------------------------------------------------------------------- */
-/*  Session-Scoped Phone Verification Cache                                   */
-/*                                                                             */
-/*  Avoids re-prompting for OTP on every single order within the same         */
-/*  browsing session (e.g. checking out from multiple shops back-to-back).    */
-/* -------------------------------------------------------------------------- */
-
-function readVerifiedPhoneCache(): Record<string, number> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.sessionStorage.getItem(VERIFIED_PHONES_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function isPhoneVerifiedThisSession(phoneE164: string): boolean {
-  const cache = readVerifiedPhoneCache();
-  const verifiedAt = cache[phoneE164];
-  return typeof verifiedAt === "number" && Date.now() - verifiedAt < VERIFIED_PHONE_TTL_MS;
-}
-
-function markPhoneVerifiedThisSession(phoneE164: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const cache = readVerifiedPhoneCache();
-    cache[phoneE164] = Date.now();
-    window.sessionStorage.setItem(VERIFIED_PHONES_STORAGE_KEY, JSON.stringify(cache));
-  } catch {
-    /* sessionStorage unavailable — non-fatal, will just re-prompt for OTP */
-  }
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Payload Sanitization Helpers                                               */
@@ -333,11 +286,13 @@ export default function WhatsAppCheckoutModal({
   accentColor = "emerald",
   accentHex = "#10b981",
 }: WhatsAppCheckoutModalProps) {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { location, isDetecting, detectLocationDetailed } = useLocation();
 
   // ── State ───────────────────────────────────────────────────────────────
-  const [step, setStep] = useState<"review" | "shipping" | "verify" | "confirm" | "success">("review");
+  const [step, setStep] = useState<"review" | "shipping" | "confirm" | "success" | "auth">("review");
+  const [authGate, setAuthGate] = useState<"checking" | "ok" | "login" | "verify">("checking");
   const [shipping, setShipping] = useState<ShippingDetails>(INITIAL_SHIPPING);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -347,17 +302,6 @@ export default function WhatsAppCheckoutModal({
   const [autofilledFromAccount, setAutofilledFromAccount] = useState(false);
   const [locationFillError, setLocationFillError] = useState<string | null>(null);
   const [locationFillBusy, setLocationFillBusy] = useState(false);
-
-  // Mandatory phone OTP verification at checkout
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [otpDigits, setOtpDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
-  const [otpSending, setOtpSending] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [otpResendCooldown, setOtpResendCooldown] = useState(0);
-  const [otpUnavailable, setOtpUnavailable] = useState(false);
-  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const otpVerifyingRef = useRef(false);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
@@ -498,8 +442,27 @@ export default function WhatsAppCheckoutModal({
     return [loc.deliveryZone, loc.city].filter(Boolean).join(", ");
   }, []);
 
+  // ── Require verified email before checkout ─────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const gate = await requireVerifiedEmailSession();
+      if (cancelled) return;
+      if (gate.ok) {
+        setAuthGate("ok");
+        return;
+      }
+      setAuthGate(gate.reason === "unverified" ? "verify" : "login");
+      setStep("auth");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ── Auto-fill from saved delivery address + profile ────────────────────
   useEffect(() => {
+    if (authGate !== "ok") return;
     let cancelled = false;
 
     async function loadProfile() {
@@ -565,7 +528,7 @@ export default function WhatsAppCheckoutModal({
 
     loadProfile();
     return () => { cancelled = true; };
-  }, [supabase]);
+  }, [supabase, authGate]);
 
   // If account had no saved address, fall back to header map location (still editable).
   useEffect(() => {
@@ -614,114 +577,6 @@ export default function WhatsAppCheckoutModal({
     };
   }, []);
 
-  // ── OTP resend cooldown timer ───────────────────────────────────────────
-  useEffect(() => {
-    if (otpResendCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setOtpResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [otpResendCooldown]);
-
-  // ── Phone OTP Handlers ──────────────────────────────────────────────────
-  const dispatchOtp = useCallback(async (phoneRaw: string) => {
-    setOtpSending(true);
-    setOtpError(null);
-    setOtpUnavailable(false);
-
-    const result = await sendCheckoutPhoneOtp(phoneRaw);
-    setOtpSending(false);
-
-    if (!result.success) {
-      if (result.providerUnavailable) {
-        // SMS provider isn't configured on this deployment — degrade gracefully
-        // rather than blocking checkout entirely.
-        setOtpUnavailable(true);
-        setOtpError(null);
-      } else {
-        setOtpError(result.error ?? "Could not send verification code. Please try again.");
-      }
-      return false;
-    }
-
-    setOtpResendCooldown(OTP_RESEND_COOLDOWN_SECONDS);
-    return true;
-  }, []);
-
-  const handleVerifyOtp = useCallback(async (code: string) => {
-    if (otpVerifyingRef.current) return;
-    otpVerifyingRef.current = true;
-    setOtpVerifying(true);
-    setOtpError(null);
-
-    const result = await verifyCheckoutPhoneOtp(shipping.customerPhone, code);
-
-    if (result.success) {
-      const normalized = normalizePhoneE164(shipping.customerPhone);
-      if (normalized) markPhoneVerifiedThisSession(normalized);
-      void markCheckoutPhoneVerified(shipping.customerPhone);
-      setPhoneVerified(true);
-      setTimeout(() => setStep("confirm"), 400);
-    } else {
-      setOtpError(result.error ?? "Incorrect code. Please try again.");
-      setOtpDigits(Array(OTP_LENGTH).fill(""));
-      otpInputRefs.current[0]?.focus();
-    }
-    setOtpVerifying(false);
-    otpVerifyingRef.current = false;
-  }, [shipping.customerPhone]);
-
-  const handleOtpDigitChange = useCallback((index: number, value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, "").slice(-1);
-    if (!cleaned) return;
-
-    setOtpDigits((prev) => {
-      const next = [...prev];
-      next[index] = cleaned;
-      const code = next.join("");
-      if (code.length === OTP_LENGTH && !otpVerifyingRef.current) {
-        setTimeout(() => handleVerifyOtp(code), 0);
-      }
-      return next;
-    });
-
-    if (index < OTP_LENGTH - 1) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  }, [handleVerifyOtp]);
-
-  const handleOtpKeyDown = useCallback((index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace") {
-      if (otpDigits[index]) {
-        setOtpDigits((prev) => { const next = [...prev]; next[index] = ""; return next; });
-      } else if (index > 0) {
-        setOtpDigits((prev) => { const next = [...prev]; next[index - 1] = ""; return next; });
-        otpInputRefs.current[index - 1]?.focus();
-      }
-      e.preventDefault();
-    } else if (e.key === "ArrowLeft" && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-    } else if (e.key === "ArrowRight" && index < OTP_LENGTH - 1) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  }, [otpDigits]);
-
-  const handleOtpPaste = useCallback((e: ClipboardEvent<HTMLInputElement>) => {
-    const pasted = e.clipboardData.getData("text").replace(/[^0-9]/g, "");
-    if (pasted.length === OTP_LENGTH) {
-      e.preventDefault();
-      setOtpDigits(pasted.slice(0, OTP_LENGTH).split(""));
-      otpInputRefs.current[OTP_LENGTH - 1]?.focus();
-      setTimeout(() => handleVerifyOtp(pasted), 0);
-    }
-  }, [handleVerifyOtp]);
-
-  const handleResendOtp = useCallback(() => {
-    if (otpResendCooldown > 0) return;
-    setOtpDigits(Array(OTP_LENGTH).fill(""));
-    dispatchOtp(shipping.customerPhone);
-  }, [otpResendCooldown, dispatchOtp, shipping.customerPhone]);
-
   // ── Step Handlers ───────────────────────────────────────────────────────
   const handleGoToShipping = useCallback(() => {
     setStep("shipping");
@@ -732,42 +587,13 @@ export default function WhatsAppCheckoutModal({
     setErrors({});
   }, []);
 
-  const handleShippingSubmit = useCallback(async (e: FormEvent) => {
+  const handleShippingSubmit = useCallback((e: FormEvent) => {
     e.preventDefault();
     const validationErrors = validateShipping(shipping);
     setErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) return;
-
-    setPhoneVerified(false);
-    const normalized = normalizePhoneE164(shipping.customerPhone);
-
-    // Already verified this exact phone earlier this session — skip OTP.
-    if (normalized && isPhoneVerifiedThisSession(normalized)) {
-      setPhoneVerified(true);
-      setStep("confirm");
-      return;
-    }
-
-    // Already verified on the customer's account (returning logged-in user).
-    const alreadyVerified = await isPhoneAlreadyVerified(shipping.customerPhone);
-    if (alreadyVerified) {
-      if (normalized) markPhoneVerifiedThisSession(normalized);
-      setPhoneVerified(true);
-      setStep("confirm");
-      return;
-    }
-
-    // Needs verification — send OTP and move to the verify step.
-    setOtpDigits(Array(OTP_LENGTH).fill(""));
-    setStep("verify");
-    await dispatchOtp(shipping.customerPhone);
-  }, [shipping, dispatchOtp]);
-
-  const handleSkipVerification = useCallback(() => {
-    // Only reachable when the SMS provider isn't configured on this deployment.
-    setPhoneVerified(true);
     setStep("confirm");
-  }, []);
+  }, [shipping]);
 
   // ── Order Submission ────────────────────────────────────────────────────
   const handlePlaceOrder = useCallback(async () => {
@@ -775,9 +601,11 @@ export default function WhatsAppCheckoutModal({
       setOrderError("This shop does not have a valid WhatsApp number configured.");
       return;
     }
-    if (!phoneVerified) {
-      setOrderError("Please verify your phone number before placing the order.");
-      setStep("shipping");
+
+    const gate = await requireVerifiedEmailSession();
+    if (!gate.ok) {
+      setAuthGate(gate.reason === "unverified" ? "verify" : "login");
+      setStep("auth");
       return;
     }
 
@@ -861,7 +689,6 @@ export default function WhatsAppCheckoutModal({
     }
   }, [
     phone,
-    phoneVerified,
     items,
     shop,
     shipping,
@@ -893,17 +720,20 @@ export default function WhatsAppCheckoutModal({
                 <StoreIcon />
               </span>
               <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                {step === "auth" && (authGate === "verify" ? "Verify Your Email" : "Sign In Required")}
                 {step === "review" && "WhatsApp Checkout"}
                 {step === "shipping" && "Delivery Details"}
-                {step === "verify" && "Verify Your Phone"}
                 {step === "confirm" && "Confirm Order"}
-                {step === "success" && "Order Sent! 🎉"}
+                {step === "success" && "Order Sent!"}
               </h3>
             </div>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {step === "auth" &&
+                (authGate === "verify"
+                  ? "Confirm your email before placing an order"
+                  : "Create or sign in with a verified email to checkout")}
               {step === "review" && `Sending order to ${shop.name}`}
               {step === "shipping" && "Enter your delivery information"}
-              {step === "verify" && "One-time phone check — skipped next time for this number"}
               {step === "confirm" && "Review everything before sending"}
               {step === "success" && "Opening WhatsApp for you..."}
             </p>
@@ -919,31 +749,88 @@ export default function WhatsAppCheckoutModal({
         </div>
 
         {/* ── Progress Steps ────────────────────────────────────────────── */}
-        <div className="flex items-center justify-center gap-1 px-6 py-3">
-          {(["review", "shipping", "verify", "confirm"] as const).map((s, idx, arr) => {
-            const order = ["review", "shipping", "verify", "confirm"];
-            const stepIdx = step === "success" ? order.length : order.indexOf(step);
-            const sIdx = order.indexOf(s);
-            const isActive = step === s;
-            const isDone = step === "success" || stepIdx > sIdx;
-            return (
-              <div key={s} className="flex items-center gap-1">
-                <div
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    isActive
-                      ? `${accentBg} text-white`
-                      : isDone
-                        ? `bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400`
-                        : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500"
-                  }`}
-                >
-                  {idx + 1}
+        {step !== "auth" && (
+          <div className="flex items-center justify-center gap-1 px-6 py-3">
+            {(["review", "shipping", "confirm"] as const).map((s, idx, arr) => {
+              const order = ["review", "shipping", "confirm"] as const;
+              const stepIdx = step === "success" ? order.length : order.indexOf(step as typeof order[number]);
+              const sIdx = order.indexOf(s);
+              const isActive = step === s;
+              const isDone = step === "success" || stepIdx > sIdx;
+              return (
+                <div key={s} className="flex items-center gap-1">
+                  <div
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      isActive
+                        ? `${accentBg} text-white`
+                        : isDone
+                          ? `bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400`
+                          : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500"
+                    }`}
+                  >
+                    {idx + 1}
+                  </div>
+                  {idx < arr.length - 1 && <div className="h-px w-6 bg-zinc-200 dark:bg-zinc-700" />}
                 </div>
-                {idx < arr.length - 1 && <div className="h-px w-6 bg-zinc-200 dark:bg-zinc-700" />}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Step: Auth / email gate ───────────────────────────────────── */}
+        {step === "auth" && (
+          <div className="px-6 py-8 text-center">
+            <div className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${accentLight} ${accentText}`}>
+              <LockIcon />
+            </div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              {authGate === "checking" && "Checking your account..."}
+              {authGate === "login" &&
+                "Browsing is free — to place an order you need an account with a verified email."}
+              {authGate === "verify" &&
+                "Your account email is not verified yet. Verify it, then come back to checkout."}
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              {authGate === "login" && (
+                <>
+                  <Link
+                    href="/login?redirect=/"
+                    className={`rounded-full ${accentBg} px-5 py-2.5 text-sm font-semibold text-white ${accentBgHover}`}
+                    onClick={onClose}
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    href="/signup?redirect=/"
+                    className="rounded-full border border-zinc-200 px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    onClick={onClose}
+                  >
+                    Create account
+                  </Link>
+                </>
+              )}
+              {authGate === "verify" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    router.push("/auth/verify-notice");
+                  }}
+                  className={`rounded-full ${accentBg} px-5 py-2.5 text-sm font-semibold text-white ${accentBgHover}`}
+                >
+                  Verify email
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full px-5 py-2.5 text-sm font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Keep browsing
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Step: Review Cart ─────────────────────────────────────────── */}
         {step === "review" && (
@@ -1265,114 +1152,6 @@ export default function WhatsAppCheckoutModal({
           </form>
         )}
 
-        {/* ── Step: Phone OTP Verification ──────────────────────────────── */}
-        {step === "verify" && (
-          <div>
-            <div className="px-6 py-6">
-              <div className="mb-5 text-center">
-                <div className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${accentLight} ${accentText} ${accentTextDark}`}>
-                  <LockIcon />
-                </div>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {otpSending
-                    ? "Sending a 6-digit code via SMS..."
-                    : otpUnavailable
-                      ? "Phone verification is temporarily unavailable on this deployment."
-                      : (<>We sent a 6-digit code to{" "}<span className="font-semibold text-zinc-900 dark:text-zinc-100">{shipping.customerPhone}</span></>)}
-                </p>
-              </div>
-
-              {otpUnavailable ? (
-                <div className="rounded-xl bg-amber-50 p-4 text-center text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-                  <InfoIcon />
-                  <p className="mt-2">
-                    SMS verification isn&apos;t configured yet for this store. You can continue —
-                    please double-check your phone number is correct so the merchant can reach you.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* Error message */}
-                  {otpError && (
-                    <div className="mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-center text-sm font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                      {otpError}
-                    </div>
-                  )}
-
-                  {/* OTP Input boxes */}
-                  <div className="mb-5 flex justify-center gap-2 sm:gap-3">
-                    {Array.from({ length: OTP_LENGTH }).map((_, index) => (
-                      <input
-                        key={index}
-                        ref={(el) => { otpInputRefs.current[index] = el; }}
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        maxLength={1}
-                        value={otpDigits[index]}
-                        onChange={(e) => handleOtpDigitChange(index, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                        onPaste={index === 0 ? handleOtpPaste : undefined}
-                        disabled={otpVerifying || otpSending}
-                        className={`h-12 w-10 rounded-xl border-2 text-center text-lg font-bold transition-all outline-none sm:h-14 sm:w-12 ${
-                          otpVerifying
-                            ? `border-${accentColor}-400 bg-${accentColor}-50 text-${accentColor}-700 dark:border-${accentColor}-600 dark:bg-${accentColor}-900/20 dark:text-${accentColor}-400`
-                            : otpDigits[index]
-                              ? `border-${accentColor}-500 bg-white text-${accentColor}-700 dark:border-${accentColor}-500 dark:bg-zinc-800 dark:text-${accentColor}-400`
-                              : "border-zinc-300 bg-white text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                        } focus:border-${accentColor}-600 focus:ring-2 focus:ring-${accentColor}-500/20`}
-                        aria-label={`OTP digit ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-
-                  {otpVerifying && (
-                    <div className="mb-4 flex justify-center">
-                      <SpinnerIcon />
-                    </div>
-                  )}
-
-                  <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-                    Didn&apos;t receive it?{" "}
-                    {otpResendCooldown > 0 ? (
-                      <span className="font-medium text-zinc-400 dark:text-zinc-500">Resend in {otpResendCooldown}s</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={otpSending}
-                        className={`font-semibold underline underline-offset-2 ${accentText} ${accentTextDark} disabled:text-zinc-400 disabled:no-underline`}
-                      >
-                        {otpSending ? "Sending..." : "Resend Code"}
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
-              <button
-                type="button"
-                onClick={() => setStep("shipping")}
-                className="rounded-full px-6 py-3 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              >
-                ← Edit Phone
-              </button>
-              {otpUnavailable && (
-                <button
-                  type="button"
-                  onClick={handleSkipVerification}
-                  className={`flex-1 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg transition-all ${accentBgHover}`}
-                >
-                  Continue Without Verification →
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* ── Step: Confirm Order ───────────────────────────────────────── */}
         {step === "confirm" && (
           <div>
@@ -1418,13 +1197,8 @@ export default function WhatsAppCheckoutModal({
               <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50 space-y-1">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Delivery Information</h4>
                 <p className="text-sm text-zinc-900 dark:text-zinc-100"><strong>{shipping.customerName}</strong></p>
-                <p className="flex items-center gap-1.5 text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
                   {shipping.customerPhone}
-                  {phoneVerified && (
-                    <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[0.6rem] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                      <CheckIcon /> Verified
-                    </span>
-                  )}
                 </p>
                 {shipping.shippingAddress && <p className="text-sm text-zinc-600 dark:text-zinc-400">📍 {shipping.shippingAddress}</p>}
                 {shipping.deliveryNotes && (

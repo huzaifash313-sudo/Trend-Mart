@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             "To operate the marketplace: matching customers with nearby shops, processing orders, and enabling WhatsApp-based order routing.",
-            "To verify identity via phone OTP before checkout.",
+            "To verify identity via email OTP at account creation / before checkout.",
             "To personalize search results, sorting, and recommendations.",
             "To detect fraud, abuse, and violations of our Terms & Conditions.",
             "To send transactional communications (order confirmations, status updates, OTP codes) via email/SMS/WhatsApp.",

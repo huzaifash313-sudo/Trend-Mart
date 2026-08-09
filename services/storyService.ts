@@ -26,10 +26,38 @@ function toError(err: unknown): string {
  * The RLS policy on the `stories` table automatically filters expired stories,
  * but we also apply a client-side cutoff as a safety net.
  */
+function mapStoryRow(row: Record<string, unknown>): Story {
+  const shop = row.shops as { name?: string; logo_url?: string | null } | null | undefined;
+  return {
+    id: String(row.id),
+    shop_id: String(row.shop_id),
+    image_url: (row.image_url as string | null) ?? null,
+    caption: (row.caption as string | null) ?? null,
+    created_at: (row.created_at as string | undefined) ?? undefined,
+    expires_at: (row.expires_at as string | undefined) ?? undefined,
+    shop_name: shop?.name ?? null,
+    shop_logo_url: shop?.logo_url ?? null,
+  };
+}
+
 export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
   const supabase = createClient();
 
   try {
+    // Prefer join so tray/viewer can show merchant shop name
+    const withShop = await supabase
+      .from("stories")
+      .select("*, shops:shop_id ( name, logo_url )")
+      .order("created_at", { ascending: false });
+
+    if (!withShop.error && withShop.data) {
+      return {
+        success: true,
+        data: (withShop.data as Record<string, unknown>[]).map(mapStoryRow),
+      };
+    }
+
+    // Fallback if join fails on older schemas
     const { data, error } = await supabase
       .from("stories")
       .select("*")

@@ -268,7 +268,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
           </div>
           {role === "customer" ? (
             <p className="mt-2 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-              Email verify once. Phone OTP only the first time you order with that number.
+              Verify your email to activate the account — required before checkout.
             </p>
           ) : (
             <p className="mt-2 text-[0.7rem] text-zinc-500 dark:text-zinc-400">

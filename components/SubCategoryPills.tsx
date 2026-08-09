@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  Interactive sub-category filter chips (homepage, search, shop storefront) */
+/*  Daraz-style sub-category tabs (homepage, search, shop storefront)         */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -57,7 +57,6 @@ export default function SubCategoryPills({
     ? subs.filter((s) => availableIds.has(s.id) || s.is_others)
     : subs;
 
-  // When filtering by inventory, drop empty lists (no products tagged yet)
   if (!loading && availableIds && visible.length === 0) return null;
   if (!loading && visible.length === 0) return null;
 
@@ -67,19 +66,16 @@ export default function SubCategoryPills({
   ];
 
   return (
-    <section className={className} aria-label={label}>
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-none">
+    <section className={`tm-cat-bar tm-cat-bar--sub ${className}`} aria-label={label}>
+      <div className="tm-cat-scroll px-1 scrollbar-none">
         <button
           type="button"
           onClick={() => onSelect(null, null)}
-          className={`chip shrink-0 rounded-full border px-3 text-[0.7rem] font-medium transition-colors ${
-            !selectedId
-              ? "border-emerald-600 bg-emerald-600 text-white"
-              : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] dark:text-[color:var(--tm-muted)]"
-          }`}
+          className={`tm-cat-tab${!selectedId ? " is-active" : ""}`}
           aria-pressed={!selectedId}
         >
-          All
+          <span className="tm-cat-tab-label">All</span>
+          <span className="tm-cat-tab-line" aria-hidden="true" />
         </button>
         {chips.map((sub) => {
           const active = selectedId === sub.id;
@@ -89,23 +85,19 @@ export default function SubCategoryPills({
               key={sub.id}
               type="button"
               onClick={() => onSelect(sub.id, sub)}
-              className={`chip shrink-0 rounded-full border px-3 text-[0.7rem] font-medium transition-colors ${
-                active
-                  ? "border-emerald-600 bg-emerald-600 text-white"
-                  : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] dark:text-[color:var(--tm-muted)]"
-              }`}
+              className={`tm-cat-tab${active ? " is-active" : ""}`}
               aria-pressed={active}
             >
-              {sub.icon ? <span className="mr-1" aria-hidden="true">{sub.icon}</span> : null}
-              {labelText}
+              <span className="tm-cat-tab-label">{labelText}</span>
+              <span className="tm-cat-tab-line" aria-hidden="true" />
             </button>
           );
         })}
-        {loading && (
-          <span className="chip shrink-0 self-center text-[0.6rem] text-zinc-400 animate-pulse">
+        {loading ? (
+          <span className="shrink-0 self-center px-2 text-[0.65rem] text-zinc-400 animate-pulse">
             Loading…
           </span>
-        )}
+        ) : null}
       </div>
     </section>
   );

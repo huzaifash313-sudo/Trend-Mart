@@ -266,7 +266,7 @@ export default function ShopLocationRadiusPicker({
         <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
           Delivery / Service Area
         </label>
-        <div className={`grid gap-2 ${compact ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3"}`}>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <CoverageModeButton
             active={mode === "radius"}
             icon={<RadiusIcon />}
