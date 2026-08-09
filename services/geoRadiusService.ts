@@ -840,38 +840,39 @@ export async function searchPlaces(
       address?: Record<string, string | undefined>;
     }>;
 
-    return (data ?? [])
-      .map((row, idx) => {
-        const lat = Number(row.lat);
-        const lng = Number(row.lon);
-        if (!isValidCoordinate(lat, lng)) return null;
-        const addr = row.address ?? {};
-        const label =
-          row.name ||
-          addr.amenity ||
-          addr.shop ||
-          addr.road ||
-          addr.suburb ||
-          addr.neighbourhood ||
-          addr.city ||
-          addr.town ||
-          row.display_name?.split(",")[0] ||
-          "Place";
-        const secondary =
-          row.display_name && row.display_name !== label
-            ? row.display_name
-            : [addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.state]
-                .filter(Boolean)
-                .join(", ") || undefined;
-        return {
-          id: String(row.place_id ?? `${lat},${lng},${idx}`),
-          label,
-          secondary,
-          latitude: lat,
-          longitude: lng,
-        } satisfies PlaceSearchResult;
-      })
-      .filter((r): r is PlaceSearchResult => r != null);
+    const results: PlaceSearchResult[] = [];
+    for (const [idx, row] of (data ?? []).entries()) {
+      const lat = Number(row.lat);
+      const lng = Number(row.lon);
+      if (!isValidCoordinate(lat, lng)) continue;
+      const addr = row.address ?? {};
+      const label =
+        row.name ||
+        addr.amenity ||
+        addr.shop ||
+        addr.road ||
+        addr.suburb ||
+        addr.neighbourhood ||
+        addr.city ||
+        addr.town ||
+        row.display_name?.split(",")[0] ||
+        "Place";
+      const secondaryParts =
+        row.display_name && row.display_name !== label
+          ? row.display_name
+          : [addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.state]
+              .filter(Boolean)
+              .join(", ");
+      const item: PlaceSearchResult = {
+        id: String(row.place_id ?? `${lat},${lng},${idx}`),
+        label,
+        latitude: lat,
+        longitude: lng,
+      };
+      if (secondaryParts) item.secondary = secondaryParts;
+      results.push(item);
+    }
+    return results;
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") return [];
     logError(err, { module: "geoRadiusService.searchPlaces", meta: { q } });
