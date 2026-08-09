@@ -17,6 +17,7 @@ import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
+import { getShopHoursSummary } from "@/lib/shopHours";
 import {
   fetchStorefrontDisplayPrefs,
   type StorefrontDisplayPrefs,
@@ -44,6 +45,15 @@ function ChevronLeftIcon() {
 
 function PinIcon() {
   return (<svg className="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>);
+}
+
+function ClockIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0 text-teal-700 dark:text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
 }
 
 function WhatsAppIcon() {
@@ -453,6 +463,47 @@ function ShopDetailInner({ id }: { id: string }) {
                 </div>
               </div>
             </div>
+
+            {/* Store hours — shown on storefront visit (not on homepage cards) */}
+            {(() => {
+              const hours = getShopHoursSummary({
+                business_hours: shop.business_hours,
+                operating_status: shop.operating_status,
+              });
+              const hasHours =
+                !!(shop.business_hours?.trim() || shop.operating_status?.trim());
+              return (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-teal-100 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 px-3 py-2 dark:border-teal-900/40 dark:from-emerald-950/30 dark:to-teal-950/20">
+                  <ClockIcon />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
+                      Store hours
+                    </p>
+                    <p className="text-xs leading-snug text-zinc-700 dark:text-zinc-300">
+                      {hasHours ? hours.hoursText : "Hours not set by merchant yet"}
+                    </p>
+                    {shop.operating_status?.trim() &&
+                    shop.operating_status.trim() !== hours.hoursText ? (
+                      <p className="mt-0.5 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                        {shop.operating_status}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold ${
+                      hours.state === "open"
+                        ? "bg-emerald-600 text-white"
+                        : hours.state === "closed"
+                          ? "bg-rose-500 text-white"
+                          : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100"
+                    }`}
+                  >
+                    {hours.label}
+                  </span>
+                </div>
+              );
+            })()}
+
             {shop.store_bio && (<p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{shop.store_bio}</p>)}
             {((shop.min_order_amount ?? 0) > 0 || (shop.free_delivery_threshold ?? 0) > 0) && (
               <div className="flex flex-wrap gap-1.5 pt-0.5">

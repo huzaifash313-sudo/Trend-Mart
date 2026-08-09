@@ -90,7 +90,7 @@ function CategoryCard({
           </span>
         </div>
         <h3
-          className={`truncate font-semibold text-zinc-900 dark:text-zinc-100 ${
+          className={`tm-title-clamp-2 font-semibold text-zinc-900 dark:text-zinc-100 ${
             compact ? "text-xs" : "text-sm sm:text-base"
           }`}
         >
@@ -191,7 +191,7 @@ export default function CategoryGrid({
 
               {/* Text content */}
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-[0.7rem] font-semibold leading-tight text-zinc-800 dark:text-zinc-100">
+                <h3 className="tm-title-clamp-2 max-w-[9.5rem] text-[0.7rem] font-semibold leading-tight text-zinc-800 dark:text-zinc-100">
                   {cat.label}
                 </h3>
                 <p className="mt-0.5 text-[0.6rem] font-medium text-zinc-400 dark:text-zinc-500">

@@ -180,12 +180,12 @@ export default function AppearanceSettingsPage() {
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-400 dark:text-emerald-700">Smaller</span>
               <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                {fontScale}px
+                {fontScale}px{fontScale === 14 ? " · default" : ""}
               </span>
               <span className="text-zinc-400 dark:text-emerald-700">Larger</span>
             </div>
             <p className="rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-text)]">
-              Preview: Text size updates across TrendMart as you drag.
+              Default is 14px. Text grows as you drag; shop cards stay compact so the UI does not cluster.
             </p>
           </div>
         </section>

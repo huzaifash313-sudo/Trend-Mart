@@ -29,7 +29,7 @@ export interface ShopLogoAvatarProps {
   logoBroken?: boolean;
   onLogoError?: () => void;
   useNextImage?: boolean;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
   className?: string;
 }
 
@@ -49,7 +49,9 @@ export function ShopLogoAvatar({
   const box =
     size === "md"
       ? "h-10 w-10 text-sm sm:h-11 sm:w-11 sm:text-base"
-      : "h-8 w-8 text-[0.7rem] sm:h-9 sm:w-9 sm:text-xs";
+      : size === "xs"
+        ? "h-[22px] w-[22px] text-[0.55rem] sm:h-6 sm:w-6 sm:text-[0.6rem]"
+        : "h-7 w-7 text-[0.65rem] sm:h-8 sm:w-8 sm:text-[0.7rem]";
 
   return (
     <div
@@ -62,7 +64,7 @@ export function ShopLogoAvatar({
             alt={`${shopName} logo`}
             fill
             className="object-cover"
-            sizes={size === "md" ? "48px" : "36px"}
+            sizes={size === "md" ? "48px" : size === "xs" ? "24px" : "32px"}
             onError={onLogoError}
           />
         ) : (
@@ -113,8 +115,8 @@ export default function ShopMediaHeader({
 
   const frameClass = isHero
     ? "relative h-36 w-full sm:h-44 md:h-48 lg:h-52"
-    : // Fixed banner height across every card column — no aspect-ratio jitter
-      "relative h-[6.75rem] w-full sm:h-[7.5rem]";
+    : // Compact marketplace banner (px so font-scale doesn't inflate cards)
+      "shop-card-banner relative h-[88px] w-full sm:h-[100px]";
 
   const logoBoxClass = isHero
     ? "absolute -bottom-7 left-3 z-10 h-14 w-14 sm:-bottom-8 sm:left-4 sm:h-[4.5rem] sm:w-[4.5rem]"
@@ -155,24 +157,30 @@ export default function ShopMediaHeader({
             />
           )
         ) : (
-          /* Uniform styled placeholder — same geometry as image banners */
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            aria-hidden="true"
-          >
-            <div className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-20"
+          /* Premium soft brand mesh — no giant initial crowding the card */
+          <div className="absolute inset-0" aria-hidden="true">
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 dark:from-zinc-900 dark:via-emerald-950/50 dark:to-teal-950/40" />
+            <div className="pointer-events-none absolute -left-6 -top-8 h-28 w-28 rounded-full bg-emerald-400/25 blur-2xl dark:bg-emerald-500/15" />
+            <div className="pointer-events-none absolute -bottom-8 -right-4 h-28 w-28 rounded-full bg-teal-400/25 blur-2xl dark:bg-teal-500/15" />
+            <div
+              className="absolute inset-0 opacity-[0.12] dark:opacity-[0.08]"
               style={{
                 backgroundImage:
-                  "radial-gradient(circle at 20% 30%, rgba(16,185,129,0.35) 0%, transparent 42%), radial-gradient(circle at 80% 70%, rgba(16,185,129,0.22) 0%, transparent 45%)",
+                  "linear-gradient(rgba(15,118,110,0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(15,118,110,0.16) 1px, transparent 1px)",
+                backgroundSize: "16px 16px",
               }}
             />
-            <span
-              className={`relative z-[1] flex items-center justify-center rounded-2xl border border-white/60 bg-white/70 font-semibold text-emerald-800 shadow-sm backdrop-blur-[2px] dark:border-white/10 dark:bg-black/30 dark:text-emerald-100 ${
-                isHero ? "h-16 w-16 text-2xl" : "h-10 w-10 text-base sm:h-11 sm:w-11 sm:text-lg"
-              }`}
-            >
-              {initial}
-            </span>
+            {isHero ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/70 bg-white/75 text-2xl font-semibold text-emerald-800 shadow-sm backdrop-blur-[2px] dark:border-white/10 dark:bg-black/30 dark:text-emerald-100">
+                  {initial}
+                </span>
+              </div>
+            ) : (
+              <div className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/70 bg-white/85 text-[0.7rem] font-bold text-teal-800 shadow-sm backdrop-blur-[1px] dark:border-white/10 dark:bg-black/35 dark:text-teal-200">
+                {initial}
+              </div>
+            )}
           </div>
         )}
         {children}

@@ -65,11 +65,11 @@ interface ThemeContextValue extends ThemePreferences {
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
-const STORAGE_KEY = "trendmart_theme_prefs_v2";
+const STORAGE_KEY = "trendmart_theme_prefs_v3";
 
 const DEFAULT_PREFS: Omit<ThemePreferences, "resolved"> = {
   mode: "system",
-  fontScale: 16,
+  fontScale: 14,
   gridLayout: "grid",
   cardStyle: "default",
   marqueeEnabled: true,
@@ -143,10 +143,15 @@ function applyThemeClass(resolved: "light" | "dark"): void {
 /** Apply font scale CSS variable to :root. */
 function applyFontScale(scale: number): void {
   if (typeof document === "undefined") return;
-  document.documentElement.style.setProperty("--font-scale", String(scale));
-  // Set the root font-size as a percentage of 16px so rem units scale everywhere.
-  const percentage = (scale / 16) * 100;
-  document.documentElement.style.fontSize = `${percentage}%`;
+  const root = document.documentElement;
+  root.style.setProperty("--font-scale", String(scale));
+  // Text scales with preference; UI density uses a gentler curve so cards
+  // don't cluster/overflow at larger sizes (14 → compact, 20 → readable).
+  const textPct = (scale / 16) * 100;
+  const density = 0.92 + ((scale - FONT_SCALE_MIN) / (FONT_SCALE_MAX - FONT_SCALE_MIN)) * 0.14;
+  root.style.fontSize = `${textPct}%`;
+  root.style.setProperty("--tm-ui-density", density.toFixed(3));
+  root.setAttribute("data-font-scale", String(scale));
 }
 
 /** Apply grid layout CSS class to the main content wrapper. */

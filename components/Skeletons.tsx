@@ -7,22 +7,18 @@
 /** A single shop card skeleton (used in grids). */
 export function ShopCardSkeleton() {
   return (
-    <div className="flex h-full min-h-[19.5rem] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 sm:min-h-[20.5rem]">
-      <div className="h-[6.75rem] w-full animate-pulse bg-zinc-200 dark:bg-zinc-800 sm:h-[7.5rem]" />
-      <div className="flex flex-1 flex-col px-2.5 pb-2.5 pt-2.5 sm:px-3 sm:pb-3 sm:pt-3">
-        <div className="flex items-center gap-1.5">
-          <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800 sm:h-9 sm:w-9" />
-          <div className="mx-auto h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-          <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-teal-100 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="h-[88px] w-full animate-pulse bg-zinc-200 dark:bg-zinc-800 sm:h-[100px]" />
+      <div className="flex flex-1 flex-col px-2 pb-2 pt-2 sm:px-2.5">
+        <div className="flex items-start gap-1.5">
+          <div className="h-[22px] w-[22px] shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-8 flex-1 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-5 w-5 shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
         </div>
-        <div className="mt-2.5 h-5 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-        <div className="mt-1.5 h-3 w-3/5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-        <div className="mt-2 flex items-center gap-1.5">
-          <div className="h-3 flex-1 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-          <div className="h-4 w-10 shrink-0 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-        </div>
-        <div className="mt-auto pt-3">
-          <div className="h-8 w-full animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+        <div className="mt-1 h-3 w-3/4 animate-pulse rounded bg-teal-100 dark:bg-zinc-800" />
+        <div className="mt-1 h-3 w-1/2 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="mt-auto pt-2">
+          <div className="h-8 w-full animate-pulse rounded-md bg-gradient-to-r from-emerald-200 to-teal-200 dark:from-zinc-800 dark:to-zinc-700" />
         </div>
       </div>
     </div>

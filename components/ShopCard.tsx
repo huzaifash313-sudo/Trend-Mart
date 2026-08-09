@@ -3,7 +3,6 @@
 import Link from "next/link";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import { formatDistance } from "@/services/geoRadiusService";
-import { getShopHoursSummary } from "@/lib/shopHours";
 
 export interface ShopCardData {
   id: string;
@@ -32,7 +31,7 @@ interface ShopCardProps {
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
     <svg
-      className="h-4 w-4"
+      className="h-3.5 w-3.5"
       viewBox="0 0 24 24"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
@@ -49,7 +48,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
 function PinIcon() {
   return (
     <svg
-      className="h-3 w-3 shrink-0 opacity-70"
+      className="h-3 w-3 shrink-0 text-teal-700 opacity-80 dark:text-teal-400"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -64,27 +63,8 @@ function PinIcon() {
   );
 }
 
-function ClockIcon() {
-  return (
-    <svg
-      className="h-3 w-3 shrink-0 opacity-70"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
 /**
- * Homepage / discovery shop card —
- * logo · category · wishlist → name → location → hours/open → CTA
+ * Premium marketplace shop card — name fills logo→heart, wraps cleanly.
  */
 export default function ShopCard({
   shop,
@@ -102,17 +82,13 @@ export default function ShopCard({
     showDistance && shop.distance_km != null
       ? formatDistance(shop.distance_km)
       : null;
-  const hours = getShopHoursSummary({
-    business_hours: shop.business_hours,
-    operating_status: shop.operating_status,
-  });
+  const category = (shop.category || "Store").trim();
 
   return (
-    <article className="trend-card group flex h-full min-h-[19.5rem] flex-col overflow-hidden sm:min-h-[20.5rem]">
-      {/* Banner */}
+    <article className="shop-card trend-card group flex h-full flex-col overflow-hidden">
       <Link
         href={href}
-        className="relative block shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
+        className="relative block shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
         aria-label={`${shop.name} store banner`}
       >
         <ShopMediaHeader
@@ -126,48 +102,56 @@ export default function ShopCard({
           onLogoError={onLogoError}
         >
           <span
-            className={`absolute left-2 top-2 z-[1] inline-flex max-w-[55%] items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6rem] font-semibold tracking-wide shadow-sm ${
+            className={`absolute left-1.5 top-1.5 z-[1] inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm backdrop-blur-[2px] ${
               isLive
-                ? "bg-white/95 text-emerald-700 dark:bg-zinc-900/90 dark:text-emerald-400"
-                : "bg-zinc-900/80 text-zinc-100 dark:bg-zinc-950/85 dark:text-zinc-200"
+                ? "bg-white/95 text-emerald-700 dark:bg-zinc-900/90 dark:text-emerald-300"
+                : "bg-zinc-900/80 text-zinc-100"
             }`}
           >
             <span
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                isLive ? "bg-emerald-500" : "bg-zinc-400"
+                isLive ? "tm-live-dot bg-emerald-500" : "bg-zinc-400"
               }`}
               aria-hidden="true"
             />
-            <span className="tm-title-ellipsis">{isLive ? "Live" : "Not available"}</span>
+            {isLive ? "Live" : "Unavailable"}
           </span>
           {distance ? (
-            <span className="absolute right-2 top-2 z-[1] rounded-md bg-zinc-900/75 px-1.5 py-0.5 text-[0.6rem] font-medium text-white backdrop-blur-sm">
+            <span className="absolute right-1.5 top-1.5 z-[1] rounded-full bg-zinc-900/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white backdrop-blur-sm">
               {distance}
             </span>
           ) : null}
         </ShopMediaHeader>
       </Link>
 
-      {/* Body */}
-      <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-2.5 sm:px-3 sm:pb-3 sm:pt-3">
-        {/* Row: logo | category | wishlist */}
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Link href={href} className="shrink-0 focus:outline-none" tabIndex={-1}>
+      <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2 sm:px-2.5 sm:pb-2.5">
+        {/*
+          Logo | Name (wraps to heart) | Heart
+          CSS grid keeps name width exact between logo and wishlist.
+        */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5">
+          <Link
+            href={href}
+            className="shop-card-logo mt-0.5 shrink-0 focus:outline-none"
+            tabIndex={-1}
+          >
             <ShopLogoAvatar
               shopName={shop.name}
               logoUrl={shop.logo_url}
               logoBroken={logoBroken}
               onLogoError={onLogoError}
-              size="sm"
+              size="xs"
+              className="ring-2 ring-emerald-400/35 ring-offset-1 ring-offset-white dark:ring-teal-400/40 dark:ring-offset-[color:var(--tm-surface)]"
             />
           </Link>
 
-          <p
-            className="tm-title-ellipsis min-w-0 flex-1 px-0.5 text-center text-[0.6875rem] font-medium leading-none text-zinc-500 dark:text-zinc-400"
-            title={shop.category || "Store"}
+          <Link
+            href={href}
+            title={shop.name}
+            className="tm-shop-name col-start-2 text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
           >
-            {shop.category || "Store"}
-          </p>
+            {shop.name}
+          </Link>
 
           {onToggleFavorite ? (
             <button
@@ -177,7 +161,7 @@ export default function ShopCard({
                 e.stopPropagation();
                 onToggleFavorite();
               }}
-              className={`icon-only shrink-0 rounded-full p-1.5 transition-colors ${
+              className={`icon-only col-start-3 -mr-0.5 -mt-0.5 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
                 favorited
                   ? "text-rose-500"
                   : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
@@ -187,22 +171,19 @@ export default function ShopCard({
               <HeartIcon filled={favorited} />
             </button>
           ) : (
-            <span className="inline-block h-8 w-8 shrink-0" aria-hidden="true" />
+            <span className="col-start-3 inline-block w-6" aria-hidden="true" />
           )}
         </div>
 
-        {/* Full-width store name */}
-        <Link
-          href={href}
-          title={shop.name}
-          className="tm-title-clamp-2 mt-2.5 min-h-[2.5rem] text-[0.9375rem] font-semibold leading-snug tracking-tight text-zinc-900 hover:text-emerald-700 sm:min-h-[2.625rem] sm:text-base dark:text-zinc-50 dark:hover:text-emerald-400"
-        >
-          {shop.name}
-        </Link>
-
-        {/* Location */}
         <p
-          className="mt-1.5 inline-flex min-h-[1.125rem] min-w-0 items-center gap-1 text-[0.6875rem] leading-none text-zinc-500 dark:text-zinc-400"
+          title={category}
+          className="tm-title-clamp-2 mt-1.5 text-[11px] font-medium leading-snug text-teal-700 dark:text-teal-300 sm:text-[12px]"
+        >
+          {category}
+        </p>
+
+        <p
+          className="mt-1 inline-flex min-w-0 items-center gap-1 text-[11px] leading-none text-zinc-500 dark:text-zinc-400"
           title={shop.location}
         >
           <PinIcon />
@@ -211,33 +192,8 @@ export default function ShopCard({
           </span>
         </p>
 
-        {/* Hours + Open / Closed */}
-        <div className="mt-2 flex min-w-0 items-center gap-1.5">
-          <p
-            className="inline-flex min-w-0 flex-1 items-center gap-1 text-[0.65rem] leading-none text-zinc-500 dark:text-zinc-400"
-            title={hours.hoursText}
-          >
-            <ClockIcon />
-            <span className="tm-title-ellipsis">{hours.hoursText}</span>
-          </p>
-          <span
-            className={`shrink-0 rounded-md px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none ${
-              hours.state === "open"
-                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                : hours.state === "closed"
-                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-                  : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-            }`}
-          >
-            {hours.label}
-          </span>
-        </div>
-
-        <div className="mt-auto pt-3">
-          <Link
-            href={href}
-            className="btn-compact inline-flex h-8 w-full items-center justify-center rounded-lg border border-emerald-600/20 bg-emerald-50 text-[0.75rem] font-semibold text-emerald-800 transition-colors hover:bg-emerald-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white dark:focus:ring-offset-[color:var(--tm-surface)]"
-          >
+        <div className="mt-auto pt-2">
+          <Link href={href} className="tm-cta btn-compact h-8 w-full text-[12px] sm:text-[13px]">
             View store
           </Link>
         </div>

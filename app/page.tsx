@@ -20,6 +20,7 @@ import { useLocation } from "@/context/LocationContext";
 import PromoAdsCarousel from "@/components/PromoAdsCarousel";
 import ShopCard from "@/components/ShopCard";
 import SubCategoryPills from "@/components/SubCategoryPills";
+import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { fetchShopIdsBySubCategory } from "@/services/productService";
 
 /* -------------------------------------------------------------------------- */
@@ -60,12 +61,19 @@ function HomeInner() {
   const [brokenStoryImgs, setBrokenStoryImgs] = useState<Set<string>>(new Set());
   const { addToast } = useToast();
 
-  // Header LocationPicker sets the pin — homepage only sorts by that pin
+  // Header LocationPicker + homepage area filter (Near me / City / All Pakistan)
   const { location: globalLocation, coordinates: globalCoords } = useLocation();
 
   const [geoFiltering, setGeoFiltering] = useState(false);
+  const [geoDetecting, setGeoDetecting] = useState(false);
   const [geoFilteredShops, setGeoFilteredShops] = useState<ShopWithDistance[]>([]);
   const [proximityActive, setProximityActive] = useState(false);
+  const [geoFilter, setGeoFilter] = useState<GeoFilterState>({
+    coordinates: null,
+    maxDistanceKm: 0,
+    locationAvailable: false,
+    scope: "pakistan",
+  });
 
   /* Fetch shops once on mount */
   useEffect(() => {
@@ -129,14 +137,26 @@ function HomeInner() {
     });
   }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds]);
 
-  /* Geo proximity — nearest-first from header map/GPS pin */
+  /* Geo filter — Near me (range) / This city / All Pakistan */
   useEffect(() => {
     let cancelled = false;
     async function applyGeoFilter() {
-      const coords = globalCoords ?? null;
-      if (!coords) {
+      const scope = geoFilter.scope;
+      const coords = geoFilter.coordinates ?? globalCoords ?? null;
+
+      // Default nationwide browse with no pin: show all category-filtered shops
+      if (scope === "pakistan" && !coords) {
         setProximityActive(false);
         setGeoFilteredShops([]);
+        setGeoFiltering(false);
+        return;
+      }
+
+      // Radius mode needs a pin; otherwise fall back to unfiltered list
+      if (scope === "radius" && !coords) {
+        setProximityActive(false);
+        setGeoFilteredShops([]);
+        setGeoFiltering(false);
         return;
       }
 
@@ -144,10 +164,10 @@ function HomeInner() {
       try {
         const result = await filterShopsByProximity(filteredShops, {
           coordinates: coords,
-          maxDistanceKm: 0,
-          enforceServiceRadius: true,
+          maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
+          enforceServiceRadius: scope === "radius",
           sortByProximity: true,
-          scope: "radius",
+          scope,
           deliveryZone: globalLocation?.deliveryZone ?? undefined,
           customerCity: globalLocation?.city ?? undefined,
         });
@@ -167,10 +187,24 @@ function HomeInner() {
     return () => {
       cancelled = true;
     };
-  }, [filteredShops, globalCoords, globalLocation]);
+  }, [filteredShops, geoFilter, globalCoords, globalLocation]);
 
   const displayShops = proximityActive ? geoFilteredShops : filteredShops;
-  const showProximityBadges = proximityActive && !!globalCoords;
+  const showProximityBadges =
+    proximityActive &&
+    (geoFilter.scope === "radius"
+      ? !!globalCoords || !!geoFilter.coordinates
+      : geoFilter.scope === "city" || geoFilter.scope === "pakistan");
+  const areaBadgeLabel =
+    geoFilter.scope === "pakistan"
+      ? "All Pakistan"
+      : geoFilter.scope === "city"
+        ? globalLocation?.city
+          ? `${globalLocation.city}`
+          : "This city"
+        : geoFilter.maxDistanceKm > 0
+          ? `Within ${geoFilter.maxDistanceKm} km`
+          : "Near you first";
 
   const handleCategoryChange = useCallback((category: ShopCategory) => {
     setActiveCategory(category);
@@ -209,16 +243,16 @@ function HomeInner() {
                 key={category}
                 type="button"
                 onClick={() => handleCategoryChange(category)}
-                className={`chip shrink-0 rounded-full border px-3 text-[0.7rem] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                className={`chip inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1.5 text-[0.68rem] font-medium leading-none transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:px-3 sm:text-[0.7rem] ${
                   isActive
-                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    ? "border-emerald-600 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-600/20"
                     : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] dark:text-[color:var(--tm-muted)] dark:hover:bg-[color:var(--tm-elevated)]"
                 }`}
                 aria-label={`${category}${catCount !== undefined ? ` — ${catCount} shop${catCount !== 1 ? "s" : ""}` : ""}`}
                 aria-pressed={isActive}
               >
-                <span className="mr-1" aria-hidden="true">{meta.icon}</span>
-                {category}
+                <span aria-hidden="true">{meta.icon}</span>
+                <span>{category}</span>
                 {catCount !== undefined && (
                   <span className={`ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[0.58rem] font-bold ${
                     isActive ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-400 dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-muted)]"
@@ -269,25 +303,35 @@ function HomeInner() {
       <PromoAdsCarousel placement="homepage_top" />
 
       {geoFiltering && (
-        <p className="text-xs text-zinc-400 animate-pulse">Sorting shops near you…</p>
+        <p className="animate-pulse text-xs text-teal-600/80 dark:text-teal-400/80">
+          Updating shops for your area…
+        </p>
       )}
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-            Live Shops
-          </h2>
-          {!loading && (
-            <p className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-              {displayShops.length} shop{displayShops.length !== 1 && "s"}
-              {showProximityBadges && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[0.65rem] font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                  Near you first
-                </span>
-              )}
-            </p>
-          )}
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-[1.05rem]">
+              Live Shops
+            </h2>
+            {!loading && (
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {displayShops.length} shop{displayShops.length !== 1 && "s"}
+                {showProximityBadges && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 px-2 py-0.5 text-[0.65rem] font-semibold text-teal-700 dark:from-emerald-950/50 dark:to-teal-950/40 dark:text-teal-300">
+                    {areaBadgeLabel}
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+          <GeoRadiusFilter
+            onFilterChange={setGeoFilter}
+            isDetecting={geoDetecting}
+            onDetectStart={() => setGeoDetecting(true)}
+            onDetectEnd={() => setGeoDetecting(false)}
+          />
         </div>
 
         {/* Loading skeletons */}

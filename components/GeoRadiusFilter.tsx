@@ -196,10 +196,10 @@ export default function GeoRadiusFilter({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
           isActive
-            ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-            : "border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+            ? "border-teal-300 bg-gradient-to-r from-emerald-50 to-teal-50 text-teal-800 shadow-sm shadow-teal-600/10 dark:border-teal-700 dark:from-emerald-900/30 dark:to-teal-900/30 dark:text-teal-300"
+            : "border-zinc-200 bg-white text-zinc-500 hover:border-teal-200 hover:bg-teal-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
         }`}
         aria-label="Filter by location distance"
         aria-expanded={expanded}
@@ -216,10 +216,10 @@ export default function GeoRadiusFilter({
       </button>
 
       {expanded && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-[300px] max-w-[92vw] rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[300px] max-w-[92vw] rounded-2xl border border-teal-200/80 bg-white p-4 shadow-xl shadow-teal-900/10 dark:border-teal-900/50 dark:bg-zinc-900 sm:left-auto">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-              📍 Filter by Area
+              Filter by area
             </h3>
             <button
               type="button"

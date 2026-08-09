@@ -13,8 +13,12 @@
   --tm-border: #e4e4e7;
   --tm-text: #18181b;
   --tm-muted: #71717a;
-  --tm-accent: #10b981;
+  --tm-accent: #10b981; /* green */
   --tm-accent-soft: #059669;
+  --tm-sea: #14b8a6; /* sea green */
+  --tm-sea-deep: #0f766e;
+  --tm-brand-gradient: linear-gradient(135deg, #10b981 0%, #0d9488 52%, #14b8a6 100%);
+  --tm-brand-gradient-hover: linear-gradient(135deg, #059669 0%, #0f766e 55%, #2dd4bf 100%);
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
@@ -43,6 +47,10 @@ html.dark {
   --tm-muted: #9aa3b5;
   --tm-accent: #34d399;
   --tm-accent-soft: #10b981;
+  --tm-sea: #2dd4bf;
+  --tm-sea-deep: #14b8a6;
+  --tm-brand-gradient: linear-gradient(135deg, #34d399 0%, #14b8a6 52%, #2dd4bf 100%);
+  --tm-brand-gradient-hover: linear-gradient(135deg, #10b981 0%, #0d9488 55%, #5eead4 100%);
   color-scheme: dark;
   background-color: var(--tm-bg);
 }
@@ -250,6 +258,20 @@ h6 {
   overflow: hidden;
   overflow-wrap: break-word;
   word-break: normal;
+  hyphens: none;
+}
+
+/* Shop card titles: fill logo→heart width, wrap to next lines (no early …) */
+.tm-shop-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  line-height: 1.28;
+  overflow-wrap: break-word;
+  word-break: break-word;
   hyphens: none;
 }
 
@@ -562,24 +584,189 @@ label {
 }
 
 .trend-card {
-  border-radius: 0.875rem;
-  border: 1px solid var(--tm-border);
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--tm-sea) 14%, var(--tm-border));
   background: var(--tm-surface);
   color: var(--tm-text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
 }
 html.dark .trend-card {
-  border-color: var(--tm-border);
+  border-color: color-mix(in srgb, var(--tm-sea) 18%, var(--tm-border));
   background: var(--tm-surface);
   color: var(--tm-text);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 .trend-card:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border-color: color-mix(in srgb, var(--tm-accent) 35%, var(--tm-border));
+  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.12);
+  transform: translateY(-2px);
 }
 html.dark .trend-card:hover {
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 14px 32px rgba(0, 0, 0, 0.35);
+  border-color: color-mix(in srgb, var(--tm-sea) 40%, var(--tm-border));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 34px rgba(0, 0, 0, 0.38);
+}
+
+/* Brand CTA — green + sea green (primary ecommerce actions) */
+.tm-cta {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.7rem;
+  background-image: var(--tm-brand-gradient);
+  color: #fff !important;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.tm-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.22) 45%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.55s ease;
+}
+.tm-cta:hover {
+  background-image: var(--tm-brand-gradient-hover);
+  box-shadow: 0 10px 22px rgba(13, 148, 136, 0.34);
+  transform: translateY(-1px);
+  filter: saturate(1.05);
+}
+.tm-cta:hover::after {
+  transform: translateX(120%);
+}
+.tm-cta:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}
+.tm-cta:focus-visible {
+  outline: 2px solid var(--tm-sea);
+  outline-offset: 2px;
+}
+
+.tm-live-dot {
+  animation: tm-live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes tm-live-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.65;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trend-card,
+  .shop-card,
+  .tm-cta,
+  .tm-cta::after,
+  .shop-card-logo {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .tm-live-dot {
+    animation: none !important;
+  }
+}
+
+/* Shop discovery cards — compact marketplace density (Daraz-like) */
+.shop-card {
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--tm-sea) 22%, var(--tm-border));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 4px 14px rgba(13, 148, 136, 0.07);
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
+}
+.shop-card:hover {
+  border-color: color-mix(in srgb, var(--tm-accent) 45%, var(--tm-sea));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 12px 28px rgba(13, 148, 136, 0.16);
+  transform: translateY(-3px);
+}
+.shop-card:active {
+  transform: translateY(-1px);
+}
+.shop-card-body {
+  gap: 0;
+}
+.shop-card .shop-card-banner {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.shop-card:hover .shop-card-banner img,
+.shop-card:hover .shop-card-banner > div:first-child {
+  transform: scale(1.03);
+}
+.shop-card .tm-cta {
+  min-height: 2rem !important;
+  height: 2rem;
+  border-radius: 0.55rem;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.22);
+}
+.shop-card-logo {
+  transition: transform 0.25s ease;
+}
+.shop-card:hover .shop-card-logo {
+  transform: scale(1.06);
+}
+
+/* When user bumps font size, tighten card chrome so UI stays clean */
+html[data-font-scale="17"] .shop-card-body,
+html[data-font-scale="18"] .shop-card-body,
+html[data-font-scale="19"] .shop-card-body,
+html[data-font-scale="20"] .shop-card-body {
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  padding-bottom: 0.45rem;
+  padding-top: 0.4rem;
+}
+html[data-font-scale="18"] .shop-card-banner,
+html[data-font-scale="19"] .shop-card-banner,
+html[data-font-scale="20"] .shop-card-banner {
+  height: 76px !important;
+}
+@media (min-width: 640px) {
+  html[data-font-scale="18"] .shop-card-banner,
+  html[data-font-scale="19"] .shop-card-banner,
+  html[data-font-scale="20"] .shop-card-banner {
+    height: 88px !important;
+  }
+}
+html[data-font-scale="18"] .shop-card .tm-cta,
+html[data-font-scale="19"] .shop-card .tm-cta,
+html[data-font-scale="20"] .shop-card .tm-cta {
+  height: 1.85rem;
+  min-height: 1.85rem !important;
+  font-size: 0.72rem;
+}
+
+/* Horizontal category chips: never force mid-word cuts */
+.chip {
+  white-space: nowrap;
+  max-width: none;
 }
 
 /* Tighter page stacks on mobile */
