@@ -168,14 +168,14 @@ export default function BecomeMerchantPage() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-4">
           <div>

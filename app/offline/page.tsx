@@ -12,7 +12,7 @@ export const metadata: Metadata = {
  */
 export default function OfflinePage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-6 text-center dark:bg-zinc-950">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-6 text-center dark:bg-[color:var(--tm-surface)]">
       <div className="mb-4 text-6xl">📡</div>
       <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">You&apos;re offline</h1>
       <p className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">

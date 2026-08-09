@@ -240,7 +240,7 @@ export default function SignupPage() {
       </div>
 
       {/* ─── Right Panel: Auth Form ───────────────────────────────────── */}
-      <div className="flex w-full items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-zinc-950 lg:w-1/2">
+      <div className="flex w-full items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-[color:var(--tm-surface)] lg:w-1/2">
         <motion.div
           className="w-full max-w-md"
           initial={{ opacity: 0, x: 20 }}

@@ -44,7 +44,7 @@ const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] 
 
 export default function Footer() {
   return (
-    <footer className="border-t border-zinc-200 bg-white pb-20 dark:border-zinc-800 dark:bg-zinc-950 md:pb-0">
+    <footer className="border-t border-zinc-200 bg-white pb-20 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-bg)] md:pb-0">
       <div className="mx-auto max-w-7xl px-6 py-10">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           <div className="col-span-2 sm:col-span-1">

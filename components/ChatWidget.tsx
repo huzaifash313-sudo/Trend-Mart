@@ -220,7 +220,7 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
         </div>
 
         {/* Messages */}
-        <div className="h-80 overflow-y-auto bg-zinc-50 px-3 py-3 space-y-3 dark:bg-zinc-950">
+        <div className="h-80 overflow-y-auto bg-zinc-50 px-3 py-3 space-y-3 dark:bg-[color:var(--tm-surface)]">
           {messages.map((msg) => (
             <div
               key={msg.id}

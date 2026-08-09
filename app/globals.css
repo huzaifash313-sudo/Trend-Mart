@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (ThemeProvider toggles `html.dark`) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Soft light theme */
+  --background: #f7f8fa;
+  --foreground: #18181b;
+  --tm-bg: #f7f8fa;
+  --tm-surface: #ffffff;
+  --tm-elevated: #f1f3f7;
+  --tm-border: #e4e4e7;
+  --tm-text: #18181b;
+  --tm-muted: #71717a;
   --tm-accent: #10b981;
   --tm-accent-soft: #059669;
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -18,66 +28,117 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Class-based dark mode (ThemeProvider) — black surfaces + emerald accents */
+/*
+ * Soft charcoal dark mode — NOT jet black.
+ * Warm slate surfaces + calm text + emerald accents only where needed.
+ */
 html.dark {
-  --background: #000000;
-  --foreground: #ecfdf5;
+  --background: #14161d;
+  --foreground: #e8eaef;
+  --tm-bg: #14161d;
+  --tm-surface: #1c1f2a;
+  --tm-elevated: #252836;
+  --tm-border: rgba(148, 163, 184, 0.16);
+  --tm-text: #e8eaef;
+  --tm-muted: #9aa3b5;
+  --tm-accent: #34d399;
+  --tm-accent-soft: #10b981;
   color-scheme: dark;
-  background-color: #000000;
+  background-color: var(--tm-bg);
 }
 
 html.dark body {
-  background: #000000 !important;
-  color: #ecfdf5;
+  background:
+    radial-gradient(900px 480px at 50% -18%, rgba(52, 211, 153, 0.08), transparent 58%),
+    var(--tm-bg) !important;
+  color: var(--tm-text);
+}
+
+/* Page / surface helpers */
+.tm-bg {
+  background-color: var(--tm-bg);
+  color: var(--tm-text);
+}
+.tm-surface {
+  background-color: var(--tm-surface);
+  color: var(--tm-text);
+  border-color: var(--tm-border);
 }
 
 html.dark .trend-card {
-  background-color: #0a0a0a;
-  border-color: rgba(16, 185, 129, 0.28);
-  color: #ecfdf5;
+  background-color: var(--tm-surface);
+  border-color: var(--tm-border);
+  color: var(--tm-text);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 
-/* Safety net: utilities without dark: variants stay readable on black */
-html.dark .bg-white:not([class*="dark:bg-"]) {
-  background-color: #0a0a0a;
+/* Remap common light utilities when dark: sibling classes are missing */
+html.dark .bg-white:not([class*="dark:bg-"]),
+html.dark .bg-black:not([class*="dark:bg-"]) {
+  background-color: var(--tm-surface);
 }
 html.dark .bg-zinc-50:not([class*="dark:bg-"]),
-html.dark .bg-zinc-100:not([class*="dark:bg-"]) {
-  background-color: #09090b;
+html.dark .bg-zinc-100:not([class*="dark:bg-"]),
+html.dark .bg-zinc-950:not([class*="dark:bg-"]) {
+  background-color: var(--tm-elevated);
 }
 html.dark .border-zinc-100:not([class*="dark:border-"]),
-html.dark .border-zinc-200:not([class*="dark:border-"]) {
-  border-color: #27272a;
+html.dark .border-zinc-200:not([class*="dark:border-"]),
+html.dark .border-zinc-800:not([class*="dark:border-"]) {
+  border-color: var(--tm-border);
 }
 html.dark .text-zinc-900:not([class*="dark:text-"]),
 html.dark .text-zinc-800:not([class*="dark:text-"]),
 html.dark .text-zinc-700:not([class*="dark:text-"]),
 html.dark .text-black:not([class*="dark:text-"]) {
-  color: #f4f4f5;
+  color: var(--tm-text);
 }
 html.dark .text-zinc-600:not([class*="dark:text-"]),
-html.dark .text-zinc-500:not([class*="dark:text-"]) {
-  color: #a1a1aa;
-}
+html.dark .text-zinc-500:not([class*="dark:text-"]),
 html.dark .text-zinc-400:not([class*="dark:text-"]) {
-  color: #71717a;
+  color: var(--tm-muted);
 }
+
+/*
+ * Soften jet-black / harsh zinc utilities even when authored as dark:bg-black.
+ * Attribute contains catches opacity variants (dark:bg-black/90).
+ */
+html.dark [class~="dark:bg-black"] {
+  background-color: var(--tm-bg) !important;
+}
+html.dark [class*="dark:bg-black/"] {
+  background-color: color-mix(in srgb, var(--tm-bg) 90%, transparent) !important;
+}
+html.dark [class*="dark:bg-zinc-950"] {
+  background-color: var(--tm-surface) !important;
+}
+html.dark [class*="dark:bg-zinc-900"] {
+  background-color: var(--tm-elevated) !important;
+}
+html.dark [class*="dark:border-emerald-900"] {
+  border-color: var(--tm-border) !important;
+}
+
 html.dark input:not([type="checkbox"]):not([type="radio"]),
 html.dark select,
 html.dark textarea {
-  color: #f4f4f5;
-  background-color: #18181b;
-  border-color: #3f3f46;
+  color: var(--tm-text);
+  background-color: var(--tm-elevated);
+  border-color: var(--tm-border);
 }
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #71717a;
+  color: #7c8498;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --background: #000000;
-    --foreground: #ecfdf5;
+    --background: #14161d;
+    --foreground: #e8eaef;
   }
 }
 
@@ -201,8 +262,11 @@ textarea,
   touch-action: manipulation;
 }
 
-/* Center label/icon inside buttons & pill links (fixes top-aligned Settings/Analytics). */
-button,
+/*
+ * Do NOT set display on all `button` elements here — unlayered CSS beats
+ * Tailwind utilities and breaks `hidden` / `sm:flex` (e.g. navbar search).
+ * Center only explicit pill / chip controls.
+ */
 a.rounded-full,
 button.rounded-full,
 [role="button"].rounded-full {
@@ -220,15 +284,15 @@ a.chip,
 button.btn-compact,
 a.btn-compact,
 .btn-compact {
-  min-height: 1.75rem !important;
+  min-height: 2rem !important;
   min-width: unset !important;
-  height: 1.75rem;
-  padding-top: 0;
-  padding-bottom: 0;
+  height: auto;
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  line-height: 1;
+  line-height: 1.15;
 }
 
 /* Exclude compact controls from the 44px floor. */
@@ -465,20 +529,24 @@ label {
 /* ── Professional Card Base ────────────────────────────────────────────────── */
 
 .trend-card {
-  border-radius: 0.75rem;
-  border: 1px solid #e4e4e7;
-  background: #fff;
+  border-radius: 0.875rem;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: var(--tm-text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
-.dark .trend-card,
 html.dark .trend-card {
-  border-color: rgba(16, 185, 129, 0.28);
-  background: #0a0a0a;
-  color: #ecfdf5;
+  border-color: var(--tm-border);
+  background: var(--tm-surface);
+  color: var(--tm-text);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 .trend-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+html.dark .trend-card:hover {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 14px 32px rgba(0, 0, 0, 0.35);
 }
 
 /* Tighter page stacks on mobile */
@@ -506,8 +574,8 @@ html.dark .trend-card {
   overflow: hidden;
   background: linear-gradient(135deg, #f4f4f5, #e4e4e7);
 }
-.dark .product-img-container {
-  background: linear-gradient(135deg, #27272a, #3f3f46);
+html.dark .product-img-container {
+  background: linear-gradient(135deg, var(--tm-elevated), #2e3345);
 }
 
 /* ── Print Styles ───────────────────────────────────────────────────────────── */
@@ -670,10 +738,10 @@ html.card-default .shop-card {
   background: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-.dark html.card-default .product-card,
-.dark html.card-default .shop-card {
-  border-color: #27272a;
-  background: #18181b;
+html.dark.card-default .product-card,
+html.dark.card-default .shop-card {
+  border-color: var(--tm-border);
+  background: var(--tm-surface);
 }
 
 /* Minimal — no borders, no shadow, clean edges */
@@ -694,11 +762,11 @@ html.card-detailed .shop-card {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   padding: 1rem;
 }
-.dark html.card-detailed .product-card,
-.dark html.card-detailed .shop-card {
-  border-color: #27272a;
-  background: #18181b;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+html.dark.card-detailed .product-card,
+html.dark.card-detailed .shop-card {
+  border-color: var(--tm-border);
+  background: var(--tm-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
 
 /* Service — accent-colored left border for service-provider cards */
@@ -710,11 +778,11 @@ html.card-service .shop-card {
   background: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-.dark html.card-service .product-card,
-.dark html.card-service .shop-card {
-  border-color: #27272a;
-  border-left-color: #059669;
-  background: #18181b;
+html.dark.card-service .product-card,
+html.dark.card-service .shop-card {
+  border-color: var(--tm-border);
+  border-left-color: var(--tm-accent-soft);
+  background: var(--tm-surface);
 }
 
 /* ── Theme Transition ──────────────────────────────────────────────────────── */

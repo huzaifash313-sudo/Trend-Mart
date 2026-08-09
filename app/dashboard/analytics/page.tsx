@@ -279,7 +279,7 @@ export default function AnalyticsDashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
       </div>
     );
@@ -287,7 +287,7 @@ export default function AnalyticsDashboard() {
 
   if (error || !shop) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
         <p className="text-sm text-red-500">{error ?? "No shop found"}</p>
         <Link href="/dashboard" className="mt-3 text-sm font-medium text-emerald-600 hover:underline">← Back to Dashboard</Link>
       </div>
@@ -295,7 +295,7 @@ export default function AnalyticsDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <Link href="/dashboard" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Back to dashboard">

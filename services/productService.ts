@@ -311,6 +311,75 @@ export async function createProduct(
 }
 
 /**
+ * Create multiple products for a shop in one merchant action.
+ * Continues on per-row failures and returns a summary.
+ */
+export async function bulkCreateProducts(
+  shopId: string,
+  forms: ProductFormData[],
+): Promise<
+  ServiceResult<{ created: Product[]; failed: { index: number; error: string }[] }>
+> {
+  if (!shopId || !isValidUUID(shopId)) {
+    return { success: false, error: "Invalid shop. Please re-open the dashboard and try again." };
+  }
+  if (!forms.length) {
+    return { success: false, error: "Add at least one product row." };
+  }
+
+  const created: Product[] = [];
+  const failed: { index: number; error: string }[] = [];
+
+  for (let i = 0; i < forms.length; i++) {
+    const form = forms[i];
+    const result = await createProduct(shopId, form);
+    if (result.success) created.push(result.data);
+    else failed.push({ index: i, error: result.error });
+  }
+
+  if (created.length === 0) {
+    return {
+      success: false,
+      error: failed[0]?.error ?? "Failed to create products.",
+    };
+  }
+
+  return { success: true, data: { created, failed } };
+}
+
+/**
+ * Shop IDs that currently have at least one product in the given sub-category.
+ * Used for homepage / search filtering by sub-category.
+ */
+export async function fetchShopIdsBySubCategory(
+  subCategoryId: string,
+): Promise<ServiceResult<string[]>> {
+  if (!subCategoryId || !isValidUUID(subCategoryId)) {
+    return { success: true, data: [] };
+  }
+  const supabase = createClient();
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select("shop_id")
+      .eq("sub_category_id", subCategoryId)
+      .eq("is_available", true);
+
+    if (error) throw error;
+    const ids = Array.from(
+      new Set(((data as { shop_id: string }[]) ?? []).map((r) => r.shop_id).filter(Boolean)),
+    );
+    return { success: true, data: ids };
+  } catch (err) {
+    logError(err, {
+      module: "productService.fetchShopIdsBySubCategory",
+      meta: { subCategoryId },
+    });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
  * Update an existing product.
  * RLS ensures only the shop owner can update.
  */

@@ -135,7 +135,7 @@ export default function CartBar() {
       {/* ── Floating Cart Bar ─────────────────────────────────────────── */}
       <div className="fixed bottom-16 left-0 right-0 z-40 md:bottom-0">
         <div className="mx-auto max-w-lg px-3">
-          <div className="overflow-hidden rounded-2xl bg-white shadow-lg border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-700 transition-all">
+          <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg transition-all dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
             {/* ── Expanded Items List (grouped by shop) ────────────────── */}
             {expanded && (
               <div className="max-h-72 overflow-y-auto border-b border-zinc-100 dark:border-zinc-800">

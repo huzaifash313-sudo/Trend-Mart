@@ -16,6 +16,7 @@ import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
+import SubCategoryPills from "@/components/SubCategoryPills";
 import {
   fetchStorefrontDisplayPrefs,
   type StorefrontDisplayPrefs,
@@ -219,6 +220,7 @@ function ShopDetailInner({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [priceSort, setPriceSort] = useState<"default" | "low" | "high">("default");
+  const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -330,15 +332,27 @@ function ShopDetailInner({ id }: { id: string }) {
     fetchServiceData();
   }, [shop, isService, supabase]);
 
+  // Sub-categories that actually have products in this shop (for cleaner pills)
+  const productSubCategoryIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of products) {
+      if (p.sub_category_id) ids.add(p.sub_category_id);
+    }
+    return ids;
+  }, [products]);
+
   // ── Filtered & Sorted Products ────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
     let result = products;
+    if (activeSubCategoryId) {
+      result = result.filter((p) => p.sub_category_id === activeSubCategoryId);
+    }
     const q = searchQuery.toLowerCase().trim();
     if (q) result = result.filter((p) => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
     if (priceSort === "low") result = [...result].sort((a, b) => a.price - b.price);
     else if (priceSort === "high") result = [...result].sort((a, b) => b.price - a.price);
     return result;
-  }, [products, searchQuery, priceSort]);
+  }, [products, searchQuery, priceSort, activeSubCategoryId]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleProductClick = useCallback((product: Product) => {
@@ -532,9 +546,16 @@ function ShopDetailInner({ id }: { id: string }) {
           </section>
         )}
 
-        {/* ── RETAIL: Search + Sort ──────────────────────────────── */}
+        {/* ── RETAIL: Sub-categories + Search + Sort ──────────────────────────────── */}
         {!isService && (
-          <section>
+          <section className="space-y-3">
+            <SubCategoryPills
+              mainCategory={shop.category}
+              selectedId={activeSubCategoryId}
+              onSelect={(id) => setActiveSubCategoryId(id)}
+              availableIds={productSubCategoryIds.size > 0 ? productSubCategoryIds : null}
+              label="Browse by sub-category"
+            />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2"><SearchIcon /></span>
@@ -561,7 +582,10 @@ function ShopDetailInner({ id }: { id: string }) {
               <span className="text-xs text-zinc-500">{filteredProducts.length} item{filteredProducts.length !== 1 && "s"}</span>
             </div>
             {filteredProducts.length === 0 ? (
-              <EmptyState title={searchQuery ? "No products match your search" : "No products yet"} description={searchQuery ? "Try a different keyword." : "Check back later."} />
+              <EmptyState
+                title={searchQuery || activeSubCategoryId ? "No products match your filters" : "No products yet"}
+                description={searchQuery || activeSubCategoryId ? "Try another sub-category or keyword." : "Check back later."}
+              />
             ) : (
               <ProductGrid
                 products={filteredProducts}

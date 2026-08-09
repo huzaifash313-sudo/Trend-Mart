@@ -11,6 +11,8 @@ import { ErrorState } from "@/components/ErrorState";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
+import SubCategoryPills from "@/components/SubCategoryPills";
+import { fetchShopIdsBySubCategory } from "@/services/productService";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -79,9 +81,12 @@ function SearchResultsInner() {
   // Read from URL
   const query = searchParams.get("q") ?? "";
   const categoryParam = searchParams.get("category") ?? "";
+  const subParam = searchParams.get("sub") ?? "";
   const sortParam = searchParams.get("sort") ?? "";
   const minPrice = searchParams.get("minPrice") ?? "";
   const maxPrice = searchParams.get("maxPrice") ?? "";
+
+  const [subShopIds, setSubShopIds] = useState<Set<string> | null>(null);
 
   // --- Global Search state (Prompt 1: cross-vendor product + shop discovery) ---
   const [globalResults, setGlobalResults] = useState<GlobalSearchItem[]>([]);
@@ -233,11 +238,28 @@ function SearchResultsInner() {
     [localQuery, updateUrl],
   );
 
+  // Sub-category → shops that stock those products
+  useEffect(() => {
+    let cancelled = false;
+    if (!subParam) {
+      setSubShopIds(null);
+      return;
+    }
+    fetchShopIdsBySubCategory(subParam).then((result) => {
+      if (cancelled) return;
+      if (result.success) setSubShopIds(new Set(result.data));
+      else setSubShopIds(new Set());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [subParam]);
+
   // Handle category pill click
   const handleCategorySelect = useCallback(
     (cat: string) => {
       setSearchMode(cat === "All" && !query ? "shops_only" : "global");
-      updateUrl({ category: cat === "All" ? "" : cat });
+      updateUrl({ category: cat === "All" ? "" : cat, sub: "" });
     },
     [updateUrl, query],
   );
@@ -274,7 +296,7 @@ function SearchResultsInner() {
     [updateUrl],
   );
 
-  const hasActiveFilters = categoryParam || sortParam || minPrice || maxPrice;
+  const hasActiveFilters = categoryParam || subParam || sortParam || minPrice || maxPrice;
 
   // --- Client-side filtering for global results ---
   const filteredGlobalResults = useMemo(() => {
@@ -291,6 +313,14 @@ function SearchResultsInner() {
           return item.category === categoryParam;
         }
         // Keep all products that match
+        return true;
+      });
+    }
+
+    if (subParam && subShopIds) {
+      results = results.filter((item) => {
+        if (item.type === "shop") return subShopIds.has(item.id);
+        if (item.type === "product" && item.shopId) return subShopIds.has(item.shopId);
         return true;
       });
     }
@@ -312,11 +342,14 @@ function SearchResultsInner() {
     // Default: keep relevance-sorted order from the engine
 
     return results;
-  }, [globalResults, categoryParam, minPrice, maxPrice, sortParam]);
+  }, [globalResults, categoryParam, subParam, subShopIds, minPrice, maxPrice, sortParam]);
 
   // --- Client-side sorting for shop-only results ---
   const sortedShops = useMemo(() => {
-    const result = [...shops];
+    let result = [...shops];
+    if (subParam && subShopIds) {
+      result = result.filter((s) => subShopIds.has(s.id));
+    }
     if (sortParam === "newest") {
       result.sort((a, b) => {
         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -329,7 +362,7 @@ function SearchResultsInner() {
       result.sort((a, b) => a.name.localeCompare(b.name));
     }
     return result;
-  }, [shops, sortParam]);
+  }, [shops, sortParam, subParam, subShopIds]);
 
   // --- Combined result count for display ---
   const totalResultCount = globalResults.length > 0 ? totalShops + totalProducts : sortedShops.length;
@@ -347,9 +380,9 @@ function SearchResultsInner() {
   }, [searchMode, query, updateUrl]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex min-h-screen flex-col bg-[color:var(--tm-bg)]">
       {/* Search toolbar — sits under global Navbar (no second logo / fake search) */}
-      <header className="sticky top-[3.25rem] z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95 sm:top-[3.5rem]">
+      <header className="sticky top-[3.25rem] z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/95 sm:top-[3.5rem]">
         <div className="mx-auto max-w-6xl px-4 py-2.5">
           <div className="flex items-center gap-2 sm:gap-3">
             <form onSubmit={handleSearch} className="flex min-w-0 flex-1">
@@ -407,10 +440,19 @@ function SearchResultsInner() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5">
+      <main className="mx-auto w-full max-w-6xl flex-1 space-y-4 px-4 py-5">
+        {categoryParam && categoryParam !== "All" && (
+          <SubCategoryPills
+            mainCategory={categoryParam}
+            selectedId={subParam || null}
+            onSelect={(id) => updateUrl({ sub: id ?? "" })}
+            label="Sub-categories"
+          />
+        )}
+
         {/* Active filters summary */}
         {(query || categoryParam) && (
-          <div className="mb-5 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <SearchIcon />
             <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
               {query ? `"${query}"` : "All"}
@@ -490,6 +532,15 @@ function SearchResultsInner() {
                 ))}
               </div>
             </div>
+
+            {categoryParam && categoryParam !== "All" && (
+              <SubCategoryPills
+                mainCategory={categoryParam}
+                selectedId={subParam || null}
+                onSelect={(id) => updateUrl({ sub: id ?? "" })}
+                label="Sub-category"
+              />
+            )}
 
             {/* Sort Options */}
             <div>
@@ -810,7 +861,7 @@ export default function SearchPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="flex min-h-screen items-center justify-center bg-[color:var(--tm-bg)]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
         </div>
       }

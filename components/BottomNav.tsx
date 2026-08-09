@@ -120,7 +120,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/85 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/85 md:hidden" aria-label="Main navigation">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden" aria-label="Main navigation">
       <div className="mx-auto flex max-w-lg items-center justify-around px-1 pb-safe">
         {tabs.map((tab) => {
           const active =
@@ -130,7 +130,7 @@ export default function BottomNav() {
             : tab.key === "account" ? isAccountActive
             : false;
 
-          const className = `flex flex-col items-center gap-0.5 py-1.5 px-2 text-[0.6rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-lg active:scale-90 ${active ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"}`;
+          const className = `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${active ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 hover:text-zinc-700 dark:text-[color:var(--tm-muted)] dark:hover:text-[color:var(--tm-text)]"}`;
 
           const content = (
             <>

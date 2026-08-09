@@ -21,6 +21,8 @@ import { useLocation } from "@/context/LocationContext";
 import CategoryGrid from "@/components/CategoryGrid";
 import PromoAdsCarousel from "@/components/PromoAdsCarousel";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
+import SubCategoryPills from "@/components/SubCategoryPills";
+import { fetchShopIdsBySubCategory } from "@/services/productService";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons (inline SVGs)                                                        */
@@ -65,6 +67,10 @@ function HomeInner() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
+  const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(
+    () => searchParams.get("sub") || null,
+  );
+  const [subCategoryShopIds, setSubCategoryShopIds] = useState<Set<string> | null>(null);
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -129,15 +135,36 @@ function HomeInner() {
     return () => { cancelled = true; };
   }, []);
 
+  /* Load shop IDs that have products in the selected sub-category */
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeSubCategoryId) {
+      setSubCategoryShopIds(null);
+      return;
+    }
+    fetchShopIdsBySubCategory(activeSubCategoryId).then((result) => {
+      if (cancelled) return;
+      if (result.success) setSubCategoryShopIds(new Set(result.data));
+      else setSubCategoryShopIds(new Set());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSubCategoryId]);
+
   /* Client-side filtering */
   const filteredShops = useMemo(() => {
     return shops.filter((shop) => {
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch = !query || shop.name.toLowerCase().includes(query) || shop.category.toLowerCase().includes(query);
       const matchesCategory = activeCategory === "All" || shop.category === activeCategory;
-      return matchesSearch && matchesCategory;
+      const matchesSub =
+        !activeSubCategoryId ||
+        !subCategoryShopIds ||
+        subCategoryShopIds.has(shop.id);
+      return matchesSearch && matchesCategory && matchesSub;
     });
-  }, [shops, searchQuery, activeCategory]);
+  }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds]);
 
   /* Geo proximity filtering */
   useEffect(() => {
@@ -188,13 +215,26 @@ function HomeInner() {
 
   const handleCategoryChange = useCallback((category: ShopCategory) => {
     setActiveCategory(category);
+    setActiveSubCategoryId(null);
     const params = new URLSearchParams(searchParams.toString());
     if (category === "All") params.delete("category");
     else params.set("category", category);
+    params.delete("sub");
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
     else params.delete("q");
     router.replace(`/?${params.toString()}`, { scroll: false });
   }, [searchParams, searchQuery, router]);
+
+  const handleSubCategoryChange = useCallback(
+    (subId: string | null) => {
+      setActiveSubCategoryId(subId);
+      const params = new URLSearchParams(searchParams.toString());
+      if (subId) params.set("sub", subId);
+      else params.delete("sub");
+      router.replace(`/?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router],
+  );
 
   const handleWhatsAppOrder = useCallback((shop: Shop) => {
     const message = encodeURIComponent(`Hi ${shop.name}! I'd like to place an order.`);
@@ -204,10 +244,10 @@ function HomeInner() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 space-y-4 px-3 py-3 pb-24 md:space-y-5 md:px-4 md:py-5 md:pb-8">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-24 md:px-4 md:py-5 md:pb-8">
       {/* ── Category Pills ────────────────────────────────────────── */}
       <section aria-label="Category filters">
-        <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1.5 scrollbar-none">
+        <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 scrollbar-none">
           {SHOP_CATEGORIES.map((category) => {
             const isActive = activeCategory === category;
             const catCount = categoryCounts.find((c) => c.key === category)?.count;
@@ -217,10 +257,10 @@ function HomeInner() {
                 key={category}
                 type="button"
                 onClick={() => handleCategoryChange(category)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                className={`chip shrink-0 rounded-full border px-3 text-[0.7rem] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                   isActive
                     ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] dark:text-[color:var(--tm-muted)] dark:hover:bg-[color:var(--tm-elevated)]"
                 }`}
                 aria-label={`${category}${catCount !== undefined ? ` — ${catCount} shop${catCount !== 1 ? "s" : ""}` : ""}`}
                 aria-pressed={isActive}
@@ -228,8 +268,8 @@ function HomeInner() {
                 <span className="mr-1" aria-hidden="true">{meta.icon}</span>
                 {category}
                 {catCount !== undefined && (
-                  <span className={`ml-1 inline-flex min-w-[18px] items-center justify-center rounded-full px-1 text-[0.6rem] font-bold ${
-                    isActive ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-400 dark:bg-zinc-700 dark:text-zinc-400"
+                  <span className={`ml-1 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[0.58rem] font-bold ${
+                    isActive ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-400 dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-muted)]"
                   }`}>{catCount}</span>
                 )}
               </button>
@@ -237,6 +277,15 @@ function HomeInner() {
           })}
         </div>
       </section>
+
+      {activeCategory !== "All" && (
+        <SubCategoryPills
+          mainCategory={activeCategory}
+          selectedId={activeSubCategoryId}
+          onSelect={(id) => handleSubCategoryChange(id)}
+          label="Filter by sub-category"
+        />
+      )}
 
       {/* ── Stories Section ───────────────────────────────────────── */}
       <section aria-label="Merchant stories">
@@ -429,9 +478,9 @@ function HomeInner() {
 
                   <Link
                     href={`/shop/${shop.id}`}
-                    className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-emerald-600 px-2 py-1.5 text-[0.65rem] font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-4 sm:py-2 sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+                    className="btn-compact inline-flex w-full items-center justify-center gap-1 rounded-full bg-emerald-600 px-2 text-[0.65rem] font-semibold text-white transition-colors hover:bg-emerald-700 sm:h-8 sm:px-4 sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-[color:var(--tm-surface)]"
                   >
-                    Browse Products →
+                    Browse →
                   </Link>
                 </div>
               </article>
@@ -451,7 +500,7 @@ function HomeInner() {
 export default function Home() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-[color:var(--tm-bg)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
       </div>
     }>

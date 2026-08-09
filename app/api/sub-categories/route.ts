@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { SubCategory } from "@/types";
+import { SHOP_CATEGORIES } from "@/types";
 import { sanitizeLight } from "@/lib/sanitization";
 import {
   apiCache,
@@ -25,25 +26,9 @@ import { sanitizeApiResponse, buildSafeErrorResponse } from "@/lib/responseSanit
 // ─── Initialize cache cleanup on first import (server-side) ──────────────────
 startCacheCleanup();
 
-// ─── Allowed categories (mirrors categoryService.ts for server-side validation) ─
+// ─── Allowed categories (single source: types/SHOP_CATEGORIES) ─
 
-const ALLOWED_CATEGORIES = [
-  "All",
-  "Fashion & Apparel",
-  "Electronics & Gadgets",
-  "Home & Living",
-  "Health & Beauty",
-  "Books & Stationery",
-  "Sports & Fitness",
-  "Toys & Baby Care",
-  "Automotive Accessories",
-  "Handmade & Crafts",
-  "Home Maintenance & Repair",
-  "Security & Surveillance",
-  "Tech & IT Services",
-  "Personal & Professional Services",
-  "Others / Universal",
-] as const;
+const ALLOWED_CATEGORIES = SHOP_CATEGORIES;
 
 // ─── Cache configuration ─────────────────────────────────────────────────────
 

@@ -173,6 +173,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const router = useRouter();
   const [session, setSession] = useState(false);
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
+  const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   // Refs for focus trapping
@@ -193,7 +194,18 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
         if (!cancelled) setSession(!!data.session);
         if (data.session?.user && !cancelled) {
           const { detectUserRole } = await import("@/services/authService");
-          setUserRole(await detectUserRole(data.session.user));
+          const role = await detectUserRole(data.session.user);
+          setUserRole(role);
+          if (role === "merchant" || role === "admin") {
+            const { data: shop } = await supabase
+              .from("shops")
+              .select("id")
+              .eq("owner_id", data.session.user.id)
+              .maybeSingle();
+            if (!cancelled) setMerchantShopId(shop?.id ?? null);
+          } else if (!cancelled) {
+            setMerchantShopId(null);
+          }
         }
 
         const {
@@ -203,9 +215,21 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
           setSession(!!currentSession);
           if (currentSession?.user) {
             const { detectUserRole } = await import("@/services/authService");
-            setUserRole(await detectUserRole(currentSession.user));
+            const role = await detectUserRole(currentSession.user);
+            setUserRole(role);
+            if (role === "merchant" || role === "admin") {
+              const { data: shop } = await supabase
+                .from("shops")
+                .select("id")
+                .eq("owner_id", currentSession.user.id)
+                .maybeSingle();
+              if (!cancelled) setMerchantShopId(shop?.id ?? null);
+            } else {
+              setMerchantShopId(null);
+            }
           } else {
             setUserRole(null);
+            setMerchantShopId(null);
           }
         });
 
@@ -365,7 +389,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
       {/* Drawer panel — sits above backdrop on the left */}
       <aside
         ref={drawerRef}
-        className={`fixed left-0 top-0 z-[10000] flex h-dvh w-80 max-w-[88vw] flex-col bg-white/95 shadow-2xl backdrop-blur-xl transition-transform duration-350 ease-[cubic-bezier(0.4,0,0.2,1)] dark:bg-zinc-900/95 ${
+        className={`fixed left-0 top-0 z-[10000] flex h-dvh w-80 max-w-[88vw] flex-col bg-white/95 shadow-2xl backdrop-blur-xl transition-transform duration-350 ease-[cubic-bezier(0.4,0,0.2,1)] dark:bg-[color:var(--tm-surface)]/95 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         role="dialog"
@@ -554,6 +578,16 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                       >
                         <DashboardIcon /> Merchant Dashboard
                       </Link>
+
+                      {merchantShopId && (
+                        <Link
+                          href={`/shop/${merchantShopId}`}
+                          onClick={onClose}
+                          className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                        >
+                          <StoreIconMenu /> View My Store
+                        </Link>
+                      )}
 
                       <Link
                         href="/dashboard/settings"

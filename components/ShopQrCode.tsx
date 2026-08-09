@@ -144,7 +144,7 @@ export default function ShopQrCode({ shopId, shopName }: ShopQrCodeProps) {
   }, [storeUrl]);
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-emerald-900/40 dark:bg-zinc-950">
+    <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-emerald-900/40 dark:bg-[color:var(--tm-surface)]">
       <h3 className="font-semibold text-zinc-900 dark:text-emerald-300">Your Shop QR Code</h3>
       <p className="mt-1 text-xs text-zinc-500 dark:text-emerald-700">
         Print this on a flex banner or counter stand. Customers who scan it land directly on your
@@ -154,7 +154,7 @@ export default function ShopQrCode({ shopId, shopName }: ShopQrCodeProps) {
       <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
         {/* Fixed square frame — img scales without stretching the QR modules */}
         <div
-          className="flex shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-emerald-900/50"
+          className="flex shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-[color:var(--tm-border)]"
           style={{ width: DISPLAY_SIZE + 24, height: DISPLAY_SIZE + 24 }}
         >
           {generating && (
@@ -190,7 +190,7 @@ export default function ShopQrCode({ shopId, shopName }: ShopQrCodeProps) {
           <label className="block text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-700">
             Store link
           </label>
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 break-all dark:border-zinc-700 dark:bg-black dark:text-emerald-400/90">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 break-all dark:border-zinc-700 dark:bg-[color:var(--tm-elevated)] dark:text-emerald-400/90">
             {storeUrl || "Generating link…"}
           </div>
           <div className="flex flex-wrap gap-2 pt-1">

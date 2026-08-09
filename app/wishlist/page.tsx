@@ -229,8 +229,8 @@ export default function WishlistPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950">
-        <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+      <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
+        <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
           <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
             <Link href="/" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Go back">
               <ChevronLeftIcon />
@@ -252,8 +252,8 @@ export default function WishlistPage() {
   const totalEmpty = items.length === 0;
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950">
-      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
+      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Link href="/" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Go back">

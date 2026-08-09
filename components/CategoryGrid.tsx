@@ -11,14 +11,13 @@
 /*   - rounded-xl, subtle shadow, hover scaling                               */
 /* -------------------------------------------------------------------------- */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  PRODUCT_CATEGORIES,
-  CATEGORY_ICONS,
   CATEGORY_GRADIENTS,
 } from "@/types";
 import type { CategoryWithCount } from "@/services/categoryService";
+import { fetchSubCategories, type SubCategoryWithMeta } from "@/services/subCategoryService";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -51,51 +50,77 @@ function CategoryCard({
   onClick?: () => void;
 }) {
   const href = `/search?category=${encodeURIComponent(label)}`;
+  const [subs, setSubs] = useState<SubCategoryWithMeta[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSubCategories(label).then((result) => {
+      if (!cancelled && result.success) {
+        // Show a few featured subs (skip trailing Others for card chips)
+        setSubs(result.data.filter((s) => !s.is_others).slice(0, 4));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [label]);
 
   return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`group block overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:shadow-emerald-900/20 ${
+    <div
+      className={`group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02] dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] ${
         compact ? "p-3" : "p-4"
       }`}
-      aria-label={`Browse ${label} — ${count} shop${count !== 1 ? "s" : ""}`}
     >
-      {/* Thumbnail / Icon Banner */}
-      <div
-        className={`flex items-center justify-center rounded-xl bg-gradient-to-br ${gradient} mb-3 ${
-          compact ? "h-16" : "h-24 sm:h-28"
-        }`}
+      <Link
+        href={href}
+        onClick={onClick}
+        className="block focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-[color:var(--tm-bg)]"
+        aria-label={`Browse ${label} — ${count} shop${count !== 1 ? "s" : ""}`}
       >
-        <span
-          className={`select-none ${
-            compact ? "text-2xl" : "text-4xl sm:text-5xl"
+        <div
+          className={`mb-3 flex items-center justify-center rounded-xl bg-gradient-to-br ${gradient} ${
+            compact ? "h-16" : "h-24 sm:h-28"
           }`}
-          aria-hidden="true"
         >
-          {icon}
-        </span>
-      </div>
+          <span
+            className={`select-none ${compact ? "text-2xl" : "text-4xl sm:text-5xl"}`}
+            aria-hidden="true"
+          >
+            {icon}
+          </span>
+        </div>
+        <h3
+          className={`truncate font-semibold text-zinc-900 dark:text-zinc-100 ${
+            compact ? "text-xs" : "text-sm sm:text-base"
+          }`}
+        >
+          {label}
+        </h3>
+        <div className="mt-1 flex items-center gap-1.5">
+          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+            {count}
+          </span>
+          <span className="text-[0.6rem] text-zinc-400 dark:text-zinc-500">
+            shop{count !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </Link>
 
-      {/* Category Title */}
-      <h3
-        className={`font-semibold text-zinc-900 truncate dark:text-zinc-100 ${
-          compact ? "text-xs" : "text-sm sm:text-base"
-        }`}
-      >
-        {label}
-      </h3>
-
-      {/* Shop Count Badge */}
-      <div className="mt-1 flex items-center gap-1.5">
-        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-          {count}
-        </span>
-        <span className="text-[0.6rem] text-zinc-400 dark:text-zinc-500">
-          shop{count !== 1 ? "s" : ""}
-        </span>
-      </div>
-    </Link>
+      {subs.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {subs.map((sub) => (
+            <Link
+              key={sub.id}
+              href={`/search?category=${encodeURIComponent(label)}&sub=${encodeURIComponent(sub.id)}`}
+              className="rounded-full bg-zinc-100 px-2 py-0.5 text-[0.58rem] font-medium text-zinc-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700 dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-muted)] dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300"
+            >
+              {sub.icon ? `${sub.icon} ` : ""}
+              {sub.name}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -152,7 +177,7 @@ export default function CategoryGrid({
               key={cat.key}
               href={`/search?category=${encodeURIComponent(cat.label)}`}
               onClick={() => onCategoryClick?.(cat.label)}
-              className="group flex shrink-0 items-center gap-2.5 rounded-2xl border border-zinc-200/80 bg-white px-3.5 py-2.5 shadow-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-[0.98] dark:border-zinc-700/60 dark:bg-zinc-800/80"
+              className="group flex shrink-0 items-center gap-2 rounded-2xl border border-zinc-200/80 bg-white px-3 py-2 shadow-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-[0.98] dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]"
               aria-label={`Browse ${cat.label} — ${cat.count} shop${cat.count !== 1 ? "s" : ""}`}
             >
               {/* Gradient Icon circle */}

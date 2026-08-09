@@ -16,7 +16,7 @@ import {
   unsubscribeAll,
 } from "@/lib/supabase/realtime";
 import type { Shop, Product, ShopFormData, ProductFormData, AnalyticsSummary } from "@/types";
-import { PRODUCT_CATEGORIES, CATEGORY_ICONS } from "@/types";
+import { PRODUCT_CATEGORIES } from "@/types";
 import {
   fetchMyShops,
   createShop,
@@ -29,7 +29,11 @@ import {
   deleteProduct,
 } from "@/services/productService";
 import { formatRupees } from "@/lib/formatters";
-import { getOthersSubCategoryId } from "@/services/subCategoryService";
+import {
+  fetchSubCategories,
+  getOthersSubCategoryId,
+  type SubCategoryWithMeta,
+} from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
@@ -37,6 +41,7 @@ import ImageUpload from "@/components/ImageUpload";
 import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
+import BulkProductCreator from "@/components/BulkProductCreator";
 import { createStory } from "@/services/storyService";
 import { fetchOrdersByShopId } from "@/services/orderService";
 import { transitionOrderStatus, getValidTransitions, getStatusLabel } from "@/services/notificationService";
@@ -83,6 +88,7 @@ const INITIAL_PRODUCT_FORM: ProductFormData = {
   price: 0,
   original_price: null,
   category_id: "",
+  sub_category_id: "",
   image_url: "",
   is_available: true,
 };
@@ -313,6 +319,8 @@ export default function DashboardPage() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productSaving, setProductSaving] = useState(false);
   const [showMoreProductOptions, setShowMoreProductOptions] = useState(false);
+  const [productSubCategories, setProductSubCategories] = useState<SubCategoryWithMeta[]>([]);
+  const [productSubsLoading, setProductSubsLoading] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
@@ -461,6 +469,35 @@ export default function DashboardPage() {
     }
   }, [activeShopId]);
 
+  // Load sub-categories for the shop's main category (product taxonomy)
+  useEffect(() => {
+    const cat = shop?.category;
+    if (!cat) {
+      setProductSubCategories([]);
+      return;
+    }
+    let cancelled = false;
+    setProductSubsLoading(true);
+    fetchSubCategories(cat).then((result) => {
+      if (cancelled) return;
+      if (result.success) {
+        setProductSubCategories(result.data);
+        const others = result.data.find((s) => s.is_others);
+        setProductForm((f) => ({
+          ...f,
+          category_id: cat,
+          sub_category_id: f.sub_category_id || others?.id || "",
+        }));
+      } else {
+        setProductSubCategories([]);
+      }
+      setProductSubsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [shop?.category]);
+
   // Swap shop handler — also resets form to match selected shop
   const handleSwitchShop = useCallback((shopId: string) => {
     setActiveShopId(shopId);
@@ -606,30 +643,40 @@ export default function DashboardPage() {
 
   const handleSaveProduct = useCallback(async (e: FormEvent) => {
     e.preventDefault();
-    if (!activeShopId) return;
+    if (!activeShopId || !shop) return;
     if (!productForm.name.trim()) { addToast("Product name is required.", "error"); return; }
-    if (!productForm.category_id) { addToast("Please select a category.", "error"); return; }
     if (!productForm.price || productForm.price <= 0) { addToast("Price must be greater than 0.", "error"); return; }
 
     setProductSaving(true);
 
-    // Auto-assign the "Others" sub-category in the background on create so the
-    // fast 4-field form still keeps products consistent with the full taxonomy —
-    // merchants never have to pick a sub-category to move fast.
-    let payload: ProductFormData = productForm;
-    if (!editingProductId) {
-      const othersId = await getOthersSubCategoryId(productForm.category_id);
-      payload = { ...productForm, sub_category_id: isValidUUID(othersId) ? othersId : null };
+    const mainCategory = shop.category;
+    let subId = productForm.sub_category_id;
+    if (!subId || !isValidUUID(subId)) {
+      const othersId = await getOthersSubCategoryId(mainCategory);
+      subId = isValidUUID(othersId) ? othersId : null;
     }
+
+    const payload: ProductFormData = {
+      ...productForm,
+      category_id: mainCategory,
+      sub_category_id: subId,
+    };
 
     const result = editingProductId ? await updateProduct(editingProductId, payload) : await createProduct(activeShopId, payload);
     if (result.success) {
-      setProductForm(INITIAL_PRODUCT_FORM); setEditingProductId(null); setShowMoreProductOptions(false);
+      const others = productSubCategories.find((s) => s.is_others);
+      setProductForm({
+        ...INITIAL_PRODUCT_FORM,
+        category_id: mainCategory,
+        sub_category_id: others?.id ?? "",
+      });
+      setEditingProductId(null);
+      setShowMoreProductOptions(false);
       addToast(editingProductId ? "Product updated!" : "Product added! 🎉", "success");
       const rr = await fetchProductsByShopId(activeShopId); if (rr.success) setProducts(rr.data);
     } else { addToast(result.error, "error"); }
     setProductSaving(false);
-  }, [productForm, activeShopId, editingProductId, addToast]);
+  }, [productForm, activeShopId, editingProductId, addToast, shop, productSubCategories]);
 
   const handleEditProduct = useCallback((product: Product) => {
     setEditingProductId(product.id);
@@ -638,15 +685,31 @@ export default function DashboardPage() {
       description: product.description,
       price: product.price,
       original_price: product.original_price ?? null,
-      category_id: product.category_id ?? "",
+      category_id: product.category_id ?? shop?.category ?? "",
+      sub_category_id: product.sub_category_id ?? "",
       image_url: product.image_url ?? "",
       is_available: product.is_available,
     });
     setShowMoreProductOptions(true);
     document.getElementById("product-form")?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+  }, [shop?.category]);
 
-  const handleCancelEdit = useCallback(() => { setEditingProductId(null); setProductForm(INITIAL_PRODUCT_FORM); setShowMoreProductOptions(false); }, []);
+  const handleCancelEdit = useCallback(() => {
+    const others = productSubCategories.find((s) => s.is_others);
+    setEditingProductId(null);
+    setProductForm({
+      ...INITIAL_PRODUCT_FORM,
+      category_id: shop?.category ?? "",
+      sub_category_id: others?.id ?? "",
+    });
+    setShowMoreProductOptions(false);
+  }, [productSubCategories, shop?.category]);
+
+  const refreshProducts = useCallback(async () => {
+    if (!activeShopId) return;
+    const rr = await fetchProductsByShopId(activeShopId);
+    if (rr.success) setProducts(rr.data);
+  }, [activeShopId]);
 
   /** Instantly pause/resume a product's availability from the list — no need to open the edit form. */
   const handleToggleAvailability = useCallback(async (product: Product) => {
@@ -759,13 +822,13 @@ export default function DashboardPage() {
   }, [selectedProductIds, products, activeShopId, addToast]);
 
   if (authLoading) {
-    return (<div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950"><div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" /></div>);
+    return (<div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]"><div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" /></div>);
   }
 
   // ── Unauthenticated state (no user found client-side) ────────────────────
   if (!userId) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-[color:var(--tm-surface)]">
         <div className="mb-4 text-5xl">🔒</div>
         <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Sign In Required</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -793,7 +856,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
       {/* ── Email Verification Warning ───────────────────────────────────── */}
       {userEmailVerified === false && (
         <div className="sticky top-0 z-30 border-b border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/30">
@@ -818,12 +881,22 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-emerald-900/40 dark:bg-black/90">
+      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h1 className="truncate text-base font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-lg">
               {shop ? shop.name : allShops.length > 0 ? "Dashboard" : "My Shop"}
             </h1>
+            {shop && (
+              <Link
+                href={`/shop/${shop.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="chip shrink-0 rounded-full bg-emerald-600 px-2.5 text-[0.65rem] font-semibold text-white hover:bg-emerald-700"
+              >
+                View My Store
+              </Link>
+            )}
             {shop && (
               <Link
                 href="/dashboard/settings"
@@ -875,7 +948,7 @@ export default function DashboardPage() {
 
         {/* Active shop summary — so merchants always see THEIR store after refresh */}
         {shop && (
-          <section className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950 sm:p-3.5">
+          <section className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] sm:p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-700">Your store</p>
@@ -891,9 +964,11 @@ export default function DashboardPage() {
                 </span>
                 <Link
                   href={`/shop/${shop.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="btn-compact inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 text-xs font-semibold text-white hover:bg-emerald-700"
                 >
-                  <EyeIcon /> View storefront
+                  <EyeIcon /> Visit Storefront
                 </Link>
               </div>
             </div>
@@ -903,7 +978,7 @@ export default function DashboardPage() {
         {/* Shop Details Form */}
         <section>
           <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">{shop ? "Edit Shop Details" : "Create Your Shop"}</h2>
-          <form onSubmit={handleSaveShop} className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950 sm:space-y-3.5 sm:p-4">
+          <form onSubmit={handleSaveShop} className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)] sm:space-y-3.5 sm:p-4">
             <div>
               <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Shop Name *</label>
               <input type="text" required value={shopForm.name} onChange={(e) => setShopForm((f) => ({ ...f, name: e.target.value }))} placeholder="My Trendy Store" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
@@ -1076,19 +1151,19 @@ export default function DashboardPage() {
           <section>
             <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">Analytics Overview</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.total_views ?? "—"}</p>
                 <p className="mt-1 flex items-center justify-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><EyeIcon /> Total Views</p>
               </div>
-              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.total_product_clicks ?? "—"}</p>
                 <p className="mt-1 flex items-center justify-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><MousePointerIcon /> Product Clicks</p>
               </div>
-              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.views_today ?? "—"}</p>
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Views Today</p>
               </div>
-              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.clicks_today ?? "—"}</p>
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Clicks Today</p>
               </div>
@@ -1104,9 +1179,9 @@ export default function DashboardPage() {
             {shop && (
               <>
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{products.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Active Products</p></div>
-                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950"><p className={`text-2xl font-bold ${liveStatus.color}`}>{liveStatus.label}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Publishing Status</p></div>
-                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{orders.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Orders</p></div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{products.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Active Products</p></div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]"><p className={`text-2xl font-bold ${liveStatus.color}`}>{liveStatus.label}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Publishing Status</p></div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{orders.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Orders</p></div>
                   <Link href={`/shop/${activeShopId}`} className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center shadow-sm transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40"><p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">View Shop</p><p className="mt-1 text-xs text-emerald-500 dark:text-emerald-400">Preview ↗</p></Link>
                 </div>
 
@@ -1265,13 +1340,33 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Product Management — Ultra-fast 4-field creation: Name, Category, Price, Image */}
-        {activeShopId && (
-          <section id="product-form">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{editingProductId ? "Edit Product" : "Add New Product"}</h2>
-              {!editingProductId && <span className="text-[0.65rem] font-medium text-zinc-400 dark:text-zinc-500">⚡ 4 fields — list it in seconds</span>}
+        {/* Product Management — multi-item bulk creator + single-item edit */}
+        {activeShopId && shop && (
+          <section id="product-form" className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                {editingProductId ? "Edit Product" : "Products"}
+              </h2>
+              {!editingProductId && (
+                <Link
+                  href="/dashboard/products/new"
+                  className="text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+                >
+                  Open full batch page →
+                </Link>
+              )}
             </div>
+
+            {!editingProductId && (
+              <BulkProductCreator
+                shopId={activeShopId}
+                shopCategory={shop.category}
+                onCreated={refreshProducts}
+                onToast={addToast}
+              />
+            )}
+
+            {editingProductId && (
             <form onSubmit={handleSaveProduct} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Product Name *</label>
@@ -1279,22 +1374,35 @@ export default function DashboardPage() {
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Category *</label>
-                  <select required value={productForm.category_id ?? ""} onChange={(e) => setProductForm((f) => ({ ...f, category_id: e.target.value }))} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
-                    <option value="" disabled>Select a category…</option>
-                    {PRODUCT_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{CATEGORY_ICONS[cat] ?? "📦"} {cat}</option>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Sub-Category *</label>
+                  <select
+                    required
+                    value={productForm.sub_category_id ?? ""}
+                    onChange={(e) => setProductForm((f) => ({ ...f, sub_category_id: e.target.value, category_id: shop.category }))}
+                    disabled={productSubsLoading || productSubCategories.length === 0}
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="" disabled>
+                      {productSubsLoading ? "Loading…" : "Select a sub-category…"}
+                    </option>
+                    {productSubCategories.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.icon ? `${sub.icon} ` : ""}
+                        {sub.name}
+                      </option>
                     ))}
                   </select>
+                  <p className="mt-1 text-[0.65rem] text-zinc-400">
+                    Store type: {shop.category}
+                  </p>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Price (PKR) *</label>
                   <input type="number" required min={0} step={1} value={productForm.price} onChange={(e) => setProductForm((f) => ({ ...f, price: Number(e.target.value) }))} placeholder="2499" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
                 </div>
               </div>
-              <ImageUpload label="Product Image *" currentUrl={productForm.image_url} onUploaded={(url) => setProductForm((f) => ({ ...f, image_url: url }))} folder="products" fileId={editingProductId ?? "new-product"} showPreview />
+              <ImageUpload label="Product Image" currentUrl={productForm.image_url} onUploaded={(url) => setProductForm((f) => ({ ...f, image_url: url }))} folder="products" fileId={editingProductId ?? "new-product"} showPreview />
 
-              {/* Optional details — kept out of the primary fast path */}
               <button
                 type="button"
                 onClick={() => setShowMoreProductOptions((v) => !v)}
@@ -1343,10 +1451,11 @@ export default function DashboardPage() {
               )}
 
               <div className="flex gap-2">
-                <button type="submit" disabled={productSaving} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"><PlusIcon />{productSaving ? "Saving…" : editingProductId ? "Update Product" : "Add Product"}</button>
-                {editingProductId && <button type="button" onClick={handleCancelEdit} className="rounded-xl px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Cancel</button>}
+                <button type="submit" disabled={productSaving} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"><PlusIcon />{productSaving ? "Saving…" : "Update Product"}</button>
+                <button type="button" onClick={handleCancelEdit} className="rounded-xl px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Cancel</button>
               </div>
             </form>
+            )}
           </section>
         )}
 

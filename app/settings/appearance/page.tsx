@@ -99,15 +99,15 @@ export default function AppearanceSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-black">
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-emerald-900/40 dark:bg-zinc-950/95">
+    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
+      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/95">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-3 py-3">
           <Link
             href="/settings"
@@ -128,7 +128,7 @@ export default function AppearanceSettingsPage() {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-emerald-500/80">
             Theme
           </h2>
-          <div className="trend-card grid grid-cols-2 gap-2 p-3 dark:border-emerald-900/50 dark:bg-zinc-950">
+          <div className="trend-card grid grid-cols-2 gap-2 p-3 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
             <button
               type="button"
               onClick={() => setMode("light")}
@@ -162,7 +162,7 @@ export default function AppearanceSettingsPage() {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-emerald-500/80">
             Font size
           </h2>
-          <div className="trend-card space-y-3 p-4 dark:border-emerald-900/50 dark:bg-zinc-950">
+          <div className="trend-card space-y-3 p-4 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
             <div className="flex items-center gap-4">
               <span className="text-xs text-zinc-500 dark:text-emerald-600">A</span>
               <input
@@ -184,7 +184,7 @@ export default function AppearanceSettingsPage() {
               </span>
               <span className="text-zinc-400 dark:text-emerald-700">Larger</span>
             </div>
-            <p className="rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-black dark:text-emerald-300">
+            <p className="rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-text)]">
               Preview: Text size updates across TrendMart as you drag.
             </p>
           </div>
@@ -196,7 +196,7 @@ export default function AppearanceSettingsPage() {
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-emerald-500/80">
               Storefront display
             </h2>
-            <div className="trend-card divide-y divide-zinc-100 dark:divide-emerald-900/40 dark:border-emerald-900/50 dark:bg-zinc-950">
+            <div className="trend-card divide-y divide-zinc-100 dark:divide-[color:var(--tm-border)]">
               <div className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-zinc-800 dark:text-emerald-300">
@@ -253,7 +253,7 @@ export default function AppearanceSettingsPage() {
             ) : null}
           </section>
         ) : (
-          <section className="trend-card p-4 dark:border-emerald-900/50 dark:bg-zinc-950">
+          <section className="trend-card p-4 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
             <p className="text-sm text-zinc-600 dark:text-emerald-400/90">
               Theme and font apply to your whole app. Storefront banner / WhatsApp options appear after you create a store.
             </p>

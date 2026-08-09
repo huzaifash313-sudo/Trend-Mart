@@ -193,7 +193,7 @@ export default function MerchantAdsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
       </div>
     );
@@ -210,7 +210,7 @@ export default function MerchantAdsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <div className="flex items-center justify-between gap-3">
           <div>

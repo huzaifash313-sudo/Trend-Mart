@@ -60,7 +60,7 @@ export default function AdminSupportPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-6xl mx-auto px-6 py-5">
           <Link href="/admin/dashboard" className="text-xs font-medium text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400">

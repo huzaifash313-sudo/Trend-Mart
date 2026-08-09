@@ -22,7 +22,7 @@ function HamburgerIcon() {
 
 function SearchIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
@@ -55,7 +55,6 @@ export default function Navbar() {
         const { data } = await supabase.auth.getSession();
         if (cancelled) return;
 
-        // Unblock the Sign In / Account button immediately
         setSession(!!data.session);
         setLoading(false);
 
@@ -113,64 +112,69 @@ export default function Navbar() {
   const navigateToSearch = useCallback(() => router.push("/search"), [router]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white dark:border-emerald-900/40 dark:bg-black">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-        {/* Hamburger — all screens */}
-        <button type="button" onClick={() => setDrawerOpen(true)} className="shrink-0 rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Open menu">
+    <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
+      <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+        {/* Hamburger */}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-600 hover:bg-zinc-100 dark:text-[color:var(--tm-muted)] dark:hover:bg-[color:var(--tm-elevated)]"
+          aria-label="Open menu"
+        >
           <HamburgerIcon />
         </button>
 
         {/* Logo */}
-        <Link href="/" className="inline-flex shrink-0 items-center text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+        <Link
+          href="/"
+          className="inline-flex shrink-0 items-center text-base font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-lg"
+        >
           TrendMart
         </Link>
 
-        {/* Location picker */}
-        <div className="hidden sm:block shrink-0">
+        {/* Location — desktop only */}
+        <div className="hidden shrink-0 sm:block">
           <LocationPicker />
         </div>
 
-        {/* Search shortcut — hide on /search (that page has the real input) */}
+        {/* Single search control — bar on sm+, icon on mobile; hide on /search */}
         {!onSearchPage ? (
-          <>
-            <button
-              type="button"
-              onClick={navigateToSearch}
-              className="hidden sm:flex flex-1 items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm text-zinc-400 hover:border-zinc-300 hover:bg-white transition-colors dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500 dark:hover:border-zinc-600 lg:max-w-md"
-              tabIndex={0}
-            >
-              <SearchIcon />
-              <span>Search shops…</span>
-            </button>
-            <div className="flex-1 sm:hidden" />
-            <button
-              type="button"
-              onClick={navigateToSearch}
-              className="shrink-0 rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 sm:hidden dark:text-zinc-400 dark:hover:bg-zinc-800"
-              aria-label="Search"
-            >
-              <SearchIcon />
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={navigateToSearch}
+            className="ml-auto inline-flex min-h-9 min-w-9 max-w-md flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 text-sm text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-white dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-muted)] dark:hover:border-zinc-600 sm:justify-start sm:px-4"
+            aria-label="Search shops"
+          >
+            <SearchIcon />
+            <span className="hidden truncate sm:inline">Search shops…</span>
+          </button>
         ) : (
-          <div className="flex-1" />
+          <div className="ml-auto min-w-0 flex-1" />
         )}
 
         {/* Auth */}
         {loading ? (
-          <div className="h-8 w-16 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-9 w-16 shrink-0 animate-pulse rounded-xl bg-zinc-200 dark:bg-[color:var(--tm-elevated)]" />
         ) : session ? (
-          <Link href={dashHref} className="inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-300 px-4 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800">
+          <Link
+            href={dashHref}
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-zinc-300 px-2.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:text-[color:var(--tm-text)] dark:hover:bg-[color:var(--tm-elevated)] sm:px-4 sm:text-sm"
+          >
             {dashLabel}
           </Link>
         ) : (
           <a
             href="/login"
-            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 transition-colors dark:bg-emerald-500 dark:hover:bg-emerald-600"
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-2.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 sm:px-4 sm:text-sm"
           >
             Sign In
           </a>
         )}
+      </div>
+
+      {/* Location row on mobile only */}
+      <div className="border-t border-zinc-100 px-3 py-1.5 sm:hidden dark:border-[color:var(--tm-border)]">
+        <LocationPicker />
       </div>
 
       {portalReady

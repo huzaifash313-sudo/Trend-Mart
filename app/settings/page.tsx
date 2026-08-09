@@ -134,16 +134,16 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-black">
+    <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-emerald-900/40 dark:bg-black/90">
+      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-3 py-2.5">
           <Link href="/" className="btn-compact inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-emerald-400 dark:hover:bg-emerald-950" aria-label="Go back">
             <ChevronLeftIcon />
@@ -180,7 +180,7 @@ export default function SettingsPage() {
           <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-600 px-1">
             Preferences
           </h2>
-          <div className="trend-card divide-y divide-zinc-100 dark:divide-emerald-900/40 overflow-hidden dark:bg-zinc-950">
+          <div className="trend-card divide-y divide-zinc-100 dark:divide-[color:var(--tm-border)] overflow-hidden dark:bg-[color:var(--tm-surface)]">
             <Link href="/settings/appearance" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
               <span className="flex items-center gap-3">
                 <span className="text-zinc-400 dark:text-emerald-500"><PaletteIcon /></span>
@@ -216,7 +216,7 @@ export default function SettingsPage() {
           <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-600 px-1">
             Account
           </h2>
-          <div className="trend-card divide-y divide-zinc-100 dark:divide-emerald-900/40 overflow-hidden dark:bg-zinc-950">
+          <div className="trend-card divide-y divide-zinc-100 dark:divide-[color:var(--tm-border)] overflow-hidden dark:bg-[color:var(--tm-surface)]">
             {session && (
               <>
                 <Link href="/dashboard" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">

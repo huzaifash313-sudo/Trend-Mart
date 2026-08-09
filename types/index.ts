@@ -363,6 +363,11 @@ export interface WhatsAppOrderItem {
 // ─── Shop Category ─────────────────────────────────────────────────────────
 export type ShopCategory =
   | "All"
+  | "Grocery & Kiryana"
+  | "Fruits & Vegetables"
+  | "Bakery & Sweets"
+  | "Fast Food & Restaurants"
+  | "Pharmacy & Medical"
   | "Fashion & Apparel"
   | "Electronics & Gadgets"
   | "Home & Living"
@@ -380,6 +385,11 @@ export type ShopCategory =
 
 export const SHOP_CATEGORIES: readonly ShopCategory[] = [
   "All",
+  "Grocery & Kiryana",
+  "Fruits & Vegetables",
+  "Bakery & Sweets",
+  "Fast Food & Restaurants",
+  "Pharmacy & Medical",
   "Fashion & Apparel",
   "Electronics & Gadgets",
   "Home & Living",
@@ -398,6 +408,11 @@ export const SHOP_CATEGORIES: readonly ShopCategory[] = [
 
 /** Categories available for shop creation (excludes "All" pseudo-category). */
 export const PRODUCT_CATEGORIES: readonly string[] = [
+  "Grocery & Kiryana",
+  "Fruits & Vegetables",
+  "Bakery & Sweets",
+  "Fast Food & Restaurants",
+  "Pharmacy & Medical",
   "Fashion & Apparel",
   "Electronics & Gadgets",
   "Home & Living",
@@ -429,6 +444,11 @@ export function isServiceCategory(category?: string): boolean {
 
 /** Professional icons for each shop category (used in sidebar, search, etc.) */
 export const CATEGORY_ICONS: Record<string, string> = {
+  "Grocery & Kiryana": "🛒",
+  "Fruits & Vegetables": "🥬",
+  "Bakery & Sweets": "🧁",
+  "Fast Food & Restaurants": "🍔",
+  "Pharmacy & Medical": "💊",
   "Fashion & Apparel": "👗",
   "Electronics & Gadgets": "📱",
   "Home & Living": "🏠",
@@ -447,6 +467,11 @@ export const CATEGORY_ICONS: Record<string, string> = {
 
 /** Elegant gradient palette for category cards/banners */
 export const CATEGORY_GRADIENTS: Record<string, string> = {
+  "Grocery & Kiryana": "from-lime-400 to-green-600",
+  "Fruits & Vegetables": "from-green-400 to-emerald-600",
+  "Bakery & Sweets": "from-amber-300 to-orange-500",
+  "Fast Food & Restaurants": "from-orange-400 to-red-500",
+  "Pharmacy & Medical": "from-teal-400 to-cyan-600",
   "Fashion & Apparel": "from-pink-400 to-rose-500",
   "Electronics & Gadgets": "from-blue-400 to-cyan-500",
   "Home & Living": "from-amber-400 to-orange-500",

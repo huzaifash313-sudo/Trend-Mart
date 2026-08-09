@@ -23,7 +23,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const SHOPS: ShopFormData[] = [
   {
     name: "FreshBites",
-    category: "Food",
+    category: "Fast Food & Restaurants",
     location: "Gujranwala",
     whatsapp_number: "923001234567",
     is_live: true,
@@ -54,7 +54,7 @@ const SHOPS: ShopFormData[] = [
   },
   {
     name: "TechDeals",
-    category: "Electronics",
+    category: "Electronics & Gadgets",
     location: "Lahore",
     whatsapp_number: "923007654321",
     is_live: true,
@@ -85,7 +85,7 @@ const SHOPS: ShopFormData[] = [
   },
   {
     name: "StyleHub",
-    category: "Boutique",
+    category: "Fashion & Apparel",
     location: "Islamabad",
     whatsapp_number: "923009988776",
     is_live: false,

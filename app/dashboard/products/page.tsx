@@ -48,6 +48,12 @@ import ImageUpload from "@/components/ImageUpload";
 import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import Link from "next/link";
+import {
+  fetchSubCategories,
+  getOthersSubCategoryId,
+  type SubCategoryWithMeta,
+} from "@/services/subCategoryService";
+import { isValidUUID } from "@/lib/sanitization";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -91,6 +97,8 @@ interface ProductFormState {
   stockQuantity: number;
   /** Low stock alert threshold */
   lowStockThreshold: number;
+  /** Sub-category UUID under the shop's main category */
+  subCategoryId: string;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -110,6 +118,7 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   tags: [],
   stockQuantity: 0,
   lowStockThreshold: 5,
+  subCategoryId: "",
 };
 
 const COLOR_OPTIONS = [
@@ -224,6 +233,35 @@ export default function ProductsDashboardPage() {
 
   // CSV import
   const [csvImporting, setCsvImporting] = useState(false);
+
+  // Sub-categories for active shop
+  const [subCategories, setSubCategories] = useState<SubCategoryWithMeta[]>([]);
+  const activeShop = shops.find((s) => s.id === activeShopId) ?? null;
+
+  useEffect(() => {
+    const cat = activeShop?.category;
+    if (!cat) {
+      setSubCategories([]);
+      return;
+    }
+    let cancelled = false;
+    fetchSubCategories(cat).then((result) => {
+      if (cancelled) return;
+      if (result.success) {
+        setSubCategories(result.data);
+        const others = result.data.find((s) => s.is_others);
+        setForm((f) => ({
+          ...f,
+          subCategoryId: f.subCategoryId || others?.id || "",
+        }));
+      } else {
+        setSubCategories([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeShop?.category]);
 
   // ── Auth check ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -520,6 +558,13 @@ export default function ProductsDashboardPage() {
 
     setFormSaving(true);
 
+    const shopCat = shops.find((s) => s.id === activeShopId)?.category ?? "";
+    let subId = form.subCategoryId;
+    if ((!subId || !isValidUUID(subId)) && shopCat) {
+      const othersId = await getOthersSubCategoryId(shopCat);
+      subId = isValidUUID(othersId) ? othersId : "";
+    }
+
     const productData: ProductFormData = {
       name: form.name.trim(),
       description: form.description.trim(),
@@ -528,6 +573,8 @@ export default function ProductsDashboardPage() {
       image_url: form.imageUrl,
       is_available: form.isAvailable,
       variants: form.variantGroups.length > 0 ? form.variantGroups : null,
+      category_id: shopCat || null,
+      sub_category_id: subId && isValidUUID(subId) ? subId : null,
     };
 
     try {
@@ -558,7 +605,7 @@ export default function ProductsDashboardPage() {
     }
 
     setFormSaving(false);
-  }, [activeShopId, form, editingProductId, addToast]);
+  }, [activeShopId, form, editingProductId, addToast, shops]);
 
   const handleEdit = useCallback((product: Product) => {
     setEditingProductId(product.id);
@@ -577,6 +624,7 @@ export default function ProductsDashboardPage() {
       galleryImages: [],
       tags: [],
       stockQuantity: 0,
+      subCategoryId: product.sub_category_id ?? "",
       lowStockThreshold: 5,
     });
 
@@ -805,14 +853,14 @@ export default function ProductsDashboardPage() {
   // ── Loading State ───────────────────────────────────────────────────────
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
@@ -824,7 +872,23 @@ export default function ProductsDashboardPage() {
               Product & Inventory Manager
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard/products/new"
+              className="inline-flex items-center rounded-full border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+            >
+              Batch Add
+            </Link>
+            {activeShopId && (
+              <Link
+                href={`/shop/${activeShopId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
+                View My Store
+              </Link>
+            )}
             <select
               value={activeShopId ?? ""}
               onChange={(e) => setActiveShopId(e.target.value)}
@@ -871,7 +935,7 @@ export default function ProductsDashboardPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Basic Info Row */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                     Product Name *
@@ -887,6 +951,32 @@ export default function ProductsDashboardPage() {
                   {form.skuPrefix && (
                     <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
                       SKU Prefix: <span className="font-mono font-bold">{form.skuPrefix}</span>
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    Sub-Category *
+                  </label>
+                  <select
+                    required
+                    value={form.subCategoryId}
+                    onChange={(e) => setForm((f) => ({ ...f, subCategoryId: e.target.value }))}
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="" disabled>
+                      {subCategories.length ? "Select…" : "No sub-categories"}
+                    </option>
+                    {subCategories.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.icon ? `${s.icon} ` : ""}
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  {activeShop && (
+                    <p className="mt-1 text-[0.6rem] text-zinc-400">
+                      Store: {activeShop.category}
                     </p>
                   )}
                 </div>

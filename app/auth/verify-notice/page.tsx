@@ -130,14 +130,14 @@ function VerifyNoticeInner() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-zinc-950">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-[color:var(--tm-surface)]">
       <div className="w-full max-w-md text-center">
         {/* Icon */}
         <div className={`mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full ${verified ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"}`}>
@@ -224,7 +224,7 @@ export default function VerifyNoticePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
         </div>
       }

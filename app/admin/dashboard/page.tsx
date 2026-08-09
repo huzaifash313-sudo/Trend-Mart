@@ -551,7 +551,7 @@ export default function AdminDashboardPage() {
   // ─── Render ─────────────────────────────────────────────────────────────
   if (state.loading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6">
+      <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)] p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
@@ -566,7 +566,7 @@ export default function AdminDashboardPage() {
 
   if (state.error) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)] flex items-center justify-center p-6">
         <div className="text-center">
           <div className="text-4xl mb-3">⚠</div>
           <p className="text-red-600 dark:text-red-400 text-lg font-medium">
@@ -586,7 +586,7 @@ export default function AdminDashboardPage() {
   const { metrics, realtimeFeed, activeTab } = state;
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-7xl mx-auto px-6 py-5">

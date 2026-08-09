@@ -6,7 +6,11 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import type { ShopCategory } from "@/types";
-import { sanitizeLight, truncate, validateEnum } from "@/lib/sanitization";
+import {
+  SHOP_CATEGORIES,
+  CATEGORY_ICONS,
+} from "@/types";
+import { sanitizeLight, validateEnum } from "@/lib/sanitization";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,112 +31,126 @@ type ServiceResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-// ─── Allowed category list (single source of truth) ─────────────────────────
+// ─── Allowed category list (mirrors types/index.ts) ─────────────────────────
 
-const ALL_CATEGORIES: readonly ShopCategory[] = [
-  "All",
-  "Fashion & Apparel",
-  "Electronics & Gadgets",
-  "Home & Living",
-  "Health & Beauty",
-  "Books & Stationery",
-  "Sports & Fitness",
-  "Toys & Baby Care",
-  "Automotive Accessories",
-  "Handmade & Crafts",
-  "Home Maintenance & Repair",
-  "Security & Surveillance",
-  "Tech & IT Services",
-  "Personal & Professional Services",
-  "Others / Universal",
-] as const;
+const ALL_CATEGORIES: readonly ShopCategory[] = SHOP_CATEGORIES;
 
 // ─── Category Metadata ───────────────────────────────────────────────────────
 
 /** Static metadata for each category — icons and descriptions. */
 const CATEGORY_META: Record<Exclude<ShopCategory, "All">, CategoryMeta> = {
+  "Grocery & Kiryana": {
+    key: "Grocery & Kiryana",
+    label: "Grocery & Kiryana",
+    icon: CATEGORY_ICONS["Grocery & Kiryana"] ?? "🛒",
+    description: "Daily essentials, dry goods, and neighborhood kiryana stores",
+  },
+  "Fruits & Vegetables": {
+    key: "Fruits & Vegetables",
+    label: "Fruits & Vegetables",
+    icon: CATEGORY_ICONS["Fruits & Vegetables"] ?? "🥬",
+    description: "Fresh sabzi, fruit stalls, and produce markets",
+  },
+  "Bakery & Sweets": {
+    key: "Bakery & Sweets",
+    label: "Bakery & Sweets",
+    icon: CATEGORY_ICONS["Bakery & Sweets"] ?? "🧁",
+    description: "Bakeries, mithai shops, cakes, and dessert counters",
+  },
+  "Fast Food & Restaurants": {
+    key: "Fast Food & Restaurants",
+    label: "Fast Food & Restaurants",
+    icon: CATEGORY_ICONS["Fast Food & Restaurants"] ?? "🍔",
+    description: "Restaurants, dhabas, cafés, and quick bites",
+  },
+  "Pharmacy & Medical": {
+    key: "Pharmacy & Medical",
+    label: "Pharmacy & Medical",
+    icon: CATEGORY_ICONS["Pharmacy & Medical"] ?? "💊",
+    description: "Pharmacies, medical stores, and health essentials",
+  },
   "Fashion & Apparel": {
     key: "Fashion & Apparel",
     label: "Fashion & Apparel",
-    icon: "👗",
+    icon: CATEGORY_ICONS["Fashion & Apparel"] ?? "👗",
     description: "Clothing, accessories, and fashion boutiques",
   },
   "Electronics & Gadgets": {
     key: "Electronics & Gadgets",
     label: "Electronics & Gadgets",
-    icon: "📱",
+    icon: CATEGORY_ICONS["Electronics & Gadgets"] ?? "📱",
     description: "Gadgets, mobile accessories, and tech stores",
   },
   "Home & Living": {
     key: "Home & Living",
     label: "Home & Living",
-    icon: "🏠",
+    icon: CATEGORY_ICONS["Home & Living"] ?? "🏠",
     description: "Furniture, home decor, and lifestyle products",
   },
   "Health & Beauty": {
     key: "Health & Beauty",
     label: "Health & Beauty",
-    icon: "💄",
+    icon: CATEGORY_ICONS["Health & Beauty"] ?? "💄",
     description: "Beauty products, skincare, and personal care",
   },
   "Books & Stationery": {
     key: "Books & Stationery",
     label: "Books & Stationery",
-    icon: "📚",
+    icon: CATEGORY_ICONS["Books & Stationery"] ?? "📚",
     description: "Books, notebooks, and office supplies",
   },
   "Sports & Fitness": {
     key: "Sports & Fitness",
     label: "Sports & Fitness",
-    icon: "🏋️",
+    icon: CATEGORY_ICONS["Sports & Fitness"] ?? "🏋️",
     description: "Sports equipment, gym gear, and activewear",
   },
   "Toys & Baby Care": {
     key: "Toys & Baby Care",
     label: "Toys & Baby Care",
-    icon: "🧸",
+    icon: CATEGORY_ICONS["Toys & Baby Care"] ?? "🧸",
     description: "Toys, baby products, and childcare items",
   },
   "Automotive Accessories": {
     key: "Automotive Accessories",
     label: "Automotive Accessories",
-    icon: "🚗",
+    icon: CATEGORY_ICONS["Automotive Accessories"] ?? "🚗",
     description: "Car accessories, tools, and automotive parts",
   },
   "Handmade & Crafts": {
     key: "Handmade & Crafts",
     label: "Handmade & Crafts",
-    icon: "🎨",
+    icon: CATEGORY_ICONS["Handmade & Crafts"] ?? "🎨",
     description: "Handcrafted goods, art supplies, and DIY products",
   },
   "Home Maintenance & Repair": {
     key: "Home Maintenance & Repair",
     label: "Home Maintenance & Repair",
-    icon: "🔧",
+    icon: CATEGORY_ICONS["Home Maintenance & Repair"] ?? "🔧",
     description: "Plumbing, electrical, painting, and home repair services",
   },
   "Security & Surveillance": {
     key: "Security & Surveillance",
     label: "Security & Surveillance",
-    icon: "📹",
+    icon: CATEGORY_ICONS["Security & Surveillance"] ?? "📹",
     description: "CCTV, alarm systems, and security solutions",
   },
   "Tech & IT Services": {
     key: "Tech & IT Services",
     label: "Tech & IT Services",
-    icon: "💻",
+    icon: CATEGORY_ICONS["Tech & IT Services"] ?? "💻",
     description: "Computer repair, web development, and IT support",
   },
   "Personal & Professional Services": {
     key: "Personal & Professional Services",
     label: "Personal & Professional Services",
-    icon: "💼",
+    icon: CATEGORY_ICONS["Personal & Professional Services"] ?? "💼",
     description: "Tutoring, consulting, beauty services, and freelancers",
   },
   "Others / Universal": {
     key: "Others / Universal",
     label: "Others / Universal",
-    icon: "📦",
+    icon: CATEGORY_ICONS["Others / Universal"] ?? "📦",
     description: "General merchandise and multi-category stores",
   },
 };
@@ -217,10 +235,11 @@ export async function fetchCategoryCounts(): Promise<
       count: total,
     });
 
-    // Then each real category
-    for (const key of Object.keys(CATEGORY_META) as ShopCategory[]) {
+    // Then each real category (preserve SHOP_CATEGORIES order)
+    for (const key of ALL_CATEGORIES) {
       if (key === "All") continue;
       const cat = CATEGORY_META[key as Exclude<ShopCategory, "All">];
+      if (!cat) continue;
       categories.push({
         ...cat,
         count: countMap.get(key) ?? 0,
