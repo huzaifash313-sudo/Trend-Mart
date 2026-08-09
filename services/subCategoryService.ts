@@ -8,6 +8,10 @@ import { logError } from "@/services/errorService";
 import { isValidCategory } from "@/services/categoryService";
 import { sanitizeLight, truncate, isValidUUID } from "@/lib/sanitization";
 import type { SubCategory } from "@/types";
+import {
+  getDefaultSubCategories,
+  seedSubCategoryId,
+} from "@/lib/defaultSubCategories";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,13 +49,45 @@ function sanitizeCategoryParam(category: string): string {
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
+function buildDefaultSubs(safeCategory: string): SubCategory[] {
+  return getDefaultSubCategories(safeCategory).map((def) => ({
+    id: seedSubCategoryId(safeCategory, def.slug),
+    category: safeCategory,
+    name: def.name,
+    slug: def.slug,
+    description: def.description,
+    icon: def.icon,
+    is_active: true,
+    sort_order: def.sort_order,
+    is_others: Boolean(def.is_others),
+  }));
+}
+
+/**
+ * Merge DB rows with the built-in catalog so the UI always shows rich
+ * sub-categories (Burgers, Shawarma, Laptop Repair, …) even before SQL seed.
+ * Prefer real DB UUIDs when a matching slug already exists.
+ */
+function mergeWithDefaults(safeCategory: string, dbSubs: SubCategory[]): SubCategory[] {
+  const defaults = buildDefaultSubs(safeCategory);
+  const bySlug = new Map(dbSubs.map((s) => [s.slug, s]));
+  const merged: SubCategory[] = defaults.map((def) => bySlug.get(def.slug) ?? def);
+
+  // Keep any extra custom DB rows not in the built-in catalog
+  for (const row of dbSubs) {
+    if (!merged.some((m) => m.slug === row.slug)) merged.push(row);
+  }
+
+  merged.sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  return merged;
+}
+
 /**
  * Fetch all sub-categories for a given main category.
  * Always includes the 'Others / General' fallback entry.
  *
- * If the database returns no 'Others' entry (e.g., seed hasn't run yet),
- * a synthetic fallback is injected programmatically to ensure merchants
- * always have an option.
+ * Merges live DB rows with the built-in Pakistan retail/services catalog so
+ * homepage + Add Product never show only an empty / Others-only list.
  */
 export async function fetchSubCategories(
   category: string,
@@ -60,6 +96,15 @@ export async function fetchSubCategories(
   const safeCategory = sanitizeCategoryParam(category);
   if (!safeCategory) {
     return { success: false, error: "Invalid category specified." };
+  }
+
+  // Fire-and-forget: try to upsert missing rows into Supabase when service role is configured
+  if (typeof window !== "undefined") {
+    void fetch(`/api/sub-categories/seed?category=${encodeURIComponent(safeCategory)}`, {
+      method: "POST",
+    }).catch(() => {
+      /* seed is best-effort */
+    });
   }
 
   const supabase = createClient();
@@ -75,25 +120,9 @@ export async function fetchSubCategories(
 
     if (error) throw error;
 
-    const subs = (data as SubCategory[]) ?? [];
-    const hasOthers = subs.some((s) => s.is_others);
+    const merged = mergeWithDefaults(safeCategory, (data as SubCategory[]) ?? []);
 
-    // Programmatic 'Others' fallback — guarantees every category has it
-    if (!hasOthers) {
-      subs.push({
-        id: `fallback-others-${safeCategory.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
-        category: safeCategory,
-        name: "Others / General",
-        slug: `${safeCategory.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}-others`,
-        description: `General items in ${safeCategory}`,
-        icon: "📦",
-        is_active: true,
-        sort_order: 999,
-        is_others: true,
-      });
-    }
-
-    const result: SubCategoryWithMeta[] = subs.map((s) => ({
+    const result: SubCategoryWithMeta[] = merged.map((s) => ({
       ...s,
       mainCategory: safeCategory,
     }));
@@ -104,8 +133,52 @@ export async function fetchSubCategories(
       module: "subCategoryService.fetchSubCategories",
       meta: { category: safeCategory },
     });
-    return { success: false, error: toError(err) };
+    // Offline / DB down — still return built-in catalog so UI stays usable
+    const fallback = mergeWithDefaults(safeCategory, []);
+    return {
+      success: true,
+      data: fallback.map((s) => ({ ...s, mainCategory: safeCategory })),
+    };
   }
+}
+
+/**
+ * Resolve a seed:/fallback sub-category id to a real DB UUID (via seed API).
+ * Returns the original id if it is already a UUID.
+ */
+export async function resolveSubCategoryId(
+  category: string,
+  subCategoryId: string | null | undefined,
+): Promise<string | null> {
+  if (!subCategoryId) return null;
+  if (isValidUUID(subCategoryId)) return subCategoryId;
+
+  const safeCategory = sanitizeCategoryParam(category);
+  if (!safeCategory) return null;
+
+  try {
+    const res = await fetch("/api/sub-categories/seed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: safeCategory, resolveId: subCategoryId }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { id?: string; data?: SubCategory[] };
+    if (typeof json.id === "string" && isValidUUID(json.id)) return json.id;
+    const match = json.data?.find((s) => s.id === subCategoryId || s.slug);
+    // After seed, re-fetch and match by slug from original seed id
+    const slug = subCategoryId.includes(":")
+      ? subCategoryId.slice(subCategoryId.lastIndexOf(":") + 1)
+      : null;
+    if (slug && json.data) {
+      const row = json.data.find((s) => s.slug === slug);
+      if (row && isValidUUID(row.id)) return row.id;
+    }
+    if (match && isValidUUID(match.id)) return match.id;
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 /**

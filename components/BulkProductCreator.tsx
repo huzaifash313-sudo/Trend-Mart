@@ -11,6 +11,7 @@ import type { ProductFormData } from "@/types";
 import {
   fetchSubCategories,
   getOthersSubCategoryId,
+  resolveSubCategoryId,
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { bulkCreateProducts } from "@/services/productService";
@@ -127,22 +128,28 @@ export default function BulkProductCreator({
 
     setSaving(true);
 
-    let othersFallback = defaultSubId;
-    if (!othersFallback || !isValidUUID(othersFallback)) {
-      othersFallback = await getOthersSubCategoryId(shopCategory);
-    }
+    // Ensure built-in catalog exists in DB, then resolve each row's sub id
+    await fetch("/api/sub-categories/seed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: shopCategory }),
+    }).catch(() => undefined);
 
-    const forms: ProductFormData[] = validRows.map((r) => {
+    const forms: ProductFormData[] = [];
+    for (const r of validRows) {
       const price = Number(r.price);
       const original = r.original_price.trim() ? Number(r.original_price) : null;
-      const subId =
+      let subId =
         r.sub_category_id && isValidUUID(r.sub_category_id)
           ? r.sub_category_id
-          : isValidUUID(othersFallback)
-            ? othersFallback
-            : null;
+          : await resolveSubCategoryId(shopCategory, r.sub_category_id);
 
-      return {
+      if (!subId || !isValidUUID(subId)) {
+        const othersFallback = await getOthersSubCategoryId(shopCategory);
+        subId = isValidUUID(othersFallback) ? othersFallback : null;
+      }
+
+      forms.push({
         name: r.name.trim(),
         description: "",
         price,
@@ -152,8 +159,8 @@ export default function BulkProductCreator({
         is_available: true,
         category_id: shopCategory,
         sub_category_id: subId,
-      };
-    });
+      });
+    }
 
     const result = await bulkCreateProducts(shopId, forms);
     setSaving(false);

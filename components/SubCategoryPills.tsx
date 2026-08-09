@@ -59,7 +59,11 @@ export default function SubCategoryPills({
 
   // When filtering by inventory, drop empty lists (no products tagged yet)
   if (!loading && availableIds && visible.length === 0) return null;
-  if (!loading && visible.length === 0) return null;
+
+  const chips = visible.filter((s) => !s.is_others);
+  const showList = chips.length > 0 || loading;
+
+  if (!loading && !showList) return null;
 
   return (
     <section className={className} aria-label={label}>
@@ -84,7 +88,7 @@ export default function SubCategoryPills({
         >
           All
         </button>
-        {visible.map((sub) => {
+        {chips.map((sub) => {
           const active = selectedId === sub.id;
           return (
             <button

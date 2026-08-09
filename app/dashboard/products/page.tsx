@@ -51,6 +51,7 @@ import Link from "next/link";
 import {
   fetchSubCategories,
   getOthersSubCategoryId,
+  resolveSubCategoryId,
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
@@ -560,6 +561,10 @@ export default function ProductsDashboardPage() {
 
     const shopCat = shops.find((s) => s.id === activeShopId)?.category ?? "";
     let subId = form.subCategoryId;
+    if (subId && !isValidUUID(subId) && shopCat) {
+      const resolved = await resolveSubCategoryId(shopCat, subId);
+      subId = resolved ?? "";
+    }
     if ((!subId || !isValidUUID(subId)) && shopCat) {
       const othersId = await getOthersSubCategoryId(shopCat);
       subId = isValidUUID(othersId) ? othersId : "";

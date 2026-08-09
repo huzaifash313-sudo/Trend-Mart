@@ -32,6 +32,7 @@ import { formatRupees } from "@/lib/formatters";
 import {
   fetchSubCategories,
   getOthersSubCategoryId,
+  resolveSubCategoryId,
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
@@ -652,12 +653,15 @@ export default function DashboardPage() {
 
     const mainCategory = shop.category;
     let subId: string | null = productForm.sub_category_id ?? null;
+    if (subId && !isValidUUID(subId)) {
+      subId = await resolveSubCategoryId(mainCategory, subId);
+    }
     if (!subId || !isValidUUID(subId)) {
       const othersId = await getOthersSubCategoryId(mainCategory);
       subId = isValidUUID(othersId) ? othersId : null;
     }
     if (!subId) {
-      addToast("No sub-category available. Run the SQL migration in Supabase first.", "error");
+      addToast("Could not save sub-category. Try again in a moment.", "error");
       setProductSaving(false);
       return;
     }

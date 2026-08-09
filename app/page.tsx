@@ -22,6 +22,7 @@ import CategoryGrid from "@/components/CategoryGrid";
 import PromoAdsCarousel from "@/components/PromoAdsCarousel";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
+import SubCategoryBrowseGrid from "@/components/SubCategoryBrowseGrid";
 import { fetchShopIdsBySubCategory } from "@/services/productService";
 
 /* -------------------------------------------------------------------------- */
@@ -316,13 +317,21 @@ function HomeInner() {
       {/* ── Sponsored / Promotional Ads Carousel ───────────────────── */}
       <PromoAdsCarousel placement="homepage_top" />
 
-      {/* ── Visual Category Grid ──────────────────────────────────── */}
-      {categoryCounts.length > 0 && (
-        <CategoryGrid
-          categories={categoryCounts}
-          maxItems={12}
-          onCategoryClick={(cat) => handleCategoryChange(cat as ShopCategory)}
+      {/* ── Browse: main categories OR selected category's sub-categories ─ */}
+      {activeCategory !== "All" ? (
+        <SubCategoryBrowseGrid
+          mainCategory={activeCategory}
+          selectedId={activeSubCategoryId}
+          onSelect={(id) => handleSubCategoryChange(id)}
         />
+      ) : (
+        categoryCounts.length > 0 && (
+          <CategoryGrid
+            categories={categoryCounts}
+            maxItems={12}
+            onCategoryClick={(cat) => handleCategoryChange(cat as ShopCategory)}
+          />
+        )
       )}
 
       {/* ── Geo-Radius Filter ─────────────────────────────────────── */}
