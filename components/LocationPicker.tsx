@@ -8,7 +8,9 @@ import {
   locationErrorMessage,
   CITY_CENTROIDS,
   requestUserLocationDetailed,
+  searchPlaces,
   type LocationDetectErrorCode,
+  type PlaceSearchResult,
 } from "@/services/geoRadiusService";
 import { SUPPORTED_CITIES, type SupportedCity } from "@/types";
 
@@ -22,7 +24,7 @@ const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
 });
 
 /* -------------------------------------------------------------------------- */
-/*  Daraz-style full-screen map location picker (header entry point)           */
+/*  Daraz-style full-screen map + area search (header entry point)             */
 /* -------------------------------------------------------------------------- */
 
 function LocateIcon() {
@@ -30,6 +32,15 @@ function LocateIcon() {
     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
       <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg className="h-4 w-4 shrink-0 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }
@@ -93,8 +104,14 @@ export default function LocationPicker() {
     longitude: number;
     accuracyMeters?: number | null;
   } | null>(null);
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeResults, setPlaceResults] = useState<PlaceSearchResult[]>([]);
+  const [placeSearching, setPlaceSearching] = useState(false);
+  const [placeSearchError, setPlaceSearchError] = useState<string | null>(null);
   const mapPickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoGpsTried = useRef(false);
+  const placeAbortRef = useRef<AbortController | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
@@ -107,10 +124,20 @@ export default function LocationPicker() {
   useEffect(() => {
     if (!open) {
       autoGpsTried.current = false;
+      setPlaceQuery("");
+      setPlaceResults([]);
+      setPlaceSearchError(null);
       return;
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        if (placeResults.length > 0 || placeQuery) {
+          setPlaceQuery("");
+          setPlaceResults([]);
+          return;
+        }
+        setOpen(false);
+      }
     }
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -119,13 +146,56 @@ export default function LocationPicker() {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open]);
+  }, [open, placeQuery, placeResults.length]);
 
   useEffect(() => {
     return () => {
       if (mapPickTimer.current) clearTimeout(mapPickTimer.current);
+      placeAbortRef.current?.abort();
     };
   }, []);
+
+  // Debounced area / landmark search (Pakistan)
+  useEffect(() => {
+    if (!open) return;
+    const q = placeQuery.trim();
+    if (q.length < 2) {
+      setPlaceResults([]);
+      setPlaceSearching(false);
+      setPlaceSearchError(null);
+      placeAbortRef.current?.abort();
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      placeAbortRef.current?.abort();
+      const controller = new AbortController();
+      placeAbortRef.current = controller;
+      setPlaceSearching(true);
+      setPlaceSearchError(null);
+      try {
+        const results = await searchPlaces(q, {
+          limit: 7,
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) {
+          setPlaceResults(results);
+          if (results.length === 0) {
+            setPlaceSearchError("No places found — try colony, road, or city name");
+          }
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setPlaceResults([]);
+          setPlaceSearchError("Search failed. Check connection and try again.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setPlaceSearching(false);
+      }
+    }, 380);
+
+    return () => window.clearTimeout(timer);
+  }, [placeQuery, open]);
 
   const applyDetectResult = useCallback(async () => {
     setDetectError(null);
@@ -187,6 +257,25 @@ export default function LocationPicker() {
     [setManualPin],
   );
 
+  const handleSelectPlace = useCallback(
+    async (place: PlaceSearchResult) => {
+      setPlaceQuery(place.label);
+      setPlaceResults([]);
+      setPlaceSearchError(null);
+      setDetectError(null);
+      setMapUpdating(true);
+      try {
+        await setManualPin(place.latitude, place.longitude);
+        searchInputRef.current?.blur();
+      } catch {
+        setDetectError("Could not open that place on the map. Try again.");
+      } finally {
+        setMapUpdating(false);
+      }
+    },
+    [setManualPin],
+  );
+
   const handleDetect = useCallback(async () => {
     await applyDetectResult();
   }, [applyDetectResult]);
@@ -222,7 +311,6 @@ export default function LocationPicker() {
             aria-modal="true"
             aria-labelledby="tm-location-title"
           >
-            {/* Full-bleed map */}
             <div className="relative min-h-0 flex-1">
               <LocationMiniMap
                 mode="fullscreen"
@@ -233,32 +321,94 @@ export default function LocationPicker() {
                 resizeKey={open}
               />
 
-              {/* Top bar */}
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] bg-gradient-to-b from-black/45 to-transparent px-3 pb-8 pt-[max(0.75rem,env(safe-area-inset-top))]">
-                <div className="pointer-events-auto mx-auto flex max-w-3xl items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="icon-only inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-zinc-800 shadow-md dark:bg-zinc-900 dark:text-zinc-100"
-                    aria-label="Close map"
-                  >
-                    <XIcon />
-                  </button>
-                  <div className="min-w-0 flex-1 rounded-2xl bg-white/95 px-3 py-2 shadow-md backdrop-blur dark:bg-zinc-900/95">
-                    <h2
-                      id="tm-location-title"
-                      className="text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] bg-gradient-to-b from-black/50 to-transparent px-3 pb-10 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                <div className="pointer-events-auto relative mx-auto max-w-3xl">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpen(false)}
+                      className="icon-only inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-zinc-800 shadow-md dark:bg-zinc-900 dark:text-zinc-100"
+                      aria-label="Close map"
                     >
-                      Select delivery location
-                    </h2>
-                    <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                      Move the map — pin stays in the center
-                    </p>
+                      <XIcon />
+                    </button>
+                    <div className="relative min-w-0 flex-1">
+                      <label htmlFor="tm-map-place-search" className="sr-only">
+                        Search area, colony, or landmark
+                      </label>
+                      <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2.5 shadow-lg ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10">
+                        <SearchIcon />
+                        <input
+                          ref={searchInputRef}
+                          id="tm-map-place-search"
+                          type="search"
+                          value={placeQuery}
+                          onChange={(e) => setPlaceQuery(e.target.value)}
+                          placeholder="Search area, colony, road, landmark…"
+                          autoComplete="off"
+                          className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50"
+                        />
+                        {placeQuery && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPlaceQuery("");
+                              setPlaceResults([]);
+                              setPlaceSearchError(null);
+                              searchInputRef.current?.focus();
+                            }}
+                            className="icon-only rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                            aria-label="Clear search"
+                          >
+                            <XIcon />
+                          </button>
+                        )}
+                      </div>
+
+                      {(placeSearching || placeResults.length > 0 || placeSearchError) &&
+                        placeQuery.trim().length >= 2 && (
+                          <ul
+                            className="absolute left-0 right-0 top-full z-[510] mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+                            role="listbox"
+                            aria-label="Place search results"
+                          >
+                            {placeSearching && placeResults.length === 0 && (
+                              <li className="px-3 py-2.5 text-xs text-zinc-400">Searching…</li>
+                            )}
+                            {!placeSearching && placeSearchError && placeResults.length === 0 && (
+                              <li className="px-3 py-2.5 text-xs text-zinc-500">{placeSearchError}</li>
+                            )}
+                            {placeResults.map((place) => (
+                              <li key={place.id} role="option">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSelectPlace(place)}
+                                  className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                >
+                                  <LocateIcon />
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                      {place.label}
+                                    </span>
+                                    {place.secondary && (
+                                      <span className="mt-0.5 block text-[0.7rem] leading-snug text-zinc-500 dark:text-zinc-400">
+                                        {place.secondary}
+                                      </span>
+                                    )}
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                    </div>
                   </div>
+                  <p id="tm-location-title" className="mt-2 px-1 text-[0.65rem] font-medium text-white/90 drop-shadow">
+                    Search an ilaqa, or move the map — pin stays in the center
+                  </p>
                 </div>
               </div>
 
-              {/* Recenter to GPS */}
               <button
                 type="button"
                 onClick={handleDetect}
@@ -271,7 +421,6 @@ export default function LocationPicker() {
               </button>
             </div>
 
-            {/* Bottom address sheet */}
             <div className="z-[500] shrink-0 rounded-t-2xl border-t border-zinc-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,.18)] dark:border-zinc-700 dark:bg-zinc-900">
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700" />
 
@@ -289,7 +438,7 @@ export default function LocationPicker() {
                       : displayAddress ||
                         (isDetecting
                           ? "Reading GPS & nearest road…"
-                          : "Pan the map to your street / house")}
+                          : "Search above or pan the map to your street")}
                   </p>
                   {accuracyLabel && !mapUpdating && (
                     <p className="mt-1 text-[0.65rem] font-medium text-blue-600 dark:text-blue-400">

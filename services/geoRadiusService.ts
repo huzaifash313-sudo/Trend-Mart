@@ -792,6 +792,93 @@ function formatOsmStreetAddress(addr: {
   return { shortAddress, neighbourhood, cityCandidate, landmark };
 }
 
+export interface PlaceSearchResult {
+  id: string;
+  label: string;
+  secondary?: string;
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * Forward-geocode an area / street / landmark (Pakistan-first).
+ * Powers the map search bar (Daraz-style “search ilaqa”).
+ */
+export async function searchPlaces(
+  query: string,
+  opts?: { limit?: number; signal?: AbortSignal },
+): Promise<PlaceSearchResult[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  const limit = Math.min(Math.max(opts?.limit ?? 6, 1), 10);
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/search?format=jsonv2` +
+      `&q=${encodeURIComponent(q)}` +
+      `&countrycodes=pk` +
+      `&addressdetails=1&namedetails=1` +
+      `&limit=${limit}` +
+      `&accept-language=en`;
+
+    const res = await fetch(url, {
+      signal: opts?.signal,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "TrendMart/1.0 (https://trend-marts.vercel.app)",
+      },
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as Array<{
+      place_id?: number | string;
+      lat?: string;
+      lon?: string;
+      display_name?: string;
+      name?: string;
+      type?: string;
+      address?: Record<string, string | undefined>;
+    }>;
+
+    return (data ?? [])
+      .map((row, idx) => {
+        const lat = Number(row.lat);
+        const lng = Number(row.lon);
+        if (!isValidCoordinate(lat, lng)) return null;
+        const addr = row.address ?? {};
+        const label =
+          row.name ||
+          addr.amenity ||
+          addr.shop ||
+          addr.road ||
+          addr.suburb ||
+          addr.neighbourhood ||
+          addr.city ||
+          addr.town ||
+          row.display_name?.split(",")[0] ||
+          "Place";
+        const secondary =
+          row.display_name && row.display_name !== label
+            ? row.display_name
+            : [addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.state]
+                .filter(Boolean)
+                .join(", ") || undefined;
+        return {
+          id: String(row.place_id ?? `${lat},${lng},${idx}`),
+          label,
+          secondary,
+          latitude: lat,
+          longitude: lng,
+        } satisfies PlaceSearchResult;
+      })
+      .filter((r): r is PlaceSearchResult => r != null);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") return [];
+    logError(err, { module: "geoRadiusService.searchPlaces", meta: { q } });
+    return [];
+  }
+}
+
 export async function reverseGeocode(
   lat: number,
   lng: number,
