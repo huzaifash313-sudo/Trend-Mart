@@ -651,10 +651,15 @@ export default function DashboardPage() {
     setProductSaving(true);
 
     const mainCategory = shop.category;
-    let subId = productForm.sub_category_id;
+    let subId: string | null = productForm.sub_category_id ?? null;
     if (!subId || !isValidUUID(subId)) {
       const othersId = await getOthersSubCategoryId(mainCategory);
       subId = isValidUUID(othersId) ? othersId : null;
+    }
+    if (!subId) {
+      addToast("No sub-category available. Run the SQL migration in Supabase first.", "error");
+      setProductSaving(false);
+      return;
     }
 
     const payload: ProductFormData = {
