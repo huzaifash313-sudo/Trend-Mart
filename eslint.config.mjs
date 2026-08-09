@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     rules: {
       // Legitimate hydration / localStorage sync patterns trip this rule.
       "react-hooks/set-state-in-effect": "off",
+      // Date.now()/Math.random() in client dashboards are intentional.
+      "react-hooks/purity": "off",
     },
   },
 ]);
