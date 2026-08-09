@@ -175,13 +175,17 @@ export default function LocationPicker() {
       setPlaceSearchError(null);
       try {
         const results = await searchPlaces(q, {
-          limit: 7,
+          limit: 8,
           signal: controller.signal,
+          latitude: mapLat,
+          longitude: mapLng,
         });
         if (!controller.signal.aborted) {
           setPlaceResults(results);
           if (results.length === 0) {
-            setPlaceSearchError("No places found — try colony, road, or city name");
+            setPlaceSearchError(
+              "No places found — try full name + city (e.g. Heaven Science Academy Gujranwala)",
+            );
           }
         }
       } catch {
@@ -195,7 +199,7 @@ export default function LocationPicker() {
     }, 380);
 
     return () => window.clearTimeout(timer);
-  }, [placeQuery, open]);
+  }, [placeQuery, open, mapLat, mapLng]);
 
   const applyDetectResult = useCallback(async () => {
     setDetectError(null);
@@ -344,7 +348,7 @@ export default function LocationPicker() {
                           type="search"
                           value={placeQuery}
                           onChange={(e) => setPlaceQuery(e.target.value)}
-                          placeholder="Search area, colony, road, landmark…"
+                          placeholder="Search shop, hospital, academy, colony…"
                           autoComplete="off"
                           className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50"
                         />

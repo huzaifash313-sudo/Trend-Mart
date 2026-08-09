@@ -798,81 +798,62 @@ export interface PlaceSearchResult {
   secondary?: string;
   latitude: number;
   longitude: number;
+  source?: "google" | "photon" | "nominatim";
 }
 
 /**
- * Forward-geocode an area / street / landmark (Pakistan-first).
- * Powers the map search bar (Daraz-style “search ilaqa”).
+ * Forward-geocode an area / street / landmark / business.
+ * Uses `/api/places/search` (Google Places when keyed, else Photon + Nominatim).
  */
 export async function searchPlaces(
   query: string,
-  opts?: { limit?: number; signal?: AbortSignal },
+  opts?: {
+    limit?: number;
+    signal?: AbortSignal;
+    latitude?: number | null;
+    longitude?: number | null;
+  },
 ): Promise<PlaceSearchResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
-  const limit = Math.min(Math.max(opts?.limit ?? 6, 1), 10);
+  const limit = Math.min(Math.max(opts?.limit ?? 8, 1), 12);
   try {
-    const url =
-      `https://nominatim.openstreetmap.org/search?format=jsonv2` +
-      `&q=${encodeURIComponent(q)}` +
-      `&countrycodes=pk` +
-      `&addressdetails=1&namedetails=1` +
-      `&limit=${limit}` +
-      `&accept-language=en`;
+    const params = new URLSearchParams({
+      q,
+      limit: String(limit),
+    });
+    if (
+      opts?.latitude != null &&
+      opts?.longitude != null &&
+      isValidCoordinate(opts.latitude, opts.longitude)
+    ) {
+      params.set("lat", String(opts.latitude));
+      params.set("lng", String(opts.longitude));
+    }
 
-    const res = await fetch(url, {
+    // Prefer same-origin API (server can use Google key safely)
+    const base =
+      typeof window !== "undefined"
+        ? ""
+        : process.env.NEXT_PUBLIC_APP_URL ||
+          process.env.NEXT_PUBLIC_SITE_URL ||
+          "http://localhost:3000";
+    const res = await fetch(`${base}/api/places/search?${params}`, {
       signal: opts?.signal,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "TrendMart/1.0 (https://trend-marts.vercel.app)",
-      },
+      headers: { Accept: "application/json" },
     });
     if (!res.ok) return [];
 
-    const data = (await res.json()) as Array<{
-      place_id?: number | string;
-      lat?: string;
-      lon?: string;
-      display_name?: string;
-      name?: string;
-      type?: string;
-      address?: Record<string, string | undefined>;
-    }>;
-
-    const results: PlaceSearchResult[] = [];
-    for (const [idx, row] of (data ?? []).entries()) {
-      const lat = Number(row.lat);
-      const lng = Number(row.lon);
-      if (!isValidCoordinate(lat, lng)) continue;
-      const addr = row.address ?? {};
-      const label =
-        row.name ||
-        addr.amenity ||
-        addr.shop ||
-        addr.road ||
-        addr.suburb ||
-        addr.neighbourhood ||
-        addr.city ||
-        addr.town ||
-        row.display_name?.split(",")[0] ||
-        "Place";
-      const secondaryParts =
-        row.display_name && row.display_name !== label
-          ? row.display_name
-          : [addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.state]
-              .filter(Boolean)
-              .join(", ");
-      const item: PlaceSearchResult = {
-        id: String(row.place_id ?? `${lat},${lng},${idx}`),
-        label,
-        latitude: lat,
-        longitude: lng,
-      };
-      if (secondaryParts) item.secondary = secondaryParts;
-      results.push(item);
-    }
-    return results;
+    const data = (await res.json()) as {
+      results?: PlaceSearchResult[];
+    };
+    return (data.results ?? []).filter(
+      (r) =>
+        r &&
+        typeof r.label === "string" &&
+        isValidCoordinate(r.latitude, r.longitude),
+    );
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") return [];
     logError(err, { module: "geoRadiusService.searchPlaces", meta: { q } });
