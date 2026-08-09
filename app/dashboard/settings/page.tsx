@@ -376,10 +376,10 @@ export default function DashboardSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-3 py-3">
+      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-emerald-900/40 dark:bg-black/90">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-3 py-2.5">
           <Link href="/dashboard" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Back to dashboard">
             <ChevronLeftIcon />
           </Link>
@@ -390,13 +390,13 @@ export default function DashboardSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-6 px-3 py-5">
+      <main className="page-stack mx-auto max-w-2xl px-3 py-4">
         {/* ── Store Branding ─────────────────────────────────────────── */}
         <section>
           <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             <ImageIcon /> Store Branding
           </h2>
-          <div className="trend-card space-y-4 p-4">
+          <div className="trend-card space-y-3 p-3 sm:p-3.5">
             <ImageUpload
               label="Store Logo"
               currentUrl={form.logo_url}
@@ -445,7 +445,7 @@ export default function DashboardSettingsPage() {
           <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             <ClockIcon /> Business Hours & Contact
           </h2>
-          <div className="trend-card space-y-4 p-4">
+          <div className="trend-card space-y-3 p-3 sm:p-3.5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Business Hours</label>
@@ -568,7 +568,7 @@ export default function DashboardSettingsPage() {
           <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             <WalletIcon /> Delivery Fees & Minimum Order
           </h2>
-          <div className="trend-card p-4 space-y-4">
+          <div className="trend-card space-y-3 p-3 sm:p-3.5">
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Control the smallest order you&apos;ll accept, when delivery becomes
               free, and how much extra to charge customers further away. Leave a

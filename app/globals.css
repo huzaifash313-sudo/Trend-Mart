@@ -21,24 +21,63 @@
 /* Class-based dark mode (ThemeProvider) — black surfaces + emerald accents */
 html.dark {
   --background: #000000;
-  --foreground: #d1fae5;
+  --foreground: #ecfdf5;
   color-scheme: dark;
+  background-color: #000000;
 }
 
 html.dark body {
-  background: #000000;
+  background: #000000 !important;
   color: #ecfdf5;
 }
 
 html.dark .trend-card {
   background-color: #0a0a0a;
-  border-color: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.28);
+  color: #ecfdf5;
+}
+
+/* Safety net: utilities without dark: variants stay readable on black */
+html.dark .bg-white:not([class*="dark:bg-"]) {
+  background-color: #0a0a0a;
+}
+html.dark .bg-zinc-50:not([class*="dark:bg-"]),
+html.dark .bg-zinc-100:not([class*="dark:bg-"]) {
+  background-color: #09090b;
+}
+html.dark .border-zinc-100:not([class*="dark:border-"]),
+html.dark .border-zinc-200:not([class*="dark:border-"]) {
+  border-color: #27272a;
+}
+html.dark .text-zinc-900:not([class*="dark:text-"]),
+html.dark .text-zinc-800:not([class*="dark:text-"]),
+html.dark .text-zinc-700:not([class*="dark:text-"]),
+html.dark .text-black:not([class*="dark:text-"]) {
+  color: #f4f4f5;
+}
+html.dark .text-zinc-600:not([class*="dark:text-"]),
+html.dark .text-zinc-500:not([class*="dark:text-"]) {
+  color: #a1a1aa;
+}
+html.dark .text-zinc-400:not([class*="dark:text-"]) {
+  color: #71717a;
+}
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  color: #f4f4f5;
+  background-color: #18181b;
+  border-color: #3f3f46;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #71717a;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     --background: #000000;
-    --foreground: #d1fae5;
+    --foreground: #ecfdf5;
   }
 }
 
@@ -146,7 +185,8 @@ code {
 
 /* Minimum touch target size for interactive elements (AA standard: 44x44px).
    Skip checkboxes/radios/switches — forcing 44×44 turns toggles into circles
-   and makes tick boxes look oversized. Labels provide the hit area instead. */
+   and makes tick boxes look oversized. Labels provide the hit area instead.
+   Center content vertically so pills don't look "top-aligned" inside tall hits. */
 button,
 a,
 input:not([type="checkbox"]):not([type="radio"]),
@@ -159,6 +199,36 @@ textarea,
   min-height: 44px;
   min-width: 44px;
   touch-action: manipulation;
+}
+
+/* Center label/icon inside buttons & pill links (fixes top-aligned Settings/Analytics). */
+button,
+a.rounded-full,
+button.rounded-full,
+[role="button"].rounded-full {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1.25;
+}
+
+/* Compact pills / chips — keep readable size without ballooning to 44px tall. */
+button.chip,
+a.chip,
+.chip,
+button.btn-compact,
+a.btn-compact,
+.btn-compact {
+  min-height: 1.75rem !important;
+  min-width: unset !important;
+  height: 1.75rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 /* Exclude compact controls from the 44px floor. */
@@ -401,12 +471,26 @@ label {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: box-shadow 0.15s ease;
 }
-.dark .trend-card {
-  border-color: #27272a;
-  background: #18181b;
+.dark .trend-card,
+html.dark .trend-card {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: #0a0a0a;
+  color: #ecfdf5;
 }
 .trend-card:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Tighter page stacks on mobile */
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .page-stack {
+    gap: 1.25rem;
+  }
 }
 
 /* ── Product Image Standard ────────────────────────────────────────────────── */

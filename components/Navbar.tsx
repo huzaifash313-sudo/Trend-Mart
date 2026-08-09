@@ -113,7 +113,7 @@ export default function Navbar() {
   const navigateToSearch = useCallback(() => router.push("/search"), [router]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white dark:border-emerald-900/40 dark:bg-black">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         {/* Hamburger — all screens */}
         <button type="button" onClick={() => setDrawerOpen(true)} className="shrink-0 rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Open menu">

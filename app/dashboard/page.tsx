@@ -793,41 +793,41 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black">
       {/* ── Email Verification Warning ───────────────────────────────────── */}
       {userEmailVerified === false && (
-        <div className="sticky top-0 z-30 border-b border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/30">
-          <div className="mx-auto flex max-w-3xl items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg" role="img" aria-label="Warning">⚠️</span>
-              <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+        <div className="sticky top-0 z-30 border-b border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/30">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="text-base" role="img" aria-label="Warning">⚠️</span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
                   Email Not Verified
                 </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Verify your email to register a store — once verified, new stores go live immediately.
+                <p className="text-[0.65rem] text-amber-600 dark:text-amber-400">
+                  Verify email to go live — stores publish right after verification.
                 </p>
               </div>
             </div>
             <Link
               href="/auth/verify-notice?redirect=/dashboard"
-              className="shrink-0 rounded-lg bg-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-200 dark:hover:bg-amber-700"
+              className="btn-compact shrink-0 rounded-lg bg-amber-200 px-2.5 text-[0.65rem] font-semibold text-amber-800 transition-colors hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-200 dark:hover:bg-amber-700"
             >
               Verify Now
             </Link>
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-emerald-900/40 dark:bg-black/90">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <h1 className="truncate text-base font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-lg">
               {shop ? shop.name : allShops.length > 0 ? "Dashboard" : "My Shop"}
             </h1>
             {shop && (
               <Link
                 href="/dashboard/settings"
-                className="rounded-full border border-zinc-200 px-2.5 py-1 text-[0.6rem] font-medium text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                className="chip shrink-0 rounded-full border border-zinc-200 px-2.5 text-[0.65rem] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
               >
                 ⚙️ Settings
               </Link>
@@ -835,18 +835,18 @@ export default function DashboardPage() {
             {shop && (
               <Link
                 href="/dashboard/analytics"
-                className="rounded-full border border-zinc-200 px-2.5 py-1 text-[0.6rem] font-medium text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                className="chip shrink-0 rounded-full border border-zinc-200 px-2.5 text-[0.65rem] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
               >
                 📊 Analytics
               </Link>
             )}
             {/* Multi-shop switcher */}
             {allShops.length > 1 && (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <select
                   value={activeShopId ?? ""}
                   onChange={(e) => handleSwitchShop(e.target.value)}
-                  className="appearance-none rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 pr-7 text-xs font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  className="btn-compact appearance-none rounded-full border border-zinc-200 bg-zinc-50 px-3 pr-7 text-xs font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
                   aria-label="Switch shop"
                 >
                   {allShops.map((s) => (
@@ -860,10 +860,10 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-8 px-4 py-6">
+      <main className="page-stack mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-5">
         {/* No shops message */}
         {allShops.length === 0 && (
-          <section className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 px-4 py-8 text-center dark:border-emerald-800 dark:bg-emerald-950/20">
+          <section className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 px-3 py-5 text-center dark:border-emerald-800 dark:bg-emerald-950/20">
             <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
               Create your first shop below to get started.
             </p>
@@ -875,31 +875,25 @@ export default function DashboardPage() {
 
         {/* Active shop summary — so merchants always see THEIR store after refresh */}
         {shop && (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400">Your store</p>
-                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{shop.name}</h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <section className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950 sm:p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-emerald-700">Your store</p>
+                <h2 className="truncate text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">{shop.name}</h2>
+                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                   {shop.category}
                   {shop.location ? ` · ${shop.location}` : ""}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-2.5 py-1 text-[0.65rem] font-semibold ${liveStatus.bg} ${liveStatus.color}`}>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`chip rounded-full px-2.5 text-[0.65rem] font-semibold ${liveStatus.bg} ${liveStatus.color}`}>
                   {liveStatus.label}
                 </span>
                 <Link
                   href={`/shop/${shop.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  className="btn-compact inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 text-xs font-semibold text-white hover:bg-emerald-700"
                 >
                   <EyeIcon /> View storefront
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  Settings
                 </Link>
               </div>
             </div>
@@ -908,8 +902,8 @@ export default function DashboardPage() {
 
         {/* Shop Details Form */}
         <section>
-          <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">{shop ? "Edit Shop Details" : "Create Your Shop"}</h2>
-          <form onSubmit={handleSaveShop} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">{shop ? "Edit Shop Details" : "Create Your Shop"}</h2>
+          <form onSubmit={handleSaveShop} className="space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950 sm:space-y-3.5 sm:p-4">
             <div>
               <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Shop Name *</label>
               <input type="text" required value={shopForm.name} onChange={(e) => setShopForm((f) => ({ ...f, name: e.target.value }))} placeholder="My Trendy Store" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
@@ -1080,21 +1074,21 @@ export default function DashboardPage() {
         {/* Analytics Summary Cards */}
         {activeShopId && (
           <section>
-            <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">Analytics Overview</h2>
+            <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">Analytics Overview</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.total_views ?? "—"}</p>
                 <p className="mt-1 flex items-center justify-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><EyeIcon /> Total Views</p>
               </div>
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.total_product_clicks ?? "—"}</p>
                 <p className="mt-1 flex items-center justify-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><MousePointerIcon /> Product Clicks</p>
               </div>
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.views_today ?? "—"}</p>
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Views Today</p>
               </div>
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950">
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.clicks_today ?? "—"}</p>
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Clicks Today</p>
               </div>
@@ -1110,9 +1104,9 @@ export default function DashboardPage() {
             {shop && (
               <>
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{products.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Active Products</p></div>
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"><p className={`text-2xl font-bold ${liveStatus.color}`}>{liveStatus.label}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Publishing Status</p></div>
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{orders.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Orders</p></div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{products.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Active Products</p></div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950"><p className={`text-2xl font-bold ${liveStatus.color}`}>{liveStatus.label}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Publishing Status</p></div>
+                  <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-emerald-900/40 dark:bg-zinc-950"><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{orders.length}</p><p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Orders</p></div>
                   <Link href={`/shop/${activeShopId}`} className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center shadow-sm transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40"><p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">View Shop</p><p className="mt-1 text-xs text-emerald-500 dark:text-emerald-400">Preview ↗</p></Link>
                 </div>
 
@@ -1219,7 +1213,7 @@ export default function DashboardPage() {
         {/* Orders Section */}
         {activeShopId && (
           <section>
-            <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">Order Inquiries ({orders.length})</h2>
+            <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">Order Inquiries ({orders.length})</h2>
             {ordersLoading && <div className="space-y-3">{Array.from({ length: 2 }).map((_, i) => (<div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"><div className="h-10 rounded bg-zinc-200 dark:bg-zinc-800" /></div>))}</div>}
             {!ordersLoading && orders.length === 0 && <p className="text-sm text-zinc-400 dark:text-zinc-500">No order inquiries yet.</p>}
             {!ordersLoading && orders.length > 0 && (
@@ -1409,7 +1403,7 @@ export default function DashboardPage() {
         {/* CSV Data Export */}
         {activeShopId && shop && (
           <section>
-            <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">Export Data</h2>
+            <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">Export Data</h2>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
