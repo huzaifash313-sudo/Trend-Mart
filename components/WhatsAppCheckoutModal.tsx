@@ -32,7 +32,7 @@ import type { OrderItem as OrderItemType, Shop } from "@/types";
 import { formatRupees } from "@/lib/formatters";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
-import { getDistanceToShop } from "@/services/geoRadiusService";
+import { getDistanceToShop, locationErrorMessage } from "@/services/geoRadiusService";
 import {
   normalizePhoneE164,
   isPhoneAlreadyVerified,
@@ -333,7 +333,7 @@ export default function WhatsAppCheckoutModal({
   accentHex = "#10b981",
 }: WhatsAppCheckoutModalProps) {
   const supabase = useMemo(() => createClient(), []);
-  const { location } = useLocation();
+  const { location, isDetecting, detectLocationDetailed } = useLocation();
 
   // ── State ───────────────────────────────────────────────────────────────
   const [step, setStep] = useState<"review" | "shipping" | "verify" | "confirm" | "success">("review");
@@ -343,7 +343,9 @@ export default function WhatsAppCheckoutModal({
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderRef, setOrderRef] = useState("");
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [useLiveLocation, setUseLiveLocation] = useState(false);
+  const [autofilledFromAccount, setAutofilledFromAccount] = useState(false);
+  const [locationFillError, setLocationFillError] = useState<string | null>(null);
+  const [locationFillBusy, setLocationFillBusy] = useState(false);
 
   // Mandatory phone OTP verification at checkout
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -488,6 +490,13 @@ export default function WhatsAppCheckoutModal({
     }
   }, [availableCoupons.length, shop.id]);
 
+  /** Best human-readable line from the header / map location context. */
+  const formatLocationAddress = useCallback((loc: typeof location): string => {
+    if (!loc) return "";
+    if (loc.address?.trim()) return loc.address.trim();
+    return [loc.deliveryZone, loc.city].filter(Boolean).join(", ");
+  }, []);
+
   // ── Auto-fill from saved delivery address + profile ────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -495,7 +504,10 @@ export default function WhatsAppCheckoutModal({
     async function loadProfile() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user || cancelled) return;
+        if (!user) {
+          if (!cancelled) setProfileLoaded(true);
+          return;
+        }
 
         const [{ data: profile }, { data: savedAddr }] = await Promise.all([
           supabase
@@ -520,22 +532,30 @@ export default function WhatsAppCheckoutModal({
               .join(", ")
           : "";
 
+        const nextName =
+          savedAddr?.full_name ||
+          profile?.full_name ||
+          user.user_metadata?.full_name ||
+          "";
+        const nextPhone =
+          savedAddr?.phone_number ||
+          profile?.phone ||
+          user.user_metadata?.phone ||
+          "";
+        const nextAddress = line || profile?.address || "";
+        const nextNotes = savedAddr?.delivery_notes || "";
+
         setShipping((prev) => ({
           ...prev,
-          customerName:
-            savedAddr?.full_name ||
-            profile?.full_name ||
-            user.user_metadata?.full_name ||
-            prev.customerName,
-          customerPhone:
-            savedAddr?.phone_number ||
-            profile?.phone ||
-            user.user_metadata?.phone ||
-            prev.customerPhone,
-          shippingAddress: line || profile?.address || prev.shippingAddress,
-          deliveryNotes: savedAddr?.delivery_notes || prev.deliveryNotes,
+          customerName: nextName || prev.customerName,
+          customerPhone: nextPhone || prev.customerPhone,
+          shippingAddress: nextAddress || prev.shippingAddress,
+          deliveryNotes: nextNotes || prev.deliveryNotes,
         }));
 
+        if (nextName || nextPhone || nextAddress) {
+          setAutofilledFromAccount(true);
+        }
         setProfileLoaded(true);
       } catch {
         if (!cancelled) setProfileLoaded(true);
@@ -546,19 +566,45 @@ export default function WhatsAppCheckoutModal({
     return () => { cancelled = true; };
   }, [supabase]);
 
-  // ── Pre-fill address from live location when toggled ──────────────────
-  const handleToggleLiveLocation = useCallback(() => {
-    setUseLiveLocation((prev) => {
-      const next = !prev;
-      if (next && location?.address) {
-        setShipping((s) => ({
-          ...s,
-          shippingAddress: location.address ?? s.shippingAddress,
-        }));
-      }
-      return next;
+  // If account had no saved address, fall back to header map location (still editable).
+  useEffect(() => {
+    if (!profileLoaded) return;
+    const fromLoc = formatLocationAddress(location);
+    if (!fromLoc) return;
+    setShipping((prev) => {
+      if (prev.shippingAddress.trim()) return prev;
+      return { ...prev, shippingAddress: fromLoc };
     });
-  }, [location]);
+  }, [profileLoaded, location, formatLocationAddress]);
+
+  // ── Use my precise location (GPS → reverse-geocode → fill address) ────
+  const handleUsePreciseLocation = useCallback(async () => {
+    setLocationFillError(null);
+    setLocationFillBusy(true);
+    try {
+      const result = await detectLocationDetailed();
+      if (!result.location) {
+        setLocationFillError(locationErrorMessage(result.error));
+        return;
+      }
+
+      const line = formatLocationAddress(result.location);
+      if (!line) {
+        setLocationFillError("Location found, but no address text. Please type your street / area.");
+        return;
+      }
+
+      setShipping((s) => ({ ...s, shippingAddress: line }));
+      setErrors((e) => {
+        if (!e.shippingAddress) return e;
+        const next = { ...e };
+        delete next.shippingAddress;
+        return next;
+      });
+    } finally {
+      setLocationFillBusy(false);
+    }
+  }, [detectLocationDetailed, formatLocationAddress]);
 
   // Cleanup timer
   useEffect(() => {
@@ -1067,6 +1113,15 @@ export default function WhatsAppCheckoutModal({
         {step === "shipping" && (
           <form onSubmit={handleShippingSubmit}>
             <div className="space-y-4 px-6 py-5">
+              {autofilledFromAccount && (
+                <div className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-xs text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                  <InfoIcon />
+                  <span>
+                    Filled from your saved account details — you can edit anything before continuing.
+                  </span>
+                </div>
+              )}
+
               {/* Name */}
               <div>
                 <label htmlFor="wc-customer-name" className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Full Name *</label>
@@ -1074,8 +1129,12 @@ export default function WhatsAppCheckoutModal({
                   id="wc-customer-name"
                   type="text"
                   required
+                  autoComplete="name"
                   value={shipping.customerName}
-                  onChange={(e) => setShipping(s => ({ ...s, customerName: e.target.value }))}
+                  onChange={(e) => {
+                    setAutofilledFromAccount(false);
+                    setShipping(s => ({ ...s, customerName: e.target.value }));
+                  }}
                   placeholder="Ahmed Khan"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerName
@@ -1093,8 +1152,12 @@ export default function WhatsAppCheckoutModal({
                   id="wc-customer-phone"
                   type="tel"
                   required
+                  autoComplete="tel"
                   value={shipping.customerPhone}
-                  onChange={(e) => setShipping(s => ({ ...s, customerPhone: e.target.value }))}
+                  onChange={(e) => {
+                    setAutofilledFromAccount(false);
+                    setShipping(s => ({ ...s, customerPhone: e.target.value }));
+                  }}
                   placeholder="+92 300 1234567"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerPhone
@@ -1103,18 +1166,44 @@ export default function WhatsAppCheckoutModal({
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
                 {errors.customerPhone && <p className="mt-1 text-xs text-red-500">{errors.customerPhone}</p>}
+                <p className="mt-1 text-[0.65rem] text-zinc-400">
+                  Unverified numbers go to a quick SMS check on the next step.
+                </p>
               </div>
 
               {/* Address */}
               <div>
-                <label htmlFor="wc-shipping-address" className="mb-1 flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                  <MapPinIcon /> Delivery Address <span className="font-normal text-zinc-400">(optional)</span>
-                </label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label htmlFor="wc-shipping-address" className="flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    <MapPinIcon /> Delivery Address <span className="font-normal text-zinc-400">(optional)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleUsePreciseLocation}
+                    disabled={locationFillBusy || isDetecting}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+                  >
+                    {(locationFillBusy || isDetecting) ? (
+                      <>
+                        <SpinnerIcon /> Detecting…
+                      </>
+                    ) : (
+                      <>
+                        <MapPinIcon /> Use my precise location
+                      </>
+                    )}
+                  </button>
+                </div>
                 <input
                   id="wc-shipping-address"
                   type="text"
+                  autoComplete="street-address"
                   value={shipping.shippingAddress}
-                  onChange={(e) => setShipping(s => ({ ...s, shippingAddress: e.target.value }))}
+                  onChange={(e) => {
+                    setAutofilledFromAccount(false);
+                    setLocationFillError(null);
+                    setShipping(s => ({ ...s, shippingAddress: e.target.value }));
+                  }}
                   placeholder="House 123, Street 4, Gulberg, Lahore"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.shippingAddress
@@ -1123,6 +1212,14 @@ export default function WhatsAppCheckoutModal({
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
                 {errors.shippingAddress && <p className="mt-1 text-xs text-red-500">{errors.shippingAddress}</p>}
+                {locationFillError && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{locationFillError}</p>
+                )}
+                {!locationFillError && (
+                  <p className="mt-1 text-[0.65rem] text-zinc-400">
+                    Autofill from account / map pin, or tap precise location — always editable.
+                  </p>
+                )}
               </div>
 
               {/* Notes */}
