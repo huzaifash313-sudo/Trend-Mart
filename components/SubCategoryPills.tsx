@@ -59,22 +59,15 @@ export default function SubCategoryPills({
 
   // When filtering by inventory, drop empty lists (no products tagged yet)
   if (!loading && availableIds && visible.length === 0) return null;
+  if (!loading && visible.length === 0) return null;
 
-  const chips = visible.filter((s) => !s.is_others);
-  const showList = chips.length > 0 || loading;
-
-  if (!loading && !showList) return null;
+  const chips = [
+    ...visible.filter((s) => !s.is_others),
+    ...visible.filter((s) => s.is_others),
+  ];
 
   return (
     <section className={className} aria-label={label}>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-          {label}
-        </p>
-        {loading && (
-          <span className="text-[0.6rem] text-zinc-400 animate-pulse">Loading…</span>
-        )}
-      </div>
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-none">
         <button
           type="button"
@@ -90,6 +83,7 @@ export default function SubCategoryPills({
         </button>
         {chips.map((sub) => {
           const active = selectedId === sub.id;
+          const labelText = sub.is_others ? "Others" : sub.name;
           return (
             <button
               key={sub.id}
@@ -103,10 +97,15 @@ export default function SubCategoryPills({
               aria-pressed={active}
             >
               {sub.icon ? <span className="mr-1" aria-hidden="true">{sub.icon}</span> : null}
-              {sub.name}
+              {labelText}
             </button>
           );
         })}
+        {loading && (
+          <span className="chip shrink-0 self-center text-[0.6rem] text-zinc-400 animate-pulse">
+            Loading…
+          </span>
+        )}
       </div>
     </section>
   );

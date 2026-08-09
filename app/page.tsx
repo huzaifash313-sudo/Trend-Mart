@@ -18,7 +18,6 @@ import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilt
 import { filterShopsByProximity, formatDistance } from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
-import CategoryGrid from "@/components/CategoryGrid";
 import PromoAdsCarousel from "@/components/PromoAdsCarousel";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
@@ -315,15 +314,6 @@ function HomeInner() {
 
       {/* ── Sponsored / Promotional Ads Carousel ───────────────────── */}
       <PromoAdsCarousel placement="homepage_top" />
-
-      {/* ── Visual Category Grid ──────────────────────────────────── */}
-      {categoryCounts.length > 0 && (
-        <CategoryGrid
-          categories={categoryCounts}
-          maxItems={12}
-          onCategoryClick={(cat) => handleCategoryChange(cat as ShopCategory)}
-        />
-      )}
 
       {/* ── Geo-Radius Filter ─────────────────────────────────────── */}
       <section className="flex items-center gap-2 flex-wrap">
