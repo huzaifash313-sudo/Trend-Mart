@@ -113,7 +113,8 @@ export default function ShopMediaHeader({
 
   const frameClass = isHero
     ? "relative h-36 w-full sm:h-44 md:h-48 lg:h-52"
-    : "relative aspect-[16/10] w-full sm:aspect-[16/9]";
+    : // Fixed banner height across every card column — no aspect-ratio jitter
+      "relative h-[6.75rem] w-full sm:h-[7.5rem]";
 
   const logoBoxClass = isHero
     ? "absolute -bottom-7 left-3 z-10 h-14 w-14 sm:-bottom-8 sm:left-4 sm:h-[4.5rem] sm:w-[4.5rem]"
@@ -125,7 +126,7 @@ export default function ShopMediaHeader({
         className={`${frameClass} overflow-hidden ${
           showBanner
             ? "bg-zinc-100 dark:bg-zinc-800"
-            : "bg-[linear-gradient(145deg,#ecfdf5_0%,#d1fae5_45%,#a7f3d0_100%)] dark:bg-[linear-gradient(145deg,#064e3b_0%,#065f46_50%,#047857_100%)]"
+            : "bg-[linear-gradient(135deg,#f4f4f5_0%,#e4e4e7_40%,#d1fae5_100%)] dark:bg-[linear-gradient(135deg,#27272a_0%,#18181b_45%,#064e3b_100%)]"
         }`}
       >
         {showBanner ? (
@@ -154,20 +155,24 @@ export default function ShopMediaHeader({
             />
           )
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-3 text-center">
+          /* Uniform styled placeholder — same geometry as image banners */
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            aria-hidden="true"
+          >
+            <div className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-20"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 20% 30%, rgba(16,185,129,0.35) 0%, transparent 42%), radial-gradient(circle at 80% 70%, rgba(16,185,129,0.22) 0%, transparent 45%)",
+              }}
+            />
             <span
-              className={`flex items-center justify-center rounded-2xl bg-white/55 font-semibold text-emerald-800 shadow-sm backdrop-blur-sm dark:bg-black/25 dark:text-emerald-100 ${
-                isHero ? "h-16 w-16 text-2xl" : "h-11 w-11 text-lg sm:h-12 sm:w-12"
+              className={`relative z-[1] flex items-center justify-center rounded-2xl border border-white/60 bg-white/70 font-semibold text-emerald-800 shadow-sm backdrop-blur-[2px] dark:border-white/10 dark:bg-black/30 dark:text-emerald-100 ${
+                isHero ? "h-16 w-16 text-2xl" : "h-10 w-10 text-base sm:h-11 sm:w-11 sm:text-lg"
               }`}
-              aria-hidden="true"
             >
               {initial}
             </span>
-            {!isHero && (
-              <span className="tm-title-ellipsis max-w-full text-[0.65rem] font-medium text-emerald-900/70 dark:text-emerald-50/80">
-                {shopName}
-              </span>
-            )}
           </div>
         )}
         {children}
