@@ -7,6 +7,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
+import { normalizePkPhoneDigits } from "@/lib/sanitization";
 import type { Order, OrderStatus } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -195,7 +196,8 @@ export async function trackOrdersByPhone(
   phone: string,
 ): Promise<ServiceResult<TrackingResult>> {
   const supabase = createClient();
-  const cleaned = phone.replace(/\D/g, "");
+  const cleaned =
+    normalizePkPhoneDigits(phone) || phone.replace(/\D/g, "");
 
   if (cleaned.length < 10) {
     return {
@@ -246,6 +248,15 @@ export async function trackOrderById(
 
   if (!trimmed) {
     return { success: false, error: "Please enter a valid order reference ID." };
+  }
+
+  const uuidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRe.test(trimmed)) {
+    return {
+      success: false,
+      error: "Please enter a valid order reference ID.",
+    };
   }
 
   try {

@@ -40,6 +40,7 @@ import {
   sendCheckoutPhoneOtp,
   verifyCheckoutPhoneOtp,
 } from "@/services/authService";
+import { toWhatsAppDigits, normalizePkPhoneDigits } from "@/lib/sanitization";
 import Link from "next/link";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -413,7 +414,7 @@ export default function WhatsAppCheckoutModal({
     [subtotal, discountAmount, deliveryFee],
   );
 
-  const phone = shop.whatsapp_number?.replace(/\D/g, "") ?? "";
+  const phone = toWhatsAppDigits(shop.whatsapp_number ?? "");
 
   // Accent class names
   const accentBg = `bg-${accentColor}-600`;
@@ -784,19 +785,26 @@ export default function WhatsAppCheckoutModal({
     setOrderError(null);
 
     try {
-      // 1. Persist order to Supabase
+      // 1. Persist order to Supabase (unit price + qty — stock deducts correctly)
       const orderItems: OrderItemType[] = items.map(item => ({
         product_id: item.productId,
         name: item.name,
-        price: item.price * (quantities[item.id] ?? item.quantity),
+        price: item.price,
+        quantity: quantities[item.id] ?? item.quantity,
         variant: item.variant,
       }));
 
       const orderResult = await createOrder({
         shopId: shop.id,
         customerName: shipping.customerName.trim(),
-        customerPhone: shipping.customerPhone.replace(/\D/g, ""),
+        customerPhone:
+          normalizePkPhoneDigits(shipping.customerPhone) ||
+          shipping.customerPhone.replace(/\D/g, ""),
         items: orderItems,
+        discountAmount,
+        deliveryFee,
+        notes: shipping.deliveryNotes,
+        couponCode: couponResult?.valid ? couponCode : undefined,
       });
 
       if (!orderResult.success) {

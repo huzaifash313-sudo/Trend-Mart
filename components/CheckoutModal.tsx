@@ -26,6 +26,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createOrder } from "@/services/orderService";
 import { validateCoupon, fetchCouponsByShopId } from "@/services/couponService";
 import type { OrderItem as OrderItemType, Shop } from "@/types";
+import { toWhatsAppDigits, normalizePkPhoneDigits } from "@/lib/sanitization";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -238,7 +239,7 @@ export default function CheckoutModal({
 
   const grandTotal = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
-  const phone = shop.whatsapp_number?.replace(/\D/g, "") ?? "";
+  const phone = toWhatsAppDigits(shop.whatsapp_number ?? "");
 
   // ── Quantity Handlers ───────────────────────────────────────────────────
   const updateQuantity = useCallback((itemId: string, delta: number) => {
@@ -345,19 +346,23 @@ export default function CheckoutModal({
     setOrderError(null);
 
     try {
-      // 1. Persist order to Supabase
+      // 1. Persist order to Supabase (unit price + qty)
       const orderItems: OrderItemType[] = items.map(item => ({
         product_id: item.productId,
         name: item.name,
-        price: item.price * (quantities[item.id] ?? item.quantity),
+        price: item.price,
+        quantity: quantities[item.id] ?? item.quantity,
         variant: item.variant,
       }));
 
       const orderResult = await createOrder({
         shopId: shop.id,
         customerName: shipping.customerName.trim(),
-        customerPhone: shipping.customerPhone.replace(/\D/g, ""),
+        customerPhone:
+          normalizePkPhoneDigits(shipping.customerPhone) ||
+          shipping.customerPhone.replace(/\D/g, ""),
         items: orderItems,
+        discountAmount,
       });
 
       if (!orderResult.success) {

@@ -324,7 +324,10 @@ export interface OrderItem {
   /** Optional product ID */
   product_id?: string;
   name: string;
+  /** Unit price (PKR). Line total = price × quantity when quantity is set. */
   price: number;
+  /** Quantity ordered (defaults to 1 when omitted). */
+  quantity?: number;
   /** Selected variant label (e.g. "Size: M", "Color: Red") if applicable */
   variant?: string;
 }

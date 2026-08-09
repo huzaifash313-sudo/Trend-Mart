@@ -170,14 +170,49 @@ export function sanitizePhone(input: string): string {
 }
 
 /**
+ * Normalize a Pakistani (or already-international) mobile to digits for
+ * storage / WhatsApp (`wa.me`), without a leading +.
+ * Examples: 03001234567 → 923001234567, 3001234567 → 923001234567
+ */
+export function normalizePkPhoneDigits(
+  input: string,
+  defaultCountryCode = "92",
+): string {
+  if (!input || typeof input !== "string") return "";
+  let digits = input.replace(/\D/g, "");
+  if (!digits) return "";
+
+  if (digits.startsWith("0") && digits.length >= 10) {
+    digits = `${defaultCountryCode}${digits.slice(1)}`;
+  } else if (
+    digits.length === 10 &&
+    digits.startsWith("3") &&
+    !digits.startsWith(defaultCountryCode)
+  ) {
+    digits = `${defaultCountryCode}${digits}`;
+  }
+
+  if (digits.length < 10 || digits.length > 15) return "";
+  return digits;
+}
+
+/**
+ * Digits suitable for `https://wa.me/{digits}` links.
+ */
+export function toWhatsAppDigits(input: string): string {
+  return normalizePkPhoneDigits(input);
+}
+
+/**
  * Validates and sanitizes a phone number for storage.
- * Returns the sanitized phone or empty string if invalid.
+ * Returns digits (or +digits when input used international + form).
  */
 export function sanitizeAndValidatePhone(input: string): string {
-  const cleaned = sanitizePhone(input);
-  // Must have between 10 and 15 digits (with or without country code)
-  if (cleaned.length < 10 || cleaned.length > 15) return "";
-  return cleaned;
+  if (!input || typeof input !== "string") return "";
+  const hasPlus = input.trim().startsWith("+");
+  const digits = normalizePkPhoneDigits(input);
+  if (!digits) return "";
+  return hasPlus ? `+${digits}` : digits;
 }
 
 // ─── Category / Enum Validation ────────────────────────────────────────────

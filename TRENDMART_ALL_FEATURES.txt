@@ -1,0 +1,503 @@
+================================================================================
+  TRENDMART — COMPLETE PROJECT FEATURES DOCUMENT
+  Hyper-Local Multi-Vendor Marketplace & WhatsApp Ordering System
+================================================================================
+  File type     : Project features inventory (.txt)
+  Generated for : TrendMart codebase (as implemented in the app)
+  Live site     : https://trend-marts.vercel.app
+  Stack         : Next.js 16 · React 19 · TypeScript · Supabase · Tailwind CSS 4
+================================================================================
+
+
+--------------------------------------------------------------------------------
+1. PLATFORM OVERVIEW
+--------------------------------------------------------------------------------
+
+TrendMart ek hyper-local multi-vendor marketplace hai jahan:
+  • Customers nearby shops browse karte hain aur WhatsApp par order bhejte hain.
+  • Merchants apni dukaan, products, delivery area, aur orders manage karte hain.
+  • Super-Admin platform ko approve/moderate/analytics se control karta hai.
+
+Guest users bina signup ke browse kar sakte hain. Checkout / order pe authentication
+aur phone verification apply hota hai.
+
+
+--------------------------------------------------------------------------------
+2. USER ROLES & ACCESS
+--------------------------------------------------------------------------------
+
+2.1 Guest (Bina login)
+  • Homepage, search, shop pages, categories, products freely browse
+  • Cart localStorage mein save (items add/remove)
+  • Wishlist (local), FAQ, legal pages, support form
+  • Signup/login ke baghair checkout pe phone OTP flow
+
+2.2 Customer
+  • Email + password signup/login
+  • Email verification (OTP / confirmation link)
+  • Account portal: profile, addresses, orders, wishlist, settings
+  • Checkout pe phone OTP (pehli dafa; baad mein skip ho sakta hai)
+  • "Become a Merchant" se merchant ban sakte hain
+
+2.3 Merchant
+  • Separate merchant signup role YA customer → become-merchant form
+  • Store create (name, category, city/location, WhatsApp, logo, banner)
+  • Full merchant dashboard (products, orders, settings, analytics, etc.)
+  • Store live/hide toggle (is_live)
+
+2.4 Super-Admin
+  • /admin/* routes
+  • Merchant approve/reject/suspend
+  • Platform metrics, categories, promo ads review
+  • Support tickets, audit logs
+
+Role resolution: user_roles table + JWT metadata + shop ownership fallback
+(middleware + authService).
+
+
+--------------------------------------------------------------------------------
+3. AUTHENTICATION & SECURITY
+--------------------------------------------------------------------------------
+
+3.1 Signup / Login
+  • Email + password
+  • Role choose: Customer ya Merchant
+  • Terms & Privacy checkbox (mandatory)
+  • Routes: /signup, /login, /auth/*
+
+3.2 Email Verification
+  • Confirmation email + OTP modal
+  • Resend verification
+  • Unverified users → /auth/verify-notice
+  • Callback: /auth/callback (production URL use hota hai, localhost nahi)
+
+3.3 Phone OTP (Checkout)
+  • Order place karte waqt phone verify
+  • Pakistan numbers (+92) normalize
+  • Agar Supabase SMS provider na ho to graceful degrade (order block nahi)
+
+3.4 Security
+  • Middleware route protection (role-based)
+  • Rate limiting (Redis/Upstash optional, memory fallback)
+  • Security headers + CSP
+  • Environment variable security audit on build
+  • RLS policies on Supabase tables
+
+
+--------------------------------------------------------------------------------
+4. HOMEPAGE & STOREFRONT DISCOVERY
+--------------------------------------------------------------------------------
+
+Route: /
+
+4.1 Categories
+  • Horizontal swipeable category pills (mobile-friendly)
+  • Category grid / filter by category
+
+4.2 Search
+  • Global search bar
+  • Dedicated /search page — shops + products
+  • Autocomplete, relevance scoring, sort (including popularity)
+  • (Note: kuch trending suggestions placeholder hain)
+
+4.3 Stories
+  • Homepage stories tray
+  • Merchants stories create kar sakte hain
+  • Stories viewer component
+
+4.4 Sponsored / Promo Ads
+  • Homepage top carousel (PromoAdsCarousel)
+  • Merchant ad request → Admin approve → public show
+
+4.5 Shop Cards
+  • Logo beside shop name, banner, category, location
+  • Favorite/wishlist toggle
+  • Responsive grid: mobile 2-col → tablet 3 → desktop 4/5
+
+4.6 Location & Distance
+  • Customer location (GPS ya city select)
+  • Geo radius filter: 5 / 10 / 20 / 50 km / Any
+  • Haversine distance — shops proximity sort
+  • Merchant service radius / city / nationwide enforce
+
+
+--------------------------------------------------------------------------------
+5. MERCHANT DELIVERY / SERVICE AREA (GEO)
+--------------------------------------------------------------------------------
+
+UI: ShopLocationRadiusPicker (Dashboard Settings + Become Merchant + Dashboard form)
+
+5.1 Store Pin
+  • "Use My Current Location" — browser GPS
+  • Reverse geocode (OpenStreetMap Nominatim)
+  • Exact / nearby address → address_display + City/Area field auto-fill
+  • Lat/Lng store hota hai
+
+5.2 Coverage Modes
+  • Custom Radius — presets (3, 5, 10, 15, 20, 50, 100 km) + custom 1–500 km
+  • Specific City — sirf selected city ke customers ko dikhe
+  • All Pakistan — nationwide discovery (km limit nahi)
+
+5.3 Customer Side
+  • Homepage filter shops by distance + merchant coverage rules
+  • "Any" distance = no customer km cap (nationwide shops visible)
+
+
+--------------------------------------------------------------------------------
+6. SHOP PAGE (PUBLIC STOREFRONT)
+--------------------------------------------------------------------------------
+
+Route: /shop/[id]
+
+  • Banner + logo + shop name + category badge
+  • Bio, hours, operating status, social links
+  • Announcement marquee banner (agar text + toggle ON)
+  • Product grid (responsive), Quick View modal
+  • Markdown pricing: original price strikethrough + "% OFF" badge
+  • In stock / out of stock respect
+  • Add to cart, wishlist heart
+  • Reviews: submit + list + realtime updates
+  • "Chat with seller" / Contact modal → WhatsApp
+  • Floating WhatsApp button (Appearance toggle se ON/OFF)
+  • Service shops: booking modal, portfolio, availability
+  • View/click analytics hooks
+
+
+--------------------------------------------------------------------------------
+7. CART, CHECKOUT & WHATSAPP ORDERS
+--------------------------------------------------------------------------------
+
+7.1 Cart
+  • Multi-item cart (localStorage persistence)
+  • Sticky CartBar
+  • Per-shop grouping for WhatsApp order
+
+7.2 Smart Checkout (WhatsAppCheckoutModal)
+  • Customer name, phone, shipping address, notes
+  • Autofill from saved customer_addresses / profile
+  • Live location address option
+  • Coupon code validate
+  • Min order amount check
+  • Free delivery threshold
+  • Flat + per-km delivery fee calculation
+  • Phone OTP step (jab required ho)
+  • Formatted WhatsApp message → merchant number (wa.me)
+  • Order database mein save + status lifecycle
+
+7.3 Order Status Lifecycle
+  Pending → Processing → Dispatched → Delivered (ya Cancelled)
+
+
+--------------------------------------------------------------------------------
+8. CUSTOMER PORTAL
+--------------------------------------------------------------------------------
+
+8.1 Account Hub — /account
+  • Profile summary, verify badges
+  • Quick links: addresses, orders, wishlist, become merchant, settings
+  • Order stats (local/history based)
+
+8.2 Profile / Auth Settings — /auth/settings
+  • Display name
+  • Email change
+  • Password change (re-auth + confirm)
+
+8.3 Saved Addresses — /account/addresses
+  • Add / edit / delete
+  • Labels: Home / Office / Other
+  • Default address
+  • Pakistan phone validation
+  • Checkout autofill ke liye use
+
+8.4 Wishlist — /wishlist
+  • Shops wishlist + Products wishlist (tabs)
+  • Hybrid sync: localStorage ↔ Supabase (login pe migrate)
+
+8.5 Orders — /orders
+  • Phone se order lookup
+  • Status badges, shop context
+
+8.6 Live Order Tracking — /orders/tracking
+  • Order ID / phone lookup
+  • Milestone timeline UI
+  • Realtime status updates (Supabase realtime)
+
+8.7 Become a Merchant — /account/become-merchant
+  • Store name, category, city/area, WhatsApp
+  • Guidelines acceptance
+  • Location pin + delivery coverage picker
+  • Role claim + shop create → dashboard
+
+
+--------------------------------------------------------------------------------
+9. MERCHANT DASHBOARD
+--------------------------------------------------------------------------------
+
+Hub: /dashboard
+
+9.1 Shop Management
+  • Create / edit shop profile
+  • Name, category, location, WhatsApp, secondary phone
+  • Instagram / Facebook
+  • Business hours, operating status
+  • Store bio, announcement text
+  • Logo + banner upload (WebP compression → Supabase Storage)
+  • Store Visibility toggle (live / hidden)
+
+9.2 Products
+  • Fast product add: name, category, price, image
+  • Description, original_price (markdown discount)
+  • In Stock / Out of Stock toggle
+  • Dedicated products pages: /dashboard/products, /dashboard/products/new
+  • Sub-categories, multi-image, variants/SKU (advanced inventory)
+  • Bulk out-of-stock style operations
+
+9.3 Store Settings — /dashboard/settings
+  • Full branding + contact fields
+  • Delivery / service area (radius, city, nationwide)
+  • Delivery fees: min order, free threshold, flat fee, per-km fee
+  • Shop QR Code (square preview + high-res PNG download + copy link)
+  • Store visibility
+
+9.4 Orders (Dashboard)
+  • Incoming orders list
+  • Status transition (Pending → … → Delivered)
+  • Realtime subscriptions
+
+9.5 Coupons
+  • Create/manage discount codes (dashboard inline)
+
+9.6 Stories
+  • Create promotional stories for homepage tray
+
+9.7 Analytics — /dashboard/analytics
+  • Sales / views metrics
+  • Charts (Recharts)
+  • CSV export
+
+9.8 Leads — /dashboard/leads
+  • WhatsApp clicks / inquiries inbox
+
+9.9 Finances — /dashboard/finances
+  • Manual income / expense ledger
+
+9.10 Promo Ads — /dashboard/ads
+  • Request sponsored placement (admin approval ke baad live)
+
+9.11 Service Portfolio — /dashboard/services/portfolio
+  • Service-type shops ke liye portfolio manager
+
+9.12 QR Code
+  • Auto store URL: https://…/shop/{shopId}
+  • Print-ready PNG download with shop name
+
+
+--------------------------------------------------------------------------------
+10. SUPER-ADMIN PANEL
+--------------------------------------------------------------------------------
+
+Routes:
+  /admin/dashboard
+  /admin/support
+  /admin/audit-logs
+
+Features:
+  • Platform overview metrics (merchants, orders, revenue, pending)
+  • Merchant approval / rejection / suspend (is_live)
+  • Merchants list + moderation
+  • Transactions feed (realtime)
+  • Global categories / sub-categories management
+  • Promo ads review, create, sort order
+  • Support ticket inbox + status
+  • Admin audit logs viewer
+  • Merchant approval email hook (Resend, agar API key set ho)
+
+
+--------------------------------------------------------------------------------
+11. APPEARANCE, THEME & PREFERENCES
+--------------------------------------------------------------------------------
+
+11.1 Appearance — /settings/appearance
+  • Light / Dark theme toggle (black + emerald accents in dark)
+  • Font size slider — REAL-TIME (poori app pe apply)
+  • Merchant: Announcement banner ON/OFF (storefront)
+  • Merchant: WhatsApp float button ON/OFF (storefront)
+  • Custom color pickers / custom grid layouts HATA diye — accent constant emerald
+
+11.2 Settings Hub — /settings
+  • Appearance
+  • Notifications preferences
+  • Privacy & Security
+  • Links to dashboard / store settings / wishlist
+
+11.3 Notifications — /settings/notifications
+  • Toggles: order updates, new products, promotions, merchant alerts, newsletter
+  • Currently localStorage preferences (push/email wiring config-dependent)
+
+11.4 Privacy — /settings/privacy
+  • Clear local cache
+  • 2FA / View My Data — Coming Soon markers
+
+11.5 Language
+  • English / Urdu context + RTL support (LanguageContext)
+
+
+--------------------------------------------------------------------------------
+12. PWA (PROGRESSIVE WEB APP)
+--------------------------------------------------------------------------------
+
+  • Web App Manifest (/manifest.webmanifest)
+  • Service Worker (public/sw.js) — shell + runtime cache
+  • Offline fallback page (/offline)
+  • Add to Home Screen support (mobile browsers)
+  • PwaRegister component
+
+
+--------------------------------------------------------------------------------
+13. LEGAL, FAQ & SUPPORT
+--------------------------------------------------------------------------------
+
+Legal pages:
+  • /legal/terms              — Terms & Conditions
+  • /legal/privacy            — Privacy Policy
+  • /legal/refund-policy      — Refund / Order policy
+  • /legal/merchant-guidelines — Merchant security / guidelines
+
+Help:
+  • /faq     — Customer FAQs + merchant onboarding guide
+  • /support — Contact / ticket form → support tickets DB + notify API
+
+Footer links in app.
+
+
+--------------------------------------------------------------------------------
+14. MEDIA & STORAGE
+--------------------------------------------------------------------------------
+
+  • Image upload component (logo, banner, products)
+  • Client-side compression + WebP conversion
+  • Storage: Supabase Storage (Cloudinary docs mein mention ho sakta hai,
+    code pipeline Supabase use karti hai)
+  • Optimized for free-tier friendly file sizes
+
+
+--------------------------------------------------------------------------------
+15. TECHNICAL FEATURES (BACKEND / INFRA)
+--------------------------------------------------------------------------------
+
+  • Next.js App Router (SSR/CSR hybrid)
+  • Supabase Auth, Postgres, Storage, Realtime, RLS
+  • Zod validation (typeGuards)
+  • Resend email helper (branded emails jab RESEND_API_KEY set ho)
+  • Optional Sentry / telemetry hooks
+  • Optional Upstash Redis rate limiting
+  • Env security audit at build
+  • Jest + Testing Library
+  • PDF helpers (jspdf) for invoices (service layer)
+  • AI chat API route (/api/chat) — shop-context assistant (key dependent)
+  • SEO: metadata, sitemap, robots, schema helpers
+
+
+--------------------------------------------------------------------------------
+16. IMPORTANT ROUTES MAP
+--------------------------------------------------------------------------------
+
+PUBLIC
+  /                              Homepage
+  /search                        Global search
+  /shop/[id]                     Shop storefront
+  /login  /signup                Auth
+  /faq  /support  /offline
+  /legal/*
+
+CUSTOMER
+  /account
+  /account/addresses
+  /account/become-merchant
+  /orders
+  /orders/tracking
+  /wishlist
+  /settings
+  /settings/appearance
+  /settings/notifications
+  /settings/privacy
+  /auth/settings
+  /auth/verify-notice
+  /auth/callback
+
+MERCHANT
+  /dashboard
+  /dashboard/products
+  /dashboard/products/new
+  /dashboard/settings
+  /dashboard/analytics
+  /dashboard/leads
+  /dashboard/finances
+  /dashboard/ads
+  /dashboard/services/portfolio
+
+ADMIN
+  /admin/dashboard
+  /admin/support
+  /admin/audit-logs
+
+
+--------------------------------------------------------------------------------
+17. HALF-WIRED / CONFIG-DEPENDENT / FUTURE NOTES
+--------------------------------------------------------------------------------
+
+Yeh cheezen code mein hain lekin poori production polish / external config chahiye:
+
+  • Phone SMS OTP — Supabase Phone + Twilio/etc. chahiye; warna degrade
+  • Resend branded emails — RESEND_API_KEY + domain verify
+  • Notification preferences — UI hai; real push/email wiring limited
+  • Search "trending" — kuch placeholders / static maps
+  • Privacy 2FA + View My Data — Coming Soon
+  • Subscription tiers service — backend-ready, UI pages limited/unwired
+  • ChatWidget — component/API maujood, har shop pe mount nahi
+  • Merchant approval queue — Admin UI hai; current create flow auto-approve lean
+  • Currency multi-support service — primary UX PKR
+
+Production ke liye zaruri env (examples):
+  NEXT_PUBLIC_SUPABASE_URL
+  NEXT_PUBLIC_SUPABASE_ANON_KEY
+  NEXT_PUBLIC_SITE_URL=https://trend-marts.vercel.app
+  NEXT_PUBLIC_APP_URL=https://trend-marts.vercel.app
+  (optional) RESEND_API_KEY, UPSTASH_REDIS_*, SENTRY_*
+
+
+--------------------------------------------------------------------------------
+18. FEATURE SUMMARY (QUICK CHECKLIST)
+--------------------------------------------------------------------------------
+
+[x] Guest browsing
+[x] Customer / Merchant / Admin roles
+[x] Email signup + login + verification
+[x] Phone OTP at checkout (config-dependent SMS)
+[x] Homepage categories, search, stories, promo ads
+[x] Geo location + distance filter
+[x] Merchant pin + reverse geocode address
+[x] Coverage: radius / city / all Pakistan
+[x] Shop storefront + products + reviews
+[x] Markdown / % OFF pricing
+[x] Cart + WhatsApp checkout + delivery slabs
+[x] Addresses + autofill
+[x] Wishlist (shops + products)
+[x] Orders list + live tracking
+[x] Become a merchant form
+[x] Merchant dashboard (products, orders, settings)
+[x] QR code generate + download
+[x] Analytics, leads, finances, ads requests
+[x] Admin panel (merchants, ads, categories, support, audit)
+[x] Dark / Light theme + live font scale
+[x] Announcement banner + WhatsApp float toggles
+[x] PWA + offline page
+[x] Legal pages + FAQ + Support tickets
+[x] Image WebP upload (Supabase Storage)
+[x] EN/UR language context
+
+
+================================================================================
+  END OF DOCUMENT — TrendMart Features Inventory
+  Is file ko project root par rakha gaya hai: TRENDMART_ALL_FEATURES.txt
+================================================================================

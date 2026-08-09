@@ -537,6 +537,7 @@ export default function AdminDashboardPage() {
       const result = await deleteShop(shopId);
       if (!result.success) throw new Error(result.error);
 
+      const deleted = state.merchants.find((m) => m.shop_id === shopId);
       setState((s) => ({
         ...s,
         merchants: s.merchants.filter((m) => m.shop_id !== shopId),
@@ -544,12 +545,24 @@ export default function AdminDashboardPage() {
           ? {
               ...s.metrics,
               total_merchants: Math.max(0, s.metrics.total_merchants - 1),
-              active_merchants: state.merchants.find((m) => m.shop_id === shopId)?.is_live
+              active_merchants: deleted?.is_live
                 ? Math.max(0, s.metrics.active_merchants - 1)
                 : s.metrics.active_merchants,
-              suspended_merchants: !state.merchants.find((m) => m.shop_id === shopId)?.is_live
+              suspended_merchants: deleted && !deleted.is_live
                 ? Math.max(0, s.metrics.suspended_merchants - 1)
                 : s.metrics.suspended_merchants,
+              pending_verifications:
+                deleted?.verification_status === "pending"
+                  ? Math.max(0, s.metrics.pending_verifications - 1)
+                  : s.metrics.pending_verifications,
+              total_orders: Math.max(
+                0,
+                s.metrics.total_orders - (deleted?.order_count ?? 0),
+              ),
+              total_revenue: Math.max(
+                0,
+                s.metrics.total_revenue - (deleted?.total_revenue ?? 0),
+              ),
             }
           : null,
       }));

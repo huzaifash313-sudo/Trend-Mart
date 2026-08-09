@@ -188,11 +188,27 @@ CREATE POLICY "shops_owner_delete"
   ON public.shops FOR DELETE
   USING (auth.uid() = owner_id);
 
--- 3.4 Re-affirm merchant role promotion trigger. `public.shops` was dropped
--- and recreated by fresh_consolidated, which silently deleted this trigger
--- (triggers are bound to the table, unlike functions). Recreating it is a
--- defense-in-depth safety net alongside the explicit claimSignupRole() call
--- already made by the become-merchant flow.
+-- 3.4 Re-affirm merchant role promotion. fresh_consolidated wiped the
+-- function + trigger; recreate both so this migration never fails mid-way.
+CREATE OR REPLACE FUNCTION public.promote_to_merchant()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.owner_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (NEW.owner_id, 'merchant')
+  ON CONFLICT (user_id)
+  DO UPDATE SET role = 'merchant', updated_at = now()
+  WHERE public.user_roles.role = 'customer';
+  RETURN NEW;
+END;
+$$;
+
 DROP TRIGGER IF EXISTS after_shop_created ON public.shops;
 CREATE TRIGGER after_shop_created
   AFTER INSERT ON public.shops
@@ -211,6 +227,12 @@ CREATE POLICY "products_admin_all"
 -- =============================================================================
 -- SECTION 5: ORDERS — close the anonymous full-table-read PII leak
 -- =============================================================================
+
+-- Ensure columns referenced by tracking RPCs exist on older schemas.
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS tracking_number text,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS notes text;
 
 -- Drop every known-bad/legacy SELECT policy name for this table.
 DROP POLICY IF EXISTS "orders_public_select" ON public.orders;
@@ -274,14 +296,34 @@ STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+  WITH normalized AS (
+    SELECT CASE
+      WHEN length(regexp_replace(p_phone, '\D', '', 'g')) >= 11
+           AND left(regexp_replace(p_phone, '\D', '', 'g'), 1) = '0'
+        THEN '92' || substr(regexp_replace(p_phone, '\D', '', 'g'), 2)
+      WHEN length(regexp_replace(p_phone, '\D', '', 'g')) = 10
+           AND left(regexp_replace(p_phone, '\D', '', 'g'), 1) = '3'
+        THEN '92' || regexp_replace(p_phone, '\D', '', 'g')
+      ELSE regexp_replace(p_phone, '\D', '', 'g')
+    END AS digits
+  )
   SELECT
     o.id, o.shop_id, s.name AS shop_name, o.customer_name, o.customer_phone,
     o.items_json, o.total_amount, o.status, o.tracking_number,
     o.created_at, o.updated_at
   FROM public.orders o
   JOIN public.shops s ON s.id = o.shop_id
-  WHERE length(regexp_replace(p_phone, '\D', '', 'g')) >= 10
-    AND o.customer_phone ILIKE '%' || regexp_replace(p_phone, '\D', '', 'g') || '%'
+  CROSS JOIN normalized n
+  WHERE length(n.digits) >= 10
+    AND (
+      regexp_replace(o.customer_phone, '\D', '', 'g') LIKE '%' || n.digits || '%'
+      OR regexp_replace(o.customer_phone, '\D', '', 'g') LIKE '%' || right(n.digits, 10) || '%'
+      OR (
+        left(regexp_replace(o.customer_phone, '\D', '', 'g'), 1) = '0'
+        AND ('92' || substr(regexp_replace(o.customer_phone, '\D', '', 'g'), 2))
+            LIKE '%' || n.digits || '%'
+      )
+    )
   ORDER BY o.created_at DESC
   LIMIT 50;
 $$;

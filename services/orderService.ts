@@ -5,6 +5,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
+import { normalizePkPhoneDigits } from "@/lib/sanitization";
 import type { Order, OrderItem, ProductVariant, VariantGroup } from "@/types";
 
 type ServiceResult<T> =
@@ -48,6 +49,8 @@ export interface PlaceOrderParams {
   couponCode?: string;
   /** Discount amount applied in PKR. */
   discountAmount?: number;
+  /** Delivery fee applied in PKR (0 = free). */
+  deliveryFee?: number;
   /** Customer delivery notes. */
   notes?: string;
 }
@@ -311,6 +314,8 @@ export async function placeOrderAtomic(
       const productUpdates: Array<{
         id: string;
         variants: VariantGroup[];
+        /** Pre-deduction snapshot for rollback if order insert fails. */
+        previousVariants: VariantGroup[];
         currentVersion?: string;
       }> = [];
 
@@ -352,6 +357,7 @@ export async function placeOrderAtomic(
 
         const currentVariants: VariantGroup[] =
           (product.variants as VariantGroup[]) ?? [];
+        const previousVariants = cloneVariants(currentVariants);
         const updatedVariants = cloneVariants(currentVariants);
 
         let deductionFailed = false;
@@ -432,6 +438,7 @@ export async function placeOrderAtomic(
         productUpdates.push({
           id: productId,
           variants: updatedVariants,
+          previousVariants,
           currentVersion: (product as Record<string, unknown>)
             .updated_at as string | undefined,
         });
@@ -453,7 +460,9 @@ export async function placeOrderAtomic(
           query = query.eq("updated_at", update.currentVersion);
         }
 
-        const { error: updateError, count } = await query.select();
+        // Must select rows — without this, Supabase leaves `count` null and
+        // version-mismatch retries never fire (oversell race).
+        const { data: updatedRows, error: updateError } = await query.select("id");
 
         if (updateError) {
           throw new Error(
@@ -461,10 +470,8 @@ export async function placeOrderAtomic(
           );
         }
 
-        // If no rows updated (version mismatch), retry the entire transaction
-        if (count === 0 && update.currentVersion) {
+        if ((!updatedRows || updatedRows.length === 0) && update.currentVersion) {
           if (attempt < MAX_RETRIES) {
-            // Wait brief backoff before retry
             await new Promise((r) => setTimeout(r, attempt * 100));
             throw new Error("RETRY_VERSION_MISMATCH");
           }
@@ -482,24 +489,33 @@ export async function placeOrderAtomic(
         0,
       );
       const discount = params.discountAmount ?? 0;
-      const finalAmount = Math.max(0, totalAmount - discount);
+      const deliveryFee = params.deliveryFee ?? 0;
+      const finalAmount = Math.max(0, totalAmount - discount + deliveryFee);
 
       const orderItems: OrderItem[] = params.items.map((item) => ({
         product_id: item.productId,
         name: item.name,
-        price: item.price * (item.quantity ?? 1),
+        price: item.price,
+        quantity: item.quantity ?? 1,
         variant: item.variant,
       }));
+
+      const customerPhone =
+        normalizePkPhoneDigits(params.customerPhone) ||
+        params.customerPhone.replace(/\D/g, "");
 
       const orderPayload: Record<string, unknown> = {
         shop_id: params.shopId,
         customer_name: params.customerName.trim(),
-        customer_phone: params.customerPhone.replace(/\D/g, ""),
+        customer_phone: customerPhone,
         items_json: orderItems,
         total_amount: finalAmount,
         status: "Pending",
-        // Extended metadata stored in items_json or a dedicated jsonb column
       };
+
+      if (params.notes?.trim()) {
+        orderPayload.notes = params.notes.trim().slice(0, 500);
+      }
 
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
@@ -508,24 +524,12 @@ export async function placeOrderAtomic(
         .single();
 
       if (orderError) {
-        // ── Phase 5: Rollback stock on order failure ──────────────────
-        // Revert stock changes for all affected products
-        for (const [productId] of productGroups.entries()) {
-          const { data: originalProduct } = await supabase
+        // ── Phase 5: Rollback stock using pre-deduction snapshots ───────
+        for (const snap of productUpdates) {
+          await supabase
             .from("products")
-            .select("variants")
-            .eq("id", productId)
-            .single();
-
-          if (originalProduct) {
-            // Simply restore original variants (add back what we deducted)
-            const originalVariants: VariantGroup[] =
-              (originalProduct.variants as VariantGroup[]) ?? [];
-            await supabase
-              .from("products")
-              .update({ variants: originalVariants })
-              .eq("id", productId);
-          }
+            .update({ variants: snap.previousVariants })
+            .eq("id", snap.id);
         }
 
         throw new Error(
@@ -574,23 +578,31 @@ export async function placeOrderAtomic(
 /**
  * Create an order from a WhatsApp product click.
  * Accepts an array of line items to support multi-item orders.
- * (Preserved for backward compatibility — uses the atomic flow internally.)
+ * Pass **unit** price + quantity (do not pre-multiply line totals).
  */
 export async function createOrder(params: {
   shopId: string;
   customerName?: string;
   customerPhone?: string;
   items: OrderItem[];
+  discountAmount?: number;
+  deliveryFee?: number;
+  notes?: string;
+  couponCode?: string;
 }): Promise<ServiceResult<Order>> {
   const result = await placeOrderAtomic({
     shopId: params.shopId,
     customerName: params.customerName ?? "",
     customerPhone: params.customerPhone ?? "",
+    discountAmount: params.discountAmount,
+    deliveryFee: params.deliveryFee,
+    notes: params.notes,
+    couponCode: params.couponCode,
     items: params.items.map((item) => ({
       productId: item.product_id ?? "",
       name: item.name,
       price: item.price,
-      quantity: 1,
+      quantity: Math.max(1, Math.min(99, Math.round(item.quantity ?? 1))),
       variant: item.variant,
     })),
   });
@@ -668,7 +680,8 @@ export async function fetchOrdersByPhone(
   const supabase = createClient();
 
   try {
-    const cleaned = phone.replace(/\D/g, "");
+    const cleaned =
+      normalizePkPhoneDigits(phone) || phone.replace(/\D/g, "");
     const { data, error } = await supabase.rpc("track_orders_by_phone", {
       p_phone: cleaned,
     });

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Shop, Product, ShopFormData } from "@/types";
 import { logError, toServiceError } from "@/services/errorService";
 import { isValidLatitude, isValidLongitude } from "@/lib/geoCoords";
+import { normalizePkPhoneDigits } from "@/lib/sanitization";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -285,10 +286,7 @@ function sanitizeDbBoolean(input: unknown): boolean {
  */
 function sanitizeDbPhone(input: unknown): string {
   if (typeof input !== "string") return "";
-  const digits = input.replace(/\D/g, "");
-  // Valid Pakistani numbers: 10-13 digits (with/without country code)
-  if (digits.length < 10 || digits.length > 15) return "";
-  return digits;
+  return normalizePkPhoneDigits(input);
 }
 
 /**
