@@ -7,17 +7,20 @@
 /** A single shop card skeleton (used in grids). */
 export function ShopCardSkeleton() {
   return (
-    <div className="flex h-full min-h-[17.5rem] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 sm:min-h-[18.5rem]">
+    <div className="flex h-full min-h-[19.5rem] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 sm:min-h-[20.5rem]">
       <div className="h-[6.75rem] w-full animate-pulse bg-zinc-200 dark:bg-zinc-800 sm:h-[7.5rem]" />
       <div className="flex flex-1 flex-col px-2.5 pb-2.5 pt-2.5 sm:px-3 sm:pb-3 sm:pt-3">
-        <div className="flex items-start gap-2.5">
+        <div className="flex items-center gap-1.5">
           <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800 sm:h-9 sm:w-9" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="h-4 w-4/5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-3 w-2/5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-          </div>
+          <div className="mx-auto h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
         </div>
-        <div className="mt-2 h-3 w-3/5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="mt-2.5 h-5 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="mt-1.5 h-3 w-3/5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="mt-2 flex items-center gap-1.5">
+          <div className="h-3 flex-1 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-4 w-10 shrink-0 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        </div>
         <div className="mt-auto pt-3">
           <div className="h-8 w-full animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
         </div>

@@ -348,6 +348,8 @@ function HomeInner() {
                     banner_url: shop.banner_url,
                     is_live: shop.is_live,
                     distance_km: withDistance.distance_km,
+                    business_hours: shop.business_hours,
+                    operating_status: shop.operating_status,
                   }}
                   favorited={favorites.has(shop.id)}
                   showDistance={showProximityBadges}

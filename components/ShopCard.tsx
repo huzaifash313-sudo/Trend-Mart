@@ -3,6 +3,7 @@
 import Link from "next/link";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import { formatDistance } from "@/services/geoRadiusService";
+import { getShopHoursSummary } from "@/lib/shopHours";
 
 export interface ShopCardData {
   id: string;
@@ -13,6 +14,8 @@ export interface ShopCardData {
   banner_url?: string | null;
   is_live?: boolean;
   distance_km?: number | null;
+  business_hours?: string | null;
+  operating_status?: string | null;
 }
 
 interface ShopCardProps {
@@ -61,9 +64,27 @@ function PinIcon() {
   );
 }
 
+function ClockIcon() {
+  return (
+    <svg
+      className="h-3 w-3 shrink-0 opacity-70"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
 /**
- * Homepage / discovery shop card — fixed structure so every tile aligns
- * in a 2 / 3 / 4 column grid (banner → meta → pinned CTA).
+ * Homepage / discovery shop card —
+ * logo · category · wishlist → name → location → hours/open → CTA
  */
 export default function ShopCard({
   shop,
@@ -76,14 +97,19 @@ export default function ShopCard({
   onToggleFavorite,
 }: ShopCardProps) {
   const href = `/shop/${shop.id}`;
+  const isLive = !!shop.is_live;
   const distance =
     showDistance && shop.distance_km != null
       ? formatDistance(shop.distance_km)
       : null;
+  const hours = getShopHoursSummary({
+    business_hours: shop.business_hours,
+    operating_status: shop.operating_status,
+  });
 
   return (
-    <article className="trend-card group flex h-full min-h-[17.5rem] flex-col overflow-hidden sm:min-h-[18.5rem]">
-      {/* ── Uniform banner slot ───────────────────────────────────────── */}
+    <article className="trend-card group flex h-full min-h-[19.5rem] flex-col overflow-hidden sm:min-h-[20.5rem]">
+      {/* Banner */}
       <Link
         href={href}
         className="relative block shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
@@ -99,12 +125,21 @@ export default function ShopCard({
           onBannerError={onBannerError}
           onLogoError={onLogoError}
         >
-          {shop.is_live ? (
-            <span className="absolute left-2 top-2 z-[1] inline-flex items-center gap-1 rounded-md bg-white/95 px-1.5 py-0.5 text-[0.6rem] font-semibold tracking-wide text-emerald-700 shadow-sm dark:bg-zinc-900/90 dark:text-emerald-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-              LIVE
-            </span>
-          ) : null}
+          <span
+            className={`absolute left-2 top-2 z-[1] inline-flex max-w-[55%] items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6rem] font-semibold tracking-wide shadow-sm ${
+              isLive
+                ? "bg-white/95 text-emerald-700 dark:bg-zinc-900/90 dark:text-emerald-400"
+                : "bg-zinc-900/80 text-zinc-100 dark:bg-zinc-950/85 dark:text-zinc-200"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                isLive ? "bg-emerald-500" : "bg-zinc-400"
+              }`}
+              aria-hidden="true"
+            />
+            <span className="tm-title-ellipsis">{isLive ? "Live" : "Not available"}</span>
+          </span>
           {distance ? (
             <span className="absolute right-2 top-2 z-[1] rounded-md bg-zinc-900/75 px-1.5 py-0.5 text-[0.6rem] font-medium text-white backdrop-blur-sm">
               {distance}
@@ -113,10 +148,11 @@ export default function ShopCard({
         </ShopMediaHeader>
       </Link>
 
-      {/* ── Body: grows; CTA stays pinned to the bottom ───────────────── */}
+      {/* Body */}
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-2.5 sm:px-3 sm:pb-3 sm:pt-3">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <Link href={href} className="mt-0.5 shrink-0 focus:outline-none" tabIndex={-1}>
+        {/* Row: logo | category | wishlist */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Link href={href} className="shrink-0 focus:outline-none" tabIndex={-1}>
             <ShopLogoAvatar
               shopName={shop.name}
               logoUrl={shop.logo_url}
@@ -126,47 +162,47 @@ export default function ShopCard({
             />
           </Link>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-1">
-              {/* Reserve ~2 lines so short names don't shift the CTA */}
-              <Link
-                href={href}
-                title={shop.name}
-                className="tm-title-clamp-2 min-h-[2.375rem] min-w-0 flex-1 text-[0.8125rem] font-semibold leading-snug text-zinc-900 hover:text-emerald-700 sm:min-h-[2.5rem] sm:text-sm dark:text-zinc-50 dark:hover:text-emerald-400"
-              >
-                {shop.name}
-              </Link>
-              {onToggleFavorite ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onToggleFavorite();
-                  }}
-                  className={`icon-only -mr-0.5 -mt-0.5 shrink-0 rounded-full p-1.5 transition-colors ${
-                    favorited
-                      ? "text-rose-500"
-                      : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-                  }`}
-                  aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
-                >
-                  <HeartIcon filled={favorited} />
-                </button>
-              ) : null}
-            </div>
+          <p
+            className="tm-title-ellipsis min-w-0 flex-1 px-0.5 text-center text-[0.6875rem] font-medium leading-none text-zinc-500 dark:text-zinc-400"
+            title={shop.category || "Store"}
+          >
+            {shop.category || "Store"}
+          </p>
 
-            <p
-              className="tm-title-ellipsis mt-1 text-[0.6875rem] font-medium leading-none text-zinc-500 dark:text-zinc-400"
-              title={shop.category}
+          {onToggleFavorite ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFavorite();
+              }}
+              className={`icon-only shrink-0 rounded-full p-1.5 transition-colors ${
+                favorited
+                  ? "text-rose-500"
+                  : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+              }`}
+              aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
             >
-              {shop.category || "Store"}
-            </p>
-          </div>
+              <HeartIcon filled={favorited} />
+            </button>
+          ) : (
+            <span className="inline-block h-8 w-8 shrink-0" aria-hidden="true" />
+          )}
         </div>
 
+        {/* Full-width store name */}
+        <Link
+          href={href}
+          title={shop.name}
+          className="tm-title-clamp-2 mt-2.5 min-h-[2.5rem] text-[0.9375rem] font-semibold leading-snug tracking-tight text-zinc-900 hover:text-emerald-700 sm:min-h-[2.625rem] sm:text-base dark:text-zinc-50 dark:hover:text-emerald-400"
+        >
+          {shop.name}
+        </Link>
+
+        {/* Location */}
         <p
-          className="mt-2 inline-flex min-h-[1.125rem] min-w-0 items-center gap-1 text-[0.6875rem] leading-none text-zinc-500 dark:text-zinc-400"
+          className="mt-1.5 inline-flex min-h-[1.125rem] min-w-0 items-center gap-1 text-[0.6875rem] leading-none text-zinc-500 dark:text-zinc-400"
           title={shop.location}
         >
           <PinIcon />
@@ -174,6 +210,28 @@ export default function ShopCard({
             {shop.location?.trim() ? shop.location : "Location not set"}
           </span>
         </p>
+
+        {/* Hours + Open / Closed */}
+        <div className="mt-2 flex min-w-0 items-center gap-1.5">
+          <p
+            className="inline-flex min-w-0 flex-1 items-center gap-1 text-[0.65rem] leading-none text-zinc-500 dark:text-zinc-400"
+            title={hours.hoursText}
+          >
+            <ClockIcon />
+            <span className="tm-title-ellipsis">{hours.hoursText}</span>
+          </p>
+          <span
+            className={`shrink-0 rounded-md px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none ${
+              hours.state === "open"
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                : hours.state === "closed"
+                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                  : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            }`}
+          >
+            {hours.label}
+          </span>
+        </div>
 
         <div className="mt-auto pt-3">
           <Link

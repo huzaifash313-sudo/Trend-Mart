@@ -682,7 +682,7 @@ function SearchResultsInner() {
                         location: item.location ?? "",
                         logo_url: item.logoUrl ?? item.imageUrl,
                         banner_url: item.bannerUrl,
-                        is_live: true,
+                        is_live: item.isAvailable !== false,
                       }}
                     />
                   );
@@ -766,6 +766,8 @@ function SearchResultsInner() {
                   logo_url: shop.logo_url,
                   banner_url: shop.banner_url,
                   is_live: shop.is_live,
+                  business_hours: shop.business_hours,
+                  operating_status: shop.operating_status,
                 }}
               />
             ))}
