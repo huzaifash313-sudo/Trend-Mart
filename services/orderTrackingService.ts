@@ -184,6 +184,12 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
 /**
  * Track orders by phone number.
  * Searches orders where customer_phone contains the given phone digits.
+ *
+ * NOTE: This calls the `track_orders_by_phone` SECURITY DEFINER RPC rather
+ * than selecting from `orders` directly. Direct table reads are restricted
+ * to the owning merchant/admin (see the RLS hardening migration) since the
+ * `orders` table holds customer PII (name, phone, address); the RPC only
+ * ever returns rows matching the exact phone the caller supplies.
  */
 export async function trackOrdersByPhone(
   phone: string,
@@ -199,12 +205,9 @@ export async function trackOrdersByPhone(
   }
 
   try {
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*, shops!inner(name)")
-      .ilike("customer_phone", `%${cleaned}%`)
-      .order("created_at", { ascending: false })
-      .limit(50);
+    const { data, error } = await supabase.rpc("track_orders_by_phone", {
+      p_phone: cleaned,
+    });
 
     if (error) throw error;
 
@@ -231,6 +234,9 @@ export async function trackOrdersByPhone(
 
 /**
  * Track a single order by its reference/order ID.
+ *
+ * NOTE: Uses the `track_order_by_id` SECURITY DEFINER RPC — see
+ * `trackOrdersByPhone` above for why direct table reads aren't used here.
  */
 export async function trackOrderById(
   orderId: string,
@@ -244,19 +250,15 @@ export async function trackOrderById(
 
   try {
     const { data, error } = await supabase
-      .from("orders")
-      .select("*, shops!inner(name)")
-      .eq("id", trimmed)
-      .single();
+      .rpc("track_order_by_id", { p_order_id: trimmed })
+      .maybeSingle();
 
-    if (error) {
-      if (error.code === "PGRST116") {
-        return {
-          success: false,
-          error: "No order found with that reference ID. Please double-check and try again.",
-        };
-      }
-      throw error;
+    if (error) throw error;
+    if (!data) {
+      return {
+        success: false,
+        error: "No order found with that reference ID. Please double-check and try again.",
+      };
     }
 
     const order = parseTrackedOrder(data as Record<string, unknown>);

@@ -33,6 +33,7 @@ import type {
   Order,
 } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
+import { deleteShop } from "@/services/shopService";
 import ImageUpload from "@/components/ImageUpload";
 import type { SubCategoryWithMeta } from "@/services/subCategoryService";
 import {
@@ -516,6 +517,54 @@ export default function AdminDashboardPage() {
     }
   }
 
+  /**
+   * Permanently remove a merchant that violates platform guidelines.
+   * Cascades to that shop's products/orders/reviews/etc via FK ON DELETE
+   * CASCADE. Requires the `shops_admin_all` RLS policy (admin override).
+   */
+  async function deleteMerchant(shopId: string, shopName: string) {
+    if (
+      !window.confirm(
+        `Permanently delete "${shopName}"? This removes the store, its products, and its order history. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setProcessingId(shopId);
+    setActionMessage(null);
+    try {
+      const result = await deleteShop(shopId);
+      if (!result.success) throw new Error(result.error);
+
+      setState((s) => ({
+        ...s,
+        merchants: s.merchants.filter((m) => m.shop_id !== shopId),
+        metrics: s.metrics
+          ? {
+              ...s.metrics,
+              total_merchants: Math.max(0, s.metrics.total_merchants - 1),
+              active_merchants: state.merchants.find((m) => m.shop_id === shopId)?.is_live
+                ? Math.max(0, s.metrics.active_merchants - 1)
+                : s.metrics.active_merchants,
+              suspended_merchants: !state.merchants.find((m) => m.shop_id === shopId)?.is_live
+                ? Math.max(0, s.metrics.suspended_merchants - 1)
+                : s.metrics.suspended_merchants,
+            }
+          : null,
+      }));
+
+      setActionMessage("Merchant deleted permanently.");
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err) {
+      logError(err, { module: "AdminDashboard.deleteMerchant" });
+      setActionMessage("Delete failed. Please try again.");
+      setTimeout(() => setActionMessage(null), 4000);
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
   // ─── Filtered Merchants ──────────────────────────────────────────────────
   const filteredMerchants = useMemo(() => {
     let result = [...state.merchants];
@@ -969,45 +1018,55 @@ export default function AdminDashboardPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {merchant.verification_status === "pending" ? (
-                              <div className="flex gap-1.5 justify-end">
+                            <div className="flex gap-1.5 justify-end">
+                              {merchant.verification_status === "pending" ? (
+                                <>
+                                  <button
+                                    onClick={() => reviewShop(merchant.shop_id, "approved")}
+                                    disabled={processingId === merchant.shop_id}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => reviewShop(merchant.shop_id, "rejected")}
+                                    disabled={processingId === merchant.shop_id}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 disabled:opacity-50 transition-colors"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              ) : (
                                 <button
-                                  onClick={() => reviewShop(merchant.shop_id, "approved")}
+                                  onClick={() =>
+                                    toggleMerchantStatus(
+                                      merchant.shop_id,
+                                      merchant.is_live,
+                                    )
+                                  }
                                   disabled={processingId === merchant.shop_id}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                                    merchant.is_live
+                                      ? "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
+                                      : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                  }`}
                                 >
-                                  Approve
+                                  {processingId === merchant.shop_id
+                                    ? "..."
+                                    : merchant.is_live
+                                      ? "Suspend"
+                                      : "Activate"}
                                 </button>
-                                <button
-                                  onClick={() => reviewShop(merchant.shop_id, "rejected")}
-                                  disabled={processingId === merchant.shop_id}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 disabled:opacity-50 transition-colors"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            ) : (
+                              )}
                               <button
-                                onClick={() =>
-                                  toggleMerchantStatus(
-                                    merchant.shop_id,
-                                    merchant.is_live,
-                                  )
-                                }
+                                onClick={() => deleteMerchant(merchant.shop_id, merchant.shop_name)}
                                 disabled={processingId === merchant.shop_id}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                                  merchant.is_live
-                                    ? "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
-                                    : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400"
-                                }`}
+                                title="Permanently delete this merchant"
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-500 hover:bg-red-600 hover:text-white dark:bg-zinc-800 dark:text-zinc-400 disabled:opacity-50 transition-colors"
                               >
-                                {processingId === merchant.shop_id
-                                  ? "..."
-                                  : merchant.is_live
-                                    ? "Suspend"
-                                    : "Activate"}
+                                Delete
                               </button>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       ))

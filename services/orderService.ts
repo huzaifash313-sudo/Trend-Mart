@@ -656,6 +656,11 @@ export async function fetchOrdersByShopId(
 
 /**
  * Fetch orders by customer phone number (customer tracking page).
+ *
+ * NOTE: Calls the `track_orders_by_phone` SECURITY DEFINER RPC instead of
+ * selecting from `orders` directly. Direct anonymous reads of the orders
+ * table are blocked by RLS (it holds customer PII) — the RPC only ever
+ * returns rows matching the exact phone the caller supplies.
  */
 export async function fetchOrdersByPhone(
   phone: string,
@@ -664,12 +669,9 @@ export async function fetchOrdersByPhone(
 
   try {
     const cleaned = phone.replace(/\D/g, "");
-    const { data, error } = await supabase
-      .from("orders")
-      .select("*, shops(name)")
-      .or(`customer_phone.ilike.%${cleaned}%`)
-      .order("created_at", { ascending: false })
-      .limit(100);
+    const { data, error } = await supabase.rpc("track_orders_by_phone", {
+      p_phone: cleaned,
+    });
 
     if (error) throw error;
     const orders = ((data as Record<string, unknown>[]) ?? []).map(parseOrder);
