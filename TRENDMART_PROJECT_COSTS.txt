@@ -1,0 +1,296 @@
+================================================================================
+TrendMart — Full Project Cost Guide (Secure Web + PWA + Future App)
+================================================================================
+Currency notes: prices change often. Figures below are approximate USD (with
+rough PKR band at ~280 PKR/USD for planning). Always check live pricing pages.
+Soft launch = WhatsApp-first (cheapest). Full secure production = add paid tiers.
+
+LEGEND
+  MUST     = almost always needed for professional live product
+  SHOULD   = strongly recommended for security / UX
+  OPTIONAL = later scale / polish / native stores
+  FREE*    = free tier exists but has limits / card may be required
+
+================================================================================
+1) ONE-TIME / YEARLY FIXED COSTS
+================================================================================
+
+A) Domain name (MUST)
+   - trendmart.pk / .com / .store
+   - Typical: $10–$20 / year (~PKR 3,000–6,000)
+   - Where money goes: Namecheap, Cloudflare Registrar, GoDaddy, NIC.pk
+   - Why: branded emails, trust, SEO, PWA install identity
+
+B) SSL / HTTPS
+   - Cost: $0 with Vercel / Cloudflare (automatic certificates)
+   - Do NOT buy expensive SSL unless using weird hosting
+
+C) Apple Developer Account (OPTIONAL — only if native iOS App Store)
+   - $99 / year (~PKR 28,000)
+   - PWA "Add to Home Screen" does NOT need this
+
+D) Google Play Developer (OPTIONAL — only if native Android Play Store)
+   - One-time $25 (~PKR 7,000)
+   - PWA does NOT need this
+
+E) Business / legal basics (SHOULD for Pakistan ops)
+   - Business registration, NTN, privacy policy lawyer review: variable
+   - Not a SaaS bill, but plan a buffer if you take real customer data
+
+================================================================================
+2) HOSTING — Web + PWA (same deploy)
+================================================================================
+
+A) Vercel (MUST for this Next.js app — already used)
+   - Hobby / free: OK for soft launch / demos
+   - Pro: ~$20 / month / member (~PKR 5,500+) when you need:
+       commercial use clarity, more bandwidth, team, better limits
+   - Bandwidth overages can appear with heavy image traffic
+   - Where: vercel.com → Project → Usage
+
+B) Alternative (OPTIONAL): Cloudflare Pages / own VPS
+   - Usually more DevOps work; stick to Vercel unless scaling hard
+
+PWA note:
+   - Progressive Web App = same Vercel deploy + manifest/service worker
+   - No separate "PWA hosting" fee
+   - Users install from browser (Android excellent; iOS limited but usable)
+
+================================================================================
+3) BACKEND — Supabase (Auth, DB, Storage, Realtime)  [MUST]
+================================================================================
+
+A) Free tier (FREE*)
+   - Good for early soft launch
+   - Limits: DB size, storage, auth MAUs, egress bandwidth
+   - Pause risk on inactive free projects (check current Supabase policy)
+
+B) Pro plan (SHOULD before serious public traffic)
+   - Typically ~$25 / month (~PKR 7,000+)
+   - Unpausable project, more capacity, daily backups, better support
+   - Extra: storage / egress overages billed separately
+
+C) What you pay Supabase for specifically
+   - Auth email OTP / magic links (email sending often via custom SMTP)
+   - Phone OTP SMS is NOT free — SMS goes through Twilio etc. (see §5)
+   - Image/file storage: free quota then paid GB
+   - Realtime subscriptions: within plan quotas
+
+Where: supabase.com → Project Settings → Billing
+
+================================================================================
+4) EMAIL VERIFICATION + BRANDED TRANSACTIONAL EMAIL  [SHOULD]
+================================================================================
+
+Provider used in code: Resend (lib/email.ts)
+
+A) Resend
+   - Free tier: limited emails / month (enough for early testing)
+   - Paid: roughly starts low, then pay-per-email at scale
+     (often ~$0.001 or package plans — check resend.com/pricing)
+   - Domain verification: free (you already own the domain)
+
+B) Also configure inside Supabase Auth
+   - Custom SMTP → Resend (so "Confirm your email" comes from your domain)
+   - Without this: default Supabase From-address looks unprofessional
+     and can land in spam
+
+C) Where money goes
+   - Resend invoice for send volume
+   - Domain DNS already paid yearly
+
+Must-set env vars:
+   RESEND_API_KEY, EMAIL_FROM, SUPPORT_TEAM_EMAIL
+   + NEXT_PUBLIC_SITE_URL / NEXT_PUBLIC_APP_URL for correct verify links
+
+================================================================================
+5) SMS / PHONE OTP (Checkout verification)  [SHOULD for production]
+================================================================================
+
+App flow: Supabase Phone Auth → SMS provider (Twilio common)
+
+A) Twilio (or MessageBird / Vonage)
+   - Account + phone number: ~$1–$2 / month for a number
+   - SMS to Pakistan: often ~$0.03–$0.08+ per SMS (varies a lot)
+   - Soft launch tip: you can skip SMS and keep WhatsApp-first checkout
+     (app already degrades if SMS provider unavailable)
+
+B) Cost example (planning)
+   - 1,000 checkout OTPs/month × $0.05 = $50 (~PKR 14,000)
+   - This is usually the FIRST big variable cost after traffic grows
+
+Where: twilio.com + Supabase → Auth → Providers → Phone
+
+Env: usually configured in Supabase UI (optional TWILIO_* only if you add
+direct Twilio API routes later)
+
+================================================================================
+6) MAPS / PLACE SEARCH  [SHOULD for Daraz-like location UX]
+================================================================================
+
+A) Google Maps Platform — Places API
+   - Free monthly credit often applies (historically ~$200 credit — verify live)
+   - After credit: pay per Places request / Autocomplete session
+   - Soft launch: without key, free OSM/Photon works but misses many local POIs
+
+B) Mapbox (OPTIONAL alternative)
+   - Free tier then paid MAUs / map loads
+
+Env: GOOGLE_MAPS_API_KEY (server) or NEXT_PUBLIC_GOOGLE_MAPS_KEY
+
+Where money goes: Google Cloud Billing account (card required)
+
+================================================================================
+7) IMAGE STORAGE / CDN
+================================================================================
+
+A) Current path: Supabase Storage (bundled with Supabase plan)
+B) Cloudinary (OPTIONAL — mentioned in docs / future)
+   - Free tier: ~25GB storage / bandwidth caps
+   - Paid when merchants upload lots of high-res photos
+   - Compression to WebP keeps free tier longer (your product design goal)
+
+================================================================================
+8) MONITORING, SECURITY, RATE LIMITS  [SHOULD for "secure professional"]
+================================================================================
+
+A) Sentry (error tracking)
+   - Free developer tier available
+   - Team plans ~$26+/month when you need more quota
+   - Env: NEXT_PUBLIC_SENTRY_DSN (+ optional SENTRY_AUTH_TOKEN)
+
+B) Upstash Redis (rate limiting / abuse protection)
+   - Free tier small
+   - Pay as you grow (~$10+/month typical for small prod)
+   - Env: UPSTASH_REDIS_URL, UPSTASH_REDIS_TOKEN
+
+C) Google Analytics / Meta Pixel (OPTIONAL)
+   - Free product; privacy compliance is your responsibility
+
+D) Cloudflare (OPTIONAL in front of domain)
+   - Free plan: DDoS basics, CDN, DNS
+   - Pro $20/month for extra WAF rules if attacked / scraped
+
+================================================================================
+9) PAYMENTS (NOT needed for WhatsApp-first soft launch)
+================================================================================
+
+Cash-on-delivery / WhatsApp order = $0 payment gateway fee.
+
+Later (OPTIONAL):
+   - Stripe / PayFast / local JazzCash-Easypaisa aggregators
+   - Gateway fees typically 2–3.5% + fixed fee per transaction
+   - Env placeholders exist but are not wired as primary flow
+
+================================================================================
+10) NATIVE APP WRAP (OPTIONAL — beyond PWA)
+================================================================================
+
+If you later wrap PWA with Capacitor / TWA:
+   - Dev time cost (your effort or freelancer)
+   - Apple $99/year + Play $25 once
+   - Still hosts content from same Vercel URL → no double backend bill
+   - Push notifications may need FCM / APNs (usually free tiers)
+
+================================================================================
+11) REALISTIC MONTHLY BUDGET SCENARIOS (approx.)
+================================================================================
+
+SCENARIO A — Soft launch (WhatsApp-first, minimal spend)
+  Domain (amortized) .............. ~$1–2 / mo
+  Vercel Hobby .................... $0
+  Supabase Free ................... $0
+  Resend Free ..................... $0 (low volume)
+  Google Maps free credit ......... $0 (until credit ends)
+  SMS OTP ......................... $0 (skip / degrade)
+  ---------------------------------------------
+  TOTAL .......................... ~$0–5 / mo + domain yearly
+  Risk: free-tier limits, weaker email brand, weaker map POIs
+
+SCENARIO B — Professional secure soft launch (recommended)
+  Domain .......................... yearly
+  Vercel Pro (optional early) ..... $0–20
+  Supabase Pro .................... ~$25
+  Resend (domain + volume) ........ $0–20
+  Google Places (after credit) .... $0–30 (usage based)
+  Twilio SMS (light) .............. $10–50
+  Sentry Free/Team ................ $0–26
+  Cloudflare Free ................. $0
+  ---------------------------------------------
+  TOTAL .......................... ~$40–150 / mo typical early
+  (~PKR 11,000–42,000) depending on SMS + Maps traffic
+
+SCENARIO C — Growth (many merchants, heavy images, lots of OTPs)
+  Supabase Pro + overages ......... $25–100+
+  Storage / CDN ................... $10–50+
+  SMS OTPs ........................ $50–300+
+  Maps API ........................ $20–100+
+  Vercel Pro + bandwidth .......... $20–100+
+  Monitoring / Redis .............. $20–50
+  ---------------------------------------------
+  TOTAL .......................... $150–700+ / mo
+  Scale with orders; SMS + Maps + egress usually dominate
+
+================================================================================
+12) WHERE EXACTLY YOU SPEND (CHECKLIST)
+================================================================================
+
+[ ] Domain registrar — yearly domain
+[ ] Vercel — hosting web + PWA
+[ ] Supabase — database, auth, storage, realtime
+[ ] Resend — branded email + verification mail
+[ ] Google Cloud — Places / Maps API billing
+[ ] Twilio (or similar) — SMS OTP for checkout phone verify
+[ ] Sentry — crash/error monitoring (optional paid)
+[ ] Upstash — rate limit Redis (optional paid)
+[ ] Cloudflare — DNS/WAF (optional paid)
+[ ] Apple / Google — ONLY if publishing native store apps
+[ ] Cloudinary — ONLY if you leave Supabase Storage for images
+
+================================================================================
+13) WHAT IS FREE / ALREADY COVERED BY CODE
+================================================================================
+
+- Guest browse + cart (localStorage)
+- WhatsApp order deep-links (no WhatsApp Business API fee required for wa.me)
+- PWA installability (once manifest/service worker live)
+- Leaflet/OSM map tiles (free; POI search weaker without Google)
+- HTTPS on Vercel
+- Basic RLS security (after you run SQL migrations)
+
+WhatsApp Business Platform API (official Cloud API) is OPTIONAL and separate —
+current product uses customer→merchant wa.me links (no Meta conversation fees).
+
+================================================================================
+14) SECURITY SPEND PRIORITY (do in this order)
+================================================================================
+
+1. Custom domain + HTTPS + correct SITE_URL
+2. Supabase service role NEVER in client / NEVER in git
+3. Resend + custom SMTP for auth emails (anti-phishing trust)
+4. Run launch_readiness SQL migration (RLS hardening)
+5. Supabase Pro before serious public launch (backups)
+6. SMS OTP only when you need stronger checkout proof
+7. Sentry + rate limiting when bots / abuse appear
+8. Google Places key with API restrictions (HTTP referrer / IP)
+9. Cloudflare WAF if scraping / DDoS starts
+
+================================================================================
+15) ENV FILE REMINDER
+================================================================================
+
+Local secrets live in:
+  .env          (gitignored template you fill)
+  .env.local    (gitignored; Next.js auto-loads; preferred for real keys)
+
+Committed template only:
+  .env.example  (placeholders, no real secrets)
+
+Vercel → Project Settings → Environment Variables:
+  paste the SAME keys for Production (+ Preview if needed)
+
+================================================================================
+End of cost guide — update numbers from each vendor’s pricing page before
+signing annual contracts. Soft-launch can start near $0–25/mo; professional
+secure ops usually settle around Supabase Pro + email + (optional) SMS/Maps.
+================================================================================
