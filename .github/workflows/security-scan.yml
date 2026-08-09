@@ -139,26 +139,30 @@ jobs:
                 try {
                   const content = fs.readFileSync(fullPath, 'utf8');
                   for (const pat of PATTERNS) {
-                    const matches = content.match(pat.regex);
-                    if (matches) {
-                      for (const match of matches) {
-                        // Verify it's not in a comment or test fixture
-                        const lines = content.split('\\n');
-                        const matchLine = lines.find(l => l.includes(match)) || '';
-                        const trimmed = matchLine.trim();
-                        if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*')) continue;
-                        if (relPath.includes('.test.') || relPath.includes('.spec.') || relPath.includes('__mocks__')) continue;
+                    // Always use matchAll + full match only (avoid counting capture groups as secrets)
+                    const flags = pat.regex.flags.includes('g') ? pat.regex.flags : pat.regex.flags + 'g';
+                    const re = new RegExp(pat.regex.source, flags);
+                    for (const m of content.matchAll(re)) {
+                      const match = m[0];
+                      const lines = content.split('\\n');
+                      const lineIdx = lines.findIndex(l => l.includes(match));
+                      const matchLine = lineIdx >= 0 ? lines[lineIdx] : '';
+                      const trimmed = matchLine.trim();
+                      if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*')) continue;
+                      if (relPath.includes('.test.') || relPath.includes('.spec.') || relPath.includes('__mocks__')) continue;
 
-                        // Check if it's the publishable key (safe)
-                        if (match.includes('sb_publishable_')) continue;
-                        if (match.includes('NEXT_PUBLIC_')) continue;
+                      // Safe / placeholder tokens — not real secrets
+                      if (match.includes('sb_publishable_')) continue;
+                      if (match.includes('NEXT_PUBLIC_')) continue;
+                      if (/YOUR_|your-|changeme|example\.com|localhost/i.test(match)) continue;
+                      if (/YOUR_|your-|changeme|example\.com|localhost/i.test(matchLine)) continue;
 
-                        foundSecrets++;
-                        const redacted = match.length > 16
-                          ? match.slice(0, 6) + '...' + match.slice(-4)
-                          : '***';
-                        console.log('::error file=' + relPath + '::FOUND ' + pat.severity.toUpperCase() + ': ' + pat.name + ' (' + redacted + ')');
-                      }
+                      foundSecrets++;
+                      const redacted = match.length > 16
+                        ? match.slice(0, 6) + '...' + match.slice(-4)
+                        : '***';
+                      const loc = lineIdx >= 0 ? (relPath + ', line ' + (lineIdx + 1)) : relPath;
+                      console.log('::error file=' + relPath + '::FOUND ' + pat.severity.toUpperCase() + ': ' + pat.name + ' (' + redacted + ') @ ' + loc);
                     }
                   }
                 } catch (e) {
