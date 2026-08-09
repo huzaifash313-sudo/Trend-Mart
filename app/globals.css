@@ -547,7 +547,19 @@ label {
   }
 }
 
-/* ── Professional Card Base ────────────────────────────────────────────────── */
+/* Leaflet map pins — don't inherit global link/button min sizes */
+.tm-map-pin,
+.tm-gps-dot {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-container {
+  font: inherit;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
 
 .trend-card {
   border-radius: 0.875rem;

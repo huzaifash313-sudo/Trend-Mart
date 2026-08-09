@@ -26,6 +26,8 @@ export { isValidLatitude, isValidLongitude, isValidCoordinate };
 export interface GeoCoordinates {
   latitude: number;
   longitude: number;
+  /** GPS accuracy in meters when available (browser Geolocation). */
+  accuracyMeters?: number | null;
 }
 
 export interface ShopWithDistance extends Shop {
@@ -79,6 +81,8 @@ export type LocationDetectErrorCode =
 export interface LocationDetectResult {
   coordinates: GeoCoordinates | null;
   error: LocationDetectErrorCode;
+  /** Horizontal accuracy from the device GPS, when provided. */
+  accuracyMeters?: number | null;
 }
 
 /** Merchant delivery coverage: pin radius, one city, or all of Pakistan. */
@@ -255,24 +259,33 @@ export function requestUserLocationDetailed(
         const latitude = position.coords.latitude;
         const longitude = position.coords.longitude;
         if (!isValidCoordinate(latitude, longitude)) {
-          resolve({ coordinates: null, error: "unavailable" });
+          resolve({ coordinates: null, error: "unavailable", accuracyMeters: null });
           return;
         }
+        const accuracy =
+          typeof position.coords.accuracy === "number" &&
+          Number.isFinite(position.coords.accuracy)
+            ? position.coords.accuracy
+            : null;
         resolve({
-          coordinates: { latitude, longitude },
+          coordinates: { latitude, longitude, accuracyMeters: accuracy },
           error: null,
+          accuracyMeters: accuracy,
         });
       },
       (err) => {
         clearTimeout(hardTimeout);
-        if (err.code === 1) resolve({ coordinates: null, error: "denied" });
-        else if (err.code === 3) resolve({ coordinates: null, error: "timeout" });
-        else resolve({ coordinates: null, error: "unavailable" });
+        if (err.code === 1)
+          resolve({ coordinates: null, error: "denied", accuracyMeters: null });
+        else if (err.code === 3)
+          resolve({ coordinates: null, error: "timeout", accuracyMeters: null });
+        else
+          resolve({ coordinates: null, error: "unavailable", accuracyMeters: null });
       },
       {
         enableHighAccuracy: true,
         timeout: timeoutMs,
-        maximumAge: 60_000,
+        maximumAge: 30_000,
         ...options,
       },
     );
@@ -921,6 +934,9 @@ export async function buildLocationFromCoords(
     coordinates: {
       latitude: coords.latitude,
       longitude: coords.longitude,
+      ...(coords.accuracyMeters != null
+        ? { accuracyMeters: coords.accuracyMeters }
+        : {}),
     },
     city: geocode.city,
     deliveryZone: geocode.deliveryZone,

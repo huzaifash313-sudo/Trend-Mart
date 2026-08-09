@@ -493,6 +493,8 @@ export interface UserLocation {
   coordinates: {
     latitude: number;
     longitude: number;
+    /** Device GPS accuracy in meters when source is gps. */
+    accuracyMeters?: number | null;
   } | null;
   /** Human-readable city / area name — resolved via reverse geocoding or manual selection. */
   city: string | null;
