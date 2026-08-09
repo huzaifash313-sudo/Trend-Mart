@@ -13,6 +13,13 @@ import { createClient } from "@/lib/supabase/client";
 import type { Shop, UserLocation, SupportedCity } from "@/types";
 import { SUPPORTED_CITIES } from "@/types";
 import { logError } from "@/services/errorService";
+import {
+  isValidLatitude,
+  isValidLongitude,
+  isValidCoordinate,
+} from "@/lib/geoCoords";
+
+export { isValidLatitude, isValidLongitude, isValidCoordinate };
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -123,7 +130,7 @@ const LOCATION_CACHE_KEY = "trendmart_user_location_v2";
 const GPS_CACHE_MAX_AGE_MS = 1_800_000; // 30 min
 
 // ─── Known city coordinate centroids (for fallback matching) ─────────────────
-const CITY_CENTROIDS: Record<string, { lat: number; lng: number }> = {
+export const CITY_CENTROIDS: Record<string, { lat: number; lng: number }> = {
   "Gujranwala": { lat: 32.1877, lng: 74.1945 },
   "Lahore": { lat: 31.5497, lng: 74.3436 },
   "Islamabad": { lat: 33.6844, lng: 73.0479 },
@@ -147,25 +154,6 @@ const CITY_CENTROIDS: Record<string, { lat: number; lng: number }> = {
 
 function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;
-}
-
-/**
- * Strictly validate geographic coordinates.
- * - Latitude must be between -90 and 90
- * - Longitude must be between -180 and 180
- * - Must be finite, non-NaN numbers
- * Returns `false` if any coordinate is invalid.
- */
-export function isValidLatitude(lat: number): boolean {
-  return typeof lat === "number" && Number.isFinite(lat) && !Number.isNaN(lat) && lat >= -90 && lat <= 90;
-}
-
-export function isValidLongitude(lng: number): boolean {
-  return typeof lng === "number" && Number.isFinite(lng) && !Number.isNaN(lng) && lng >= -180 && lng <= 180;
-}
-
-export function isValidCoordinate(lat: number, lng: number): boolean {
-  return isValidLatitude(lat) && isValidLongitude(lng);
 }
 
 /**
@@ -306,33 +294,66 @@ export function locationErrorMessage(code: LocationDetectErrorCode): string {
   }
 }
 
-export async function getCachedUserLocation(): Promise<GeoCoordinates | null> {
+const LEGACY_SESSION_LOCATION_KEY = "trendmart_user_location";
+
+/**
+ * Read cached coordinates only (no GPS prompt).
+ * Prefers LocationContext localStorage payload, then legacy sessionStorage.
+ * Kept as a local binding so proximity filtering never depends on a
+ * cross-chunk export that Turbopack may tree-shake.
+ */
+function readCachedCoordinates(): GeoCoordinates | null {
   if (typeof window === "undefined") return null;
 
-  const cached = sessionStorage.getItem("trendmart_user_location");
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached) as GeoCoordinates & { ts: number };
-      if (Date.now() - parsed.ts < 600_000) {
-        return { latitude: parsed.latitude, longitude: parsed.longitude };
-      }
-    } catch { /* invalid cache */ }
+  try {
+    const saved = getValidSavedLocation();
+    if (
+      saved?.coordinates &&
+      isValidCoordinate(
+        saved.coordinates.latitude,
+        saved.coordinates.longitude,
+      )
+    ) {
+      return saved.coordinates;
+    }
+  } catch {
+    /* ignore */
   }
 
-  const coords = await requestUserLocation();
-  if (coords) {
-    sessionStorage.setItem(
-      "trendmart_user_location",
-      JSON.stringify({ ...coords, ts: Date.now() }),
-    );
+  try {
+    const cached = sessionStorage.getItem(LEGACY_SESSION_LOCATION_KEY);
+    if (!cached) return null;
+    const parsed = JSON.parse(cached) as GeoCoordinates & { ts?: number };
+    if (
+      typeof parsed.ts === "number" &&
+      Date.now() - parsed.ts >= 600_000
+    ) {
+      return null;
+    }
+    if (isValidCoordinate(parsed.latitude, parsed.longitude)) {
+      return { latitude: parsed.latitude, longitude: parsed.longitude };
+    }
+  } catch {
+    /* invalid cache */
   }
+
+  return null;
+}
+
+/** @deprecated Prefer LocationContext / getValidSavedLocation — kept for callers. */
+export async function getCachedUserLocation(): Promise<GeoCoordinates | null> {
+  const cached = readCachedCoordinates();
+  if (cached) return cached;
+
+  const coords = await requestUserLocation();
+  if (coords) storeUserLocation(coords);
   return coords;
 }
 
 export function storeUserLocation(coordinates: GeoCoordinates): void {
   if (typeof window === "undefined") return;
   sessionStorage.setItem(
-    "trendmart_user_location",
+    LEGACY_SESSION_LOCATION_KEY,
     JSON.stringify({ ...coordinates, ts: Date.now() }),
   );
 }
@@ -380,7 +401,9 @@ export async function filterShopsByProximity(
   }
 
   const totalBeforeFilter = allShops.length;
-  const userCoords = coordinates ?? (await getCachedUserLocation());
+  // Local helper only — never import/call getCachedUserLocation via live binding
+  // (Turbopack has dropped that export from the public surface before).
+  const userCoords = coordinates ?? readCachedCoordinates();
   const resolvedCustomerCity = (customerCity || deliveryZone || "").trim();
   const browseScope = scope === "city" || scope === "pakistan" ? scope : "radius";
   const unlimitedBrowse =
@@ -987,8 +1010,3 @@ export async function detectAndSaveLocationDetailed(): Promise<{
   storeUserLocation(coordinates);
   return { location, error: null };
 }
-
-/**
- * Re-export CITY_CENTROIDS for components that need to show a map/pin.
- */
-export { CITY_CENTROIDS };

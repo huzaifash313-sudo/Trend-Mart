@@ -526,7 +526,7 @@ function SearchResultsInner() {
                         : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                     }`}
                   >
-                    {cat !== "All" && <span className="mr-1" aria-hidden="true">{CATEGORY_ICONS[cat] ?? ""}</span>}
+                    {cat !== "All" && <span className="mr-1" aria-hidden="true">{CATEGORY_ICONS?.[cat] ?? ""}</span>}
                     {cat}
                   </button>
                 ))}
@@ -645,7 +645,7 @@ function SearchResultsInner() {
                     onClick={() => handleCategorySelect(cat)}
                     className="inline-flex items-center gap-1 rounded-full border border-dashed border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
                   >
-                    {CATEGORY_ICONS[cat] ?? ""} {cat}
+                    {CATEGORY_ICONS?.[cat] ?? ""} {cat}
                   </button>
                 ))}
               </div>
@@ -743,7 +743,7 @@ function SearchResultsInner() {
                         <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <span className="select-none text-4xl font-bold text-white/70 sm:text-5xl">
-                          {CATEGORY_ICONS[item.shopName ?? ""] ?? "📦"}
+                          {CATEGORY_ICONS?.[item.shopName ?? ""] ?? "📦"}
                         </span>
                       )}
                       <span className="absolute left-2 top-2 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 sm:left-3 sm:top-3 sm:text-xs dark:bg-violet-900/60 dark:text-violet-300">

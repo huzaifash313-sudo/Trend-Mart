@@ -6,10 +6,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import type { ShopCategory } from "@/types";
-import {
-  SHOP_CATEGORIES,
-  CATEGORY_ICONS,
-} from "@/types";
+import { SHOP_CATEGORIES } from "@/types";
 import { sanitizeLight, validateEnum } from "@/lib/sanitization";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,121 +33,123 @@ type ServiceResult<T> =
 const ALL_CATEGORIES: readonly ShopCategory[] = SHOP_CATEGORIES;
 
 // ─── Category Metadata ───────────────────────────────────────────────────────
+// Icons are inlined (not read from CATEGORY_ICONS at module init) so a split
+// chunk / partial @/types export cannot crash the homepage category pills.
 
 /** Static metadata for each category — icons and descriptions. */
 const CATEGORY_META: Record<Exclude<ShopCategory, "All">, CategoryMeta> = {
   "Grocery & Kiryana": {
     key: "Grocery & Kiryana",
     label: "Grocery & Kiryana",
-    icon: CATEGORY_ICONS["Grocery & Kiryana"] ?? "🛒",
+    icon: "🛒",
     description: "Daily essentials, dry goods, and neighborhood kiryana stores",
   },
   "Fruits & Vegetables": {
     key: "Fruits & Vegetables",
     label: "Fruits & Vegetables",
-    icon: CATEGORY_ICONS["Fruits & Vegetables"] ?? "🥬",
+    icon: "🥬",
     description: "Fresh sabzi, fruit stalls, and produce markets",
   },
   "Bakery & Sweets": {
     key: "Bakery & Sweets",
     label: "Bakery & Sweets",
-    icon: CATEGORY_ICONS["Bakery & Sweets"] ?? "🧁",
+    icon: "🧁",
     description: "Bakeries, mithai shops, cakes, and dessert counters",
   },
   "Fast Food & Restaurants": {
     key: "Fast Food & Restaurants",
     label: "Fast Food & Restaurants",
-    icon: CATEGORY_ICONS["Fast Food & Restaurants"] ?? "🍔",
+    icon: "🍔",
     description: "Restaurants, dhabas, cafés, and quick bites",
   },
   "Pharmacy & Medical": {
     key: "Pharmacy & Medical",
     label: "Pharmacy & Medical",
-    icon: CATEGORY_ICONS["Pharmacy & Medical"] ?? "💊",
+    icon: "💊",
     description: "Pharmacies, medical stores, and health essentials",
   },
   "Fashion & Apparel": {
     key: "Fashion & Apparel",
     label: "Fashion & Apparel",
-    icon: CATEGORY_ICONS["Fashion & Apparel"] ?? "👗",
+    icon: "👗",
     description: "Clothing, accessories, and fashion boutiques",
   },
   "Electronics & Gadgets": {
     key: "Electronics & Gadgets",
     label: "Electronics & Gadgets",
-    icon: CATEGORY_ICONS["Electronics & Gadgets"] ?? "📱",
+    icon: "📱",
     description: "Gadgets, mobile accessories, and tech stores",
   },
   "Home & Living": {
     key: "Home & Living",
     label: "Home & Living",
-    icon: CATEGORY_ICONS["Home & Living"] ?? "🏠",
+    icon: "🏠",
     description: "Furniture, home decor, and lifestyle products",
   },
   "Health & Beauty": {
     key: "Health & Beauty",
     label: "Health & Beauty",
-    icon: CATEGORY_ICONS["Health & Beauty"] ?? "💄",
+    icon: "💄",
     description: "Beauty products, skincare, and personal care",
   },
   "Books & Stationery": {
     key: "Books & Stationery",
     label: "Books & Stationery",
-    icon: CATEGORY_ICONS["Books & Stationery"] ?? "📚",
+    icon: "📚",
     description: "Books, notebooks, and office supplies",
   },
   "Sports & Fitness": {
     key: "Sports & Fitness",
     label: "Sports & Fitness",
-    icon: CATEGORY_ICONS["Sports & Fitness"] ?? "🏋️",
+    icon: "🏋️",
     description: "Sports equipment, gym gear, and activewear",
   },
   "Toys & Baby Care": {
     key: "Toys & Baby Care",
     label: "Toys & Baby Care",
-    icon: CATEGORY_ICONS["Toys & Baby Care"] ?? "🧸",
+    icon: "🧸",
     description: "Toys, baby products, and childcare items",
   },
   "Automotive Accessories": {
     key: "Automotive Accessories",
     label: "Automotive Accessories",
-    icon: CATEGORY_ICONS["Automotive Accessories"] ?? "🚗",
+    icon: "🚗",
     description: "Car accessories, tools, and automotive parts",
   },
   "Handmade & Crafts": {
     key: "Handmade & Crafts",
     label: "Handmade & Crafts",
-    icon: CATEGORY_ICONS["Handmade & Crafts"] ?? "🎨",
+    icon: "🎨",
     description: "Handcrafted goods, art supplies, and DIY products",
   },
   "Home Maintenance & Repair": {
     key: "Home Maintenance & Repair",
     label: "Home Maintenance & Repair",
-    icon: CATEGORY_ICONS["Home Maintenance & Repair"] ?? "🔧",
+    icon: "🔧",
     description: "Plumbing, electrical, painting, and home repair services",
   },
   "Security & Surveillance": {
     key: "Security & Surveillance",
     label: "Security & Surveillance",
-    icon: CATEGORY_ICONS["Security & Surveillance"] ?? "📹",
+    icon: "📹",
     description: "CCTV, alarm systems, and security solutions",
   },
   "Tech & IT Services": {
     key: "Tech & IT Services",
     label: "Tech & IT Services",
-    icon: CATEGORY_ICONS["Tech & IT Services"] ?? "💻",
+    icon: "💻",
     description: "Computer repair, web development, and IT support",
   },
   "Personal & Professional Services": {
     key: "Personal & Professional Services",
     label: "Personal & Professional Services",
-    icon: CATEGORY_ICONS["Personal & Professional Services"] ?? "💼",
+    icon: "💼",
     description: "Tutoring, consulting, beauty services, and freelancers",
   },
   "Others / Universal": {
     key: "Others / Universal",
     label: "Others / Universal",
-    icon: CATEGORY_ICONS["Others / Universal"] ?? "📦",
+    icon: "📦",
     description: "General merchandise and multi-category stores",
   },
 };

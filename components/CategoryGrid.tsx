@@ -171,7 +171,7 @@ export default function CategoryGrid({
       {/* Mobile: Horizontal Scrollable Category Cards (hidden on md+) */}
       <div className="-mx-3 flex gap-2.5 overflow-x-auto px-3 pb-2 scrollbar-none md:hidden">
         {displayCategories.map((cat) => {
-          const gradient = CATEGORY_GRADIENTS[cat.key] ?? "from-gray-400 to-zinc-500";
+          const gradient = CATEGORY_GRADIENTS?.[cat.key] ?? "from-gray-400 to-zinc-500";
           return (
             <Link
               key={cat.key}
@@ -226,7 +226,7 @@ export default function CategoryGrid({
             label={cat.label}
             icon={cat.icon}
             count={cat.count}
-            gradient={CATEGORY_GRADIENTS[cat.key] ?? "from-gray-400 to-zinc-500"}
+            gradient={CATEGORY_GRADIENTS?.[cat.key] ?? "from-gray-400 to-zinc-500"}
             compact={compact}
             onClick={() => onCategoryClick?.(cat.label)}
           />

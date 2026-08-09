@@ -516,7 +516,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                         className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                       >
                         <span aria-hidden="true" className="text-lg">
-                          {CATEGORY_ICONS[cat] ?? "📦"}
+                          {CATEGORY_ICONS?.[cat] ?? "📦"}
                         </span>
                         {cat}
                       </Link>

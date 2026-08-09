@@ -6,7 +6,7 @@
 import { createClient } from "@/lib/supabase/client";
 import type { Shop, Product, ShopFormData } from "@/types";
 import { logError, toServiceError } from "@/services/errorService";
-import { isValidLatitude, isValidLongitude } from "@/services/geoRadiusService";
+import { isValidLatitude, isValidLongitude } from "@/lib/geoCoords";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
