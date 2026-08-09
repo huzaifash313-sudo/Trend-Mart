@@ -439,11 +439,18 @@ function ShopDetailInner({ id }: { id: string }) {
             <div className="flex items-start gap-3">
               <ShopLogoAvatar shopName={shop.name} logoUrl={shop.logo_url} size="md" />
               <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">{shop.name}</h2>
-                  <span className={`rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold ${theme.badgeClass}`}>{shop.category}</span>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h2 className="min-w-0 max-w-full truncate text-base font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">
+                    {shop.name}
+                  </h2>
+                  <span className={`max-w-full truncate rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold ${theme.badgeClass}`}>
+                    {shop.category}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><PinIcon />{shop.location}</div>
+                <div className="flex min-w-0 items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <PinIcon />
+                  <span className="truncate">{shop.location}</span>
+                </div>
               </div>
             </div>
             {shop.store_bio && (<p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{shop.store_bio}</p>)}
@@ -479,9 +486,9 @@ function ShopDetailInner({ id }: { id: string }) {
                   </a>
                 )}
                 {shop.secondary_phone && (
-                  <a href={`https://wa.me/${shop.secondary_phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-zinc-700 px-3 py-1 text-[0.65rem] font-semibold text-white transition-opacity hover:opacity-90 dark:bg-zinc-600">
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.62 10.79a15.053 15.053 0 0 0 6.59 6.59l2.2-2.2a1.003 1.003 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1.02 1.02 0 0 1-.25 1.02l-2.2 2.2z" /></svg>
-                    {shop.secondary_phone}
+                  <a href={`https://wa.me/${shop.secondary_phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 rounded-full bg-zinc-700 px-3 py-1 text-[0.65rem] font-semibold text-white transition-opacity hover:opacity-90 dark:bg-zinc-600">
+                    <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.62 10.79a15.053 15.053 0 0 0 6.59 6.59l2.2-2.2a1.003 1.003 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1.02 1.02 0 0 1-.25 1.02l-2.2 2.2z" /></svg>
+                    <span className="truncate">{shop.secondary_phone}</span>
                   </a>
                 )}
               </div>

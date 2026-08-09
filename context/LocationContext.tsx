@@ -17,6 +17,7 @@ import {
   detectAndSaveLocation,
   detectAndSaveLocationDetailed,
   buildLocationFromCity,
+  buildLocationFromCoords,
   resolveCoordinates,
   storeUserLocation,
   type GeoCoordinates,
@@ -53,6 +54,8 @@ interface LocationContextValue {
     location: UserLocation | null;
     error: LocationDetectErrorCode;
   }>;
+  /** Set pin from map click / drag (reverse-geocodes + saves). */
+  setManualPin: (lat: number, lng: number) => Promise<UserLocation | null>;
   /** Set location from a manually selected city. */
   setManualCity: (city: SupportedCity) => void;
   /** Clear the saved location (reset to no location). */
@@ -192,6 +195,22 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setManualPin = useCallback(async (lat: number, lng: number) => {
+    setIsDetecting(true);
+    try {
+      const loc = await buildLocationFromCoords(
+        { latitude: lat, longitude: lng },
+        "gps",
+      );
+      saveLocation(loc);
+      setLocation(loc);
+      if (loc.coordinates) storeUserLocation(loc.coordinates);
+      return loc;
+    } finally {
+      setIsDetecting(false);
+    }
+  }, []);
+
   const setManualCity = useCallback((city: SupportedCity) => {
     const loc = buildLocationFromCity(city);
     saveLocation(loc);
@@ -213,6 +232,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         isInitialized,
         detectLocation,
         detectLocationDetailed,
+        setManualPin,
         setManualCity,
         clearLocation,
       }}

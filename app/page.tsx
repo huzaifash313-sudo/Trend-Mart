@@ -451,9 +451,9 @@ function HomeInner() {
                       <div className="flex items-start justify-between gap-1">
                         <Link
                           href={`/shop/${shop.id}`}
-                          className="block truncate text-[0.7rem] font-semibold leading-snug text-zinc-900 hover:text-emerald-600 sm:text-sm dark:text-zinc-100 dark:hover:text-emerald-400"
+                          className="block min-w-0 flex-1 text-[0.7rem] font-semibold leading-snug text-zinc-900 hover:text-emerald-600 sm:text-sm dark:text-zinc-100 dark:hover:text-emerald-400"
                         >
-                          {shop.name}
+                          <span className="line-clamp-2 break-words">{shop.name}</span>
                         </Link>
                         <button
                           type="button"
@@ -475,9 +475,14 @@ function HomeInner() {
                           </svg>
                         </button>
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-                        <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[0.55rem] font-medium leading-none sm:px-2 sm:text-[0.6rem] dark:bg-zinc-800">{shop.category}</span>
-                        <span className="inline-flex items-center gap-0.5 text-[0.55rem] sm:text-xs"><PinIcon />{shop.location}</span>
+                      <div className="mt-1 flex min-w-0 flex-col gap-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                        <span className="max-w-full truncate rounded-full bg-zinc-100 px-1.5 py-0.5 text-[0.55rem] font-medium leading-none sm:px-2 sm:text-[0.6rem] dark:bg-zinc-800">
+                          {shop.category}
+                        </span>
+                        <span className="inline-flex min-w-0 items-center gap-0.5 text-[0.55rem] sm:text-xs">
+                          <PinIcon />
+                          <span className="truncate">{shop.location}</span>
+                        </span>
                       </div>
                     </div>
                   </div>

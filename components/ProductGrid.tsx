@@ -139,7 +139,7 @@ function ProductCard({
 
         {/* Category Badge */}
         {categoryLabel && (
-          <span className="absolute left-2 top-2 z-10 rounded-full bg-black/45 px-2 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur-sm">
+          <span className="absolute left-1.5 top-1.5 z-10 max-w-[70%] truncate rounded-full bg-black/45 px-2 py-0.5 text-[0.55rem] font-semibold text-white backdrop-blur-sm sm:left-2 sm:text-[0.6rem]">
             {categoryLabel}
           </span>
         )}
@@ -152,8 +152,8 @@ function ProductCard({
             </span>
           </div>
         ) : (
-          <span className="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur-sm">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-white" />
+          <span className="absolute bottom-1.5 left-1.5 z-10 flex max-w-[55%] items-center gap-1 truncate rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[0.55rem] font-semibold text-white backdrop-blur-sm sm:text-[0.6rem]">
+            <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
             In Stock
           </span>
         )}
@@ -176,8 +176,12 @@ function ProductCard({
       </div>
 
       {/* Info area */}
-      <div className={`space-y-1 ${compact ? "p-2" : "p-2.5"}`}>
-        <h3 className={`line-clamp-2 font-semibold text-zinc-800 dark:text-zinc-200 ${compact ? "text-xs leading-tight" : "text-sm"}`}>
+      <div className={`min-w-0 space-y-1 ${compact ? "p-2" : "p-2 sm:p-2.5"}`}>
+        <h3
+          className={`line-clamp-2 break-words font-semibold text-zinc-800 dark:text-zinc-200 ${
+            compact ? "text-[0.7rem] leading-snug sm:text-xs" : "text-xs leading-snug sm:text-sm"
+          }`}
+        >
           {product.name}
         </h3>
 
@@ -187,18 +191,22 @@ function ProductCard({
           </p>
         )}
 
-        <div className="flex items-center justify-between pt-0.5 gap-1">
-          <div className="flex items-center gap-1 min-w-0">
-            <span className={`font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap ${compact ? "text-sm" : "text-base"}`}>
+        <div className="flex items-end justify-between gap-2 pt-0.5">
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p
+              className={`truncate font-bold text-zinc-900 dark:text-zinc-100 ${
+                compact ? "text-xs sm:text-sm" : "text-sm sm:text-base"
+              }`}
+            >
               {priceLabel}
-            </span>
+            </p>
             {hasDiscount && originalPrice != null && (
-              <>
-                <span className={`text-zinc-400 line-through ${compact ? "text-[0.6rem]" : "text-xs"}`}>
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
+                <span className="truncate text-[0.6rem] text-zinc-400 line-through sm:text-xs">
                   {formatRupees(originalPrice)}
                 </span>
                 <DiscountBadge originalPrice={originalPrice} currentPrice={product.price} />
-              </>
+              </div>
             )}
           </div>
 
@@ -206,18 +214,18 @@ function ProductCard({
             <button
               type="button"
               onClick={handleAddToCart}
-              className={`flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 active:scale-95 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 ${
-                compact ? "px-2 py-1 text-[0.6rem]" : "px-2.5 py-1 text-[0.65rem]"
+              className={`flex shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 active:scale-95 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 ${
+                compact ? "h-7 w-7" : "h-8 w-8 sm:h-auto sm:w-auto sm:gap-1 sm:px-2.5 sm:py-1 sm:text-[0.65rem]"
               }`}
               aria-label={`Add ${product.name} to cart`}
             >
               <PlusCartIcon />
-              {compact ? "" : "Add"}
+              <span className="hidden sm:inline">Add</span>
             </button>
           )}
 
           {product.is_available && !onAddToCart && (
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
+            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
               Available
             </span>
           )}

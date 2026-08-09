@@ -260,9 +260,14 @@ function ProductRow({
             {product.is_available ? "In Stock" : "Out of Stock"}
           </span>
         </div>
-        <p className="mt-0.5 whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
           <span className="font-medium text-zinc-700 dark:text-zinc-300">{priceLabel}</span>
-          {categoryLabel ? ` · ${categoryLabel}` : ""}
+          {categoryLabel ? (
+            <span className="text-zinc-400"> · </span>
+          ) : null}
+          {categoryLabel ? (
+            <span className="truncate">{categoryLabel}</span>
+          ) : null}
         </p>
       </div>
 

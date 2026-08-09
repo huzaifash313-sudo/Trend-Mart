@@ -158,9 +158,16 @@ export default function Navbar() {
         ) : session ? (
           <Link
             href={dashHref}
-            className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-zinc-300 px-2.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:text-[color:var(--tm-text)] dark:hover:bg-[color:var(--tm-elevated)] sm:px-4 sm:text-sm"
+            className="inline-flex h-9 max-w-[5.5rem] shrink-0 items-center justify-center truncate rounded-xl border border-zinc-300 px-2 text-[0.7rem] font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-[color:var(--tm-border)] dark:text-[color:var(--tm-text)] dark:hover:bg-[color:var(--tm-elevated)] sm:max-w-none sm:px-4 sm:text-sm"
           >
-            {dashLabel}
+            {dashLabel === "Dashboard" ? (
+              <>
+                <span className="sm:hidden">Dash</span>
+                <span className="hidden sm:inline">Dashboard</span>
+              </>
+            ) : (
+              dashLabel
+            )}
           </Link>
         ) : (
           <a

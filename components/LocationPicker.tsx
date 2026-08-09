@@ -1,12 +1,23 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useLocation } from "@/context/LocationContext";
 import {
   locationErrorMessage,
+  CITY_CENTROIDS,
   type LocationDetectErrorCode,
 } from "@/services/geoRadiusService";
 import { SUPPORTED_CITIES, type SupportedCity } from "@/types";
+
+const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-40 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-[0.65rem] text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800">
+      Loading map…
+    </div>
+  ),
+});
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Precise Street‑Level Location Picker                            */
@@ -90,13 +101,31 @@ function shortAreaLabel(address?: string | null, zone?: string | null, city?: st
 }
 
 export default function LocationPicker() {
-  const { location, isDetecting, detectLocationDetailed, setManualCity, clearLocation } =
-    useLocation();
+  const {
+    location,
+    coordinates,
+    isDetecting,
+    detectLocationDetailed,
+    setManualPin,
+    setManualCity,
+    clearLocation,
+  } = useLocation();
   const [open, setOpen] = useState(false);
   const [detectError, setDetectError] = useState<string | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const [mapUpdating, setMapUpdating] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const mapPickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const mapLat =
+    coordinates?.latitude ??
+    CITY_CENTROIDS["Gujranwala"]?.lat ??
+    32.1877;
+  const mapLng =
+    coordinates?.longitude ??
+    CITY_CENTROIDS["Gujranwala"]?.lng ??
+    74.1945;
 
   useEffect(() => {
     if (!open) return;
@@ -132,11 +161,34 @@ export default function LocationPicker() {
         setDetectError(locationErrorMessage(code));
         return false;
       }
-      setOpen(false);
       return true;
     },
     [detectLocationDetailed],
   );
+
+  const handleMapPick = useCallback(
+    (lat: number, lng: number) => {
+      setDetectError(null);
+      if (mapPickTimer.current) clearTimeout(mapPickTimer.current);
+      mapPickTimer.current = setTimeout(async () => {
+        setMapUpdating(true);
+        try {
+          await setManualPin(lat, lng);
+        } catch {
+          setDetectError("Could not update pin address. Try again.");
+        } finally {
+          setMapUpdating(false);
+        }
+      }, 350);
+    },
+    [setManualPin],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (mapPickTimer.current) clearTimeout(mapPickTimer.current);
+    };
+  }, []);
 
   const handleDetect = useCallback(async () => {
     await applyDetectResult();
@@ -289,6 +341,28 @@ export default function LocationPicker() {
             <p className="mt-1 text-[0.6rem] text-zinc-400 dark:text-zinc-500">
               Uses high-accuracy GPS + map reverse geocode (road, colony, nearby landmark).
             </p>
+          </div>
+
+          {/* Compact map — tap / drag pin for exact spot */}
+          <div className="mb-3">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                Adjust on map
+              </p>
+              {mapUpdating && (
+                <span className="text-[0.6rem] text-emerald-600 animate-pulse dark:text-emerald-400">
+                  Updating address…
+                </span>
+              )}
+            </div>
+            {open && (
+              <LocationMiniMap
+                latitude={mapLat}
+                longitude={mapLng}
+                onPick={handleMapPick}
+                heightClassName="h-36 sm:h-40"
+              />
+            )}
           </div>
 
           <div className="mb-3 flex items-center gap-2">
