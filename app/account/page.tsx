@@ -43,11 +43,14 @@ export default function CustomerAccountPage() {
     }
   }, []);
 
-  const pendingCount = localOrders.filter((o) => {
-    // Local history has no live status — treat recent (7d) as "active"
-    const age = Date.now() - new Date(o.timestamp).getTime();
-    return age < 7 * 24 * 60 * 60 * 1000;
-  }).length;
+  const pendingCount = useMemo(() => {
+    const now = Date.now();
+    return localOrders.filter((o) => {
+      // Local history has no live status — treat recent (7d) as "active"
+      const age = now - new Date(o.timestamp).getTime();
+      return age < 7 * 24 * 60 * 60 * 1000;
+    }).length;
+  }, [localOrders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,18 +130,18 @@ export default function CustomerAccountPage() {
           Checking your account…
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <a
+          <Link
             href="/dashboard"
             className="text-sm font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
           >
             Open Dashboard →
-          </a>
-          <a
+          </Link>
+          <Link
             href="/"
             className="text-sm font-medium text-zinc-500 hover:underline"
           >
             Home
-          </a>
+          </Link>
         </div>
       </div>
     );

@@ -439,7 +439,7 @@ export function generateEnvExample(): string {
     "SUPABASE_SERVICE_ROLE_KEY=your-service-role-key",
     "",
     "# ── Database ───────────────────────────────────────────────────────",
-    "DATABASE_URL=postgresql://postgres:password@localhost:5432/postgres",
+    "DATABASE_URL=postgresql://localhost:5432/postgres",
     "",
     "# ── Storage ────────────────────────────────────────────────────────",
     "SUPABASE_STORAGE_BUCKET=trendmart-media",

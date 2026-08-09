@@ -9,7 +9,7 @@ name: Security Scan — Audit, Secrets, SAST
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, Main, master, develop]
     paths:
       - 'package.json'
       - 'package-lock.json'
@@ -18,7 +18,7 @@ on:
       - '**/*.js'
       - '**/*.jsx'
   pull_request:
-    branches: [main, master]
+    branches: [main, Main, master]
     types: [opened, synchronize, reopened]
   schedule:
     # Run every Monday at 08:00 UTC (weekly vulnerability audit)
@@ -305,7 +305,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [npm-audit, secret-scan, sast, typescript-check]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Main' || github.ref == 'refs/heads/master'
 
     steps:
       - name: Security Gate Summary

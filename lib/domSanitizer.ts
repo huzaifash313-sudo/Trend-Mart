@@ -37,12 +37,8 @@ const MERCHANT_BIO_ALLOWED_TAGS: string[] = [
  * DOMPurify is a function that sets configuration and returns a sanitizer.
  * We call it once with default config to get a typed instance.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const getDefaultPurifier = ((): Purifier => DOMPurify as any)();
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createPurifier = (config?: Record<string, unknown>): any =>
-  DOMPurify(config as any);
+const createPurifier = (config?: Record<string, unknown>): Purifier =>
+  (DOMPurify as (cfg?: Record<string, unknown>) => Purifier)(config);
 
 // ─── Core Sanitization Functions ─────────────────────────────────────────────
 
@@ -105,7 +101,6 @@ export function sanitizeUrl(url: string): string {
  */
 export function sanitizeSearchQuery(query: string): string {
   if (!query || typeof query !== "string") return "";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const purifier = createPurifier();
   const noHtml = (purifier as { sanitize: (d: string, o?: Record<string, unknown>) => string })
     .sanitize(query, { ALLOWED_TAGS: [] });
