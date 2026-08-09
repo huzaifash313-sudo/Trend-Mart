@@ -29,7 +29,7 @@ function SearchIcon() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Navbar                                                                     */
+/*  Navbar — location lives beside search (map pin picker opens from here)     */
 /* -------------------------------------------------------------------------- */
 
 export default function Navbar() {
@@ -113,8 +113,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
-      <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
-        {/* Hamburger */}
+      <div className="mx-auto flex max-w-6xl items-center gap-1.5 px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-3">
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
@@ -124,37 +123,34 @@ export default function Navbar() {
           <HamburgerIcon />
         </button>
 
-        {/* Logo */}
         <Link
           href="/"
-          className="inline-flex shrink-0 items-center text-base font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-lg"
+          className="inline-flex shrink-0 items-center text-[0.95rem] font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-lg"
         >
           TrendMart
         </Link>
 
-        {/* Location — desktop only */}
-        <div className="hidden shrink-0 sm:block">
+        {/* Location + Search sit together — map pin opens from Location */}
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
           <LocationPicker />
+
+          {!onSearchPage ? (
+            <button
+              type="button"
+              onClick={navigateToSearch}
+              className="inline-flex h-9 min-w-0 max-w-md flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 text-sm text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-white dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-muted)] dark:hover:border-zinc-600 sm:justify-start sm:px-4"
+              aria-label="Search shops"
+            >
+              <SearchIcon />
+              <span className="hidden truncate sm:inline">Search shops…</span>
+            </button>
+          ) : (
+            <div className="hidden min-w-0 flex-1 sm:block" />
+          )}
         </div>
 
-        {/* Single search control — bar on sm+, icon on mobile; hide on /search */}
-        {!onSearchPage ? (
-          <button
-            type="button"
-            onClick={navigateToSearch}
-            className="ml-auto inline-flex min-h-9 min-w-9 max-w-md flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 text-sm text-zinc-500 transition-colors hover:border-zinc-300 hover:bg-white dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-elevated)] dark:text-[color:var(--tm-muted)] dark:hover:border-zinc-600 sm:justify-start sm:px-4"
-            aria-label="Search shops"
-          >
-            <SearchIcon />
-            <span className="hidden truncate sm:inline">Search shops…</span>
-          </button>
-        ) : (
-          <div className="ml-auto min-w-0 flex-1" />
-        )}
-
-        {/* Auth */}
         {loading ? (
-          <div className="h-9 w-16 shrink-0 animate-pulse rounded-xl bg-zinc-200 dark:bg-[color:var(--tm-elevated)]" />
+          <div className="h-9 w-14 shrink-0 animate-pulse rounded-xl bg-zinc-200 dark:bg-[color:var(--tm-elevated)] sm:w-16" />
         ) : session ? (
           <Link
             href={dashHref}
@@ -177,11 +173,6 @@ export default function Navbar() {
             Sign In
           </a>
         )}
-      </div>
-
-      {/* Location row on mobile only */}
-      <div className="border-t border-zinc-100 px-3 py-1.5 sm:hidden dark:border-[color:var(--tm-border)]">
-        <LocationPicker />
       </div>
 
       {portalReady
