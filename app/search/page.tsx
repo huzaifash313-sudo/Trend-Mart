@@ -8,7 +8,7 @@ import { SHOP_CATEGORIES, CATEGORY_ICONS, CATEGORY_GRADIENTS } from "@/types";
 import { fetchShops } from "@/services/shopService";
 import { globalSearch, autocomplete, type GlobalSearchItem, type SearchSuggestion } from "@/services/globalSearchService";
 import { ErrorState } from "@/components/ErrorState";
-import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
+import ShopCard from "@/components/ShopCard";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
 import SubCategoryPills from "@/components/SubCategoryPills";
@@ -22,14 +22,6 @@ function SearchIcon() {
   return (
     <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg className="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
     </svg>
   );
 }
@@ -677,56 +669,22 @@ function SearchResultsInner() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
               {filteredGlobalResults.map((item) => {
                 if (item.type === "shop") {
                   return (
-                    <Link
+                    <ShopCard
                       key={`shop-${item.id}`}
-                      href={`/shop/${item.id}`}
-                      className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
-                    >
-                      <ShopMediaHeader
-                        shopName={item.name}
-                        bannerUrl={item.bannerUrl}
-                        logoUrl={item.logoUrl ?? item.imageUrl}
-                        size="card"
-                        useNextImage={false}
-                      >
-                        <span className="absolute left-2 top-2 z-[1] rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 sm:left-3 sm:top-3 sm:text-xs dark:bg-emerald-900/60 dark:text-emerald-300">
-                          Store
-                        </span>
-                      </ShopMediaHeader>
-                      <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
-                        <div className="flex items-start gap-2">
-                          <ShopLogoAvatar
-                            shopName={item.name}
-                            logoUrl={item.logoUrl ?? item.imageUrl}
-                            useNextImage={false}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-base dark:text-zinc-100">
-                              {item.name}
-                            </h3>
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 sm:gap-2 sm:text-sm dark:text-zinc-400">
-                              {item.category && (
-                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs dark:bg-zinc-800">
-                                  {item.category}
-                                </span>
-                              )}
-                              {item.location && (
-                                <span className="inline-flex items-center gap-1 truncate">
-                                  <PinIcon />{item.location}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        {item.snippet && (
-                          <p className="hidden truncate text-xs text-zinc-400 sm:block dark:text-zinc-500">{item.snippet}</p>
-                        )}
-                      </div>
-                    </Link>
+                      shop={{
+                        id: item.id,
+                        name: item.name,
+                        category: item.category ?? "Store",
+                        location: item.location ?? "",
+                        logo_url: item.logoUrl ?? item.imageUrl,
+                        banner_url: item.bannerUrl,
+                        is_live: true,
+                      }}
+                    />
                   );
                 }
 
@@ -736,26 +694,29 @@ function SearchResultsInner() {
                   <Link
                     key={`product-${item.id}`}
                     href={`/shop/${item.shopId}`}
-                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                    className="trend-card flex h-full flex-col overflow-hidden"
                   >
-                    <div className="relative flex h-28 items-center justify-center bg-gradient-to-br from-violet-400 to-purple-600 sm:h-40">
+                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
                       {item.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
-                        <span className="select-none text-4xl font-bold text-white/70 sm:text-5xl">
-                          {CATEGORY_ICONS?.[item.shopName ?? ""] ?? "📦"}
-                        </span>
+                        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(145deg,#ede9fe_0%,#ddd6fe_100%)] dark:bg-[linear-gradient(145deg,#4c1d95_0%,#5b21b6_100%)]">
+                          <span className="text-2xl" aria-hidden="true">
+                            {CATEGORY_ICONS?.[item.shopName ?? ""] ?? "📦"}
+                          </span>
+                        </div>
                       )}
-                      <span className="absolute left-2 top-2 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 sm:left-3 sm:top-3 sm:text-xs dark:bg-violet-900/60 dark:text-violet-300">
+                      <span className="absolute left-2 top-2 rounded-md bg-white/95 px-1.5 py-0.5 text-[0.6rem] font-semibold text-violet-700 shadow-sm dark:bg-zinc-900/90 dark:text-violet-300">
                         Product
                       </span>
                       <button
                         type="button"
                         onClick={(e) => handleProductWishlist(item, e)}
-                        className={`absolute right-2 top-2 z-10 rounded-full p-1.5 backdrop-blur-sm transition-colors ${
+                        className={`icon-only absolute right-2 top-2 z-10 rounded-full p-1.5 backdrop-blur-sm transition-colors ${
                           productWishlisted
-                            ? "bg-red-500/90 text-white"
-                            : "bg-white/85 text-zinc-500 hover:text-red-500"
+                            ? "bg-rose-500 text-white"
+                            : "bg-white/90 text-zinc-500 hover:text-rose-500"
                         }`}
                         aria-label={productWishlisted ? "Remove from wishlist" : "Add to wishlist"}
                       >
@@ -764,22 +725,25 @@ function SearchResultsInner() {
                         </svg>
                       </button>
                     </div>
-                    <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
-                      <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-base dark:text-zinc-100">{item.name}</h3>
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs sm:gap-2 sm:text-sm">
-                        {item.price && (
-                          <span className="text-base font-bold text-emerald-600 sm:text-lg dark:text-emerald-400">
+                    <div className="flex flex-1 flex-col gap-1.5 p-2.5 sm:p-3">
+                      <h3 className="tm-title-ellipsis text-[0.8125rem] font-semibold text-zinc-900 sm:text-sm dark:text-zinc-50" title={item.name}>
+                        {item.name}
+                      </h3>
+                      <div className="mt-auto flex flex-wrap items-center gap-1.5">
+                        {item.price != null && (
+                          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
                             Rs. {item.price.toLocaleString("en-PK")}
                           </span>
                         )}
                         {!item.isAvailable && (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600 sm:text-xs">Sold Out</span>
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[0.6rem] font-semibold text-red-600">Sold Out</span>
                         )}
                       </div>
-                      <p className="hidden text-xs text-zinc-500 sm:block dark:text-zinc-400">
-                        {item.shopName && <span>🏪 {item.shopName}</span>}
-                        {item.snippet && <span className="ml-2 text-zinc-400">{item.snippet.slice(0, 60)}</span>}
-                      </p>
+                      {item.shopName && (
+                        <p className="tm-title-ellipsis text-[0.6875rem] text-zinc-500 dark:text-zinc-400" title={item.shopName}>
+                          {item.shopName}
+                        </p>
+                      )}
                     </div>
                   </Link>
                 );
@@ -790,61 +754,20 @@ function SearchResultsInner() {
 
         {/* Legacy Shop Results Grid (fallback) */}
         {!loading && !error && sortedShops.length > 0 && filteredGlobalResults.length === 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {sortedShops.map((shop) => (
-              <Link
+              <ShopCard
                 key={shop.id}
-                href={`/shop/${shop.id}`}
-                className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                {/* Banner + logo — separate slots */}
-                <ShopMediaHeader
-                  shopName={shop.name}
-                  bannerUrl={shop.banner_url}
-                  logoUrl={shop.logo_url}
-                  size="card"
-                  useNextImage={false}
-                >
-                  {shop.is_live && (
-                    <span className="absolute left-2 top-2 z-[1] animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white sm:left-3 sm:top-3 sm:text-xs">
-                      LIVE
-                    </span>
-                  )}
-                  {shop.operating_status && (
-                    <span className="absolute bottom-2 right-2 z-[1] rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
-                      {shop.operating_status}
-                    </span>
-                  )}
-                </ShopMediaHeader>
-
-                {/* Info — logo beside name */}
-                <div className="space-y-1.5 p-2.5 sm:space-y-2 sm:p-4">
-                  <div className="flex items-start gap-2">
-                    <ShopLogoAvatar
-                      shopName={shop.name}
-                      logoUrl={shop.logo_url}
-                      useNextImage={false}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-sm font-semibold text-zinc-900 sm:text-base dark:text-zinc-100">
-                        {shop.name}
-                      </h3>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 sm:gap-2 sm:text-sm dark:text-zinc-400">
-                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium sm:px-2.5 sm:text-xs dark:bg-zinc-800">
-                          {shop.category}
-                        </span>
-                        <span className="inline-flex items-center gap-1 truncate">
-                          <PinIcon />
-                          {shop.location}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  {shop.business_hours && (
-                    <p className="hidden text-xs text-zinc-400 sm:block dark:text-zinc-500">{shop.business_hours}</p>
-                  )}
-                </div>
-              </Link>
+                shop={{
+                  id: shop.id,
+                  name: shop.name,
+                  category: shop.category,
+                  location: shop.location,
+                  logo_url: shop.logo_url,
+                  banner_url: shop.banner_url,
+                  is_live: shop.is_live,
+                }}
+              />
             ))}
           </div>
         )}

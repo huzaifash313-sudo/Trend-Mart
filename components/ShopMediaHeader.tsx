@@ -48,8 +48,8 @@ export function ShopLogoAvatar({
   const initial = shopName.charAt(0).toUpperCase() || "S";
   const box =
     size === "md"
-      ? "h-11 w-11 text-base sm:h-12 sm:w-12 sm:text-lg"
-      : "h-8 w-8 text-xs sm:h-9 sm:w-9 sm:text-sm";
+      ? "h-10 w-10 text-sm sm:h-11 sm:w-11 sm:text-base"
+      : "h-8 w-8 text-[0.7rem] sm:h-9 sm:w-9 sm:text-xs";
 
   return (
     <div
@@ -113,7 +113,7 @@ export default function ShopMediaHeader({
 
   const frameClass = isHero
     ? "relative h-36 w-full sm:h-44 md:h-48 lg:h-52"
-    : "relative h-28 w-full sm:h-32";
+    : "relative aspect-[16/10] w-full sm:aspect-[16/9]";
 
   const logoBoxClass = isHero
     ? "absolute -bottom-7 left-3 z-10 h-14 w-14 sm:-bottom-8 sm:left-4 sm:h-[4.5rem] sm:w-[4.5rem]"
@@ -124,8 +124,8 @@ export default function ShopMediaHeader({
       <div
         className={`${frameClass} overflow-hidden ${
           showBanner
-            ? "bg-zinc-200 dark:bg-zinc-800"
-            : "bg-gradient-to-br from-emerald-400 to-emerald-600"
+            ? "bg-zinc-100 dark:bg-zinc-800"
+            : "bg-[linear-gradient(145deg,#ecfdf5_0%,#d1fae5_45%,#a7f3d0_100%)] dark:bg-[linear-gradient(145deg,#064e3b_0%,#065f46_50%,#047857_100%)]"
         }`}
       >
         {showBanner ? (
@@ -138,7 +138,7 @@ export default function ShopMediaHeader({
               sizes={
                 isHero
                   ? "100vw"
-                  : "(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                  : "(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               }
               priority={isHero}
               onError={onBannerError}
@@ -154,14 +154,20 @@ export default function ShopMediaHeader({
             />
           )
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-3 text-center">
             <span
-              className={`select-none font-bold text-white/70 ${
-                isHero ? "text-5xl" : "text-2xl sm:text-4xl"
+              className={`flex items-center justify-center rounded-2xl bg-white/55 font-semibold text-emerald-800 shadow-sm backdrop-blur-sm dark:bg-black/25 dark:text-emerald-100 ${
+                isHero ? "h-16 w-16 text-2xl" : "h-11 w-11 text-lg sm:h-12 sm:w-12"
               }`}
+              aria-hidden="true"
             >
               {initial}
             </span>
+            {!isHero && (
+              <span className="tm-title-ellipsis max-w-full text-[0.65rem] font-medium text-emerald-900/70 dark:text-emerald-50/80">
+                {shopName}
+              </span>
+            )}
           </div>
         )}
         {children}

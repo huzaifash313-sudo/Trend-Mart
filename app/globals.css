@@ -213,7 +213,8 @@ table {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Prevent long unbreakable strings (URLs, codes, phone numbers) from overflowing. */
+/* Prevent long strings from overflowing — without mid-word hyphenation.
+   `hyphens: auto` was splitting shop names like "Islamabad" → "Islamaba-d". */
 p,
 span,
 a,
@@ -227,9 +228,29 @@ h3,
 h4,
 h5,
 h6 {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: manual;
+}
+
+/* Shop / product titles: clean ellipsis, never hyphenate mid-word. */
+.tm-title-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.tm-title-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   overflow-wrap: break-word;
-  word-break: break-word;
-  hyphens: auto;
+  word-break: normal;
+  hyphens: none;
 }
 
 /* Ensure pre/code blocks are scrollable on mobile instead of overflowing. */
