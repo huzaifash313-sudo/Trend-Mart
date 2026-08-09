@@ -26,7 +26,16 @@ async function seedCategory(category: string) {
   }
 
   const defs = getDefaultSubCategories(category);
-  const payload = defs.map((d) => ({
+  const payload: Array<{
+    category: string;
+    name: string;
+    slug: string;
+    description: string;
+    icon: string;
+    sort_order: number;
+    is_others: boolean;
+    is_active: boolean;
+  }> = defs.map((d) => ({
     category,
     name: d.name,
     slug: d.slug,
@@ -37,10 +46,13 @@ async function seedCategory(category: string) {
     is_active: true,
   }));
 
-  const { error } = await admin.from("sub_categories").upsert(payload, {
-    onConflict: "category,slug",
-    ignoreDuplicates: false,
-  });
+  // Admin client may not include generated table typings — cast for upsert.
+  const { error } = await admin
+    .from("sub_categories")
+    .upsert(payload as unknown as never, {
+      onConflict: "category,slug",
+      ignoreDuplicates: false,
+    });
 
   if (error) {
     return { seeded: false, reason: error.message, rows: [] as Array<Record<string, unknown>> };
