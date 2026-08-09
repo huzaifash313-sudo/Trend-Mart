@@ -2,23 +2,15 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "@/context/LocationContext";
+import {
+  locationErrorMessage,
+  type LocationDetectErrorCode,
+} from "@/services/geoRadiusService";
 import { SUPPORTED_CITIES, type SupportedCity } from "@/types";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Precise Street‑Level Location Picker                            */
-/*                                                                             */
-/*  Features:                                                                   */
-/*   - One‑tap GPS geolocation via navigator.geolocation API                   */
-/*   - Reverse geocoding to resolve exact locality/street address              */
-/*   - Displays resolved address (street, suburb, city) beside the pin         */
-/*   - Manual city fallback with full dropdown                                  */
-/*   - Quick‑select top cities chip bar                                       */
-/*   - 'Use Live Location' toggle for returning users                          */
-/*   - Smooth dropdown with outside‑click and Escape dismissal                 */
-/*   - Graceful fallback when permissions denied — falls back to city select    */
 /* -------------------------------------------------------------------------- */
-
-/* ── Inline SVG Icons ──────────────────────────────────────────────────────── */
 
 function LocateIcon() {
   return (
@@ -38,15 +30,6 @@ function CrosshairIcon({ pulsing }: { pulsing?: boolean }) {
       <line x1="12" y1="18" x2="12" y2="22" />
       <line x1="2" y1="12" x2="6" y2="12" />
       <line x1="18" y1="12" x2="22" y2="12" />
-    </svg>
-  );
-}
-
-function PinIcon() {
-  return (
-    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-      <circle cx="12" cy="10" r="3" />
     </svg>
   );
 }
@@ -95,24 +78,26 @@ function NavigationIcon() {
   );
 }
 
-/* ── Constants ─────────────────────────────────────────────────────────────── */
-
 const TOP_CITIES: SupportedCity[] = ["Gujranwala", "Lahore", "Islamabad", "Faisalabad", "Karachi"];
-
-/** Minimum time between refresh geolocation attempts to prevent spamming. */
 const REFRESH_COOLDOWN_MS = 10_000;
 
-/* ── Component ─────────────────────────────────────────────────────────────── */
+function shortAreaLabel(address?: string | null, zone?: string | null, city?: string | null): string {
+  if (address) {
+    const first = address.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return zone || city || "Set Location";
+}
 
 export default function LocationPicker() {
-  const { location, isDetecting, detectLocation, setManualCity, clearLocation } = useLocation();
+  const { location, isDetecting, detectLocationDetailed, setManualCity, clearLocation } =
+    useLocation();
   const [open, setOpen] = useState(false);
   const [detectError, setDetectError] = useState<string | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // ── Close on outside click ──────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
@@ -129,7 +114,6 @@ export default function LocationPicker() {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
-  // ── Close on Escape ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -139,18 +123,25 @@ export default function LocationPicker() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // ── GPS Detection Handler ───────────────────────────────────────────────────
-  const handleDetect = useCallback(async () => {
-    setDetectError(null);
-    const result = await detectLocation();
-    if (!result) {
-      setDetectError("Location access denied or unavailable. Please select a city manually.");
-    } else {
+  const applyDetectResult = useCallback(
+    async () => {
+      setDetectError(null);
+      const { location: detected, error } = await detectLocationDetailed();
+      if (!detected) {
+        const code = (error ?? "unavailable") as LocationDetectErrorCode;
+        setDetectError(locationErrorMessage(code));
+        return false;
+      }
       setOpen(false);
-    }
-  }, [detectLocation]);
+      return true;
+    },
+    [detectLocationDetailed],
+  );
 
-  // ── Refresh location (re-detect with cooldown) ──────────────────────────────
+  const handleDetect = useCallback(async () => {
+    await applyDetectResult();
+  }, [applyDetectResult]);
+
   const handleRefreshLocation = useCallback(async () => {
     const now = Date.now();
     if (now - lastRefreshTime < REFRESH_COOLDOWN_MS) {
@@ -158,11 +149,9 @@ export default function LocationPicker() {
       return;
     }
     setLastRefreshTime(now);
-    setDetectError(null);
-    await detectLocation();
-  }, [detectLocation, lastRefreshTime]);
+    await applyDetectResult();
+  }, [applyDetectResult, lastRefreshTime]);
 
-  // ── Manual city selection ───────────────────────────────────────────────────
   const handleSelectCity = useCallback(
     (city: SupportedCity) => {
       setManualCity(city);
@@ -172,7 +161,6 @@ export default function LocationPicker() {
     [setManualCity],
   );
 
-  // ── Clear location ──────────────────────────────────────────────────────────
   const handleClear = useCallback(() => {
     clearLocation();
     setOpen(false);
@@ -180,17 +168,16 @@ export default function LocationPicker() {
 
   const hasLocation = !!location;
   const isGps = hasLocation && location!.source === "gps";
-  const displayLabel = location?.deliveryZone ?? location?.city;
   const displayAddress = location?.address ?? null;
-
-  // ── Build trigger label with street address context ─────────────────────────
-  const triggerLabel = hasLocation
-    ? displayLabel ?? "Set"
-    : "Set Location";
+  const displayLabel = shortAreaLabel(
+    displayAddress,
+    location?.deliveryZone,
+    location?.city,
+  );
+  const triggerLabel = hasLocation ? displayLabel : "Set Location";
 
   return (
     <div className="relative" ref={panelRef}>
-      {/* ── Trigger button ────────────────────────────────────────────────── */}
       <button
         ref={triggerRef}
         type="button"
@@ -200,21 +187,19 @@ export default function LocationPicker() {
             ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
             : "border-zinc-200 bg-white text-zinc-500 hover:border-emerald-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500"
         }`}
-        aria-label={hasLocation ? `Location: ${displayLabel ?? "Set"}${isGps ? " (GPS)" : ""}` : "Set your location"}
+        aria-label={hasLocation ? `Location: ${displayLabel}${isGps ? " (GPS)" : ""}` : "Set your location"}
         aria-expanded={open}
       >
         {isGps ? <NavigationIcon /> : <LocateIcon />}
-        <span className="max-w-[120px] truncate">{triggerLabel}</span>
+        <span className="max-w-[140px] truncate">{triggerLabel}</span>
         <ChevronDownIcon />
       </button>
 
-      {/* ── Dropdown panel ────────────────────────────────────────────────── */}
       {open && (
         <div
           className="absolute left-0 top-full z-50 mt-2 w-[340px] max-w-[92vw] rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="mb-3 flex items-center justify-between">
             <h3 className="flex items-center gap-1.5 text-xs font-bold text-zinc-800 dark:text-zinc-200">
               <MapPinHouseIcon /> Set Your Location
@@ -229,7 +214,6 @@ export default function LocationPicker() {
             </button>
           </div>
 
-          {/* ── Current location status card ───────────────────────────────── */}
           {hasLocation && (
             <div className="mb-3 rounded-xl border border-emerald-200/60 bg-emerald-50 p-3 dark:border-emerald-700/30 dark:bg-emerald-900/20">
               <div className="flex items-start gap-2.5">
@@ -237,11 +221,10 @@ export default function LocationPicker() {
                   📍
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-emerald-800 dark:text-emerald-200">
-                    {displayLabel ?? "Location Set"}
+                  <p className="text-xs font-bold leading-snug text-emerald-800 dark:text-emerald-200">
+                    {displayLabel}
                   </p>
-                  {/* Show street-level address when GPS */}
-                  {isGps && displayAddress && (
+                  {displayAddress && displayAddress !== displayLabel && (
                     <p className="mt-0.5 text-[0.65rem] leading-relaxed text-emerald-600 dark:text-emerald-400">
                       {displayAddress}
                     </p>
@@ -250,26 +233,23 @@ export default function LocationPicker() {
                     {isGps ? (
                       <>
                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Live GPS location
+                        Live GPS · nearest road / colony / landmark
                       </>
                     ) : location!.source === "manual" ? (
-                      "Manually selected"
+                      "City selected — use Live Location for street-level pin"
                     ) : (
                       "Restored from previous visit"
                     )}
                   </p>
-                  {/* Refresh GPS + Clear buttons */}
                   <div className="mt-2 flex items-center gap-2">
-                    {isGps && (
-                      <button
-                        type="button"
-                        onClick={handleRefreshLocation}
-                        className="inline-flex items-center gap-1 rounded-full bg-emerald-200/60 px-2.5 py-1 text-[0.6rem] font-semibold text-emerald-800 transition-colors hover:bg-emerald-200 dark:bg-emerald-800/40 dark:text-emerald-300 dark:hover:bg-emerald-700/60"
-                        aria-label="Refresh GPS location"
-                      >
-                        <RefreshIcon /> Refresh
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleRefreshLocation}
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-200/60 px-2.5 py-1 text-[0.6rem] font-semibold text-emerald-800 transition-colors hover:bg-emerald-200 dark:bg-emerald-800/40 dark:text-emerald-300 dark:hover:bg-emerald-700/60"
+                      aria-label="Refresh GPS location"
+                    >
+                      <RefreshIcon /> Refresh GPS
+                    </button>
                     <button
                       type="button"
                       onClick={handleClear}
@@ -284,7 +264,6 @@ export default function LocationPicker() {
             </div>
           )}
 
-          {/* ── Detect My Location button ──────────────────────────────────── */}
           <div className="mb-3">
             <button
               type="button"
@@ -294,7 +273,7 @@ export default function LocationPicker() {
             >
               {isDetecting ? (
                 <>
-                  <CrosshairIcon pulsing /> Detecting your precise location...
+                  <CrosshairIcon pulsing /> Finding nearest road & landmark…
                 </>
               ) : (
                 <>
@@ -308,18 +287,16 @@ export default function LocationPicker() {
               </p>
             )}
             <p className="mt-1 text-[0.6rem] text-zinc-400 dark:text-zinc-500">
-              Uses browser GPS for accurate street‑level proximity matching.
+              Uses high-accuracy GPS + map reverse geocode (road, colony, nearby landmark).
             </p>
           </div>
 
-          {/* ── Divider ────────────────────────────────────────────────────── */}
           <div className="mb-3 flex items-center gap-2">
             <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800" />
             <span className="text-[0.6rem] font-medium uppercase tracking-widest text-zinc-400 dark:text-zinc-500">or</span>
             <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800" />
           </div>
 
-          {/* ── Quick-pick top cities ──────────────────────────────────────── */}
           <div className="mb-3">
             <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
               Quick Select a City
@@ -331,7 +308,7 @@ export default function LocationPicker() {
                   type="button"
                   onClick={() => handleSelectCity(city)}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition-all active:scale-95 ${
-                    location?.deliveryZone === city
+                    location?.city === city || location?.deliveryZone === city
                       ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
                       : "border-zinc-200 bg-white text-zinc-600 hover:border-emerald-300 hover:text-emerald-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-emerald-600 dark:hover:text-emerald-400"
                   }`}
@@ -342,7 +319,6 @@ export default function LocationPicker() {
             </div>
           </div>
 
-          {/* ── Full city list dropdown ────────────────────────────────────── */}
           <div>
             <label
               htmlFor="location-city-select"
@@ -353,7 +329,7 @@ export default function LocationPicker() {
             <div className="relative">
               <select
                 id="location-city-select"
-                value={location?.deliveryZone ?? ""}
+                value={location?.city ?? location?.deliveryZone ?? ""}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val && SUPPORTED_CITIES.includes(val as SupportedCity)) {
@@ -374,7 +350,7 @@ export default function LocationPicker() {
               </div>
             </div>
             <p className="mt-1.5 text-[0.6rem] text-zinc-400 dark:text-zinc-500">
-              Shops are filtered and sorted by proximity to your location.
+              Shops are sorted nearest-first using your live pin or city centre.
             </p>
           </div>
         </div>

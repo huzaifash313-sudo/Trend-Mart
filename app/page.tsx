@@ -97,6 +97,7 @@ function HomeInner() {
     coordinates: null,
     maxDistanceKm: 0,
     locationAvailable: false,
+    scope: "radius",
   });
   const [geoFiltering, setGeoFiltering] = useState(false);
   const [geoDetecting, setGeoDetecting] = useState(false);
@@ -165,31 +166,34 @@ function HomeInner() {
     });
   }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds]);
 
-  /* Geo proximity filtering */
+  /* Geo proximity filtering — always nearest-first when we have a pin / city / Pakistan scope */
   useEffect(() => {
     let cancelled = false;
     async function applyGeoFilter() {
-      // Prefer explicit geo filter; fall back to global location
-      const coords = geoFilter.locationAvailable && geoFilter.coordinates
-        ? geoFilter.coordinates
-        : globalCoords;
+      const scope = geoFilter.scope ?? "radius";
+      const coords =
+        geoFilter.coordinates ??
+        globalCoords ??
+        null;
 
-      if (!coords) {
+      // Pakistan / city scopes can run without coords; radius needs a pin for distance.
+      if (!coords && scope === "radius") {
         setProximityActive(false);
         setGeoFilteredShops([]);
         return;
       }
+
       setGeoFiltering(true);
       try {
         const result = await filterShopsByProximity(filteredShops, {
           coordinates: coords,
-          // 0 / Any = no customer distance cap (nationwide shops stay visible).
-          maxDistanceKm: geoFilter.maxDistanceKm > 0 ? geoFilter.maxDistanceKm : 0,
-          // Shops without a pinned location/radius are always shown (see
-          // filterShopsByProximity); this only hides shops that have opted
-          // into a specific delivery radius once the customer is outside it.
-          enforceServiceRadius: true,
+          maxDistanceKm:
+            scope === "radius" && geoFilter.maxDistanceKm > 0
+              ? geoFilter.maxDistanceKm
+              : 0,
+          enforceServiceRadius: scope !== "pakistan",
           sortByProximity: true,
+          scope,
           deliveryZone: globalLocation?.deliveryZone ?? undefined,
           customerCity: globalLocation?.city ?? undefined,
         });
@@ -200,17 +204,19 @@ function HomeInner() {
       } catch {
         if (!cancelled) {
           setGeoFilteredShops([]);
-          setProximityActive(true);
+          setProximityActive(Boolean(coords) || scope !== "radius");
         }
       }
       if (!cancelled) setGeoFiltering(false);
     }
     applyGeoFilter();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [filteredShops, geoFilter, globalCoords, globalLocation]);
 
   const displayShops = proximityActive ? geoFilteredShops : filteredShops;
-  const showProximityBadges = proximityActive && geoFilter.locationAvailable;
+  const showProximityBadges = proximityActive && !!globalCoords;
 
   const handleCategoryChange = useCallback((category: ShopCategory) => {
     setActiveCategory(category);
@@ -318,10 +324,20 @@ function HomeInner() {
       {/* ── Geo-Radius Filter ─────────────────────────────────────── */}
       <section className="flex items-center gap-2 flex-wrap">
         {/* Global location badge */}
-        {globalLocation && !geoFilter.locationAvailable && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-            📍 {globalLocation.deliveryZone ?? globalLocation.city ?? "Nearby"}
-            {globalLocation.source === "gps" ? " (GPS)" : globalLocation.source === "manual" ? " (Selected)" : ""}
+        {globalLocation && (
+          <span className="inline-flex max-w-[220px] items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+            📍{" "}
+            <span className="truncate">
+              {globalLocation.address?.split(",")[0] ??
+                globalLocation.deliveryZone ??
+                globalLocation.city ??
+                "Nearby"}
+            </span>
+            {globalLocation.source === "gps"
+              ? " (GPS)"
+              : globalLocation.source === "manual"
+                ? " (City)"
+                : ""}
           </span>
         )}
         <GeoRadiusFilter

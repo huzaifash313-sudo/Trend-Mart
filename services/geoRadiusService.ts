@@ -35,6 +35,13 @@ export interface GeoFilterOptions {
   deliveryZone?: string;
   /** Customer city (from GPS or manual picker) — used for merchant city-only coverage. */
   customerCity?: string;
+  /**
+   * Browse scope:
+   * - radius: within maxDistanceKm of pin
+   * - city: shops in / serving the customer's city
+   * - pakistan: all Pakistan (still nearest-first when coords exist)
+   */
+  scope?: "radius" | "city" | "pakistan";
 }
 
 export interface GeoFilterResult {
@@ -51,6 +58,20 @@ export interface ReverseGeocodeResult {
   displayName: string | null;
   address?: string | null;
   neighbourhood?: string | null;
+  /** Nearest landmark / amenity / building name when OSM provides one. */
+  landmark?: string | null;
+}
+
+export type LocationDetectErrorCode =
+  | "unsupported"
+  | "denied"
+  | "unavailable"
+  | "timeout"
+  | null;
+
+export interface LocationDetectResult {
+  coordinates: GeoCoordinates | null;
+  error: LocationDetectErrorCode;
 }
 
 /** Merchant delivery coverage: pin radius, one city, or all of Pakistan. */
@@ -219,34 +240,70 @@ export function haversineDistance(
 export function requestUserLocation(
   options?: PositionOptions,
 ): Promise<GeoCoordinates | null> {
+  return requestUserLocationDetailed(options).then((r) => r.coordinates);
+}
+
+/**
+ * High-accuracy GPS request with typed error codes for UI messaging.
+ */
+export function requestUserLocationDetailed(
+  options?: PositionOptions,
+): Promise<LocationDetectResult> {
   return new Promise((resolve) => {
     if (typeof window === "undefined" || !navigator.geolocation) {
-      resolve(null);
+      resolve({ coordinates: null, error: "unsupported" });
       return;
     }
 
-    const timeout = setTimeout(() => resolve(null), 8000);
+    const timeoutMs = options?.timeout ?? 15_000;
+    const hardTimeout = setTimeout(
+      () => resolve({ coordinates: null, error: "timeout" }),
+      timeoutMs + 1500,
+    );
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        clearTimeout(timeout);
+        clearTimeout(hardTimeout);
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        if (!isValidCoordinate(latitude, longitude)) {
+          resolve({ coordinates: null, error: "unavailable" });
+          return;
+        }
         resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          coordinates: { latitude, longitude },
+          error: null,
         });
       },
-      () => {
-        clearTimeout(timeout);
-        resolve(null);
+      (err) => {
+        clearTimeout(hardTimeout);
+        if (err.code === 1) resolve({ coordinates: null, error: "denied" });
+        else if (err.code === 3) resolve({ coordinates: null, error: "timeout" });
+        else resolve({ coordinates: null, error: "unavailable" });
       },
       {
-        enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: 300_000,
+        enableHighAccuracy: true,
+        timeout: timeoutMs,
+        maximumAge: 60_000,
         ...options,
       },
     );
   });
+}
+
+export function locationErrorMessage(code: LocationDetectErrorCode): string {
+  switch (code) {
+    case "denied":
+      return "Browser blocked location. Allow location for this site (lock icon → Location → Allow), then try again. Or pick your city below.";
+    case "timeout":
+      return "GPS timed out. Move near a window, turn on Location Services, and try again — or pick your city.";
+    case "unsupported":
+      return "This browser cannot share GPS. Please select your city manually.";
+    case "unavailable":
+      return "GPS is temporarily unavailable. Try again or select your city / area manually.";
+    default:
+      return "Could not detect location. Please try again or select a city.";
+  }
 }
 
 export async function getCachedUserLocation(): Promise<GeoCoordinates | null> {
@@ -293,6 +350,7 @@ export async function filterShopsByProximity(
     sortByProximity = true,
     deliveryZone,
     customerCity,
+    scope = "radius",
   } = opts ?? {};
 
   let allShops: Shop[] = shops ?? [];
@@ -324,18 +382,36 @@ export async function filterShopsByProximity(
   const totalBeforeFilter = allShops.length;
   const userCoords = coordinates ?? (await getCachedUserLocation());
   const resolvedCustomerCity = (customerCity || deliveryZone || "").trim();
+  const browseScope = scope === "city" || scope === "pakistan" ? scope : "radius";
   const unlimitedBrowse =
-    !Number.isFinite(maxDistanceKm) || maxDistanceKm <= 0;
+    browseScope === "pakistan" ||
+    !Number.isFinite(maxDistanceKm) ||
+    maxDistanceKm <= 0;
 
   if (!userCoords) {
     // Without GPS, still honor nationwide + city-only coverage when city is known.
-    if (enforceServiceRadius && resolvedCustomerCity) {
+    if (browseScope === "pakistan") {
+      return {
+        shops: allShops.map((s) => ({ ...s, within_radius: true })),
+        locationAvailable: false,
+        userCoordinates: null,
+        totalBeforeFilter,
+        totalAfterFilter: allShops.length,
+      };
+    }
+    if ((enforceServiceRadius || browseScope === "city") && resolvedCustomerCity) {
       const cityFiltered = allShops.filter((shop) => {
         const coverage = parseCoverageFromZones(shop.delivery_zones);
         if (coverage.mode === "nationwide") return true;
         if (coverage.mode === "city") {
           const target = coverage.city || shop.location || "";
           return cityNamesMatch(target, resolvedCustomerCity);
+        }
+        // Radius shops: match free-text shop.location / zones to city name
+        if (browseScope === "city") {
+          if (shop.location && cityNamesMatch(shop.location, resolvedCustomerCity)) return true;
+          const zones = shop.delivery_zones ?? [];
+          return zones.some((z) => cityNamesMatch(z, resolvedCustomerCity));
         }
         return true;
       });
@@ -406,11 +482,32 @@ export async function filterShopsByProximity(
     };
   });
 
-  if (enforceServiceRadius) {
+  if (enforceServiceRadius && browseScope !== "pakistan") {
     enriched = enriched.filter((s) => s.within_radius === true);
   }
 
+  // City scope: keep shops that serve / sit in the customer's city
+  if (browseScope === "city" && resolvedCustomerCity) {
+    enriched = enriched.filter((s) => {
+      const coverage = parseCoverageFromZones(s.delivery_zones);
+      if (coverage.mode === "nationwide") return true;
+      if (coverage.mode === "city") {
+        const target = coverage.city || s.location || "";
+        return cityNamesMatch(target, resolvedCustomerCity);
+      }
+      if (s.location && cityNamesMatch(s.location, resolvedCustomerCity)) return true;
+      const zones = (s.delivery_zones ?? []).filter(
+        (z) => z !== COVERAGE_NATIONWIDE && !z.startsWith(COVERAGE_CITY_PREFIX),
+      );
+      if (zones.some((z) => cityNamesMatch(z, resolvedCustomerCity))) return true;
+      // With pin: within ~40 km of customer still counts as same metro area
+      if (s.distance_km != null && s.distance_km <= 40) return true;
+      return false;
+    });
+  }
+
   enriched = enriched.filter((s) => {
+    if (browseScope === "pakistan" || browseScope === "city") return true;
     if (skipDistanceCapIds.has(s.id) || unlimitedBrowse) return true;
     return s.distance_km == null || s.distance_km <= maxDistanceKm;
   });
@@ -577,17 +674,18 @@ export function findNearestCity(
 }
 
 /**
- * Try to reverse-geocode coordinates using the OpenStreetMap Nominatim API
- * (free, no API key required; rate-limited to 1 req/sec — we use a single
- * call on demand). Falls back to nearest-city centroid matching.
+ * Build a human street / colony / landmark label from Nominatim address parts.
  */
 function formatOsmStreetAddress(addr: {
   house_number?: string;
   road?: string;
   pedestrian?: string;
+  path?: string;
   neighbourhood?: string;
   suburb?: string;
   quarter?: string;
+  residential?: string;
+  hamlet?: string;
   city_district?: string;
   city?: string;
   town?: string;
@@ -597,13 +695,47 @@ function formatOsmStreetAddress(addr: {
   state?: string;
   postcode?: string;
   country?: string;
-}): { shortAddress: string; neighbourhood: string | null; cityCandidate: string | null } {
-  const street = [addr.house_number, addr.road || addr.pedestrian]
+  amenity?: string;
+  building?: string;
+  shop?: string;
+  tourism?: string;
+  leisure?: string;
+  office?: string;
+  school?: string;
+  college?: string;
+  university?: string;
+}): {
+  shortAddress: string;
+  neighbourhood: string | null;
+  cityCandidate: string | null;
+  landmark: string | null;
+} {
+  const landmark =
+    addr.amenity ||
+    addr.building ||
+    addr.shop ||
+    addr.tourism ||
+    addr.leisure ||
+    addr.office ||
+    addr.school ||
+    addr.college ||
+    addr.university ||
+    null;
+
+  const street = [addr.house_number, addr.road || addr.pedestrian || addr.path]
     .filter(Boolean)
     .join(" ")
     .trim();
+
   const neighbourhood =
-    addr.neighbourhood || addr.suburb || addr.quarter || addr.city_district || null;
+    addr.neighbourhood ||
+    addr.suburb ||
+    addr.residential ||
+    addr.quarter ||
+    addr.hamlet ||
+    addr.city_district ||
+    null;
+
   const cityCandidate =
     addr.city ||
     addr.town ||
@@ -612,28 +744,31 @@ function formatOsmStreetAddress(addr: {
     addr.county ||
     null;
 
-  const parts = [street, neighbourhood, cityCandidate, addr.state]
+  const parts = [landmark, street, neighbourhood, cityCandidate]
     .map((p) => (typeof p === "string" ? p.trim() : ""))
-    .filter(Boolean);
+    .filter(Boolean)
+    // Drop accidental duplicates (e.g. road name repeated)
+    .filter((part, idx, arr) =>
+      arr.findIndex((x) => x.toLowerCase() === part.toLowerCase()) === idx,
+    );
 
-  // Prefer a readable local address over the ultra-long OSM display_name.
   const shortAddress = parts.length > 0 ? parts.join(", ") : "";
-  return { shortAddress, neighbourhood, cityCandidate };
+  return { shortAddress, neighbourhood, cityCandidate, landmark };
 }
 
 export async function reverseGeocode(
   lat: number,
   lng: number,
 ): Promise<ReverseGeocodeResult> {
-  // Attempt OSM Nominatim reverse geocoding
+  // Attempt OSM Nominatim reverse geocoding (zoom 18 = building/street detail)
   try {
     const url =
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
       `&lat=${encodeURIComponent(String(lat))}` +
       `&lon=${encodeURIComponent(String(lng))}` +
-      `&zoom=18&addressdetails=1&accept-language=en`;
+      `&zoom=18&addressdetails=1&namedetails=1&extratags=1&accept-language=en`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 10_000);
 
     const res = await fetch(url, {
       signal: controller.signal,
@@ -646,33 +781,37 @@ export async function reverseGeocode(
 
     if (res.ok) {
       const data = (await res.json()) as {
-        address?: {
-          house_number?: string;
-          road?: string;
-          pedestrian?: string;
-          neighbourhood?: string;
-          suburb?: string;
-          quarter?: string;
-          city_district?: string;
-          city?: string;
-          town?: string;
-          village?: string;
-          municipality?: string;
-          county?: string;
-          state?: string;
-          postcode?: string;
-          country?: string;
-        };
+        address?: Record<string, string | undefined>;
         display_name?: string;
         name?: string;
+        namedetails?: { name?: string; "name:en"?: string };
       };
 
       const addr = data.address ?? {};
-      const { shortAddress, neighbourhood, cityCandidate } = formatOsmStreetAddress(addr);
+      const { shortAddress, neighbourhood, cityCandidate, landmark } =
+        formatOsmStreetAddress(addr);
+
+      const namedPlace =
+        data.name ||
+        data.namedetails?.["name:en"] ||
+        data.namedetails?.name ||
+        landmark ||
+        null;
+
+      // Prefer named place (school/colony/shop) at the front of the label
+      let composed = shortAddress;
+      if (namedPlace && !composed.toLowerCase().includes(namedPlace.toLowerCase())) {
+        composed = [namedPlace, composed].filter(Boolean).join(", ");
+      }
 
       // Check if the resolved city matches a supported city (case-insensitive)
       let matchedCity: string | null = null;
-      const candidates = [cityCandidate, neighbourhood, data.display_name].filter(Boolean) as string[];
+      const candidates = [
+        cityCandidate,
+        neighbourhood,
+        composed,
+        data.display_name,
+      ].filter(Boolean) as string[];
       for (const candidate of candidates) {
         const lowerCandidate = candidate.toLowerCase();
         for (const sc of SUPPORTED_CITIES) {
@@ -687,24 +826,31 @@ export async function reverseGeocode(
         if (matchedCity) break;
       }
 
-      // If Nominatim city is outside our list, still keep nearest supported city as zone.
       if (!matchedCity) {
         const nearest = findNearestCity(lat, lng, 40);
         if (nearest) matchedCity = nearest.city;
       }
 
-      const displayName = shortAddress || data.display_name || null;
-      const address =
-        shortAddress ||
+      const displayName =
+        composed ||
         data.display_name ||
+        (matchedCity ? `${matchedCity}, Pakistan` : null);
+
+      // Keep address readable — prefer local parts over ultra-long OSM dump
+      const address =
+        composed ||
+        (data.display_name
+          ? data.display_name.split(",").slice(0, 5).join(",").trim()
+          : null) ||
         (matchedCity ? `${matchedCity}, Pakistan` : null);
 
       return {
         city: matchedCity ?? cityCandidate,
-        deliveryZone: matchedCity,
+        deliveryZone: matchedCity ?? neighbourhood ?? cityCandidate,
         displayName,
         address,
         neighbourhood,
+        landmark: namedPlace,
       };
     }
   } catch {
@@ -712,7 +858,7 @@ export async function reverseGeocode(
   }
 
   // Fallback: nearest-city centroid matching
-  const nearest = findNearestCity(lat, lng, 75); // wider radius for fallback
+  const nearest = findNearestCity(lat, lng, 75);
   if (nearest) {
     const nearLabel =
       nearest.distanceKm < 2
@@ -724,6 +870,7 @@ export async function reverseGeocode(
       displayName: nearLabel,
       address: nearLabel,
       neighbourhood: null,
+      landmark: null,
     };
   }
 
@@ -733,6 +880,7 @@ export async function reverseGeocode(
     displayName: null,
     address: null,
     neighbourhood: null,
+    landmark: null,
   };
 }
 
@@ -799,12 +947,45 @@ export function resolveCoordinates(
  * and persist it to localStorage. Returns null if geolocation fails.
  */
 export async function detectAndSaveLocation(): Promise<UserLocation | null> {
-  const coords = await requestUserLocation();
-  if (!coords) return null;
+  const { coordinates, error } = await requestUserLocationDetailed({
+    enableHighAccuracy: true,
+    timeout: 15_000,
+    maximumAge: 60_000,
+  });
+  if (!coordinates) {
+    if (error) {
+      logError(`GPS detect failed: ${error}`, {
+        module: "geoRadiusService.detectAndSaveLocation",
+        meta: { error },
+      });
+    }
+    return null;
+  }
 
-  const location = await buildLocationFromCoords(coords, "gps");
+  const location = await buildLocationFromCoords(coordinates, "gps");
   saveLocation(location);
+  storeUserLocation(coordinates);
   return location;
+}
+
+/**
+ * Same as detectAndSaveLocation but also returns the typed GPS error for UI copy.
+ */
+export async function detectAndSaveLocationDetailed(): Promise<{
+  location: UserLocation | null;
+  error: LocationDetectErrorCode;
+}> {
+  const { coordinates, error } = await requestUserLocationDetailed({
+    enableHighAccuracy: true,
+    timeout: 15_000,
+    maximumAge: 60_000,
+  });
+  if (!coordinates) return { location: null, error };
+
+  const location = await buildLocationFromCoords(coordinates, "gps");
+  saveLocation(location);
+  storeUserLocation(coordinates);
+  return { location, error: null };
 }
 
 /**

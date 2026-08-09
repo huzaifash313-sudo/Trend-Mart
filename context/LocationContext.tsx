@@ -15,9 +15,12 @@ import {
   saveLocation,
   clearSavedLocation,
   detectAndSaveLocation,
+  detectAndSaveLocationDetailed,
   buildLocationFromCity,
   resolveCoordinates,
+  storeUserLocation,
   type GeoCoordinates,
+  type LocationDetectErrorCode,
 } from "@/services/geoRadiusService";
 
 /* -------------------------------------------------------------------------- */
@@ -45,6 +48,11 @@ interface LocationContextValue {
   isInitialized: boolean;
   /** Detect via browser GPS, reverse-geocode, and persist. */
   detectLocation: () => Promise<UserLocation | null>;
+  /** Same as detectLocation with typed GPS error for UI messages. */
+  detectLocationDetailed: () => Promise<{
+    location: UserLocation | null;
+    error: LocationDetectErrorCode;
+  }>;
   /** Set location from a manually selected city. */
   setManualCity: (city: SupportedCity) => void;
   /** Clear the saved location (reset to no location). */
@@ -159,9 +167,26 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       const detected = await detectAndSaveLocation();
       if (detected) {
         setLocation(detected);
+        if (detected.coordinates) storeUserLocation(detected.coordinates);
         return detected;
       }
       return null;
+    } finally {
+      setIsDetecting(false);
+    }
+  }, []);
+
+  const detectLocationDetailed = useCallback(async () => {
+    setIsDetecting(true);
+    try {
+      const result = await detectAndSaveLocationDetailed();
+      if (result.location) {
+        setLocation(result.location);
+        if (result.location.coordinates) {
+          storeUserLocation(result.location.coordinates);
+        }
+      }
+      return result;
     } finally {
       setIsDetecting(false);
     }
@@ -171,6 +196,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     const loc = buildLocationFromCity(city);
     saveLocation(loc);
     setLocation(loc);
+    if (loc.coordinates) storeUserLocation(loc.coordinates);
   }, []);
 
   const clearLocation = useCallback(() => {
@@ -186,6 +212,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         isDetecting,
         isInitialized,
         detectLocation,
+        detectLocationDetailed,
         setManualCity,
         clearLocation,
       }}

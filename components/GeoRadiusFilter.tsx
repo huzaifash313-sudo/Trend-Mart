@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { requestUserLocation, getCachedUserLocation, storeUserLocation, formatDistance, type GeoCoordinates } from "@/services/geoRadiusService";
+import { useLocation } from "@/context/LocationContext";
+import {
+  locationErrorMessage,
+  type GeoCoordinates,
+  type LocationDetectErrorCode,
+} from "@/services/geoRadiusService";
+import { SUPPORTED_CITIES, type SupportedCity } from "@/types";
 
 /* -------------------------------------------------------------------------- */
-/*  Icons                                                                      */
+/*  Distance + area filter — synced with LocationContext                       */
 /* -------------------------------------------------------------------------- */
 
 function LocateIcon() {
@@ -41,10 +47,6 @@ function XIcon() {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Constants                                                                  */
-/* -------------------------------------------------------------------------- */
-
 const RADIUS_OPTIONS = [
   { value: 5, label: "5 km" },
   { value: 10, label: "10 km" },
@@ -53,14 +55,13 @@ const RADIUS_OPTIONS = [
   { value: 0, label: "Any" },
 ] as const;
 
-/* -------------------------------------------------------------------------- */
-/*  Component                                                                  */
-/* -------------------------------------------------------------------------- */
+export type GeoScope = "radius" | "city" | "pakistan";
 
 export interface GeoFilterState {
   coordinates: GeoCoordinates | null;
   maxDistanceKm: number;
   locationAvailable: boolean;
+  scope: GeoScope;
 }
 
 interface GeoRadiusFilterProps {
@@ -76,85 +77,122 @@ export default function GeoRadiusFilter({
   onDetectStart,
   onDetectEnd,
 }: GeoRadiusFilterProps) {
-  const [coordinates, setCoordinates] = useState<GeoCoordinates | null>(null);
+  const {
+    location,
+    coordinates: globalCoords,
+    detectLocationDetailed,
+    setManualCity,
+  } = useLocation();
+
   const [maxDistanceKm, setMaxDistanceKm] = useState<number>(0);
+  const [scope, setScope] = useState<GeoScope>("radius");
   const [locationError, setLocationError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  // Try to load cached location on mount
+  const emit = useCallback(
+    (coords: GeoCoordinates | null, km: number, nextScope: GeoScope) => {
+      onFilterChange({
+        coordinates: coords,
+        maxDistanceKm: km,
+        locationAvailable: !!coords || nextScope === "pakistan" || nextScope === "city",
+        scope: nextScope,
+      });
+    },
+    [onFilterChange],
+  );
+
+  // Keep filter synced with global LocationContext pin
   useEffect(() => {
-    let cancelled = false;
-    async function init() {
-      const cached = await getCachedUserLocation();
-      if (!cancelled && cached) {
-        setCoordinates(cached);
-        onFilterChange({
-          coordinates: cached,
-          maxDistanceKm: maxDistanceKm,
-          locationAvailable: true,
-        });
-      }
-    }
-    init();
-    return () => { cancelled = true; };
+    emit(globalCoords, maxDistanceKm, scope);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [globalCoords, location?.city, location?.address]);
 
   const handleDetectLocation = useCallback(async () => {
     setLocationError(null);
     onDetectStart();
     try {
-      const coords = await requestUserLocation();
-      if (coords) {
-        setCoordinates(coords);
-        storeUserLocation(coords);
-        onFilterChange({
-          coordinates: coords,
-          maxDistanceKm,
-          locationAvailable: true,
-        });
+      const { location: detected, error } = await detectLocationDetailed();
+      if (detected?.coordinates) {
+        emit(detected.coordinates, maxDistanceKm || 10, scope === "pakistan" ? "radius" : scope);
+        if (scope === "pakistan") setScope("radius");
+        if (maxDistanceKm === 0) setMaxDistanceKm(10);
       } else {
-        setLocationError("Could not detect location. Please enable location access.");
-        onFilterChange({
-          coordinates: null,
-          maxDistanceKm: 0,
-          locationAvailable: false,
-        });
+        const code = (error ?? "unavailable") as LocationDetectErrorCode;
+        setLocationError(locationErrorMessage(code));
       }
     } catch {
       setLocationError("Location detection failed. Try again.");
     }
     onDetectEnd();
-  }, [maxDistanceKm, onFilterChange, onDetectStart, onDetectEnd]);
+  }, [
+    detectLocationDetailed,
+    emit,
+    maxDistanceKm,
+    onDetectEnd,
+    onDetectStart,
+    scope,
+  ]);
 
   const handleRadiusChange = useCallback(
     (km: number) => {
       setMaxDistanceKm(km);
-      onFilterChange({
-        coordinates,
-        maxDistanceKm: km,
-        locationAvailable: !!coordinates,
-      });
+      setScope("radius");
+      emit(globalCoords, km, "radius");
     },
-    [coordinates, onFilterChange],
+    [emit, globalCoords],
+  );
+
+  const handleScopeChange = useCallback(
+    (next: GeoScope) => {
+      setScope(next);
+      if (next === "radius" && maxDistanceKm === 0) {
+        setMaxDistanceKm(10);
+        emit(globalCoords, 10, "radius");
+        return;
+      }
+      emit(globalCoords, maxDistanceKm, next);
+    },
+    [emit, globalCoords, maxDistanceKm],
+  );
+
+  const handleCityPick = useCallback(
+    (city: SupportedCity) => {
+      setManualCity(city);
+      setScope("city");
+      setLocationError(null);
+      // City centroid coords come from context after setManualCity
+      emit(null, 0, "city");
+    },
+    [emit, setManualCity],
   );
 
   const handleClearLocation = useCallback(() => {
-    setCoordinates(null);
     setMaxDistanceKm(0);
+    setScope("radius");
     setLocationError(null);
-    onFilterChange({
-      coordinates: null,
-      maxDistanceKm: 0,
-      locationAvailable: false,
-    });
-  }, [onFilterChange]);
+    emit(null, 0, "radius");
+  }, [emit]);
 
-  const isActive = !!coordinates;
+  const isActive = !!globalCoords || scope === "city" || scope === "pakistan";
+  const addressLabel =
+    location?.address ||
+    location?.deliveryZone ||
+    location?.city ||
+    (globalCoords
+      ? `Lat ${globalCoords.latitude.toFixed(4)}, Lng ${globalCoords.longitude.toFixed(4)}`
+      : null);
+
+  const triggerText = (() => {
+    if (scope === "pakistan") return "All Pakistan";
+    if (scope === "city") return location?.city ? `City: ${location.city}` : "This city";
+    if (globalCoords) {
+      return maxDistanceKm > 0 ? `Within ${maxDistanceKm} km` : "Nearest first";
+    }
+    return "Nearby";
+  })();
 
   return (
     <div className="relative">
-      {/* Trigger button */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -170,19 +208,18 @@ export default function GeoRadiusFilter({
         {isActive ? (
           <span className="inline-flex items-center gap-1">
             <PinIcon />
-            Within {maxDistanceKm > 0 ? `${maxDistanceKm} km` : "any distance"}
+            {triggerText}
           </span>
         ) : (
           "Nearby"
         )}
       </button>
 
-      {/* Dropdown panel */}
       {expanded && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="absolute left-0 top-full z-50 mt-2 w-[300px] max-w-[92vw] rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-              📍 Filter by Distance
+              📍 Filter by Area
             </h3>
             <button
               type="button"
@@ -194,24 +231,23 @@ export default function GeoRadiusFilter({
             </button>
           </div>
 
-          {/* Detect location button */}
           <div className="mb-3">
-            {isActive ? (
-              <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-900/20">
+            {addressLabel ? (
+              <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-900/20">
                 <span className="text-base">📍</span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                  <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
                     Location Active
                   </p>
-                  <p className="text-[0.6rem] text-emerald-600 dark:text-emerald-400">
-                    Lat: {coordinates?.latitude.toFixed(4)} · Lng: {coordinates?.longitude.toFixed(4)}
+                  <p className="mt-0.5 text-[0.65rem] leading-relaxed text-emerald-700 dark:text-emerald-400">
+                    {addressLabel}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleClearLocation}
                   className="shrink-0 rounded-full p-1 text-emerald-600 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
-                  aria-label="Clear location"
+                  aria-label="Reset distance filter"
                 >
                   <XIcon />
                 </button>
@@ -231,13 +267,50 @@ export default function GeoRadiusFilter({
               </button>
             )}
             {locationError && (
-              <p className="mt-1 text-[0.6rem] text-red-500">{locationError}</p>
+              <p className="mt-1 text-[0.6rem] leading-relaxed text-red-500">{locationError}</p>
+            )}
+            {addressLabel && (
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={isDetecting}
+                className="mt-2 w-full rounded-lg border border-emerald-200 py-1.5 text-[0.65rem] font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-400"
+              >
+                {isDetecting ? "Updating…" : "Refresh live GPS pin"}
+              </button>
             )}
           </div>
 
-          {/* Radius slider */}
-          {isActive && (
-            <div>
+          <div className="mb-3">
+            <p className="mb-1.5 text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
+              Browse scope
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  { id: "radius" as const, label: "Near me" },
+                  { id: "city" as const, label: "This city" },
+                  { id: "pakistan" as const, label: "All Pakistan" },
+                ]
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => handleScopeChange(opt.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                    scope === opt.id
+                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/25"
+                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {scope === "radius" && (
+            <div className="mb-3">
               <label className="mb-2 block text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
                 Show shops within:
               </label>
@@ -257,11 +330,40 @@ export default function GeoRadiusFilter({
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-[0.6rem] text-zinc-400 dark:text-zinc-500">
-                Shops are sorted by proximity — closest first.
-              </p>
             </div>
           )}
+
+          {scope === "city" && (
+            <div className="mb-2">
+              <p className="mb-1.5 text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                Pick a city
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {SUPPORTED_CITIES.slice(0, 8).map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    onClick={() => handleCityPick(city as SupportedCity)}
+                    className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium ${
+                      location?.city === city
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-zinc-200 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"
+                    }`}
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="mt-2 text-[0.6rem] text-zinc-400 dark:text-zinc-500">
+            {scope === "pakistan"
+              ? "Showing shops across Pakistan — closest to your pin first when GPS is on."
+              : scope === "city"
+                ? "Showing shops in the selected city — nearest first."
+                : "Closest shops appear first. “Any” still sorts by proximity."}
+          </p>
         </div>
       )}
     </div>
