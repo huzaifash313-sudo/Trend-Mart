@@ -320,7 +320,7 @@ function HomeInner() {
       {categoryCounts.length > 0 && (
         <CategoryGrid
           categories={categoryCounts}
-          maxItems={8}
+          maxItems={12}
           onCategoryClick={(cat) => handleCategoryChange(cat as ShopCategory)}
         />
       )}
