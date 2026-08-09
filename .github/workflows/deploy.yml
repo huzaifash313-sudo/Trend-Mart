@@ -124,22 +124,34 @@ jobs:
 
   # ===========================================================================
   # JOB 3: Deploy to Vercel (Production)
+  # Vercel GitHub integration already deploys trend-mart / trend-marts.
+  # This job only runs when repo secrets are configured; otherwise it succeeds
+  # as a no-op so CI stays green.
   # ===========================================================================
   deploy:
     name: 🚀 Deploy to Vercel Production
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [quality-gate, build]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Main' || github.ref == 'refs/heads/master'
-    environment:
-      name: production
-      url: https://trendmart.vercel.app
+    if: >
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/Main' ||
+       github.ref == 'refs/heads/master')
 
     steps:
+      - name: Skip when VERCEL_TOKEN is not configured
+        if: ${{ secrets.VERCEL_TOKEN == '' }}
+        run: |
+          echo "✅ Skipping Actions deploy — VERCEL_TOKEN secret is not set."
+          echo "Vercel GitHub App already deploys this repo (trend-mart / trend-marts)."
+          echo "To enable Actions deploy later, add secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
+
       - name: Checkout repository
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         uses: actions/checkout@v4
 
       - name: Deploy to Vercel
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -149,9 +161,10 @@ jobs:
           working-directory: ./
 
       - name: Notify deployment success
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         run: |
           echo "✅ Deployed successfully to Vercel Production!"
-          echo "🌐 URL: https://trendmart.vercel.app"
+          echo "🌐 URL: https://trend-marts.vercel.app"
 
   # ===========================================================================
   # JOB 4: Sentry Release Tracking & Source Maps
@@ -160,8 +173,12 @@ jobs:
     name: 📊 Sentry Release & Source Maps
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: deploy
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Main' || github.ref == 'refs/heads/master'
+    needs: [quality-gate, build]
+    if: >
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/Main' ||
+       github.ref == 'refs/heads/master') &&
+      secrets.SENTRY_AUTH_TOKEN != ''
 
     steps:
       - name: Checkout repository
