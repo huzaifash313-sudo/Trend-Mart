@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SHOP_CATEGORIES, CATEGORY_ICONS } from "@/types";
+import PwaInstallTip from "@/components/PwaInstallTip";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons                                                          */
@@ -459,6 +460,10 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               >
                 <HeartIcon /> Wishlist
               </Link>
+            </li>
+
+            <li className="px-1 py-2">
+              <PwaInstallTip />
             </li>
 
             {/* Divider */}

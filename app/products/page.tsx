@@ -78,14 +78,16 @@ function ProductsPageInner() {
     coordinates: null,
     maxDistanceKm: 0,
     locationAvailable: false,
-    scope: "pakistan",
+    scope: "radius",
   });
+  const [areaOpen, setAreaOpen] = useState(false);
 
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
+  const [visibleCount, setVisibleCount] = useState(24);
 
   const syncUrl = useCallback(
     (next: {
@@ -133,10 +135,12 @@ function ProductsPageInner() {
         category: categoryParam === "All" ? undefined : categoryParam,
         subCategoryId: subParam,
         sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
+        limit: 240,
       });
       if (cancelled) return;
       if (result.success) {
         setProducts(result.data);
+        setVisibleCount(24);
         if (productParam) {
           const match = result.data.find((p) => p.id === productParam);
           if (match) setQuickView(match);
@@ -168,25 +172,37 @@ function ProductsPageInner() {
 
   const displayProducts = useMemo(() => {
     const coords = geoFilter.coordinates ?? globalCoords;
-    if (
-      geoFilter.scope !== "radius" ||
-      !coords ||
-      geoFilter.maxDistanceKm <= 0
-    ) {
-      return products;
-    }
+    const radiusActive =
+      geoFilter.scope === "radius" && !!coords && geoFilter.maxDistanceKm > 0;
+
+    if (!radiusActive || !coords) return products;
+
     const radius = geoFilter.maxDistanceKm;
-    return products.filter((p) => {
-      if (p.shop_latitude == null || p.shop_longitude == null) return false;
+    const nearby: MarketplaceProduct[] = [];
+    const unpinned: MarketplaceProduct[] = [];
+
+    for (const p of products) {
+      if (p.shop_latitude == null || p.shop_longitude == null) {
+        // Keep unpinned shops so Near Me never empties the catalogue
+        unpinned.push(p);
+        continue;
+      }
       const km = haversineDistance(
         coords.latitude,
         coords.longitude,
         p.shop_latitude,
         p.shop_longitude,
       );
-      return km != null && km <= radius;
-    });
+      if (km != null && km <= radius) nearby.push(p);
+    }
+
+    return [...nearby, ...unpinned];
   }, [products, geoFilter, globalCoords]);
+
+  const visibleProducts = useMemo(
+    () => displayProducts.slice(0, visibleCount),
+    [displayProducts, visibleCount],
+  );
 
   const handleCategoryChange = useCallback(
     (category: ShopCategory) => {
@@ -377,38 +393,54 @@ function ProductsPageInner() {
         />
       )}
 
-      {/* Sort + geo */}
-      <div className="mb-3 mt-2 flex flex-wrap items-center gap-2">
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
-          {SORT_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => handleSortChange(opt.value)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                sort === opt.value
-                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+      {/* Sticky mobile filter strip */}
+      <div className="sticky top-[3.6rem] z-30 -mx-3 mb-3 border-b border-zinc-100/80 bg-white/95 px-3 py-2 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">
+        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-none">
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleSortChange(opt.value)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                  sort === opt.value
+                    ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                    : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setAreaOpen((v) => !v)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+              areaOpen || (geoFilter.scope === "radius" && geoFilter.maxDistanceKm > 0)
+                ? "bg-teal-600 text-white"
+                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            }`}
+            aria-expanded={areaOpen}
+          >
+            Area
+          </button>
         </div>
-        <div className="ml-auto min-w-0">
-          <GeoRadiusFilter
-            onFilterChange={setGeoFilter}
-            isDetecting={geoDetecting}
-            onDetectStart={() => setGeoDetecting(true)}
-            onDetectEnd={() => setGeoDetecting(false)}
-          />
-        </div>
+        {areaOpen && (
+          <div className="mt-2 rounded-2xl border border-zinc-100 bg-zinc-50/80 p-2 dark:border-zinc-800 dark:bg-zinc-900/60">
+            <GeoRadiusFilter
+              onFilterChange={setGeoFilter}
+              isDetecting={geoDetecting}
+              onDetectStart={() => setGeoDetecting(true)}
+              onDetectEnd={() => setGeoDetecting(false)}
+            />
+          </div>
+        )}
       </div>
 
       <p className="mb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
         {loading
           ? "Loading products…"
-          : `${displayProducts.length} product${displayProducts.length === 1 ? "" : "s"}`}
+          : `Showing ${Math.min(visibleCount, displayProducts.length)} of ${displayProducts.length}`}
       </p>
 
       {error && (
@@ -425,7 +457,7 @@ function ProductsPageInner() {
       )}
 
       <ProductGrid
-        products={displayProducts}
+        products={visibleProducts}
         loading={loading}
         columns="auto"
         compact
@@ -472,6 +504,18 @@ function ProductsPageInner() {
           </div>
         }
       />
+
+      {!loading && visibleCount < displayProducts.length && (
+        <div className="mt-5 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((n) => n + 24)}
+            className="rounded-full border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 active:scale-95 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+          >
+            Load more
+          </button>
+        </div>
+      )}
 
       {quickView && quickViewShop && (
         <QuickViewModal

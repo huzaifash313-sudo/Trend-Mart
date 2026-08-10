@@ -1711,9 +1711,26 @@ export default function DashboardPage() {
               </div>
             )}
             {!productsLoading && products.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/40 py-10 text-center dark:border-emerald-800 dark:bg-emerald-950/20">
                 <div className="mb-2 flex justify-center"><ShoppingBagIcon /></div>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">No products yet. Add your first product above!</p>
+                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">No products yet</p>
+                <p className="mx-auto mt-1 max-w-sm text-xs text-zinc-500 dark:text-zinc-400">
+                  Add items so they appear on the public Products feed for customers.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <a
+                    href="#product-form"
+                    className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                  >
+                    Add first product
+                  </a>
+                  <a
+                    href="#bulk-products"
+                    className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                  >
+                    Batch upload
+                  </a>
+                </div>
               </div>
             )}
             {!productsLoading && products.length > 0 && filteredProducts.length === 0 && (
