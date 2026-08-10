@@ -338,6 +338,7 @@ const VERIFY_EXEMPT_PATHS = [
   "/auth/callback",
   "/settings",
   "/search",
+  "/products",
   "/wishlist", // guest local wishlist; purchase still gated at checkout
 ];
 

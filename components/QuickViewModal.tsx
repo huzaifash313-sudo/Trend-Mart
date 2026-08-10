@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import type { Product, Shop } from "@/types";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
@@ -271,7 +272,8 @@ export default function QuickViewModal({
             <button
               type="button"
               onClick={handleAddToCart}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all active:scale-95 ${
+              disabled={!product.is_available}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                 added
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
                   : "border-teal-300 text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/30"
@@ -295,8 +297,17 @@ export default function QuickViewModal({
             )}
           </div>
 
+          <Link
+            href={`/shop/${shop.id}`}
+            onClick={onClose}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-700 active:scale-[0.98]"
+          >
+            View {shop.name.length > 22 ? "Store" : shop.name}
+          </Link>
+
           <p className="text-center text-[0.6rem] text-zinc-400 dark:text-zinc-500">
-            Items added to your cart — checkout from the cart bar at the bottom
+            From <span className="font-medium text-zinc-500 dark:text-zinc-400">{shop.name}</span>
+            {" · "}checkout from the cart bar below
           </p>
 
           {product.variants && product.variants.length > 0 && (

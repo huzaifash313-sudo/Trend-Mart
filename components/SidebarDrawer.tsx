@@ -439,14 +439,14 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               </Link>
             </li>
 
-            {/* Search */}
+            {/* Products marketplace */}
             <li>
               <Link
-                href="/search"
+                href="/products"
                 onClick={onClose}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               >
-                <SearchIconMenu /> Search
+                <SearchIconMenu /> Products
               </Link>
             </li>
 

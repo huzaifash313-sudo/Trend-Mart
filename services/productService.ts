@@ -4,9 +4,10 @@
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
-import type { Product, ProductFormData } from "@/types";
+import type { MarketplaceProduct, Product, ProductFormData } from "@/types";
 import { logError, toServiceError } from "@/services/errorService";
 import { isValidUUID } from "@/lib/sanitization";
+import { getProductDiscount } from "@/lib/formatters";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -228,6 +229,216 @@ export async function fetchProductsByShopId(
     return { success: true, data: (data as Product[]) ?? [] };
   } catch (err) {
     logError(err, { module: "productService.fetchProductsByShopId", meta: { shopId } });
+    return { success: false, error: toError(err) };
+  }
+}
+
+export type MarketplaceSort =
+  | "for_you"
+  | "newest"
+  | "price_asc"
+  | "price_desc"
+  | "discount";
+
+export interface MarketplaceProductFilters {
+  query?: string;
+  /** Shop main category (matches shops.category) */
+  category?: string;
+  subCategoryId?: string | null;
+  sort?: MarketplaceSort;
+  /** Cap rows pulled from Supabase before client sort (default 160) */
+  limit?: number;
+  availableOnly?: boolean;
+}
+
+type ShopJoin = {
+  id?: string;
+  name?: string | null;
+  logo_url?: string | null;
+  whatsapp_number?: string | null;
+  category?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_live?: boolean | null;
+  verification_status?: string | null;
+};
+
+function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | null {
+  const shopRaw = row.shops as ShopJoin | ShopJoin[] | null | undefined;
+  const shop = Array.isArray(shopRaw) ? shopRaw[0] : shopRaw;
+  if (!shop?.name) return null;
+
+  const images = Array.isArray(row.images)
+    ? (row.images as string[])
+    : null;
+
+  return {
+    id: String(row.id),
+    shop_id: String(row.shop_id ?? shop.id ?? ""),
+    name: String(row.name ?? ""),
+    title: (row.title as string | null) ?? null,
+    description: String(row.description ?? ""),
+    price: Number(row.price) || 0,
+    original_price: (row.original_price as number | null) ?? null,
+    compare_at_price: (row.compare_at_price as number | null) ?? null,
+    deal_expires_at: (row.deal_expires_at as string | null) ?? null,
+    currency: String(row.currency ?? "PKR"),
+    image_url: (row.image_url as string | null) ?? null,
+    images,
+    is_available: row.is_available !== false,
+    stock_status: (row.stock_status as string | undefined) ?? undefined,
+    variants: (row.variants as Product["variants"]) ?? null,
+    category_id: (row.category_id as string | null) ?? null,
+    sub_category_id: (row.sub_category_id as string | null) ?? null,
+    created_at: (row.created_at as string | undefined) ?? undefined,
+    shop_name: String(shop.name),
+    shop_logo_url: shop.logo_url ?? null,
+    shop_whatsapp: shop.whatsapp_number ?? null,
+    shop_category: shop.category ?? null,
+    shop_latitude: typeof shop.latitude === "number" ? shop.latitude : null,
+    shop_longitude: typeof shop.longitude === "number" ? shop.longitude : null,
+  };
+}
+
+function sortMarketplaceProducts(
+  items: MarketplaceProduct[],
+  sort: MarketplaceSort,
+): MarketplaceProduct[] {
+  const copy = [...items];
+  switch (sort) {
+    case "price_asc":
+      return copy.sort((a, b) => a.price - b.price);
+    case "price_desc":
+      return copy.sort((a, b) => b.price - a.price);
+    case "discount":
+      return copy.sort((a, b) => {
+        const da = getProductDiscount(a).discountPercent;
+        const db = getProductDiscount(b).discountPercent;
+        if (db !== da) return db - da;
+        return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+      });
+    case "newest":
+      return copy.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    case "for_you":
+    default:
+      // Soft “For You”: discounted + newer first, then price as tie-break
+      return copy.sort((a, b) => {
+        const da = getProductDiscount(a).discountPercent;
+        const db = getProductDiscount(b).discountPercent;
+        if (db !== da) return db - da;
+        const ta = a.created_at ?? "";
+        const tb = b.created_at ?? "";
+        if (tb !== ta) return tb.localeCompare(ta);
+        return a.price - b.price;
+      });
+  }
+}
+
+/**
+ * Cross-store marketplace catalogue for /products.
+ * Only products from live + approved shops.
+ */
+export async function fetchMarketplaceProducts(
+  filters: MarketplaceProductFilters = {},
+): Promise<ServiceResult<MarketplaceProduct[]>> {
+  const supabase = createClient();
+  const {
+    query = "",
+    category,
+    subCategoryId,
+    sort = "for_you",
+    limit = 160,
+    availableOnly = true,
+  } = filters;
+
+  try {
+    let builder = supabase
+      .from("products")
+      .select(
+        `
+        id, shop_id, name, title, description, price, original_price, compare_at_price,
+        deal_expires_at, currency, image_url, images, is_available, stock_status,
+        variants, category_id, sub_category_id, created_at,
+        shops!inner (
+          id, name, logo_url, whatsapp_number, category,
+          is_live, verification_status, latitude, longitude
+        )
+      `,
+      )
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(Math.min(Math.max(limit, 20), 240));
+
+    if (availableOnly) {
+      builder = builder.eq("is_available", true);
+    }
+
+    const q = query.trim();
+    if (q) {
+      const safe = q.replace(/[%_,.()]/g, " ").trim();
+      if (safe) {
+        const pattern = `%${safe}%`;
+        builder = builder.or(
+          `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+        );
+      }
+    }
+
+    if (subCategoryId) {
+      builder = builder.eq("sub_category_id", subCategoryId);
+    }
+
+    const { data, error } = await builder;
+    if (error) throw error;
+
+    let items = ((data as Record<string, unknown>[]) ?? [])
+      .map(mapMarketplaceRow)
+      .filter((p): p is MarketplaceProduct => !!p);
+
+    // Fallback: older products may lack sub_category_id — use shops that sell that sub-cat
+    if (subCategoryId && items.length === 0) {
+      const subRes = await fetchShopIdsBySubCategory(subCategoryId);
+      if (subRes.success && subRes.data.length > 0) {
+        const { data: fallbackRows, error: fbErr } = await supabase
+          .from("products")
+          .select(
+            `
+            id, shop_id, name, title, description, price, original_price, compare_at_price,
+            deal_expires_at, currency, image_url, images, is_available, stock_status,
+            variants, category_id, sub_category_id, created_at,
+            shops!inner (
+              id, name, logo_url, whatsapp_number, category,
+              is_live, verification_status, latitude, longitude
+            )
+          `,
+          )
+          .eq("shops.is_live", true)
+          .eq("shops.verification_status", "approved")
+          .eq("is_available", true)
+          .in("shop_id", subRes.data)
+          .order("created_at", { ascending: false })
+          .limit(Math.min(Math.max(limit, 20), 240));
+        if (!fbErr && fallbackRows) {
+          items = (fallbackRows as Record<string, unknown>[])
+            .map(mapMarketplaceRow)
+            .filter((p): p is MarketplaceProduct => !!p);
+        }
+      }
+    }
+
+    if (category && category !== "All") {
+      const cat = category.toLowerCase();
+      items = items.filter((p) => {
+        const shopCat = (p.shop_category ?? "").toLowerCase();
+        const prodCat = (p.category_id ?? "").toLowerCase();
+        return shopCat === cat || prodCat === cat || shopCat.includes(cat) || prodCat.includes(cat);
+      });
+    }
+
+    return { success: true, data: sortMarketplaceProducts(items, sort) };
+  } catch (err) {
+    logError(err, { module: "productService.fetchMarketplaceProducts", meta: { ...filters } });
     return { success: false, error: toError(err) };
   }
 }

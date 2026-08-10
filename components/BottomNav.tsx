@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -23,10 +22,16 @@ function HomeIcon({ active }: { active: boolean }) {
   );
 }
 
-function SearchTabIcon({ active }: { active: boolean }) {
+function ProductsTabIcon({ active }: { active: boolean }) {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      {!active && (
+        <>
+          <polyline points="3.29 7 12 12 20.71 7" />
+          <line x1="12" y1="22" x2="12" y2="12" />
+        </>
+      )}
     </svg>
   );
 }
@@ -74,7 +79,6 @@ interface Tab {
 }
 
 export default function BottomNav() {
-  const router = useRouter();
   const pathname = usePathname();
 
   const [session, setSession] = useState(false);
@@ -123,12 +127,10 @@ export default function BottomNav() {
     };
   }, [pathname]);
 
-  const handleSearch = useCallback(() => router.push("/search"), [router]);
-
   // Merchants land on /dashboard; customers are redirected to /account by middleware
   const accountHref = session ? "/dashboard" : "/login";
   const isHomeActive = pathname === "/";
-  const isSearchActive = pathname === "/search";
+  const isProductsActive = pathname === "/products" || pathname.startsWith("/products/");
   const isAccountActive =
     pathname === "/dashboard" ||
     pathname.startsWith("/account") ||
@@ -137,7 +139,7 @@ export default function BottomNav() {
 
   const tabs: Tab[] = [
     { key: "home", label: "Home", icon: HomeIcon, href: "/" },
-    { key: "search", label: "Search", icon: SearchTabIcon, onClick: handleSearch },
+    { key: "products", label: "Products", icon: ProductsTabIcon, href: "/products" },
     { key: "wishlist", label: "Wishlist", icon: HeartIcon, href: "/wishlist", badgeCount: wishlistCount },
     { key: "account", label: session ? "Dashboard" : "Sign In", icon: UserIcon, href: accountHref },
   ];
@@ -148,7 +150,7 @@ export default function BottomNav() {
         {tabs.map((tab) => {
           const active =
             tab.key === "home" ? isHomeActive
-            : tab.key === "search" ? isSearchActive
+            : tab.key === "products" ? isProductsActive
             : tab.key === "wishlist" ? isWishlistActive
             : tab.key === "account" ? isAccountActive
             : false;

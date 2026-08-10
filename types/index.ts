@@ -253,7 +253,19 @@ export interface Product {
   /** FK to sub_category */
   sub_category_id?: string | null;
   created_at?: string;
+  /** Joined from shops — marketplace feed / multi-vendor cards */
+  shop_name?: string | null;
+  shop_logo_url?: string | null;
+  shop_whatsapp?: string | null;
+  shop_category?: string | null;
+  shop_latitude?: number | null;
+  shop_longitude?: number | null;
 }
+
+/** Product row enriched for the cross-store /products marketplace feed. */
+export type MarketplaceProduct = Product & {
+  shop_name: string;
+};
 
 // ─── Product Form (subset used when creating / updating a product) ──────────
 /** Form data type — includes all enhanced fields for marketplace product creation. */

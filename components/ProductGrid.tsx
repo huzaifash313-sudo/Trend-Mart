@@ -47,11 +47,15 @@ interface ProductGridProps {
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
   onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
+  /** When set, shows store name under the title (marketplace feed). */
+  onShopClick?: (product: Product) => void;
   favorites?: Set<string>;
   emptyState?: ReactNode;
   columns?: "2" | "3" | "4" | "auto";
   compact?: boolean;
   categoryLabel?: string;
+  /** Show joined shop_name / shop_logo on each card */
+  showShopMeta?: boolean;
 }
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
@@ -61,17 +65,21 @@ function ProductCard({
   compact,
   isFavorite,
   categoryLabel,
+  showShopMeta,
   onProductClick,
   onAddToCart,
   onFavoriteToggle,
+  onShopClick,
 }: {
   product: Product;
   compact: boolean;
   isFavorite: boolean;
   categoryLabel?: string;
+  showShopMeta?: boolean;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
   onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
+  onShopClick?: (product: Product) => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const priceLabel = formatPrice(product.price, {
@@ -176,7 +184,33 @@ function ProductCard({
           {product.name}
         </h3>
 
-        {!compact && product.description ? (
+        {showShopMeta && product.shop_name ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShopClick?.(product);
+            }}
+            className="mt-0.5 flex max-w-full items-center gap-1 text-left"
+            aria-label={`View store ${product.shop_name}`}
+          >
+            {product.shop_logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={getSafeImageUrl(product.shop_logo_url, "shop")}
+                alt=""
+                className="h-3.5 w-3.5 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[8px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                {product.shop_name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
+              {product.shop_name}
+            </span>
+          </button>
+        ) : !compact && product.description ? (
           <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-400 dark:text-zinc-500">
             {product.description}
           </p>
@@ -251,11 +285,13 @@ export default function ProductGrid({
   onProductClick,
   onAddToCart,
   onFavoriteToggle,
+  onShopClick,
   favorites = new Set(),
   emptyState,
   columns = "auto",
   compact = false,
   categoryLabel,
+  showShopMeta = false,
 }: ProductGridProps) {
   const gridCols =
     columns === "2"
@@ -296,9 +332,11 @@ export default function ProductGrid({
           compact={compact}
           isFavorite={favorites.has(product.id)}
           categoryLabel={categoryLabel}
+          showShopMeta={showShopMeta}
           onProductClick={onProductClick}
           onAddToCart={onAddToCart}
           onFavoriteToggle={onFavoriteToggle}
+          onShopClick={onShopClick}
         />
       ))}
     </div>

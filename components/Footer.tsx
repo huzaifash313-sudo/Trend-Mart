@@ -12,7 +12,7 @@ const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] 
     heading: "Shop",
     links: [
       { href: "/", label: "Browse Shops" },
-      { href: "/search", label: "Search" },
+      { href: "/products", label: "Products" },
       { href: "/wishlist", label: "Wishlist" },
     ],
   },

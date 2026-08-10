@@ -116,7 +116,7 @@ function TrendBackdrop() {
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const onSearchPage = pathname === "/search" || pathname.startsWith("/search/");
+  const onProductsPage = pathname === "/products" || pathname.startsWith("/products/");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
 
@@ -125,7 +125,7 @@ export default function Navbar() {
     setPortalReady(true);
   }, []);
 
-  const navigateToSearch = useCallback(() => router.push("/search"), [router]);
+  const navigateToProducts = useCallback(() => router.push("/products"), [router]);
 
   return (
     <header className="tm-navbar-wrap sticky top-0 z-40">
@@ -151,15 +151,15 @@ export default function Navbar() {
           </Link>
 
           <div className="ml-auto flex shrink-0 items-center">
-            {!onSearchPage ? (
+            {!onProductsPage ? (
               <button
                 type="button"
-                onClick={navigateToSearch}
+                onClick={navigateToProducts}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/40 bg-white/20 text-white shadow-sm backdrop-blur-sm transition-all hover:bg-white/30 active:scale-95 sm:h-12 sm:w-auto sm:gap-2.5 sm:px-4"
-                aria-label="Search shops"
+                aria-label="Browse products"
               >
                 <SearchIcon />
-                <span className="hidden text-[0.95rem] font-medium text-white sm:inline">Search</span>
+                <span className="hidden text-[0.95rem] font-medium text-white sm:inline">Products</span>
               </button>
             ) : null}
           </div>
