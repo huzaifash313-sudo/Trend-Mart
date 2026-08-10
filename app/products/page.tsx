@@ -18,6 +18,7 @@ import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { haversineDistance } from "@/services/geoRadiusService";
+import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -175,29 +176,37 @@ function ProductsPageInner() {
     const radiusActive =
       geoFilter.scope === "radius" && !!coords && geoFilter.maxDistanceKm > 0;
 
-    if (!radiusActive || !coords) return products;
+    let list = products;
 
-    const radius = geoFilter.maxDistanceKm;
-    const nearby: MarketplaceProduct[] = [];
-    const unpinned: MarketplaceProduct[] = [];
+    if (radiusActive && coords) {
+      const radius = geoFilter.maxDistanceKm;
+      const nearby: MarketplaceProduct[] = [];
+      const unpinned: MarketplaceProduct[] = [];
 
-    for (const p of products) {
-      if (p.shop_latitude == null || p.shop_longitude == null) {
-        // Keep unpinned shops so Near Me never empties the catalogue
-        unpinned.push(p);
-        continue;
+      for (const p of products) {
+        if (p.shop_latitude == null || p.shop_longitude == null) {
+          // Keep unpinned shops so Near Me never empties the catalogue
+          unpinned.push(p);
+          continue;
+        }
+        const km = haversineDistance(
+          coords.latitude,
+          coords.longitude,
+          p.shop_latitude,
+          p.shop_longitude,
+        );
+        if (km != null && km <= radius) nearby.push(p);
       }
-      const km = haversineDistance(
-        coords.latitude,
-        coords.longitude,
-        p.shop_latitude,
-        p.shop_longitude,
-      );
-      if (km != null && km <= radius) nearby.push(p);
+
+      // Nearby first, then unpinned — each block fair-mixed so one shop cannot flood
+      list = [
+        ...diversifyMarketplaceFeed(nearby, sort),
+        ...diversifyMarketplaceFeed(unpinned, sort),
+      ];
     }
 
-    return [...nearby, ...unpinned];
-  }, [products, geoFilter, globalCoords]);
+    return list;
+  }, [products, geoFilter, globalCoords, sort]);
 
   const visibleProducts = useMemo(
     () => displayProducts.slice(0, visibleCount),

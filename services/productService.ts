@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { MarketplaceProduct, Product, ProductFormData } from "@/types";
 import { logError, toServiceError } from "@/services/errorService";
 import { isValidUUID } from "@/lib/sanitization";
-import { getProductDiscount } from "@/lib/formatters";
+import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -304,34 +304,99 @@ function sortMarketplaceProducts(
   items: MarketplaceProduct[],
   sort: MarketplaceSort,
 ): MarketplaceProduct[] {
-  const copy = [...items];
-  switch (sort) {
-    case "price_asc":
-      return copy.sort((a, b) => a.price - b.price);
-    case "price_desc":
-      return copy.sort((a, b) => b.price - a.price);
-    case "discount":
-      return copy.sort((a, b) => {
-        const da = getProductDiscount(a).discountPercent;
-        const db = getProductDiscount(b).discountPercent;
-        if (db !== da) return db - da;
-        return (b.created_at ?? "").localeCompare(a.created_at ?? "");
-      });
-    case "newest":
-      return copy.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-    case "for_you":
-    default:
-      // Soft “For You”: discounted + newer first, then price as tie-break
-      return copy.sort((a, b) => {
-        const da = getProductDiscount(a).discountPercent;
-        const db = getProductDiscount(b).discountPercent;
-        if (db !== da) return db - da;
-        const ta = a.created_at ?? "";
-        const tb = b.created_at ?? "";
-        if (tb !== ta) return tb.localeCompare(ta);
-        return a.price - b.price;
-      });
+  // Fair mix: best-of-each-shop + round-robin so one seller cannot flood the feed
+  return diversifyMarketplaceFeed(items, sort);
+}
+
+const MARKETPLACE_SELECT = `
+  id, shop_id, name, title, description, price, original_price, compare_at_price,
+  deal_expires_at, currency, image_url, images, is_available, stock_status,
+  variants, category_id, sub_category_id, created_at,
+  shops!inner (
+    id, name, logo_url, whatsapp_number, category,
+    is_live, verification_status, latitude, longitude
+  )
+`;
+
+/**
+ * Newest-first DB slice can be dominated by one seller — even after category /
+ * subcategory / search filters. Pull extra rows from *other* shops that still
+ * match the same filters so fair-mix has something to interleave.
+ */
+async function topUpMarketplaceDiversity(
+  supabase: ReturnType<typeof createClient>,
+  items: MarketplaceProduct[],
+  opts: {
+    availableOnly: boolean;
+    query: string;
+    subCategoryId?: string | null;
+    category?: string;
+    targetShopSpread?: number;
+  },
+): Promise<MarketplaceProduct[]> {
+  if (items.length === 0) return items;
+
+  const targetShops = opts.targetShopSpread ?? 12;
+  const counts = new Map<string, number>();
+  for (const p of items) {
+    counts.set(p.shop_id, (counts.get(p.shop_id) ?? 0) + 1);
   }
+
+  const shopCount = counts.size;
+  const maxShare = Math.max(...counts.values()) / items.length;
+
+  // Enough distinct shops and no single seller >55% → diversify alone is enough
+  if (shopCount >= Math.min(targetShops, 4) && maxShare < 0.55) {
+    return items;
+  }
+
+  // Exclude shops flooding the newest window (or the only shop in the slice)
+  const excludeIds = [...counts.entries()]
+    .filter(([, n]) => n >= 6 || shopCount === 1)
+    .map(([id]) => id);
+
+  if (excludeIds.length === 0) return items;
+
+  let builder = supabase
+    .from("products")
+    .select(MARKETPLACE_SELECT)
+    .eq("shops.is_live", true)
+    .eq("shops.verification_status", "approved")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (opts.availableOnly) builder = builder.eq("is_available", true);
+  builder = builder.not("shop_id", "in", `(${excludeIds.join(",")})`);
+  if (opts.subCategoryId) builder = builder.eq("sub_category_id", opts.subCategoryId);
+
+  const safe = opts.query.replace(/[%_,.()']/g, " ").trim();
+  if (safe) {
+    const pattern = `%${safe}%`;
+    builder = builder.or(
+      `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+    );
+  }
+
+  const { data, error } = await builder;
+  if (error || !data?.length) return items;
+
+  const seen = new Set(items.map((p) => p.id));
+  let extra = (data as Record<string, unknown>[])
+    .map(mapMarketplaceRow)
+    .filter((p): p is MarketplaceProduct => !!p && !seen.has(p.id));
+
+  // Keep the same category filter the user already applied
+  if (opts.category && opts.category !== "All") {
+    const cat = opts.category.toLowerCase();
+    extra = extra.filter((p) => {
+      const shopCat = (p.shop_category ?? "").toLowerCase();
+      const prodCat = (p.category_id ?? "").toLowerCase();
+      return shopCat === cat || prodCat === cat || shopCat.includes(cat) || prodCat.includes(cat);
+    });
+  }
+
+  if (!extra.length) return items;
+  return [...items, ...extra];
 }
 
 /**
@@ -354,17 +419,7 @@ export async function fetchMarketplaceProducts(
   try {
     let builder = supabase
       .from("products")
-      .select(
-        `
-        id, shop_id, name, title, description, price, original_price, compare_at_price,
-        deal_expires_at, currency, image_url, images, is_available, stock_status,
-        variants, category_id, sub_category_id, created_at,
-        shops!inner (
-          id, name, logo_url, whatsapp_number, category,
-          is_live, verification_status, latitude, longitude
-        )
-      `,
-      )
+      .select(MARKETPLACE_SELECT)
       .eq("shops.is_live", true)
       .eq("shops.verification_status", "approved")
       .order("created_at", { ascending: false })
@@ -402,17 +457,7 @@ export async function fetchMarketplaceProducts(
       if (subRes.success && subRes.data.length > 0) {
         const { data: fallbackRows, error: fbErr } = await supabase
           .from("products")
-          .select(
-            `
-            id, shop_id, name, title, description, price, original_price, compare_at_price,
-            deal_expires_at, currency, image_url, images, is_available, stock_status,
-            variants, category_id, sub_category_id, created_at,
-            shops!inner (
-              id, name, logo_url, whatsapp_number, category,
-              is_live, verification_status, latitude, longitude
-            )
-          `,
-          )
+          .select(MARKETPLACE_SELECT)
           .eq("shops.is_live", true)
           .eq("shops.verification_status", "approved")
           .eq("is_available", true)
@@ -435,6 +480,14 @@ export async function fetchMarketplaceProducts(
         return shopCat === cat || prodCat === cat || shopCat.includes(cat) || prodCat.includes(cat);
       });
     }
+
+    items = await topUpMarketplaceDiversity(supabase, items, {
+      availableOnly,
+      query: q,
+      subCategoryId,
+      category,
+      targetShopSpread: 12,
+    });
 
     return { success: true, data: sortMarketplaceProducts(items, sort) };
   } catch (err) {
