@@ -179,6 +179,19 @@ export async function transitionOrderStatus(
 
     await broadcastOrderUpdate(notification);
 
+    // Best-effort OS push for merchant + customer.
+    if (typeof window !== "undefined") {
+      void import("@/lib/pushClient")
+        .then(({ notifyOrderPush }) =>
+          notifyOrderPush({
+            orderId,
+            shopId,
+            status: newStatus,
+          }),
+        )
+        .catch(() => undefined);
+    }
+
     // 6. Notify global transition listeners
     for (const listener of globalTransitionListeners) {
       try {

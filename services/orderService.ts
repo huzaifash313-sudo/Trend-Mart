@@ -6,6 +6,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
+import { getShopHoursSummary } from "@/lib/shopHours";
+import { getDistanceToShop } from "@/services/geoRadiusService";
 import type { Order, OrderItem, ProductVariant, VariantGroup } from "@/types";
 
 type ServiceResult<T> =
@@ -55,6 +57,9 @@ export interface PlaceOrderParams {
   deliveryFee?: number;
   /** Customer delivery notes. */
   notes?: string;
+  /** Optional customer GPS for radius enforcement. */
+  customerLat?: number | null;
+  customerLng?: number | null;
 }
 
 export interface OrderResult {
@@ -371,11 +376,13 @@ export async function placeOrderAtomic(
   const supabase = createClient();
   const MAX_RETRIES = 3;
 
-  // Soft server-side shop rules (min order + live store) before stock work.
+  // Soft server-side shop rules (live, hours, radius, min order) before stock work.
   try {
     const { data: shopRow, error: shopErr } = await supabase
       .from("shops")
-      .select("id, name, is_live, min_order_amount, delivery_fee_per_km")
+      .select(
+        "id, name, is_live, min_order_amount, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, business_hours, operating_status",
+      )
       .eq("id", params.shopId)
       .maybeSingle();
 
@@ -388,6 +395,53 @@ export async function placeOrderAtomic(
         success: false,
         error: "This shop is currently offline and cannot accept orders.",
       };
+    }
+
+    const hours = getShopHoursSummary({
+      business_hours: shopRow.business_hours as string | null,
+      operating_status: shopRow.operating_status as string | null,
+    });
+    if (hours.state === "closed") {
+      return {
+        success: false,
+        error: `This shop is closed right now (${hours.hoursText}). Try again during open hours.`,
+      };
+    }
+
+    const radiusKm = Number(shopRow.service_radius_km ?? 0);
+    const zones = Array.isArray(shopRow.delivery_zones)
+      ? (shopRow.delivery_zones as string[])
+      : [];
+    const isNationwide = zones.some((z) => /pakistan|nationwide|all/i.test(String(z)));
+    if (
+      !isNationwide &&
+      radiusKm > 0 &&
+      params.customerLat != null &&
+      params.customerLng != null &&
+      Number.isFinite(params.customerLat) &&
+      Number.isFinite(params.customerLng)
+    ) {
+      const dist = getDistanceToShop(
+        {
+          id: String(shopRow.id),
+          name: String(shopRow.name ?? ""),
+          category: "",
+          location: "",
+          whatsapp_number: "",
+          is_live: true,
+          latitude: shopRow.latitude as number | null,
+          longitude: shopRow.longitude as number | null,
+          service_radius_km: radiusKm,
+        },
+        params.customerLat,
+        params.customerLng,
+      );
+      if (dist != null && dist > radiusKm) {
+        return {
+          success: false,
+          error: `You are about ${dist.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`,
+        };
+      }
     }
 
     const lineSubtotal = params.items.reduce(
@@ -719,6 +773,19 @@ export async function placeOrderAtomic(
 
       const order = parseOrder(orderData as Record<string, unknown>);
 
+      // Best-effort: notify merchant (and customer if linked) via web push.
+      if (typeof window !== "undefined") {
+        void import("@/lib/pushClient")
+          .then(({ notifyOrderPush }) =>
+            notifyOrderPush({
+              orderId: order.id,
+              shopId: params.shopId,
+              status: order.status || "Pending",
+            }),
+          )
+          .catch(() => undefined);
+      }
+
       return {
         success: true,
         data: {
@@ -764,6 +831,8 @@ export async function createOrder(params: {
   deliveryFee?: number;
   notes?: string;
   couponCode?: string;
+  customerLat?: number | null;
+  customerLng?: number | null;
 }): Promise<ServiceResult<Order>> {
   const result = await placeOrderAtomic({
     shopId: params.shopId,
@@ -773,6 +842,8 @@ export async function createOrder(params: {
     deliveryFee: params.deliveryFee,
     notes: params.notes,
     couponCode: params.couponCode,
+    customerLat: params.customerLat,
+    customerLng: params.customerLng,
     items: params.items.map((item) => ({
       productId: item.product_id ?? "",
       name: item.name,
