@@ -8,6 +8,11 @@ import type { MarketplaceProduct, Product, ProductFormData } from "@/types";
 import { logError, toServiceError } from "@/services/errorService";
 import { isValidUUID } from "@/lib/sanitization";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
+import {
+  buildFuzzyIlikeOr,
+  fuzzyFilterAndRank,
+  FUZZY_MIN_SCORE,
+} from "@/lib/fuzzySearch";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -417,12 +422,19 @@ async function topUpMarketplaceDiversity(
   builder = builder.not("shop_id", "in", `(${excludeIds.join(",")})`);
   if (opts.subCategoryId) builder = builder.eq("sub_category_id", opts.subCategoryId);
 
-  const safe = opts.query.replace(/[%_,.()']/g, " ").trim();
-  if (safe) {
-    const pattern = `%${safe}%`;
-    builder = builder.or(
-      `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
-    );
+  const fuzzyOr = opts.query
+    ? buildFuzzyIlikeOr(opts.query, ["name", "description", "title"], 6)
+    : null;
+  if (fuzzyOr) {
+    builder = builder.or(fuzzyOr);
+  } else {
+    const safe = opts.query.replace(/[%_,.()']/g, " ").trim();
+    if (safe) {
+      const pattern = `%${safe}%`;
+      builder = builder.or(
+        `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+      );
+    }
   }
 
   const { data, error } = await builder;
@@ -479,12 +491,17 @@ export async function fetchMarketplaceProducts(
 
     const q = query.trim();
     if (q) {
-      const safe = q.replace(/[%_,.()]/g, " ").trim();
-      if (safe) {
-        const pattern = `%${safe}%`;
-        builder = builder.or(
-          `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
-        );
+      const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "description", "title"], 6);
+      if (fuzzyOr) {
+        builder = builder.or(fuzzyOr);
+      } else {
+        const safe = q.replace(/[%_,.()']/g, " ").trim();
+        if (safe) {
+          const pattern = `%${safe}%`;
+          builder = builder.or(
+            `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+          );
+        }
       }
     }
 
@@ -508,12 +525,17 @@ export async function fetchMarketplaceProducts(
         .limit(Math.min(Math.max(limit, 20), 240));
       if (availableOnly) legacy = legacy.eq("is_available", true);
       if (q) {
-        const safe = q.replace(/[%_,.()']/g, " ").trim();
-        if (safe) {
-          const pattern = `%${safe}%`;
-          legacy = legacy.or(
-            `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
-          );
+        const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "description", "title"], 6);
+        if (fuzzyOr) {
+          legacy = legacy.or(fuzzyOr);
+        } else {
+          const safe = q.replace(/[%_,.()']/g, " ").trim();
+          if (safe) {
+            const pattern = `%${safe}%`;
+            legacy = legacy.or(
+              `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+            );
+          }
         }
       }
       if (subCategoryId) legacy = legacy.eq("sub_category_id", subCategoryId);
@@ -555,6 +577,43 @@ export async function fetchMarketplaceProducts(
         const prodCat = (p.category_id ?? "").toLowerCase();
         return shopCat === cat || prodCat === cat || shopCat.includes(cat) || prodCat.includes(cat);
       });
+    }
+
+    // Typo / near-miss rescue: widen the pool, then keep only fuzzy-ranked matches.
+    if (q && items.length < 8) {
+      let broad = supabase
+        .from("products")
+        .select(MARKETPLACE_SELECT)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(240);
+      if (availableOnly) broad = broad.eq("is_available", true);
+      if (subCategoryId) broad = broad.eq("sub_category_id", subCategoryId);
+      const broadRes = await broad;
+      if (!broadRes.error && broadRes.data) {
+        const pool = (broadRes.data as Record<string, unknown>[])
+          .map(mapMarketplaceRow)
+          .filter((p): p is MarketplaceProduct => !!p);
+        const seen = new Set(items.map((p) => p.id));
+        for (const p of pool) {
+          if (!seen.has(p.id)) {
+            items.push(p);
+            seen.add(p.id);
+          }
+        }
+      }
+    }
+
+    if (q) {
+      const ranked = fuzzyFilterAndRank(
+        items,
+        q,
+        (p) => [p.name, p.title, p.description, p.shop_name, p.shop_category],
+        { minScore: FUZZY_MIN_SCORE, weights: [1, 0.95, 0.75, 0.7, 0.55] },
+      );
+      // Relevance first (exact → similar). Skip For You mix so typos still surface best hits.
+      return { success: true, data: ranked.map((r) => r.item) };
     }
 
     items = await topUpMarketplaceDiversity(supabase, items, {

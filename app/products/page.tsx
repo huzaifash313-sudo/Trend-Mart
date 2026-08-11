@@ -31,6 +31,11 @@ import {
 } from "@/lib/dealSchedule";
 import { isOfferActive } from "@/lib/shopOfferTicker";
 import type { ProductOfferContext } from "@/components/ProductGrid";
+import {
+  fuzzyFilterAndRank,
+  suggestSearchCorrections,
+  FUZZY_MIN_SCORE,
+} from "@/lib/fuzzySearch";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -285,17 +290,22 @@ function ProductsPageInner() {
   );
 
   const matchingDealCount = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     if (!q) return 0;
     const today = toPkDateKey();
-    return activeDeals.filter((d) => {
-      if (!d.is_active || !isDealActiveOnDate(d, today)) return false;
-      const hay = [d.title, d.description ?? "", d.badge_text ?? "", d.shop_name ?? ""]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    }).length;
+    const live = activeDeals.filter((d) => d.is_active && isDealActiveOnDate(d, today));
+    return fuzzyFilterAndRank(
+      live,
+      q,
+      (d) => [d.title, d.description, d.badge_text, d.shop_name],
+      { minScore: FUZZY_MIN_SCORE },
+    ).length;
   }, [activeDeals, query]);
+
+  const searchSuggestions = useMemo(() => {
+    if (!qParam.trim() || displayProducts.length > 0) return [];
+    return suggestSearchCorrections(qParam, 4);
+  }, [qParam, displayProducts.length]);
 
   const visibleProducts = useMemo(
     () => displayProducts.slice(0, visibleCount),
@@ -456,7 +466,7 @@ function ProductsPageInner() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products…"
+            placeholder="Search products (typos OK)…"
             className="w-full rounded-2xl border border-zinc-200 bg-white py-2.5 pl-10 pr-20 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             aria-label="Search products"
           />
@@ -615,6 +625,24 @@ function ProductsPageInner() {
                 ? "Try another search, category, or widen your area filter."
                 : "When merchants list items, they’ll show up here across every store."}
             </p>
+            {searchSuggestions.length > 0 ? (
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                <span className="w-full text-[0.7rem] font-medium text-zinc-400">Did you mean?</span>
+                {searchSuggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setQuery(s);
+                      syncUrl({ q: s });
+                    }}
+                    className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {(qParam || activeCategory !== "All") && (
                 <button

@@ -32,6 +32,7 @@ import { fetchShopIdsBySubCategory } from "@/services/productService";
 import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
 import { fetchActiveDeals } from "@/services/dealService";
 import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
+import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 
 /* -------------------------------------------------------------------------- */
 /*  HomeInner Component                                                        */
@@ -181,17 +182,25 @@ function HomeInner() {
   /* Client-side filtering */
   const filteredShops = useMemo(() => {
     const dealShopIds = offerDateKey ? shopIdsWithDealOnDate(activeDeals, offerDateKey) : null;
-    return shops.filter((shop) => {
-      const query = searchQuery.toLowerCase().trim();
-      const matchesSearch = !query || shop.name.toLowerCase().includes(query) || shop.category.toLowerCase().includes(query);
+    const base = shops.filter((shop) => {
       const matchesCategory = activeCategory === "All" || shop.category === activeCategory;
       const matchesSub =
         !activeSubCategoryId ||
         !subCategoryShopIds ||
         subCategoryShopIds.has(shop.id);
       const matchesOffer = !dealShopIds || dealShopIds.has(shop.id);
-      return matchesSearch && matchesCategory && matchesSub && matchesOffer;
+      return matchesCategory && matchesSub && matchesOffer;
     });
+
+    const query = searchQuery.trim();
+    if (!query) return base;
+
+    return fuzzyFilterAndRank(
+      base,
+      query,
+      (shop) => [shop.name, shop.category, shop.location, shop.store_bio],
+      { minScore: FUZZY_MIN_SCORE, weights: [1, 0.7, 0.55, 0.45] },
+    ).map((r) => r.item);
   }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds, offerDateKey, activeDeals]);
 
   /* Geo filter — Near me (range) / This city / All Pakistan */

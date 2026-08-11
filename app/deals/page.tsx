@@ -12,6 +12,7 @@ import {
   type ShopDeal,
 } from "@/lib/dealSchedule";
 import { fetchActiveDeals } from "@/services/dealService";
+import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@/lib/fuzzySearch";
 
 type FilterMode = "today" | "featured" | "upcoming" | "all";
 
@@ -71,7 +72,6 @@ function DealsInner() {
   const offerDays = useMemo(() => listOfferDayKeys(deals, 14, todayKey), [deals, todayKey]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     let list = deals.filter((d) => d.is_active);
 
     if (dayKey) {
@@ -87,30 +87,33 @@ function DealsInner() {
       });
     }
 
+    const q = query.trim();
     if (q) {
-      list = list.filter((d) => {
-        const hay = [
-          d.title,
-          d.description ?? "",
-          d.badge_text ?? "",
-          d.shop_name ?? "",
-        ]
-          .join(" ")
-          .toLowerCase();
-        return hay.includes(q);
+      list = fuzzyFilterAndRank(
+        list,
+        q,
+        (d) => [d.title, d.badge_text, d.description, d.shop_name],
+        { minScore: FUZZY_MIN_SCORE, weights: [1, 0.9, 0.7, 0.75] },
+      ).map((r) => r.item);
+    } else {
+      list = list.slice().sort((a, b) => {
+        const af = a.is_featured ? 1 : 0;
+        const bf = b.is_featured ? 1 : 0;
+        if (bf !== af) return bf - af;
+        const ai = a.image_url ? 1 : 0;
+        const bi = b.image_url ? 1 : 0;
+        if (bi !== ai) return bi - ai;
+        return (b.created_at || "").localeCompare(a.created_at || "");
       });
     }
 
-    return list.slice().sort((a, b) => {
-      const af = a.is_featured ? 1 : 0;
-      const bf = b.is_featured ? 1 : 0;
-      if (bf !== af) return bf - af;
-      const ai = a.image_url ? 1 : 0;
-      const bi = b.image_url ? 1 : 0;
-      if (bi !== ai) return bi - ai;
-      return (b.created_at || "").localeCompare(a.created_at || "");
-    });
+    return list;
   }, [deals, query, filter, dayKey, todayKey, offerDays]);
+
+  const searchSuggestions = useMemo(() => {
+    if (!query.trim() || filtered.length > 0) return [];
+    return suggestSearchCorrections(query, 4);
+  }, [query, filtered.length]);
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -151,7 +154,7 @@ function DealsInner() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search deals, badges, shops…"
+            placeholder="Search deals, shops… (typos OK)"
             className="w-full rounded-2xl border border-zinc-200 bg-white py-2.5 pl-10 pr-20 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             aria-label="Search deals"
           />
@@ -248,6 +251,23 @@ function DealsInner() {
           <p className="mt-1 text-xs text-zinc-500">
             Try another filter, clear search, or check back on offer days.
           </p>
+          {searchSuggestions.length > 0 ? (
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+              {searchSuggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setQuery(s);
+                    syncUrl({ q: s });
+                  }}
+                  className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <Link
             href="/products"
             className="mt-3 inline-flex rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white"
