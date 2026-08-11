@@ -21,16 +21,28 @@ interface FeaturedDealsStripProps {
   limit?: number;
   className?: string;
   getOfferTags?: (shopId: string) => string[];
+  /**
+   * `home` — one card wide, short cards, small inter-card gap,
+   * extra space between marquee loop copies. Deals/products keep `default`.
+   */
+  variant?: "default" | "home";
 }
 
 /** ~2 cards on mobile, ~3 tablet, ~4 desktop */
-const SLOT =
+const SLOT_DEFAULT =
   "w-[calc(50%-0.25rem)] shrink-0 sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]";
+
+/** One full card on home (matches strip viewport; next card only after scroll) */
+const SLOT_HOME =
+  "w-[calc(100vw-2.75rem)] shrink-0 sm:w-[min(24rem,calc(100%-1.5rem))] lg:w-[min(26rem,calc(100%-2rem))]";
 
 /** Slow continuous marquee (px/sec) — e-commerce shelf feel */
 const AUTO_PX_PER_SEC = 36;
 const RESUME_AFTER_MS = 2800;
 const ARROW_EASE_MS = 420;
+const CARD_GAP_PX = 8;
+const HOME_CARD_GAP_PX = 12;
+const HOME_LOOP_GAP_PX = 28;
 
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
@@ -89,7 +101,11 @@ export default function FeaturedDealsStrip({
   limit = 12,
   className = "",
   getOfferTags,
+  variant = "default",
 }: FeaturedDealsStripProps) {
+  const isHome = variant === "home";
+  const slotClass = isHome ? SLOT_HOME : SLOT_DEFAULT;
+  const cardGapPx = isHome ? HOME_CARD_GAP_PX : CARD_GAP_PX;
   const day = dateKey ?? toPkDateKey();
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -148,11 +164,12 @@ export default function FeaturedDealsStrip({
   const measure = useCallback(() => {
     const setEl = setRef.current;
     if (!setEl) return;
-    // scrollWidth of first set (= one full loop length including gaps)
-    setWidthRef.current = setEl.offsetWidth;
+    // One full loop = first set width (+ seam gap between duplicated copies on home)
+    const seam = isHome ? HOME_LOOP_GAP_PX : 0;
+    setWidthRef.current = setEl.offsetWidth + seam;
     setReady(setWidthRef.current > 0);
     applyTransform();
-  }, [applyTransform]);
+  }, [applyTransform, isHome]);
 
   useEffect(() => {
     measure();
@@ -197,7 +214,9 @@ export default function FeaturedDealsStrip({
       pauseAuto(5000);
       const setEl = setRef.current;
       const card = setEl?.querySelector<HTMLElement>("[data-deal-slot]");
-      const stepPx = card ? card.offsetWidth + 8 : (viewportRef.current?.clientWidth ?? 160) * 0.5;
+      const stepPx = card
+        ? card.offsetWidth + cardGapPx
+        : (viewportRef.current?.clientWidth ?? 160) * (isHome ? 0.92 : 0.5);
       const setW = setWidthRef.current || 1;
       if (animRef.current != null) {
         cancelAnimationFrame(animRef.current);
@@ -219,7 +238,7 @@ export default function FeaturedDealsStrip({
       };
       animRef.current = requestAnimationFrame(stepAnim);
     },
-    [applyTransform, pauseAuto],
+    [applyTransform, pauseAuto, cardGapPx, isHome],
   );
 
   const onPointerDown = useCallback(
@@ -272,14 +291,15 @@ export default function FeaturedDealsStrip({
   const renderSet = (keyPrefix: string, isMeasureSet: boolean) => (
     <div
       ref={isMeasureSet ? setRef : undefined}
-      className="flex shrink-0 items-stretch gap-2"
+      className={`flex shrink-0 items-stretch ${isHome ? "gap-3" : "gap-2"}`}
       aria-hidden={!isMeasureSet}
     >
       {visible.map((deal, i) => (
-        <div key={`${keyPrefix}-${deal.id}`} data-deal-slot className={`${SLOT} flex`}>
+        <div key={`${keyPrefix}-${deal.id}`} data-deal-slot className={`${slotClass} flex`}>
           <DealCard
             deal={deal}
             compact
+            density={isHome ? "home" : "default"}
             priority={isMeasureSet && i < 2}
             offerTags={getOfferTags?.(deal.shop_id) ?? []}
             onOpen={() => {
@@ -358,7 +378,7 @@ export default function FeaturedDealsStrip({
         >
           <div
             ref={trackRef}
-            className="flex w-max will-change-transform"
+            className={`flex w-max will-change-transform ${isHome ? "gap-7" : ""}`}
             style={{
               transform: "translate3d(0,0,0)",
               backfaceVisibility: "hidden",

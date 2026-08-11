@@ -25,6 +25,8 @@ interface DealCardProps {
   href?: string;
   offerTags?: string[];
   compact?: boolean;
+  /** Home shelf: shorter image + tighter body. Deals grid stays `default`. */
+  density?: "default" | "home";
   priority?: boolean;
   className?: string;
   shopWhatsapp?: string | null;
@@ -73,11 +75,13 @@ export default function DealCard({
   href,
   offerTags = [],
   compact = false,
+  density = "default",
   priority = false,
   className = "",
   shopWhatsapp,
   onOpen,
 }: DealCardProps) {
+  const isHomeDensity = density === "home";
   const { addItem } = useCart();
   const { addToast } = useToast();
   const gallery = useMemo(() => getDealImages(deal), [deal]);
@@ -198,7 +202,11 @@ export default function DealCard({
     },
   ];
 
-  const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
+  const titleClass = isHomeDensity
+    ? "text-[12px] sm:text-[13px] line-clamp-1 min-h-0"
+    : compact
+      ? "text-[12px] sm:text-[13px]"
+      : "text-[13px] sm:text-sm";
   const priceLabel = hasPrice ? formatDealPrice(Number(deal.price)) : null;
 
   return (
@@ -220,7 +228,9 @@ export default function DealCard({
         aria-label={onOpen ? `View ${deal.title}` : undefined}
       >
         <div
-          className="tm-product-media relative shrink-0 overflow-hidden"
+          className={`tm-product-media relative shrink-0 overflow-hidden ${
+            isHomeDensity ? "!aspect-[16/10]" : ""
+          }`}
           onClick={(e) => {
             if (!onOpen) return;
             e.stopPropagation();
@@ -233,7 +243,11 @@ export default function DealCard({
               alt={deal.title}
               fill
               className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              sizes={
+                isHomeDensity
+                  ? "(max-width: 640px) 92vw, 26rem"
+                  : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              }
               priority={priority}
               loading={priority ? "eager" : "lazy"}
               quality={75}
@@ -288,8 +302,15 @@ export default function DealCard({
           {tickerTags.length > 0 ? <OfferTickerMarquee tags={tickerTags} /> : null}
         </div>
 
-        <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
-          <h3 className={`tm-product-title min-h-[2.45em] ${titleClass}`} title={deal.title}>
+        <div
+          className={`tm-product-body flex min-h-0 flex-1 flex-col ${
+            isHomeDensity ? "!gap-0.5 !p-2 sm:!p-2.5" : "gap-1"
+          }`}
+        >
+          <h3
+            className={`tm-product-title ${isHomeDensity ? "" : "min-h-[2.45em]"} ${titleClass}`}
+            title={deal.title}
+          >
             {deal.title}
           </h3>
 
@@ -320,7 +341,11 @@ export default function DealCard({
           </button>
 
           {/* Price FULL WIDTH — never shares a row with buttons (no clipping) */}
-          <div className="mt-auto flex min-h-[2.4rem] flex-col justify-end gap-0.5 pt-1">
+          <div
+            className={`mt-auto flex flex-col justify-end gap-0.5 ${
+              isHomeDensity ? "min-h-0 pt-0.5" : "min-h-[2.4rem] pt-1"
+            }`}
+          >
             {hasPrice && priceLabel ? (
               <>
                 <p
@@ -354,7 +379,11 @@ export default function DealCard({
           </div>
 
           {/* Actions on their own row — full readable labels */}
-          <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+          <div
+            className={`flex items-center justify-between gap-1 border-t border-zinc-100 dark:border-zinc-800 ${
+              isHomeDensity ? "pt-1" : "pt-1.5"
+            }`}
+          >
             <button
               type="button"
               onClick={handleWishlist}

@@ -440,7 +440,7 @@ function HomeInner() {
       )}
 
       {/* Deals block — day chips + cards together (not split by Stories) */}
-      <section aria-label="Featured deals" className="mb-3 space-y-2">
+      <section aria-label="Featured deals" className="mb-6 space-y-2.5 sm:mb-8">
         <OfferDaysStrip
           deals={activeDeals}
           selectedDateKey={offerDateKey}
@@ -452,6 +452,7 @@ function HomeInner() {
           dateKey={offerDateKey}
           title="Featured deals"
           seeAllHref="/deals"
+          variant="home"
           getOfferTags={getDealStripOfferTags}
         />
       </section>
