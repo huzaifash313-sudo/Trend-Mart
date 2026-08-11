@@ -154,7 +154,7 @@ function ProductCard({
 
       <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
         <h3
-          className={`tm-product-title ${compact || showShopMeta ? "tm-product-title--single" : ""} ${
+          className={`tm-product-title ${
             compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"
           }`}
           title={product.name}
@@ -163,14 +163,14 @@ function ProductCard({
         </h3>
 
         {showShopMeta && product.shop_name ? (
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onShopClick?.(product);
               }}
-              className="flex min-w-0 flex-1 items-center gap-1 text-left"
+              className="flex min-w-0 max-w-full items-center gap-1 text-left"
               aria-label={`View store ${product.shop_name}`}
             >
               {product.shop_logo_url ? (
@@ -193,19 +193,19 @@ function ProductCard({
               average={product.shop_avg_rating}
               count={product.shop_review_count}
               size="xs"
-              className="shrink-0"
+              className="w-fit max-w-full"
             />
           </div>
         ) : !compact && product.description ? (
-          <p className="line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
+          <p className="line-clamp-2 text-[11px] leading-snug text-zinc-400 dark:text-zinc-500">
             {product.description}
           </p>
         ) : null}
 
-        <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
-          <div className="min-w-0 flex-1">
+        <div className="tm-product-footer mt-auto flex flex-col gap-1.5 pt-1.5">
+          <div className="min-w-0 w-full">
             <p
-              className={`truncate font-bold tabular-nums leading-tight text-zinc-900 dark:text-zinc-50 ${
+              className={`break-words font-bold tabular-nums leading-tight tracking-tight text-zinc-900 dark:text-zinc-50 ${
                 compact ? "text-[13px] sm:text-sm" : "text-sm sm:text-[15px]"
               }`}
             >
@@ -213,7 +213,7 @@ function ProductCard({
             </p>
             {hasDiscount && originalPrice != null ? (
               <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-                <span className="truncate text-[10px] text-zinc-400 line-through tabular-nums sm:text-[11px]">
+                <span className="text-[10px] text-zinc-400 line-through tabular-nums sm:text-[11px]">
                   {formatRupees(originalPrice)}
                 </span>
                 <DiscountBadge originalPrice={originalPrice} currentPrice={product.price} />
@@ -221,33 +221,37 @@ function ProductCard({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center gap-0.5">
-            {onFavoriteToggle ? (
-              <button
-                type="button"
-                onClick={handleFavorite}
-                className={`rounded-full p-1.5 transition-colors ${
-                  isFavorite
-                    ? "text-rose-500"
-                    : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-                }`}
-                aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-              >
-                <HeartIcon filled={isFavorite} />
-              </button>
-            ) : null}
+          {(onFavoriteToggle || (product.is_available && onAddToCart)) ? (
+            <div className="flex w-full items-center justify-between gap-2">
+              {onFavoriteToggle ? (
+                <button
+                  type="button"
+                  onClick={handleFavorite}
+                  className={`-ml-1 inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                    isFavorite
+                      ? "text-rose-500"
+                      : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                  }`}
+                  aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <HeartIcon filled={isFavorite} />
+                </button>
+              ) : (
+                <span className="h-8 w-8" aria-hidden="true" />
+              )}
 
-            {product.is_available && onAddToCart ? (
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                className="tm-product-add-text shrink-0"
-                aria-label={`Add ${product.name} to cart`}
-              >
-                Add
-              </button>
-            ) : null}
-          </div>
+              {product.is_available && onAddToCart ? (
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  className="tm-product-add-text inline-flex h-8 items-center shrink-0 px-0.5"
+                  aria-label={`Add ${product.name} to cart`}
+                >
+                  Add
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </article>
@@ -261,9 +265,12 @@ function SkeletonCard() {
       <div className="tm-product-body flex flex-col gap-1">
         <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-        <div className="mt-1 flex items-end justify-between">
-          <div className="h-4 w-14 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          <div className="h-3 w-8 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="mt-auto flex flex-col gap-1.5 pt-1.5">
+          <div className="h-4 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+          <div className="flex items-center justify-between">
+            <div className="h-3.5 w-3.5 animate-pulse rounded-full bg-zinc-100 dark:bg-zinc-800" />
+            <div className="h-3 w-8 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+          </div>
         </div>
       </div>
     </div>

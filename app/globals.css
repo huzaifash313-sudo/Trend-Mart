@@ -1003,11 +1003,11 @@ html.dark .tm-product-placeholder {
 }
 
 .tm-product-body {
-  padding: 0.4rem 0.5rem 0.45rem;
+  padding: 0.5rem 0.55rem 0.55rem;
 }
 @media (min-width: 640px) {
   .tm-product-body {
-    padding: 0.45rem 0.55rem 0.5rem;
+    padding: 0.55rem 0.6rem 0.6rem;
   }
 }
 
@@ -1017,16 +1017,18 @@ html.dark .tm-product-placeholder {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  min-height: 0;
+  min-height: 2.5em;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: -0.01em;
   color: #18181b;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .tm-product-title--single {
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  min-height: 2.5em;
 }
 html.dark .tm-product-title {
   color: #f4f4f5;
@@ -1034,6 +1036,7 @@ html.dark .tm-product-title {
 
 .tm-product-footer {
   min-height: 0;
+  width: 100%;
 }
 
 /* Image upload — file picker only (no URL field) */
