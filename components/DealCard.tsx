@@ -202,12 +202,176 @@ export default function DealCard({
     },
   ];
 
-  const titleClass = isHomeDensity
-    ? "text-[12px] sm:text-[13px] line-clamp-1 min-h-0"
-    : compact
-      ? "text-[12px] sm:text-[13px]"
-      : "text-[13px] sm:text-sm";
+  const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
   const priceLabel = hasPrice ? formatDealPrice(Number(deal.price)) : null;
+
+  const checkoutModal = checkoutOpen ? (
+    <WhatsAppCheckoutModal
+      items={checkoutItems}
+      shop={
+        {
+          id: deal.shop_id,
+          name: deal.shop_name || "Store",
+          whatsapp_number: shopPick.whatsapp_number,
+          location: "",
+        } as Shop
+      }
+      onClose={() => setCheckoutOpen(false)}
+      onOrderPlaced={() => setCheckoutOpen(false)}
+    />
+  ) : null;
+
+  /* ── Home: horizontal compact spotlight (short height, readable type) ── */
+  if (isHomeDensity) {
+    return (
+      <>
+        <article
+          className={`tm-home-deal-card group relative flex w-full overflow-hidden ${
+            onOpen ? "cursor-pointer" : ""
+          } ${className}`}
+          onClick={() => onOpen?.()}
+          onKeyDown={(e) => {
+            if (!onOpen) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen();
+            }
+          }}
+          role={onOpen ? "button" : undefined}
+          tabIndex={onOpen ? 0 : undefined}
+          aria-label={onOpen ? `View ${deal.title}` : undefined}
+        >
+          <div className="relative h-[7.25rem] w-[7.25rem] shrink-0 overflow-hidden sm:h-[8.5rem] sm:w-[8.5rem] md:h-[9.5rem] md:w-[9.5rem] lg:h-[10.25rem] lg:w-[10.25rem]">
+            {showPhoto && safeSrc ? (
+              <Image
+                src={safeSrc}
+                alt={deal.title}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                sizes="(max-width: 640px) 7.25rem, (max-width: 768px) 8.5rem, 10rem"
+                priority={priority}
+                loading={priority ? "eager" : "lazy"}
+                quality={78}
+                unoptimized={/\.supabase\.(co|in)\//i.test(safeSrc)}
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="tm-product-placeholder flex h-full w-full items-center justify-center">
+                <span className="select-none text-2xl font-bold text-teal-700/40 dark:text-teal-300/35">
+                  {deal.title.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <span className="absolute left-1.5 top-1.5 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-white shadow-sm">
+              Deal
+            </span>
+            {hasDiscount && discountPercent > 0 ? (
+              <span className="absolute bottom-1.5 left-1.5 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm sm:text-[11px]">
+                {discountPercent}% OFF
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col justify-between gap-1.5 p-2.5 sm:gap-2 sm:p-3 md:p-3.5">
+            <div className="min-w-0 space-y-1">
+              <h3
+                className="line-clamp-2 text-[0.9rem] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-base md:text-[1.05rem]"
+                title={deal.title}
+              >
+                {deal.title}
+              </h3>
+              <button
+                type="button"
+                onClick={(e) => {
+                  stop(e);
+                  goStore();
+                }}
+                className="flex min-w-0 max-w-full items-center gap-1.5 text-left"
+                aria-label={`Visit ${deal.shop_name || "store"}`}
+              >
+                {deal.shop_logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={getSafeImageUrl(deal.shop_logo_url, "shop")}
+                    alt=""
+                    className="h-4 w-4 shrink-0 rounded-full object-cover sm:h-[1.125rem] sm:w-[1.125rem]"
+                  />
+                ) : (
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[8px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    {(deal.shop_name || "?").charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="truncate text-xs font-medium text-emerald-700 dark:text-emerald-400 sm:text-[0.8125rem]">
+                  {deal.shop_name || "Store"}
+                </span>
+              </button>
+              {tickerTags[0] ? (
+                <p className="truncate text-[11px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-xs">
+                  {tickerTags[0]}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                {hasPrice && priceLabel ? (
+                  <>
+                    <p className="text-base font-bold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-lg md:text-[1.2rem]">
+                      {priceLabel}
+                    </p>
+                    {hasDiscount && originalPrice != null ? (
+                      <span className="mt-0.5 inline-block text-xs text-zinc-400 line-through tabular-nums sm:text-[0.8125rem]">
+                        {formatDealPrice(originalPrice)}
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-sm font-semibold text-zinc-500">{whenTag}</p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleWishlist}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                    favorited
+                      ? "text-rose-500"
+                      : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                  }`}
+                  aria-label="Wishlist"
+                >
+                  <HeartIcon filled={favorited} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  className="tm-product-add-text text-[0.8125rem] sm:text-sm"
+                  aria-label={`Add ${deal.title} to cart`}
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOrder}
+                  disabled={!canOrderToday}
+                  title={canOrderToday ? "Order via WhatsApp" : `Order on ${whenTag}`}
+                  className={`rounded-full px-2.5 py-1 text-[0.8125rem] font-bold transition sm:px-3 sm:text-sm ${
+                    canOrderToday
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "cursor-not-allowed bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600"
+                  }`}
+                  aria-label={canOrderToday ? "Order now" : `Order only on ${whenTag}`}
+                >
+                  Order
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+        {checkoutModal}
+      </>
+    );
+  }
 
   return (
     <>
@@ -228,9 +392,7 @@ export default function DealCard({
         aria-label={onOpen ? `View ${deal.title}` : undefined}
       >
         <div
-          className={`tm-product-media relative shrink-0 overflow-hidden ${
-            isHomeDensity ? "!aspect-[16/10]" : ""
-          }`}
+          className="tm-product-media relative shrink-0 overflow-hidden"
           onClick={(e) => {
             if (!onOpen) return;
             e.stopPropagation();
@@ -243,11 +405,7 @@ export default function DealCard({
               alt={deal.title}
               fill
               className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-              sizes={
-                isHomeDensity
-                  ? "(max-width: 640px) 92vw, 26rem"
-                  : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              }
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               priority={priority}
               loading={priority ? "eager" : "lazy"}
               quality={75}
@@ -302,15 +460,8 @@ export default function DealCard({
           {tickerTags.length > 0 ? <OfferTickerMarquee tags={tickerTags} /> : null}
         </div>
 
-        <div
-          className={`tm-product-body flex min-h-0 flex-1 flex-col ${
-            isHomeDensity ? "!gap-0.5 !p-2 sm:!p-2.5" : "gap-1"
-          }`}
-        >
-          <h3
-            className={`tm-product-title ${isHomeDensity ? "" : "min-h-[2.45em]"} ${titleClass}`}
-            title={deal.title}
-          >
+        <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
+          <h3 className={`tm-product-title min-h-[2.45em] ${titleClass}`} title={deal.title}>
             {deal.title}
           </h3>
 
@@ -340,12 +491,7 @@ export default function DealCard({
             </span>
           </button>
 
-          {/* Price FULL WIDTH — never shares a row with buttons (no clipping) */}
-          <div
-            className={`mt-auto flex flex-col justify-end gap-0.5 ${
-              isHomeDensity ? "min-h-0 pt-0.5" : "min-h-[2.4rem] pt-1"
-            }`}
-          >
+          <div className="mt-auto flex min-h-[2.4rem] flex-col justify-end gap-0.5 pt-1">
             {hasPrice && priceLabel ? (
               <>
                 <p
@@ -378,12 +524,7 @@ export default function DealCard({
             )}
           </div>
 
-          {/* Actions on their own row — full readable labels */}
-          <div
-            className={`flex items-center justify-between gap-1 border-t border-zinc-100 dark:border-zinc-800 ${
-              isHomeDensity ? "pt-1" : "pt-1.5"
-            }`}
-          >
+          <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
             <button
               type="button"
               onClick={handleWishlist}
@@ -423,22 +564,7 @@ export default function DealCard({
           </div>
         </div>
       </article>
-
-      {checkoutOpen ? (
-        <WhatsAppCheckoutModal
-          items={checkoutItems}
-          shop={
-            {
-              id: deal.shop_id,
-              name: deal.shop_name || "Store",
-              whatsapp_number: shopPick.whatsapp_number,
-              location: "",
-            } as Shop
-          }
-          onClose={() => setCheckoutOpen(false)}
-          onOrderPlaced={() => setCheckoutOpen(false)}
-        />
-      ) : null}
+      {checkoutModal}
     </>
   );
 }

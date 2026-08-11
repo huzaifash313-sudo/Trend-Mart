@@ -440,7 +440,7 @@ function HomeInner() {
       )}
 
       {/* Deals block — day chips + cards together (not split by Stories) */}
-      <section aria-label="Featured deals" className="mb-6 space-y-2.5 sm:mb-8">
+      <section aria-label="Featured deals" className="mb-5 space-y-2 sm:mb-6">
         <OfferDaysStrip
           deals={activeDeals}
           selectedDateKey={offerDateKey}

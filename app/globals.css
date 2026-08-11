@@ -1022,6 +1022,97 @@ html.dark .tm-deals-marquee .tm-product-card:hover {
   cursor: grabbing;
 }
 
+/* Home Featured Deals — snap-shift spotlight (compact, unique vs shop grid) */
+.tm-home-deals-stage {
+  background:
+    linear-gradient(135deg, rgba(13, 148, 136, 0.07) 0%, rgba(245, 158, 11, 0.05) 48%, transparent 72%),
+    linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+  border: 1px solid color-mix(in srgb, var(--tm-sea) 28%, #e2e8f0);
+  box-shadow: 0 8px 28px rgba(15, 118, 110, 0.08);
+  padding: 0.55rem 0.55rem 0.65rem;
+}
+html.dark .tm-home-deals-stage {
+  background:
+    linear-gradient(135deg, rgba(13, 148, 136, 0.14) 0%, rgba(245, 158, 11, 0.06) 45%, transparent 70%),
+    linear-gradient(180deg, #0c1222 0%, #09090b 100%);
+  border-color: color-mix(in srgb, var(--tm-sea) 35%, transparent);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
+}
+.tm-home-deal-card {
+  border-radius: 1rem;
+  border: 1.5px solid color-mix(in srgb, var(--tm-sea) 45%, #99f6e4);
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(13, 148, 136, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+html.dark .tm-home-deal-card {
+  background: var(--tm-surface);
+  border-color: color-mix(in srgb, var(--tm-sea) 42%, transparent);
+}
+.tm-home-deal-card:hover {
+  border-color: color-mix(in srgb, var(--tm-sea-deep) 65%, var(--tm-sea));
+  box-shadow: 0 10px 24px rgba(13, 148, 136, 0.14);
+  transform: translateY(-1px);
+}
+.tm-home-deals-pulse {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #14b8a6;
+  box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.55);
+  animation: tm-home-deals-pulse 1.8s ease-out infinite;
+  flex-shrink: 0;
+}
+@keyframes tm-home-deals-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(20, 184, 166, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
+  }
+}
+.tm-home-deals-progress {
+  height: 2px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tm-sea) 12%, #e4e4e7);
+}
+html.dark .tm-home-deals-progress {
+  background: color-mix(in srgb, var(--tm-sea) 18%, #27272a);
+}
+.tm-home-deals-progress-bar {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0d9488, #f59e0b);
+  animation-name: tm-home-deals-hold;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes tm-home-deals-hold {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-home-deals-pulse,
+  .tm-home-deals-progress-bar {
+    animation: none;
+  }
+  .tm-home-deals-progress-bar {
+    transform: scaleX(1);
+  }
+}
+
 .tm-product-media {
   aspect-ratio: 5 / 4;
   width: 100%;
