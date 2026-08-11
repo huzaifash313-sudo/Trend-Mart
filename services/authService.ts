@@ -525,8 +525,8 @@ export function redirectToDashboard(role: AuthRole | "admin"): void {
 
 /**
  * Detect the user's role.
- * Checks the user_roles table first, then metadata, then falls back to shop ownership.
- * DB lookups are time-boxed so a hung PostgREST call never freezes Sign-In /account.
+ * Prefers get_my_role() RPC (avoids recursive user_roles RLS 500), then metadata,
+ * then shop ownership. Direct user_roles table reads are last-resort only.
  */
 export async function detectUserRole(user: User | null): Promise<AuthRole | "admin"> {
   if (!user) return "customer";
@@ -556,29 +556,27 @@ export async function detectUserRole(user: User | null): Promise<AuthRole | "adm
     }
   };
 
-  // 1. user_roles table
+  const normalizeRole = async (raw: string | null | undefined): Promise<AuthRole | "admin" | null> => {
+    if (!raw) return null;
+    const validRoles: string[] = ["customer", "merchant", "admin"];
+    if (!validRoles.includes(raw)) return null;
+    if (raw === "customer" && (await ownsShop())) return "merchant";
+    return raw as AuthRole | "admin";
+  };
+
+  // 1. SECURITY DEFINER RPC — bypasses recursive RLS on user_roles
   try {
     const result = await withTimeout(
-      supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle()
-        .then((r) => r),
+      supabase.rpc("get_my_role").then((r) => r),
       4000,
     );
-    const roleData = result && "data" in result ? result.data : null;
-    if (roleData?.role) {
-      const validRoles: string[] = ["customer", "merchant", "admin"];
-      if (validRoles.includes(roleData.role)) {
-        // Legacy / mismatched rows: shop owner must remain merchant
-        if (roleData.role === "customer" && (await ownsShop())) {
-          return "merchant";
-        }
-        return roleData.role as AuthRole | "admin";
-      }
-    }
-  } catch { /* fall through */ }
+    const rpcRole =
+      result && "data" in result && typeof result.data === "string" ? result.data : null;
+    const normalized = await normalizeRole(rpcRole);
+    if (normalized) return normalized;
+  } catch {
+    /* fall through — run supabase/FIX_USER_ROLES_500.sql if RPC is missing */
+  }
 
   // 2. user metadata
   const metadataRole = user.user_metadata?.role as AuthRole | undefined;
