@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import dynamic from "next/dynamic";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -14,14 +13,9 @@ import { MerchantQuickAddProvider } from "@/context/MerchantQuickAddContext";
 import { ToastProvider } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
+import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
 import type { ReactNode } from "react";
-
-/** Merchant quick-add pulls DealManager / BulkProductCreator — keep off the critical path. */
-const MerchantQuickAddModal = dynamic(
-  () => import("@/components/MerchantQuickAddModal"),
-  { ssr: false },
-);
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -85,7 +79,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <ErrorBoundary name="CartBar">
                 <CartBar />
               </ErrorBoundary>
-              <MerchantQuickAddModal />
+              <MerchantQuickAddHost />
               <PwaRegister />
               </AppNotifications>
               </MerchantQuickAddProvider>
