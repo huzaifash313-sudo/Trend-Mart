@@ -75,11 +75,18 @@ export async function createSupportTicket(
 
   const phone = form.phone?.trim() ? formatPkPhoneDisplay(form.phone) : "";
 
+  // Soft session lookup — never block ticket submit if auth/network is down
+  // (e.g. auth/v1/user net::ERR_CONNECTION_CLOSED).
   let userId: string | null = null;
   try {
     const supabase = createClient();
-    const { data: userData } = await supabase.auth.getUser();
-    userId = userData.user?.id ?? null;
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+    ]);
+    if (result && "data" in result) {
+      userId = result.data.user?.id ?? null;
+    }
   } catch {
     userId = null;
   }

@@ -39,6 +39,17 @@ interface NotifyPayload {
   userId?: string | null;
 }
 
+type SupportTicketInsert = {
+  user_id: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  category: string;
+  subject: string;
+  message: string;
+  status: string;
+};
+
 function publicDbMessage(err: unknown): string {
   const raw =
     err instanceof Error
@@ -60,10 +71,13 @@ function publicDbMessage(err: unknown): string {
   return "We could not send your message right now. Please try again.";
 }
 
-async function persistTicket(row: Record<string, unknown>) {
+async function persistTicket(row: SupportTicketInsert) {
+  // Untyped Supabase clients infer insert as `never` — cast the payload only.
+  const payload = row as unknown as never;
+
   const admin = getSupabaseAdminClient();
   if (admin) {
-    const { error } = await admin.from("support_tickets").insert(row);
+    const { error } = await admin.from("support_tickets").insert(payload);
     if (error) throw error;
     return;
   }
@@ -78,7 +92,7 @@ async function persistTicket(row: Record<string, unknown>) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   // No .select() — guests cannot read rows under own_read RLS.
-  const { error } = await client.from("support_tickets").insert(row);
+  const { error } = await client.from("support_tickets").insert(payload);
   if (error) throw error;
 }
 
