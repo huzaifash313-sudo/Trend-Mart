@@ -55,19 +55,54 @@ function buildProductOfferTags(
   }
 
   const coupon = offerContext?.couponLabel?.trim();
-  if (coupon && tags.length < 2) {
-    tags.push(coupon.length > 26 ? `${coupon.slice(0, 24)}…` : coupon);
+  if (coupon) {
+    tags.push(coupon.length > 28 ? `${coupon.slice(0, 26)}…` : coupon);
   }
 
   const announcement =
     (offerContext?.announcement ?? product.shop_announcement)?.trim() || "";
   const announcementExpires =
     offerContext?.announcementExpiresAt ?? product.shop_announcement_expires_at;
-  if (announcement && isOfferActive(announcementExpires) && tags.length < 2) {
-    tags.push(announcement.length > 24 ? `${announcement.slice(0, 22)}…` : announcement);
+  if (announcement && isOfferActive(announcementExpires)) {
+    // Skip if same text already covered by coupon/discount wording
+    const short =
+      announcement.length > 28 ? `${announcement.slice(0, 26)}…` : announcement;
+    if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) {
+      tags.push(short);
+    }
   }
 
-  return tags.slice(0, 2);
+  return tags;
+}
+
+/** Dark continuous ticker over product image (homepage-style moving strip). */
+function ProductOfferMarquee({ tags }: { tags: string[] }) {
+  if (tags.length === 0) return null;
+
+  // Duplicate for seamless loop; single tag also scrolls as a “patti”.
+  const sequence = tags.length === 1 ? [tags[0], tags[0], tags[0]] : tags;
+  const track = [...sequence, ...sequence];
+  const durationSec = Math.max(10, Math.min(28, track.length * 3.2));
+
+  return (
+    <div
+      className="tm-product-offer-strip"
+      aria-label={tags.join(", ")}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        className="tm-product-offer-track"
+        style={{ animationDuration: `${durationSec}s` }}
+      >
+        {track.map((tag, i) => (
+          <span key={`${tag}-${i}`} className="tm-product-offer-chip">
+            <span className="tm-product-offer-dot" aria-hidden="true" />
+            {tag}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 interface ProductGridProps {
@@ -178,31 +213,15 @@ function ProductCard({
         )}
 
         {categoryLabel ? (
-          <span className="absolute left-1.5 top-1.5 z-10 max-w-[55%] truncate rounded bg-zinc-900/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+          <span className="absolute left-1.5 top-1.5 z-10 max-w-[70%] truncate rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/95 shadow-sm backdrop-blur-[2px]">
             {categoryLabel}
           </span>
         ) : null}
 
-        {offerTags.length > 0 ? (
-          <div
-            className={`absolute z-10 flex max-w-[78%] flex-col items-end gap-0.5 ${
-              categoryLabel ? "right-1.5 top-1.5" : "left-1.5 top-1.5"
-            }`}
-          >
-            {offerTags.map((tag) => (
-              <span
-                key={tag}
-                className="max-w-full truncate rounded bg-zinc-950/85 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-tight text-white shadow-sm backdrop-blur-[2px]"
-                title={tag}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
+        <ProductOfferMarquee tags={offerTags} />
 
         {!product.is_available ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-900/45">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-900/45">
             <span className="rounded bg-zinc-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
               Sold Out
             </span>
