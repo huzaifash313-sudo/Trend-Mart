@@ -9,6 +9,7 @@ import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { getSafeImageUrl } from "@/services/storageService";
 import { getProductImages } from "@/lib/productImages";
 import { useToast } from "@/components/Toast";
+import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -80,23 +81,42 @@ export default function QuickViewModal({
   const [activeIndex, setActiveIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [broken, setBroken] = useState<Set<number>>(() => new Set());
+  const [selectedVariants, setSelectedVariants] = useState<SelectedVariant[]>([]);
+  const [itemNotes, setItemNotes] = useState("");
 
   const images = useMemo(() => getProductImages(product), [product]);
   const safeIndex = images.length ? Math.min(activeIndex, images.length - 1) : 0;
   const currentUrl = images[safeIndex];
+  const hasVariants = Boolean(product.variants && product.variants.length > 0);
+  const variantLabel = selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · ");
+  const priceAdj = selectedVariants.reduce((sum, v) => sum + (v.priceAdj || 0), 0);
+  const displayPrice = product.price + priceAdj;
+  const variantsReady = !hasVariants || selectedVariants.length === (product.variants?.length ?? 0);
 
   useEffect(() => {
     setActiveIndex(0);
     setBroken(new Set());
     setGalleryOpen(false);
+    setSelectedVariants([]);
+    setItemNotes("");
+    setQuantity(1);
+    setAdded(false);
   }, [product.id]);
 
   const handleAddToCart = useCallback(() => {
-    addItem(product, shop, quantity);
+    if (!variantsReady) {
+      addToast("Please choose flavour / options first.", "error");
+      return;
+    }
+    const productForCart =
+      priceAdj !== 0
+        ? { ...product, price: displayPrice }
+        : product;
+    addItem(productForCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, quantity, addItem, addToast]);
+  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, priceAdj, displayPrice]);
 
   const { hasDiscount, originalPrice, discountPercent: discountPct } = getProductDiscount(product);
 
@@ -229,7 +249,7 @@ export default function QuickViewModal({
 
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatRupees(product.price)}
+              {formatRupees(displayPrice)}
             </span>
             {hasDiscount && originalPrice != null && (
               <>
@@ -241,6 +261,29 @@ export default function QuickViewModal({
                 </span>
               </>
             )}
+          </div>
+
+          {hasVariants && product.variants ? (
+            <VariantSelector
+              variants={product.variants}
+              basePrice={product.price}
+              onSelectionChange={setSelectedVariants}
+              compact
+            />
+          ) : null}
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Special instructions (optional)
+            </label>
+            <textarea
+              value={itemNotes}
+              onChange={(e) => setItemNotes(e.target.value.slice(0, 200))}
+              rows={2}
+              maxLength={200}
+              placeholder="e.g. Extra spicy · No onion · Flavour: mango"
+              className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            />
           </div>
 
           <div className="flex items-center gap-3">
@@ -272,7 +315,7 @@ export default function QuickViewModal({
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!product.is_available}
+              disabled={!product.is_available || !variantsReady}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                 added
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
@@ -309,27 +352,6 @@ export default function QuickViewModal({
             From <span className="font-medium text-zinc-500 dark:text-zinc-400">{shop.name}</span>
             {" · "}checkout from the cart bar below
           </p>
-
-          {product.variants && product.variants.length > 0 && (
-            <div className="space-y-1.5 border-t border-zinc-100 pt-1 dark:border-zinc-800">
-              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Available Options</p>
-              {product.variants.map((group) => (
-                <div key={group.name} className="flex items-center gap-2">
-                  <span className="w-16 shrink-0 text-xs text-zinc-400">{group.name}:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {group.options.map((opt) => (
-                      <span
-                        key={opt.label}
-                        className="rounded-full border border-zinc-200 px-2 py-0.5 text-[0.65rem] text-zinc-600 dark:border-zinc-700 dark:text-zinc-400"
-                      >
-                        {opt.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 

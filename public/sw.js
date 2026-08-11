@@ -1,11 +1,9 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Service Worker                                                */
-/*  Provides installability ("Add to Home Screen") and basic offline          */
-/*  resilience: caches the app shell + recently viewed pages, and serves an   */
-/*  offline fallback page when navigation fails with no network.              */
+/*  Installability, offline fallback, and optional Web Push display.           */
 /* -------------------------------------------------------------------------- */
 
-const CACHE_VERSION = "trendmart-v1";
+const CACHE_VERSION = "trendmart-v2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_URL = "/offline";
@@ -17,26 +15,27 @@ const APP_SHELL_ASSETS = [
   "/icon-512.png",
 ];
 
-// ── Install: pre-cache the app shell ────────────────────────────────────────
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(APP_SHELL_CACHE)
       .then((cache) => cache.addAll(APP_SHELL_ASSETS))
-      .catch(() => {
-        /* Pre-caching is best-effort — a slow/offline install shouldn't fail */
-      }),
+      .catch(() => {}),
   );
   self.skipWaiting();
 });
 
-// ── Activate: clean up old cache versions ───────────────────────────────────
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith("trendmart-") && key !== APP_SHELL_CACHE && key !== RUNTIME_CACHE)
+          .filter(
+            (key) =>
+              key.startsWith("trendmart-") &&
+              key !== APP_SHELL_CACHE &&
+              key !== RUNTIME_CACHE,
+          )
           .map((key) => caches.delete(key)),
       ),
     ),
@@ -44,18 +43,14 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// ── Fetch: network-first for navigations (with offline fallback),           ──
-// ── stale-while-revalidate for same-origin static assets. Never intercepts  ──
-// ── Supabase/API/cross-origin requests — those must always hit the network. ──
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return; // let Supabase/API calls pass through untouched
+  if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
 
-  // Page navigations: try the network, fall back to cache, then offline page.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -72,7 +67,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets (images, fonts, icons): stale-while-revalidate.
   if (["image", "font", "style", "script"].includes(request.destination)) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -89,4 +83,44 @@ self.addEventListener("fetch", (event) => {
       }),
     );
   }
+});
+
+self.addEventListener("push", (event) => {
+  let data = {
+    title: "TrendMart",
+    body: "You have an update.",
+    url: "/",
+    tag: "trendmart",
+  };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    /* ignore */
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "TrendMart", {
+      body: data.body || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: data.tag || "trendmart",
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl =
+    (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ("focus" in client) {
+          if ("navigate" in client) client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    }),
+  );
 });

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import { getAuthCallbackUrl } from "@/lib/appUrl";
+import { getAuthCallbackUrl, getPublicAppUrl } from "@/lib/appUrl";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -211,20 +211,32 @@ export async function verifyOtp(
   token: string,
 ): Promise<OtpVerificationResult> {
   try {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token,
-      type: "signup", // or "email" depending on how the OTP was sent
+    const normalized = email.trim().toLowerCase();
+    const cleaned = token.trim();
+
+    // Supabase templates may send signup or email OTP depending on project settings.
+    let result = await supabase.auth.verifyOtp({
+      email: normalized,
+      token: cleaned,
+      type: "signup",
     });
 
-    if (error) {
+    if (result.error) {
+      result = await supabase.auth.verifyOtp({
+        email: normalized,
+        token: cleaned,
+        type: "email",
+      });
+    }
+
+    if (result.error) {
       return {
         success: false,
-        error: mapSupabaseError(error.message),
+        error: mapSupabaseError(result.error.message),
       };
     }
 
-    if (!data.session) {
+    if (!result.data.session) {
       return {
         success: false,
         error: "Verification succeeded but no session was returned.",
@@ -237,6 +249,74 @@ export async function verifyOtp(
       success: false,
       error:
         err instanceof Error ? err.message : "Verification failed.",
+    };
+  }
+}
+
+/**
+ * Send a password-reset OTP / recovery email (Supabase recovery flow).
+ * Configure the Recovery template in Supabase to use a 6-digit OTP for best UX.
+ */
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo: `${getPublicAppUrl()}/auth/reset-password` },
+    );
+    if (error) {
+      return { success: false, error: mapSupabaseError(error.message) };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Could not send reset code.",
+    };
+  }
+}
+
+/** Verify recovery OTP, then caller can set a new password while session is active. */
+export async function verifyRecoveryOtp(
+  email: string,
+  token: string,
+): Promise<OtpVerificationResult> {
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: token.trim(),
+      type: "recovery",
+    });
+    if (error) {
+      return { success: false, error: mapSupabaseError(error.message) };
+    }
+    if (!data.session) {
+      return { success: false, error: "Code accepted but session missing. Try again." };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Verification failed.",
+    };
+  }
+}
+
+/** Set a new password after a successful recovery OTP / magic-link session. */
+export async function updatePasswordAfterRecovery(
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      return { success: false, error: mapSupabaseError(error.message) };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Could not update password.",
     };
   }
 }

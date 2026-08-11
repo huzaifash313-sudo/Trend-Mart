@@ -107,7 +107,7 @@ function groupItemsByShop(items: CartItem[]): ShopGroup[] {
 /* -------------------------------------------------------------------------- */
 
 export default function CartBar() {
-  const { items, removeItem, updateQuantity, totalItems, totalAmount, clearCart } = useCart();
+  const { items, removeItem, updateQuantity, updateItemNotes, totalItems, totalAmount, clearCart } = useCart();
   const [expanded, setExpanded] = useState(false);
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
 
@@ -126,6 +126,7 @@ export default function CartBar() {
     imageUrl: i.imageUrl,
     quantity: i.quantity,
     variant: i.variant,
+    notes: i.notes,
     currency: i.currency,
     originalPrice: i.originalPrice ?? undefined,
   }));
@@ -200,6 +201,14 @@ export default function CartBar() {
                           <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                             {formatRupees(item.price)}
                           </p>
+                          <input
+                            type="text"
+                            value={item.notes ?? ""}
+                            onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                            placeholder="Note (flavour, spice…)"
+                            maxLength={200}
+                            className="mt-1 w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[0.6rem] text-zinc-700 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                          />
                         </div>
 
                         {/* Quantity controls */}

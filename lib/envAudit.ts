@@ -455,7 +455,7 @@ export function generateEnvExample(): string {
     "# ── Branded Email — Resend (Optional, see lib/email.ts) ─────────────",
     "# RESEND_API_KEY=re_your_api_key",
     "# EMAIL_FROM=TrendMart <notifications@trendmart.pk>",
-    "# SUPPORT_TEAM_EMAIL=support@trendmart.pk",
+    "# SUPPORT_TEAM_EMAIL=support@yourdomain.com",
     "",
     "# ── Application ────────────────────────────────────────────────────",
     "NODE_ENV=development",

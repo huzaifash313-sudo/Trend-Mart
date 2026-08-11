@@ -23,6 +23,11 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import {
+  formatPkPhoneInput,
+  isValidPkMobile,
+  PK_PHONE_PLACEHOLDER,
+} from "@/lib/phoneFormat";
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 
@@ -45,14 +50,6 @@ interface CustomerAddress {
 type AddressLabel = "Home" | "Office" | "Other";
 
 const ADDRESS_LABELS: AddressLabel[] = ["Home", "Office", "Other"];
-
-function isValidPkPhone(raw: string): boolean {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("03")) return true;
-  if (digits.length === 12 && digits.startsWith("92")) return true;
-  if (digits.length === 10 && digits.startsWith("3")) return true;
-  return false;
-}
 
 const INITIAL_ADDRESS_FORM: Omit<CustomerAddress, "id" | "user_id" | "created_at" | "updated_at"> = {
   label: "Home",
@@ -219,7 +216,7 @@ export default function AddressesPage() {
       addToast("Full name must be at least 2 characters.", "error");
       return;
     }
-    if (!isValidPkPhone(form.phone_number)) {
+    if (!isValidPkMobile(form.phone_number)) {
       addToast("Enter a valid Pakistani mobile (e.g. 03001234567).", "error");
       return;
     }
@@ -453,8 +450,13 @@ export default function AddressesPage() {
                     type="tel"
                     required
                     value={form.phone_number}
-                    onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))}
-                    placeholder="+92 300 1234567"
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        phone_number: formatPkPhoneInput(e.target.value),
+                      }))
+                    }
+                    placeholder={PK_PHONE_PLACEHOLDER}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 </div>

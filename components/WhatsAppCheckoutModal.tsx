@@ -34,6 +34,13 @@ import { useLocation } from "@/context/LocationContext";
 import { getDistanceToShop, locationErrorMessage } from "@/services/geoRadiusService";
 import { requireVerifiedEmailSession } from "@/services/authService";
 import { toWhatsAppDigits, normalizePkPhoneDigits } from "@/lib/sanitization";
+import {
+  formatPkPhoneDisplay,
+  formatPkPhoneInput,
+  isValidPkMobile,
+  PK_PHONE_PLACEHOLDER,
+  toPkWhatsAppDigits,
+} from "@/lib/phoneFormat";
 import Link from "next/link";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -47,6 +54,8 @@ export interface WhatsAppCartItem {
   imageUrl?: string | null;
   quantity: number;
   variant?: string;
+  /** Per-item special instructions. */
+  notes?: string;
   currency?: string;
   /** Original price before discount (for showing savings). */
   originalPrice?: number;
@@ -188,6 +197,7 @@ function buildWhatsAppMessage(
     const safePrice = sanitizePayloadNumber(item.price);
     const safeItemName = sanitizePayloadString(item.name, 100);
     const safeVariant = item.variant ? sanitizePayloadString(item.variant, 50) : "";
+    const safeItemNotes = item.notes ? sanitizePayloadString(item.notes, 200) : "";
     const itemTotal = safePrice * qty;
     const safeOriginalPrice = item.originalPrice ? sanitizePayloadNumber(item.originalPrice) : 0;
 
@@ -198,6 +208,9 @@ function buildWhatsAppMessage(
 
     lines.push(`• ${safeItemName}${variantLabel}`);
     lines.push(`  ${qty} x ${formatRupees(safePrice)} = ${formatRupees(itemTotal)}${originalPriceStr}`);
+    if (safeItemNotes) {
+      lines.push(`  📝 Note: ${safeItemNotes}`);
+    }
   }
 
   lines.push(``);
@@ -260,13 +273,10 @@ function validateShipping(details: ShippingDetails): ValidationErrors {
     errors.customerName = "Name is too long (max 100 characters).";
   }
 
-  const phone = details.customerPhone.replace(/\D/g, "");
-  if (!phone) {
+  if (!details.customerPhone.trim()) {
     errors.customerPhone = "Phone number is required.";
-  } else if (phone.length < 10) {
-    errors.customerPhone = "Enter a valid phone number (min 10 digits).";
-  } else if (phone.length > 15) {
-    errors.customerPhone = "Phone number is too long.";
+  } else if (!isValidPkMobile(details.customerPhone)) {
+    errors.customerPhone = `Enter a valid mobile (e.g. ${PK_PHONE_PLACEHOLDER}).`;
   }
 
   if (details.shippingAddress.trim() && details.shippingAddress.trim().length < 5) {
@@ -298,6 +308,7 @@ export default function WhatsAppCheckoutModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderRef, setOrderRef] = useState("");
+  const [pendingWhatsAppUrl, setPendingWhatsAppUrl] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [autofilledFromAccount, setAutofilledFromAccount] = useState(false);
   const [locationFillError, setLocationFillError] = useState<string | null>(null);
@@ -501,11 +512,12 @@ export default function WhatsAppCheckoutModal({
           profile?.full_name ||
           user.user_metadata?.full_name ||
           "";
-        const nextPhone =
+        const nextPhoneRaw =
           savedAddr?.phone_number ||
           profile?.phone ||
           user.user_metadata?.phone ||
           "";
+        const nextPhone = nextPhoneRaw ? formatPkPhoneDisplay(String(nextPhoneRaw)) : "";
         const nextAddress = line || profile?.address || "";
         const nextNotes = savedAddr?.delivery_notes || "";
 
@@ -587,13 +599,25 @@ export default function WhatsAppCheckoutModal({
     setErrors({});
   }, []);
 
-  const handleShippingSubmit = useCallback((e: FormEvent) => {
-    e.preventDefault();
-    const validationErrors = validateShipping(shipping);
-    setErrors(validationErrors);
-    if (Object.keys(validationErrors).length > 0) return;
-    setStep("confirm");
-  }, [shipping]);
+  const handleShippingSubmit = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+      const validationErrors = validateShipping(shipping);
+      setErrors(validationErrors);
+      if (Object.keys(validationErrors).length > 0) return;
+
+      // Email verification only — no paid SMS / phone OTP.
+      const gate = await requireVerifiedEmailSession();
+      if (!gate.ok) {
+        setAuthGate(gate.reason === "unverified" ? "verify" : "login");
+        setStep("auth");
+        return;
+      }
+
+      setStep("confirm");
+    },
+    [shipping],
+  );
 
   // ── Order Submission ────────────────────────────────────────────────────
   const handlePlaceOrder = useCallback(async () => {
@@ -620,14 +644,15 @@ export default function WhatsAppCheckoutModal({
         price: item.price,
         quantity: quantities[item.id] ?? item.quantity,
         variant: item.variant,
+        notes: item.notes,
       }));
 
       const orderResult = await createOrder({
         shopId: shop.id,
         customerName: shipping.customerName.trim(),
         customerPhone:
-          normalizePkPhoneDigits(shipping.customerPhone) ||
-          shipping.customerPhone.replace(/\D/g, ""),
+          toPkWhatsAppDigits(shipping.customerPhone) ||
+          normalizePkPhoneDigits(shipping.customerPhone),
         items: orderItems,
         discountAmount,
         deliveryFee,
@@ -654,7 +679,7 @@ export default function WhatsAppCheckoutModal({
         notes: shipping.deliveryNotes,
       });
 
-      // 3. Build WhatsApp message
+      // 3. Build WhatsApp message and keep modal open until user acts
       const whatsappText = buildWhatsAppMessage(
         shop.name,
         shop.location,
@@ -669,16 +694,11 @@ export default function WhatsAppCheckoutModal({
         ref,
       );
 
-      // 4. Show success state, then open WhatsApp
+      setPendingWhatsAppUrl(
+        `https://wa.me/${phone}?text=${encodeURIComponent(whatsappText)}`,
+      );
       setStep("success");
-
-      setTimeout(() => {
-        window.open(
-          `https://wa.me/${phone}?text=${encodeURIComponent(whatsappText)}`,
-          "_blank",
-        );
-        onOrderPlaced();
-      }, 1000);
+      setIsSubmitting(false);
     } catch (err) {
       setOrderError(
         err instanceof Error
@@ -697,16 +717,27 @@ export default function WhatsAppCheckoutModal({
     deliveryFee,
     grandTotal,
     couponCode,
+    couponResult,
     quantities,
-    onOrderPlaced,
   ]);
+
+  const finishOrder = useCallback(() => {
+    onOrderPlaced();
+  }, [onOrderPlaced]);
+
+  const openWhatsAppAndFinish = useCallback(() => {
+    if (pendingWhatsAppUrl) {
+      window.open(pendingWhatsAppUrl, "_blank", "noopener,noreferrer");
+    }
+    finishOrder();
+  }, [pendingWhatsAppUrl, finishOrder]);
 
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
     <div
       className="fixed inset-0 z-[150] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
+      onClick={step === "success" ? undefined : onClose}
     >
       <div
         className="w-full max-w-lg overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-zinc-900"
@@ -1047,13 +1078,17 @@ export default function WhatsAppCheckoutModal({
                   id="wc-customer-phone"
                   type="tel"
                   required
+                  inputMode="numeric"
                   autoComplete="tel"
                   value={shipping.customerPhone}
                   onChange={(e) => {
                     setAutofilledFromAccount(false);
-                    setShipping(s => ({ ...s, customerPhone: e.target.value }));
+                    setShipping((s) => ({
+                      ...s,
+                      customerPhone: formatPkPhoneInput(e.target.value),
+                    }));
                   }}
-                  placeholder="+92 300 1234567"
+                  placeholder={PK_PHONE_PLACEHOLDER}
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerPhone
                       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
@@ -1062,7 +1097,7 @@ export default function WhatsAppCheckoutModal({
                 />
                 {errors.customerPhone && <p className="mt-1 text-xs text-red-500">{errors.customerPhone}</p>}
                 <p className="mt-1 text-[0.65rem] text-zinc-400">
-                  Unverified numbers go to a quick SMS check on the next step.
+                  Format: {PK_PHONE_PLACEHOLDER} — spaces, dashes, or +92 all work.
                 </p>
               </div>
 
@@ -1253,7 +1288,7 @@ export default function WhatsAppCheckoutModal({
           </div>
         )}
 
-        {/* ── Step: Success ─────────────────────────────────────────────── */}
+        {/* ── Step: Success — stays open until WhatsApp or Close ─────────── */}
         {step === "success" && (
           <div className="px-6 py-10 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
@@ -1261,33 +1296,42 @@ export default function WhatsAppCheckoutModal({
             </div>
             <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Order Placed Successfully!</h4>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              WhatsApp is opening with your order details.
+              Tap WhatsApp to send this order to the merchant. This screen stays open until you choose.
             </p>
             <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
               Your order has been logged for {shop.name}{"'s"} records.
             </p>
             {orderRef && (
-              <p className="mt-1 rounded-full bg-zinc-100 px-3 py-1 text-xs font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              <p className="mt-3 inline-block rounded-full bg-zinc-100 px-3 py-1 text-xs font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                 Ref: {orderRef.slice(0, 8).toUpperCase()}
               </p>
             )}
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-full px-6 py-2.5 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-              >
-                Close
-              </button>
-              {orderRef && (
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
+              {pendingWhatsAppUrl ? (
+                <button
+                  type="button"
+                  onClick={openWhatsAppAndFinish}
+                  className={`inline-flex items-center justify-center gap-2 rounded-full ${accentBg} px-6 py-3 text-sm font-semibold text-white transition-all ${accentBgHover}`}
+                >
+                  <WhatsAppIcon /> Open WhatsApp
+                </button>
+              ) : null}
+              {orderRef ? (
                 <Link
                   href={`/orders/tracking?orderId=${orderRef}`}
-                  onClick={onClose}
-                  className={`rounded-full ${accentBg} px-6 py-2.5 text-sm font-semibold text-white transition-all ${accentBgHover}`}
+                  onClick={finishOrder}
+                  className="rounded-full border border-zinc-200 px-6 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 >
                   Track Live →
                 </Link>
-              )}
+              ) : null}
+              <button
+                type="button"
+                onClick={finishOrder}
+                className="rounded-full px-6 py-3 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}

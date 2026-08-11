@@ -10,6 +10,11 @@ import { createShop } from "@/services/shopService";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
+import {
+  formatPkPhoneInput,
+  isValidPkMobile,
+  PK_PHONE_PLACEHOLDER,
+} from "@/lib/phoneFormat";
 
 const CATEGORIES = SHOP_CATEGORIES.filter((c) => c !== "All");
 
@@ -48,14 +53,6 @@ function emptyShopForm(): ShopFormData {
   };
 }
 
-function isValidPkPhone(raw: string): boolean {
-  const digits = raw.replace(/\D/g, "");
-  // 03XXXXXXXXX (11) or 923XXXXXXXXX (12) or 3XXXXXXXXX (10)
-  if (digits.length === 11 && digits.startsWith("03")) return true;
-  if (digits.length === 12 && digits.startsWith("92")) return true;
-  if (digits.length === 10 && digits.startsWith("3")) return true;
-  return false;
-}
 
 export default function BecomeMerchantPage() {
   const router = useRouter();
@@ -107,8 +104,8 @@ export default function BecomeMerchantPage() {
     }
     if (!form.whatsapp_number.trim()) {
       next.whatsapp_number = "WhatsApp number is required for orders.";
-    } else if (!isValidPkPhone(form.whatsapp_number)) {
-      next.whatsapp_number = "Enter a valid Pakistani mobile (e.g. 03001234567).";
+    } else if (!isValidPkMobile(form.whatsapp_number)) {
+      next.whatsapp_number = `Enter a valid Pakistani mobile (e.g. ${PK_PHONE_PLACEHOLDER}).`;
     }
     if (!agreed) next.agreed = "You must accept the merchant guidelines.";
     if (!confirmSwitch) {
@@ -287,15 +284,23 @@ export default function BecomeMerchantPage() {
             </label>
             <input
               type="tel"
+              inputMode="numeric"
               value={form.whatsapp_number}
-              onChange={(e) => setForm((f) => ({ ...f, whatsapp_number: e.target.value }))}
-              placeholder="03001234567"
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  whatsapp_number: formatPkPhoneInput(e.target.value),
+                }))
+              }
+              placeholder={PK_PHONE_PLACEHOLDER}
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             {errors.whatsapp_number ? (
               <p className="mt-1 text-xs text-red-500">{errors.whatsapp_number}</p>
             ) : (
-              <p className="mt-1 text-[0.65rem] text-zinc-400">Customers&apos; orders go to this WhatsApp.</p>
+              <p className="mt-1 text-[0.65rem] text-zinc-400">
+                Format: {PK_PHONE_PLACEHOLDER}. Customers&apos; orders go to this WhatsApp.
+              </p>
             )}
           </div>
 

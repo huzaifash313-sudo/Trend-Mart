@@ -58,9 +58,8 @@ export default function PrivacyPage() {
   }, [addToast]);
 
   const handleChangePassword = useCallback(() => {
-    router.push("/settings");
-    addToast("Password reset link will be sent to your email.", "info");
-  }, [router, addToast]);
+    router.push("/forgot-password");
+  }, [router]);
 
   if (loading) {
     return (

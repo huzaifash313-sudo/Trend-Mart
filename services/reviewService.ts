@@ -238,20 +238,19 @@ export async function fetchReviewsByShopId(
   try {
     const { data, error } = await supabase
       .from("reviews")
-      .select("*")
+      .select("id, shop_id, customer_name, rating, comment, created_at, user_id, merchant_reply, merchant_reply_at, verified_purchase")
       .eq("shop_id", sanitizedShopId)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (error) throw error;
 
     const reviews = (data as Review[]) ?? [];
-
-    // PROMPT 3: Sanitize all review data before returning to the client
     const sanitizedReviews = reviews.map((review) => ({
       ...review,
       customer_name: sanitizeCustomerName(review.customer_name),
       comment: sanitizeReviewComment(review.comment),
+      merchant_reply: review.merchant_reply ? sanitizeReviewComment(review.merchant_reply) : "",
       rating: sanitizeRating(review.rating) ?? review.rating,
     }));
 
@@ -276,37 +275,23 @@ export async function fetchReviewsByShopId(
  */
 export async function submitReview(
   shopId: string,
-  customerName: string,
+  _customerName: string,
   rating: number,
   comment: string,
 ): Promise<ServiceResult<Review>> {
   cleanupRateLimits();
 
-  // ── PROMPT 3: Input sanitization (first layer of defense) ─────────────────
   const sanitizedShopId = sanitizeShopId(shopId);
   if (!sanitizedShopId) {
     return { success: false, error: "Invalid shop ID." };
   }
 
-  const sanitizedName = sanitizeCustomerName(customerName);
-  if (!sanitizedName || sanitizedName === "Anonymous") {
-    return { success: false, error: "Please provide a valid name (no HTML or special characters allowed)." };
-  }
-  if (sanitizedName.length < 2) {
-    return { success: false, error: "Name must be at least 2 characters long." };
-  }
-
-  // PROMPT 3: Strict rating validation — must be integer 1-5
   const sanitizedRating = sanitizeRating(rating);
   if (sanitizedRating === null) {
     return { success: false, error: "Rating must be a whole number between 1 and 5." };
   }
 
   const sanitizedComment = sanitizeReviewComment(comment);
-  // Comment is optional, but if provided, it must not be empty after sanitization
-  // (if user only submitted scripts/spam, it becomes empty — that's OK)
-
-  // ── PROMPT 3: Rate limiting checks ────────────────────────────────────────
   const sessionKey = getSessionKey();
   const sessionCheck = checkSessionRateLimit(sessionKey);
   if (!sessionCheck.allowed) {
@@ -316,76 +301,123 @@ export async function submitReview(
     };
   }
 
-  // IP rate limit check (basic implementation — Supabase edge handles real IPs)
-  const ipCheck = checkIpRateLimit(sessionKey); // Uses session as proxy for IP
-  if (!ipCheck.allowed) {
-    return { success: false, error: "Too many reviews submitted. Please try again later." };
-  }
-
-  // ── PROMPT 3: Content quality checks (anti-spam) ──────────────────────────
-  if (sanitizedComment.length > 0) {
-    // Check for repetitive characters (e.g., "aaaaaa.........")
-    const repetitiveCheck = /(.)\1{9,}/.test(sanitizedComment);
-    if (repetitiveCheck) {
-      return { success: false, error: "Review contains repetitive characters. Please write a meaningful review." };
-    }
-
-    // Check for excessive capitalization (shouting)
-    const capsRatio = (sanitizedComment.replace(/[^A-Z]/g, "").length) /
-      Math.max(1, sanitizedComment.replace(/[^a-zA-Z]/g, "").length);
-    if (capsRatio > 0.7 && sanitizedComment.length > 20) {
-      return { success: false, error: "Please avoid using excessive capital letters." };
-    }
-  }
-
-  // ── PROMPT 3: Submit to database with sanitized values ────────────────────
-  const supabase = createClient();
-
   try {
-    const { data, error } = await supabase
-      .from("reviews")
-      .insert({
-        shop_id: sanitizedShopId,
-        customer_name: sanitizedName,
+    const res = await fetch("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shopId: sanitizedShopId,
         rating: sanitizedRating,
-        comment: sanitizedComment || "", // Store empty string if no comment
-      })
-      .select()
-      .single();
-
-    if (error) {
-      // Handle specific database errors
-      if (error.code === "23514") {
-        // Check constraint violation (e.g., rating out of range)
-        return { success: false, error: "Invalid rating value." };
-      }
-      if (error.code === "23503") {
-        // Foreign key violation
-        return { success: false, error: "Shop not found." };
-      }
-      throw error;
+        comment: sanitizedComment,
+      }),
+    });
+    const payload = (await res.json()) as { success?: boolean; error?: string; data?: Review };
+    if (!res.ok || !payload.success || !payload.data) {
+      return { success: false, error: payload.error || "Could not submit review." };
     }
-
-    // Return sanitized response
-    const review = data as Review;
     return {
       success: true,
       data: {
-        ...review,
-        customer_name: sanitizeCustomerName(review.customer_name),
-        comment: sanitizeReviewComment(review.comment),
+        ...payload.data,
+        customer_name: sanitizeCustomerName(payload.data.customer_name),
+        comment: sanitizeReviewComment(payload.data.comment ?? ""),
+        merchant_reply: payload.data.merchant_reply
+          ? sanitizeReviewComment(payload.data.merchant_reply)
+          : "",
       },
     };
   } catch (err) {
-    logError(err, {
-      module: "reviewService.submitReview",
-      meta: {
-        shopId: sanitizedShopId,
-        customerName: sanitizedName,
-        rating: sanitizedRating,
-      },
-    });
+    logError(err, { module: "reviewService.submitReview", meta: { shopId: sanitizedShopId } });
     return { success: false, error: toError(err) };
+  }
+}
+
+export async function replyToReview(
+  reviewId: string,
+  reply: string,
+): Promise<ServiceResult<Review>> {
+  if (!reviewId || !/^[0-9a-f-]{36}$/i.test(reviewId.trim())) {
+    return { success: false, error: "Invalid review." };
+  }
+  const sanitizedReply = sanitizeReviewComment(reply);
+  if (!sanitizedReply) {
+    return { success: false, error: "Reply cannot be empty." };
+  }
+
+  try {
+    const res = await fetch("/api/reviews", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reviewId: reviewId.trim(), reply: sanitizedReply }),
+    });
+    const payload = (await res.json()) as { success?: boolean; error?: string; data?: Review };
+    if (!res.ok || !payload.success || !payload.data) {
+      return { success: false, error: payload.error || "Could not save reply." };
+    }
+    return { success: true, data: payload.data };
+  } catch (err) {
+    logError(err, { module: "reviewService.replyToReview", meta: { reviewId } });
+    return { success: false, error: toError(err) };
+  }
+}
+
+export interface ReviewSessionContext {
+  signedIn: boolean;
+  isOwner: boolean;
+  displayName: string;
+  alreadyReviewed: boolean;
+  canSubmit: boolean;
+}
+
+export async function fetchReviewSessionContext(
+  shopId: string,
+  ownerId?: string | null,
+): Promise<ReviewSessionContext> {
+  const empty: ReviewSessionContext = {
+    signedIn: false,
+    isOwner: false,
+    displayName: "",
+    alreadyReviewed: false,
+    canSubmit: false,
+  };
+  const sanitizedShopId = sanitizeShopId(shopId);
+  if (!sanitizedShopId) return empty;
+
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return empty;
+
+    const isOwner = Boolean(ownerId && ownerId === user.id);
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const displayName =
+      (profile?.full_name || "").trim() ||
+      (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "") ||
+      (user.email?.split("@")[0] ?? "");
+
+    const { data: existing } = await supabase
+      .from("reviews")
+      .select("id")
+      .eq("shop_id", sanitizedShopId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    return {
+      signedIn: true,
+      isOwner,
+      displayName: displayName.slice(0, 60),
+      alreadyReviewed: Boolean(existing),
+      canSubmit: !isOwner && !existing,
+    };
+  } catch (err) {
+    logError(err, { module: "reviewService.fetchReviewSessionContext", meta: { shopId } });
+    return empty;
   }
 }
 

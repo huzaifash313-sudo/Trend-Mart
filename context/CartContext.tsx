@@ -17,7 +17,7 @@ import { getProductDiscount } from "@/lib/formatters";
 /* -------------------------------------------------------------------------- */
 
 export interface CartItem {
-  /** Unique cart entry id (productId + variant key). */
+  /** Unique cart entry id (productId + variant + notes key). */
   id: string;
   productId: string;
   shopId: string;
@@ -29,14 +29,23 @@ export interface CartItem {
   imageUrl?: string | null;
   quantity: number;
   variant?: string;
+  /** Per-item special instructions (spice, flavour, etc.). */
+  notes?: string;
   currency?: string;
 }
 
 interface CartContextValue {
   items: CartItem[];
-  addItem: (product: Product, shop: Pick<Shop, "id" | "name" | "whatsapp_number">, quantity?: number, variant?: string) => void;
+  addItem: (
+    product: Product,
+    shop: Pick<Shop, "id" | "name" | "whatsapp_number">,
+    quantity?: number,
+    variant?: string,
+    notes?: string,
+  ) => void;
   removeItem: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
+  updateItemNotes: (cartItemId: string, notes: string) => void;
   clearCart: () => void;
   totalItems: number;
   totalAmount: number;
@@ -124,6 +133,7 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
   const shopName = sanitizeString(raw.shopName, 200);
   const shopWhatsapp = sanitizeString(raw.shopWhatsapp, 50);
   const variant = raw.variant ? sanitizeVariant(raw.variant) : undefined;
+  const notes = raw.notes ? sanitizeString(raw.notes, 200) || undefined : undefined;
   const currency = raw.currency ? sanitizeString(raw.currency, 10).toUpperCase() : undefined;
 
   // Validate currency code (3 uppercase letters or empty)
@@ -140,8 +150,7 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
   const imageUrl = raw.imageUrl ? sanitizeString(raw.imageUrl, 500) : null;
   // Validate URL format if present
   if (imageUrl && !/^https?:\/\/.+/i.test(imageUrl)) {
-    // Invalid URL — strip it
-    return { id, productId, shopId, shopName, shopWhatsapp, name, price, originalPrice, imageUrl: null, quantity, variant, currency };
+    return { id, productId, shopId, shopName, shopWhatsapp, name, price, originalPrice, imageUrl: null, quantity, variant, notes, currency };
   }
 
   return {
@@ -156,6 +165,7 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
     imageUrl,
     quantity,
     variant,
+    notes,
     currency,
   };
 }
@@ -245,6 +255,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       shop: Pick<Shop, "id" | "name" | "whatsapp_number">,
       quantity = 1,
       variant?: string,
+      notes?: string,
     ) => {
       // ── Strict Input Sanitization ──────────────────────────────────────
       const safeProductId = sanitizeString(product.id, 200);
@@ -257,6 +268,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const safeOriginalPrice = discountOriginalPrice != null ? sanitizePrice(discountOriginalPrice) : null;
       const safeQuantity = sanitizeQuantity(quantity);
       const safeVariant = variant ? sanitizeVariant(variant) : undefined;
+      const safeNotes = notes ? sanitizeString(notes, 200) || undefined : undefined;
       const safeCurrency = product.currency ? sanitizeString(product.currency, 10).toUpperCase() : undefined;
 
       // Reject invalid currencies
@@ -278,9 +290,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       setItems((prev) => {
-        // Generate a unique cart id from sanitized values
         const variantSuffix = safeVariant ? `-${safeVariant.replace(/\s+/g, "-")}` : "";
-        const cartId = `${safeProductId}${variantSuffix}`;
+        const notesSuffix = safeNotes ? `-n-${safeNotes.slice(0, 24).replace(/\s+/g, "-")}` : "";
+        const cartId = `${safeProductId}${variantSuffix}${notesSuffix}`;
 
         const existing = prev.find((i) => i.id === cartId);
         if (existing) {
@@ -305,6 +317,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             imageUrl: safeImageUrl,
             quantity: safeQuantity,
             variant: safeVariant,
+            notes: safeNotes,
             currency: validCurrency,
           },
         ];
@@ -335,6 +348,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const updateItemNotes = useCallback((cartItemId: string, notes: string) => {
+    if (!cartItemId || typeof cartItemId !== "string") return;
+    const safeNotes = sanitizeString(notes, 200);
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === cartItemId
+          ? { ...i, notes: safeNotes || undefined }
+          : i,
+      ),
+    );
+  }, []);
+
   const clearCart = useCallback(() => {
     setItems([]);
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
@@ -356,7 +381,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, totalItems, totalAmount }}
+      value={{ items, addItem, removeItem, updateQuantity, updateItemNotes, clearCart, totalItems, totalAmount }}
     >
       {children}
     </CartContext.Provider>

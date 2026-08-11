@@ -439,6 +439,7 @@ export const cartItemSchema = z.object({
   imageUrl: z.string().max(500).nullish().transform((v) => v ?? undefined),
   quantity: z.number().int().min(1).max(99),
   variant: z.string().max(100).optional(),
+  notes: z.string().max(200).optional(),
   currency: z.string().max(10).optional(),
 });
 

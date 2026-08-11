@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   getUnseenFavoriteCount,
   markWishlistSeen,
 } from "@/services/wishlistService";
+import { fetchMyShop } from "@/services/shopService";
+import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons (compact)                                                */
@@ -52,9 +54,14 @@ function HeartIcon({ active }: { active: boolean }) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Badge                                                                      */
-/* -------------------------------------------------------------------------- */
+function PlusIcon() {
+  return (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
 
 function Badge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -66,22 +73,16 @@ function Badge({ count }: { count: number }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  BottomNav — 4 Essential Tabs Only                                          */
+/*  BottomNav — 4 tabs + center merchant Add (TikTok-style)                     */
 /* -------------------------------------------------------------------------- */
-
-interface Tab {
-  key: string;
-  label: string;
-  icon: (props: { active: boolean }) => React.ReactNode;
-  href?: string;
-  onClick?: () => void;
-  badgeCount?: number;
-}
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { openQuickAdd } = useMerchantQuickAdd();
 
   const [session, setSession] = useState(false);
+  const [merchantShop, setMerchantShop] = useState<{ id: string; category: string } | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
 
   useEffect(() => {
@@ -90,10 +91,37 @@ export default function BottomNav() {
       try {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
-        if (!cancelled) setSession(!!data.session);
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => { if (!cancelled) setSession(!!s); });
+        const signedIn = !!data.session;
+        if (!cancelled) setSession(signedIn);
+        if (signedIn) {
+          const shopResult = await fetchMyShop();
+          if (!cancelled && shopResult.success && shopResult.data) {
+            setMerchantShop({ id: shopResult.data.id, category: shopResult.data.category });
+          } else if (!cancelled) {
+            setMerchantShop(null);
+          }
+        } else if (!cancelled) {
+          setMerchantShop(null);
+        }
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
+          if (cancelled) return;
+          setSession(!!s);
+          if (s) {
+            const shopResult = await fetchMyShop();
+            if (!cancelled && shopResult.success && shopResult.data) {
+              setMerchantShop({ id: shopResult.data.id, category: shopResult.data.category });
+            } else if (!cancelled) setMerchantShop(null);
+          } else {
+            setMerchantShop(null);
+          }
+        });
         if (cancelled) subscription.unsubscribe();
-      } catch { if (!cancelled) setSession(false); }
+      } catch {
+        if (!cancelled) {
+          setSession(false);
+          setMerchantShop(null);
+        }
+      }
     }
     init();
     return () => { cancelled = true; };
@@ -101,7 +129,6 @@ export default function BottomNav() {
 
   const isWishlistActive = pathname === "/wishlist";
 
-  // On wishlist page: clear badge and keep it cleared while viewing
   useEffect(() => {
     if (isWishlistActive) markWishlistSeen();
   }, [isWishlistActive]);
@@ -109,7 +136,6 @@ export default function BottomNav() {
   useEffect(() => {
     let cancelled = false;
     const updateCount = async () => {
-      // Red badge = new adds since last wishlist visit (not total wishlist size)
       if (pathname === "/wishlist") {
         if (!cancelled) setWishlistCount(0);
         return;
@@ -127,7 +153,6 @@ export default function BottomNav() {
     };
   }, [pathname]);
 
-  // Merchants land on /dashboard; customers are redirected to /account by middleware
   const accountHref = session ? "/dashboard" : "/login";
   const isHomeActive = pathname === "/";
   const isProductsActive = pathname === "/products" || pathname.startsWith("/products/");
@@ -137,36 +162,82 @@ export default function BottomNav() {
     pathname === "/login" ||
     pathname === "/signup";
 
-  const tabs: Tab[] = [
-    { key: "home", label: "Home", icon: HomeIcon, href: "/" },
-    { key: "products", label: "Products", icon: ProductsTabIcon, href: "/products" },
-    { key: "wishlist", label: "Wishlist", icon: HeartIcon, href: "/wishlist", badgeCount: wishlistCount },
-    { key: "account", label: session ? "Dashboard" : "Sign In", icon: UserIcon, href: accountHref },
-  ];
+  const handleCenterAdd = () => {
+    if (merchantShop) {
+      openQuickAdd({ shopId: merchantShop.id, shopCategory: merchantShop.category, tab: "product" });
+      return;
+    }
+    if (session) {
+      router.push("/dashboard");
+      return;
+    }
+    router.push("/login?next=/dashboard");
+  };
+
+  const sideTabClass = (active: boolean) =>
+    `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
+      active
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-zinc-500 hover:text-zinc-700 dark:text-[color:var(--tm-muted)] dark:hover:text-[color:var(--tm-text)]"
+    }`;
 
   return (
-    <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden" aria-label="Main navigation">
-      <div className="mx-auto flex h-full max-w-lg items-center justify-around px-1">
-        {tabs.map((tab) => {
-          const active =
-            tab.key === "home" ? isHomeActive
-            : tab.key === "products" ? isProductsActive
-            : tab.key === "wishlist" ? isWishlistActive
-            : tab.key === "account" ? isAccountActive
-            : false;
+    <nav
+      className="bottom-nav fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden"
+      aria-label="Main navigation"
+    >
+      <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-end px-1 pb-1">
+        <Link href="/" className={sideTabClass(isHomeActive)} aria-label="Home" aria-current={isHomeActive ? "page" : undefined}>
+          <HomeIcon active={isHomeActive} />
+          <span>Home</span>
+        </Link>
 
-          const className = `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${active ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 hover:text-zinc-700 dark:text-[color:var(--tm-muted)] dark:hover:text-[color:var(--tm-text)]"}`;
+        <Link
+          href="/products"
+          className={sideTabClass(isProductsActive)}
+          aria-label="Products"
+          aria-current={isProductsActive ? "page" : undefined}
+        >
+          <ProductsTabIcon active={isProductsActive} />
+          <span>Products</span>
+        </Link>
 
-          const content = (
-            <>
-              <div className="relative"><tab.icon active={active} />{tab.badgeCount !== undefined && <Badge count={tab.badgeCount} />}</div>
-              <span>{tab.label}</span>
-            </>
-          );
+        <div className="flex flex-col items-center justify-end">
+          <button
+            type="button"
+            onClick={handleCenterAdd}
+            className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/35 ring-4 ring-white transition hover:bg-emerald-700 active:scale-95 dark:ring-[color:var(--tm-surface)]"
+            aria-label={merchantShop ? "Add product" : session ? "Open dashboard" : "Sign in to add products"}
+          >
+            <PlusIcon />
+          </button>
+          <span className="mt-0.5 text-[0.58rem] font-semibold text-emerald-700 dark:text-emerald-400">
+            {merchantShop ? "Add" : "Post"}
+          </span>
+        </div>
 
-          if (tab.href) return (<Link key={tab.key} href={tab.href} className={className} aria-label={tab.label} aria-current={active ? "page" : undefined}>{content}</Link>);
-          return (<button key={tab.key} type="button" onClick={tab.onClick} className={className} aria-label={tab.label}>{content}</button>);
-        })}
+        <Link
+          href="/wishlist"
+          className={sideTabClass(isWishlistActive)}
+          aria-label="Wishlist"
+          aria-current={isWishlistActive ? "page" : undefined}
+        >
+          <div className="relative">
+            <HeartIcon active={isWishlistActive} />
+            <Badge count={wishlistCount} />
+          </div>
+          <span>Wishlist</span>
+        </Link>
+
+        <Link
+          href={accountHref}
+          className={sideTabClass(isAccountActive)}
+          aria-label={session ? "Dashboard" : "Sign In"}
+          aria-current={isAccountActive ? "page" : undefined}
+        >
+          <UserIcon active={isAccountActive} />
+          <span>{session ? "Dashboard" : "Sign In"}</span>
+        </Link>
       </div>
     </nav>
   );

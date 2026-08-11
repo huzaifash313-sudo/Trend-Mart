@@ -66,6 +66,10 @@ export interface Shop {
    * Public visibility: `is_live = true` AND status is `approved` (or unset).
    */
   verification_status?: ShopVerificationStatus;
+  /** Denormalized average of shop reviews (1–5). */
+  avg_rating?: number | null;
+  /** Denormalized count of shop reviews. */
+  review_count?: number | null;
 }
 
 export type ShopVerificationStatus = "pending" | "approved" | "rejected";
@@ -260,6 +264,10 @@ export interface Product {
   shop_category?: string | null;
   shop_latitude?: number | null;
   shop_longitude?: number | null;
+  /** Parent shop average rating (for marketplace cards). */
+  shop_avg_rating?: number | null;
+  /** Parent shop review count (for marketplace cards). */
+  shop_review_count?: number | null;
 }
 
 /** Product row enriched for the cross-store /products marketplace feed. */
@@ -298,6 +306,10 @@ export interface Review {
   rating: number; // 1-5
   comment: string;
   created_at?: string;
+  user_id?: string | null;
+  merchant_reply?: string | null;
+  merchant_reply_at?: string | null;
+  verified_purchase?: boolean;
 }
 
 // ─── Analytics Log (public.analytics_logs table) ────────────────────────────
@@ -353,6 +365,8 @@ export interface OrderItem {
   quantity?: number;
   /** Selected variant label (e.g. "Size: M", "Color: Red") if applicable */
   variant?: string;
+  /** Per-item special instructions (spice level, flavour, etc.) */
+  notes?: string;
 }
 
 // ─── Order (public.orders table) ────────────────────────────────────────────
@@ -369,6 +383,8 @@ export interface Order {
   updated_at?: string;
   /** Optional tracking number / dispatch reference */
   tracking_number?: string | null;
+  /** Authenticated buyer, when the order was placed while signed in */
+  customer_user_id?: string | null;
 }
 
 // ─── Merchant Analytics Summary (dashboard cards) ───────────────────────────

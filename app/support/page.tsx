@@ -5,6 +5,7 @@ import LegalPageLayout from "@/components/LegalPageLayout";
 import { useToast } from "@/components/Toast";
 import { createSupportTicket } from "@/services/supportService";
 import type { SupportTicketCategory, SupportTicketFormData } from "@/types";
+import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Platform Support Desk                                        */
@@ -65,6 +66,15 @@ export default function SupportPage() {
           </p>
 
           <div className="space-y-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                How it works
+              </p>
+              <p className="mt-2 text-sm text-zinc-800 dark:text-zinc-200">
+                Submit the form — your ticket reaches the TrendMart team and Admin Support Inbox.
+                We keep staff contacts private (no public email or phone on this page).
+              </p>
+            </div>
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Response time</p>
               <p className="mt-1 text-sm font-medium text-zinc-800 dark:text-zinc-200">Usually within 24–48 hours</p>
@@ -125,8 +135,12 @@ export default function SupportPage() {
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Phone (optional)</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
                     value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, phone: formatPkPhoneInput(e.target.value) }))
+                    }
+                    placeholder={PK_PHONE_PLACEHOLDER}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 </div>

@@ -9,6 +9,7 @@ import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
+import CompactRating from "@/components/CompactRating";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ function ProductCard({
   isFavorite,
   categoryLabel,
   showShopMeta,
+  priority = false,
   onProductClick,
   onAddToCart,
   onFavoriteToggle,
@@ -76,6 +78,7 @@ function ProductCard({
   isFavorite: boolean;
   categoryLabel?: string;
   showShopMeta?: boolean;
+  priority?: boolean;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
   onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
@@ -131,6 +134,8 @@ function ProductCard({
             fill
             className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            priority={priority}
+            loading={priority ? "eager" : "lazy"}
             onError={() => setImgError(true)}
           />
         ) : (
@@ -185,31 +190,38 @@ function ProductCard({
         </h3>
 
         {showShopMeta && product.shop_name ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onShopClick?.(product);
-            }}
-            className="mt-0.5 flex max-w-full items-center gap-1 text-left"
-            aria-label={`View store ${product.shop_name}`}
-          >
-            {product.shop_logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={getSafeImageUrl(product.shop_logo_url, "shop")}
-                alt=""
-                className="h-3.5 w-3.5 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[8px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                {product.shop_name.charAt(0).toUpperCase()}
+          <div className="mt-0.5 min-w-0 space-y-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onShopClick?.(product);
+              }}
+              className="flex max-w-full items-center gap-1 text-left"
+              aria-label={`View store ${product.shop_name}`}
+            >
+              {product.shop_logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={getSafeImageUrl(product.shop_logo_url, "shop")}
+                  alt=""
+                  className="h-3.5 w-3.5 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[8px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  {product.shop_name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
+                {product.shop_name}
               </span>
-            )}
-            <span className="truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
-              {product.shop_name}
-            </span>
-          </button>
+            </button>
+            <CompactRating
+              average={product.shop_avg_rating}
+              count={product.shop_review_count}
+              size="xs"
+            />
+          </div>
         ) : !compact && product.description ? (
           <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-400 dark:text-zinc-500">
             {product.description}
@@ -325,7 +337,7 @@ export default function ProductGrid({
 
   return (
     <div className={`grid ${gridCols} ${gap} items-stretch`}>
-      {products.map((product) => (
+      {products.map((product, index) => (
         <ProductCard
           key={product.id}
           product={product}
@@ -333,6 +345,7 @@ export default function ProductGrid({
           isFavorite={favorites.has(product.id)}
           categoryLabel={categoryLabel}
           showShopMeta={showShopMeta}
+          priority={index < 8}
           onProductClick={onProductClick}
           onAddToCart={onAddToCart}
           onFavoriteToggle={onFavoriteToggle}

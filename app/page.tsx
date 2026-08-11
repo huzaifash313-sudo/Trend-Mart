@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import type { Shop, ShopCategory } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
-import { fetchShops } from "@/services/shopService";
+import { fetchMyShop, fetchShops } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import type { Story } from "@/types";
 import StoriesViewer from "@/components/StoriesViewer";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/storyViewed";
 import { toggleFavorite as toggleFav } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
+import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { fetchCategoryCounts, type CategoryWithCount } from "@/services/categoryService";
 import { getSafeImageUrl } from "@/services/storageService";
 import { filterShopsByProximity } from "@/services/geoRadiusService";
@@ -65,7 +66,9 @@ function HomeInner() {
   const [categoryCounts, setCategoryCounts] = useState<CategoryWithCount[]>([]);
   const [brokenImgs, setBrokenImgs] = useState<Set<string>>(new Set());
   const [brokenStoryImgs, setBrokenStoryImgs] = useState<Set<string>>(new Set());
+  const [myShop, setMyShop] = useState<{ id: string; category: string; name: string } | null>(null);
   const { addToast } = useToast();
+  const { openQuickAdd } = useMerchantQuickAdd();
 
   // Header LocationPicker + homepage area filter (Near me / City / All Pakistan)
   const { location: globalLocation, coordinates: globalCoords } = useLocation();
@@ -112,11 +115,34 @@ function HomeInner() {
     }
 
     loadData();
+    void fetchMyShop().then((result) => {
+      if (cancelled) return;
+      if (result.success && result.data) {
+        setMyShop({
+          id: result.data.id,
+          category: result.data.category,
+          name: result.data.name,
+        });
+      } else {
+        setMyShop(null);
+      }
+    });
+    const onStoriesUpdated = () => {
+      void fetchActiveStories().then((storiesResult) => {
+        if (!cancelled && storiesResult.success) {
+          setStories(sortStoriesUnseenFirst(storiesResult.data));
+        }
+      });
+    };
+    window.addEventListener("trendmart:stories-updated", onStoriesUpdated);
     const catTimeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), LOADING_TIMEOUT_MS));
     Promise.race([fetchCategoryCounts(), catTimeout])
       .then((r) => { if (!cancelled && r && typeof r === "object" && "success" in r && r.success) setCategoryCounts(r.data.categories); })
       .catch(() => { /* ignore */ });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      window.removeEventListener("trendmart:stories-updated", onStoriesUpdated);
+    };
   }, []);
 
   /* Load shop IDs that have products in the selected sub-category */
@@ -283,7 +309,27 @@ function HomeInner() {
       <section aria-label="Merchant stories">
         <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Stories</h2>
         <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-1 scrollbar-none">
-          {stories.length === 0 ? (
+          {myShop ? (
+            <button
+              type="button"
+              onClick={() =>
+                openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" })
+              }
+              className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              aria-label="Add your store story"
+            >
+              <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
+                <div className="relative flex h-[3.35rem] w-[3.35rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
+                  <span className="text-2xl font-bold leading-none text-emerald-600 dark:text-emerald-400">+</span>
+                </div>
+              </div>
+              <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+                Your story
+              </span>
+            </button>
+          ) : null}
+
+          {stories.length === 0 && !myShop ? (
             <p className="px-3 text-xs text-zinc-400 dark:text-zinc-500">No active stories right now.</p>
           ) : (
             stories.map((story, i) => {
@@ -475,13 +521,14 @@ function HomeInner() {
         {/* Shop cards — 2 mobile / 3 tablet / 4 laptop (readable width, less truncation) */}
         {!loading && !error && displayShops.length > 0 && (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {displayShops.map((shop) => {
+            {displayShops.map((shop, index) => {
               const bannerBroken = brokenImgs.has(`banner:${shop.id}`);
               const logoBroken = brokenImgs.has(`logo:${shop.id}`);
               const withDistance = shop as ShopWithDistance;
               return (
                 <ShopCard
                   key={shop.id}
+                  priority={index < 8}
                   shop={{
                     id: shop.id,
                     name: shop.name,
@@ -496,6 +543,8 @@ function HomeInner() {
                     announcement: shop.announcement,
                     announcement_expires_at: shop.announcement_expires_at,
                     free_delivery_threshold: shop.free_delivery_threshold,
+                    avg_rating: shop.avg_rating,
+                    review_count: shop.review_count,
                     coupons: shopCoupons[shop.id],
                   }}
                   favorited={favorites.has(shop.id)}

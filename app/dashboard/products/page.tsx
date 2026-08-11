@@ -1380,7 +1380,7 @@ export default function ProductsDashboardPage() {
                     disabled={formSaving}
                     className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    {formSaving ? "Saving…" : <><SaveIcon />{editingProductId ? "Update Product" : "Create Product"}</>}
+                    {formSaving ? "Saving…" : <><SaveIcon />{editingProductId ? "Update Product" : "Done"}</>}
                   </button>
                 </div>
               </div>

@@ -21,6 +21,7 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { subscribeToPlatformTransactions } from "@/services/notificationService";
@@ -655,11 +656,31 @@ export default function AdminDashboardPage() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                Super Admin Dashboard
+                Super Admin
               </h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                Platform overview & merchant management
+                Approvals · merchants · support · live orders · categories · ads
               </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/admin/support"
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
+              >
+                Support Inbox
+              </Link>
+              <Link
+                href="/admin/audit-logs"
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              >
+                Audit Logs
+              </Link>
+              <Link
+                href="/"
+                className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                Storefront
+              </Link>
             </div>
             {actionMessage && (
               <div

@@ -7,6 +7,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { sanitizeLight, truncate } from "@/lib/sanitization";
+import { formatPkPhoneDisplay } from "@/lib/phoneFormat";
 import type { SupportTicket, SupportTicketFormData, SupportTicketStatus } from "@/types";
 
 type ServiceResult<T> =
@@ -41,6 +42,10 @@ export async function createSupportTicket(
     return { success: false, error: "Please describe your issue in at least 10 characters." };
   }
 
+  const phone = form.phone?.trim()
+    ? formatPkPhoneDisplay(form.phone)
+    : "";
+
   try {
     const { data: userData } = await supabase.auth.getUser();
 
@@ -50,7 +55,7 @@ export async function createSupportTicket(
         user_id: userData.user?.id ?? null,
         name,
         email,
-        phone: truncate(sanitizeLight(form.phone ?? ""), 30),
+        phone: truncate(sanitizeLight(phone), 30),
         category: form.category,
         subject,
         message,
@@ -67,7 +72,14 @@ export async function createSupportTicket(
       fetch("/api/support/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, subject, message, category: form.category }),
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          subject,
+          message,
+          category: form.category,
+        }),
       }).catch(() => { /* best-effort only */ });
     }
 

@@ -102,7 +102,8 @@ export async function fetchStoriesByShopId(
 
 /**
  * Create a new story for a shop.
- * RLS ensures only the shop owner can insert.
+ * Strict rule: one active story per shop — replace any existing ones first.
+ * RLS ensures only the shop owner can insert/delete.
  */
 export async function createStory(
   shopId: string,
@@ -112,6 +113,21 @@ export async function createStory(
   const supabase = createClient();
 
   try {
+    // Enforce 1 active story per merchant store
+    const { data: existing } = await supabase
+      .from("stories")
+      .select("id")
+      .eq("shop_id", shopId);
+
+    if (existing && existing.length > 0) {
+      const ids = existing.map((row) => String(row.id));
+      const { error: deleteError } = await supabase
+        .from("stories")
+        .delete()
+        .in("id", ids);
+      if (deleteError) throw deleteError;
+    }
+
     const { data, error } = await supabase
       .from("stories")
       .insert({ shop_id: shopId, image_url: imageUrl, caption })

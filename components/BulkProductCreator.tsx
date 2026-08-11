@@ -497,7 +497,7 @@ export default function BulkProductCreator({
         >
           {saving
             ? "Saving…"
-            : `Add ${filledCount || ""} Product${filledCount === 1 ? "" : "s"}`}
+            : `Done · Save ${filledCount || ""} Product${filledCount === 1 ? "" : "s"}`}
         </button>
       </div>
     </div>

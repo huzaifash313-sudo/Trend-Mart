@@ -261,6 +261,8 @@ type ShopJoin = {
   longitude?: number | null;
   is_live?: boolean | null;
   verification_status?: string | null;
+  avg_rating?: number | null;
+  review_count?: number | null;
 };
 
 function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | null {
@@ -297,6 +299,12 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     shop_category: shop.category ?? null,
     shop_latitude: typeof shop.latitude === "number" ? shop.latitude : null,
     shop_longitude: typeof shop.longitude === "number" ? shop.longitude : null,
+    shop_avg_rating:
+      typeof shop.avg_rating === "number" ? shop.avg_rating : Number(shop.avg_rating) || null,
+    shop_review_count:
+      typeof shop.review_count === "number"
+        ? shop.review_count
+        : Number(shop.review_count) || null,
   };
 }
 
@@ -314,9 +322,28 @@ const MARKETPLACE_SELECT = `
   variants, category_id, sub_category_id, created_at,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
+    is_live, verification_status, latitude, longitude,
+    avg_rating, review_count
+  )
+`;
+
+/** Pre-migration fallback if avg_rating columns are not applied yet. */
+const MARKETPLACE_SELECT_LEGACY = `
+  id, shop_id, name, title, description, price, original_price, compare_at_price,
+  deal_expires_at, currency, image_url, images, is_available, stock_status,
+  variants, category_id, sub_category_id, created_at,
+  shops!inner (
+    id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude
   )
 `;
+
+function isMissingRatingColumnError(err: unknown): boolean {
+  const msg = err && typeof err === "object" && "message" in err
+    ? String((err as { message?: string }).message || "")
+    : String(err || "");
+  return /avg_rating|review_count|column .* does not exist/i.test(msg);
+}
 
 /**
  * Newest-first DB slice can be dominated by one seller — even after category /
@@ -444,7 +471,31 @@ export async function fetchMarketplaceProducts(
       builder = builder.eq("sub_category_id", subCategoryId);
     }
 
-    const { data, error } = await builder;
+    let { data, error } = await builder;
+    if (error && isMissingRatingColumnError(error)) {
+      // Migration not applied yet — degrade gracefully without ratings.
+      let legacy = supabase
+        .from("products")
+        .select(MARKETPLACE_SELECT_LEGACY)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(Math.min(Math.max(limit, 20), 240));
+      if (availableOnly) legacy = legacy.eq("is_available", true);
+      if (q) {
+        const safe = q.replace(/[%_,.()']/g, " ").trim();
+        if (safe) {
+          const pattern = `%${safe}%`;
+          legacy = legacy.or(
+            `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+          );
+        }
+      }
+      if (subCategoryId) legacy = legacy.eq("sub_category_id", subCategoryId);
+      const legacyRes = await legacy;
+      data = legacyRes.data;
+      error = legacyRes.error;
+    }
     if (error) throw error;
 
     let items = ((data as Record<string, unknown>[]) ?? [])

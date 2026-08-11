@@ -2,9 +2,8 @@
 
 import { useState, useEffect, use, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { Shop, Product, Review } from "@/types";
+import type { Shop, Product } from "@/types";
 import { fetchShopById } from "@/services/shopService";
-import { fetchReviewsByShopId, submitReview, computeRatingStats } from "@/services/reviewService";
 import { logShopView } from "@/services/analyticsService";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorState } from "@/components/ErrorState";
@@ -17,6 +16,8 @@ import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
+import StoreReviews from "@/components/StoreReviews";
+import CompactRating from "@/components/CompactRating";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { buildShopOfferSlides, formatOfferRemaining } from "@/lib/shopOfferTicker";
 import { fetchCouponsByShopId, type Coupon } from "@/services/couponService";
@@ -26,12 +27,12 @@ import {
 } from "@/services/themePrefsService";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
+import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { getStoreTheme, type StoreTheme, isServiceTheme } from "@/lib/storeThemes";
 import { formatRupees } from "@/lib/formatters";
 import {
   subscribeToProducts,
-  subscribeToReviews,
   unsubscribeAll,
 } from "@/lib/supabase/realtime";
 import ServiceBookingModal, { type ServicePackageItem } from "@/components/ServiceBookingModal";
@@ -66,161 +67,7 @@ function SearchIcon() {
   return (<svg className="h-4 w-4 shrink-0 text-zinc-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>);
 }
 
-function StarIcon({ filled }: { filled: boolean }) {
-  return (<svg className={`h-3.5 w-3.5 ${filled ? "text-amber-400" : "text-zinc-300 dark:text-zinc-600"}`} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>);
-}
-
 function GridIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>); }
-
-// ─── Star Rating Display ────────────────────────────────────────────────────
-
-function StarRatingDisplay({ rating, size }: { rating: number; size?: "sm" | "md" }) {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    stars.push(<StarIcon key={i} filled={i <= Math.round(rating)} />);
-  }
-  return <div className={`flex items-center gap-0.5 ${size === "sm" ? "scale-90" : ""}`} aria-label={`${rating} out of 5 stars`}>{stars}</div>;
-}
-
-// ─── Review Form ────────────────────────────────────────────────────────────
-
-function ReviewForm({
-  shopId,
-  onReviewSubmitted,
-  submitting,
-  setSubmitting,
-  addToast,
-}: {
-  shopId: string;
-  onReviewSubmitted: () => void;
-  submitting: boolean;
-  setSubmitting: (v: boolean) => void;
-  addToast: (msg: string, variant?: "success" | "error" | "info") => void;
-}) {
-  const [name, setName] = useState("");
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [comment, setComment] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || rating === 0) {
-      addToast("Please provide your name and rating.", "error");
-      return;
-    }
-    setSubmitting(true);
-    const result = await submitReview(shopId, name, rating, comment);
-    if (result.success) {
-      addToast("Thank you for your review!", "success");
-      setName("");
-      setRating(0);
-      setComment("");
-      onReviewSubmitted();
-    } else {
-      addToast(result.error, "error");
-    }
-    setSubmitting(false);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Write a Review</h3>
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Your Name *</label>
-        <input
-          type="text" required value={name} onChange={(e) => setName(e.target.value)}
-          placeholder="Your name" maxLength={60}
-          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-        />
-      </div>
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Rating *</label>
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button key={star} type="button" onClick={() => setRating(star)} onMouseEnter={() => setHoverRating(star)} onMouseLeave={() => setHoverRating(0)} className="p-0.5 transition-transform hover:scale-110 focus:outline-none" aria-label={`${star} star${star > 1 ? "s" : ""}`}>
-              <StarIcon filled={star <= (hoverRating || rating)} />
-            </button>
-          ))}
-          {rating > 0 && <span className="ml-2 text-xs text-zinc-500">{rating} / 5</span>}
-        </div>
-      </div>
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Comment (optional)</label>
-        <textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Share your experience…" maxLength={500} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 resize-none" />
-      </div>
-      <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900">
-        {submitting ? "Submitting…" : "Submit Review"}
-      </button>
-    </form>
-  );
-}
-
-// ─── Rating Breakdown ───────────────────────────────────────────────────────
-
-function RatingBreakdown({ reviews }: { reviews: Review[] }) {
-  const { average, total, distribution } = computeRatingStats(reviews);
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center gap-3">
-        <div className="text-center">
-          <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{average}</p>
-          <StarRatingDisplay rating={average} />
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{total} review{total !== 1 && "s"}</p>
-        </div>
-        <div className="flex-1 space-y-1">
-          {[5, 4, 3, 2, 1].map((star) => {
-            const count = distribution[star - 1];
-            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-            return (
-              <div key={star} className="flex items-center gap-1.5 text-xs">
-                <span className="w-2 text-zinc-500 dark:text-zinc-400">{star}</span>
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
-                  <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="w-5 text-right text-zinc-400">{count}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Review List ────────────────────────────────────────────────────────────
-
-function ReviewList({ reviews, loading }: { reviews: Review[]; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="mb-1.5 h-3 w-1/3 rounded bg-zinc-200 dark:bg-zinc-800" />
-            <div className="mb-1.5 h-2 w-1/4 rounded bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-2 w-full rounded bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-  if (reviews.length === 0) {
-    return <p className="py-4 text-center text-sm text-zinc-400 dark:text-zinc-500">No reviews yet. Be the first to review!</p>;
-  }
-  return (
-    <div className="space-y-2">
-      {reviews.map((review) => (
-        <div key={review.id} className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="mb-0.5 flex items-center justify-between">
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{review.customer_name}</span>
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">{new Date(review.created_at!).toLocaleDateString()}</span>
-          </div>
-          <StarRatingDisplay rating={review.rating} size="sm" />
-          {review.comment && <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">{review.comment}</p>}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ─── Shop Detail Inner ──────────────────────────────────────────────────────
 
@@ -234,11 +81,10 @@ function ShopDetailInner({ id }: { id: string }) {
   const [priceSort, setPriceSort] = useState<"default" | "low" | "high">("default");
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(true);
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const { addToast } = useToast();
   const { addItem } = useCart();
+  const { openQuickAdd } = useMerchantQuickAdd();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
   // Quick view modal state — cart-first: no single-item checkout
@@ -268,35 +114,52 @@ function ShopDetailInner({ id }: { id: string }) {
   const showProductCatalog = !isServiceCategory || products.length > 0;
   const THEME_ACCENT = "#10b981";
 
-  // ── Data Loading ──────────────────────────────────────────────────────────
+  // ── Data Loading (parallel: shop + prefs + coupons) ───────────────────────
   useEffect(() => {
     let cancelled = false;
     async function fetchData() {
       setLoading(true);
       setError(null);
-      const result = await fetchShopById(id);
-      if (!cancelled) {
-        if (result.success) {
-          setShop(result.data.shop);
-          setProducts(result.data.products);
-          const prefs = await fetchStorefrontDisplayPrefs(id);
-          if (!cancelled) setDisplayPrefs(prefs);
-        } else {
-          setError(result.error);
-        }
+      setIsOwner(false);
+
+      const [shopResult, prefs, couponsResult, auth] = await Promise.all([
+        fetchShopById(id),
+        fetchStorefrontDisplayPrefs(id),
+        fetchCouponsByShopId(id),
+        supabase.auth.getUser(),
+      ]);
+
+      if (cancelled) return;
+
+      if (shopResult.success) {
+        setShop(shopResult.data.shop);
+        setProducts(shopResult.data.products);
+        const ownerId = shopResult.data.shop.owner_id;
+        const uid = auth.data.user?.id;
+        setIsOwner(Boolean(ownerId && uid && ownerId === uid));
+      } else {
+        setError(shopResult.error);
       }
-      if (!cancelled) setLoading(false);
+      setDisplayPrefs(prefs);
+      if (couponsResult.success) setCoupons(couponsResult.data);
+      setLoading(false);
+
+      // Fire-and-forget visit log (skips owner + dedupes inside service)
+      void logShopView(id);
     }
     fetchData();
-    logShopView(id);
-    fetchReviewsByShopId(id).then((r) => {
-      if (!cancelled && r.success) setReviews(r.data);
-      if (!cancelled) setReviewsLoading(false);
-    });
-    fetchCouponsByShopId(id).then((r) => {
-      if (!cancelled && r.success) setCoupons(r.data);
-    });
     return () => { cancelled = true; };
+  }, [id, supabase]);
+
+  // Refresh catalog when merchant adds from in-store modal
+  useEffect(() => {
+    const refresh = () => {
+      void fetchShopById(id).then((result) => {
+        if (result.success) setProducts(result.data.products);
+      });
+    };
+    window.addEventListener("trendmart:products-updated", refresh);
+    return () => window.removeEventListener("trendmart:products-updated", refresh);
   }, [id]);
 
   const promoBannerSegments = useMemo(() => {
@@ -313,7 +176,7 @@ function ShopDetailInner({ id }: { id: string }) {
     });
   }, [shop, coupons]);
 
-  // ── Real-time Subscriptions ──────────────────────────────────────────────
+  // ── Real-time product updates ─────────────────────────────────────────────
   useEffect(() => {
     const unsubProducts = subscribeToProducts(id, (payload) => {
       const updated = payload.new as Product;
@@ -325,11 +188,7 @@ function ShopDetailInner({ id }: { id: string }) {
       const deleted = payload.old as { id: string };
       setProducts((prev) => prev.filter((p) => p.id !== deleted.id));
     });
-    const unsubReviews = subscribeToReviews(id, (payload) => {
-      const newReview = payload.new as Review;
-      setReviews((prev) => [newReview, ...prev]);
-    });
-    return () => { unsubProducts(); unsubReviews(); };
+    return () => { unsubProducts(); };
   }, [id]);
 
   useEffect(() => () => { unsubscribeAll(); }, []);
@@ -489,6 +348,11 @@ function ShopDetailInner({ id }: { id: string }) {
                     {shop.category}
                   </span>
                 </div>
+                <CompactRating
+                  average={shop.avg_rating}
+                  count={shop.review_count}
+                  className="mt-0.5"
+                />
                 <div className="flex min-w-0 items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                   <PinIcon />
                   <span className="truncate">{shop.location}</span>
@@ -554,6 +418,35 @@ function ShopDetailInner({ id }: { id: string }) {
             <div className="flex gap-2 flex-wrap">
               <button type="button" onClick={() => setShowContactModal(true)} disabled={!shop.whatsapp_number} className={`inline-flex items-center gap-1.5 rounded-full ${theme.buttonClass} px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50`}><WhatsAppIcon />Chat with seller</button>
             </div>
+
+            {isOwner ? (
+              <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+                <p className="mb-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">Your store tools</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "product" })}
+                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  >
+                    Add product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "bulk" })}
+                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
+                  >
+                    Bulk add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "story" })}
+                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
+                  >
+                    Add story
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {(shop.instagram_handle || shop.facebook_url || shop.secondary_phone) && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 {shop.instagram_handle && (
@@ -690,14 +583,10 @@ function ShopDetailInner({ id }: { id: string }) {
           </section>
         )}
 
-        {/* Reviews & Ratings */}
+        {/* Reviews & Ratings — owner can reply; cannot self-review */}
         <section aria-label="Customer Reviews" className="mt-4">
           <h2 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Customer Reviews</h2>
-          <div className="space-y-3">
-            <RatingBreakdown reviews={reviews} />
-            <ReviewForm shopId={id} onReviewSubmitted={() => fetchReviewsByShopId(id).then((r) => { if (r.success) setReviews(r.data); })} submitting={reviewSubmitting} setSubmitting={setReviewSubmitting} addToast={addToast} />
-            <ReviewList reviews={reviews} loading={reviewsLoading} />
-          </div>
+          <StoreReviews shopId={id} ownerId={shop.owner_id} />
         </section>
       </>)}
 

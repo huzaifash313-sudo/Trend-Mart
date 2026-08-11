@@ -65,10 +65,11 @@ interface ThemeContextValue extends ThemePreferences {
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
-const STORAGE_KEY = "trendmart_theme_prefs_v3";
+const STORAGE_KEY = "trendmart_theme_prefs_v4";
+const LEGACY_STORAGE_KEY = "trendmart_theme_prefs_v3";
 
 const DEFAULT_PREFS: Omit<ThemePreferences, "resolved"> = {
-  mode: "system",
+  mode: "light",
   fontScale: 14,
   gridLayout: "grid",
   cardStyle: "default",
@@ -81,27 +82,46 @@ const FONT_SCALE_MAX = 20;
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
+function normalizeMode(raw: unknown): ThemeMode {
+  if (raw === "dark") return "dark";
+  if (raw === "light") return "light";
+  // "system" and unknown values fall back to explicit light (platform default).
+  return "light";
+}
+
+function parseStoredPrefs(raw: string): Omit<ThemePreferences, "resolved"> {
+  const parsed = JSON.parse(raw) as Partial<ThemePreferences>;
+  return {
+    mode: normalizeMode(parsed.mode),
+    fontScale:
+      typeof parsed.fontScale === "number" &&
+      parsed.fontScale >= FONT_SCALE_MIN &&
+      parsed.fontScale <= FONT_SCALE_MAX
+        ? parsed.fontScale
+        : DEFAULT_PREFS.fontScale,
+    gridLayout: (["grid", "compact", "cards", "list", "gallery"].includes(parsed.gridLayout as string) ? parsed.gridLayout : DEFAULT_PREFS.gridLayout) as GridLayout,
+    cardStyle: (["default", "minimal", "detailed", "service"].includes(parsed.cardStyle as string) ? parsed.cardStyle : DEFAULT_PREFS.cardStyle) as CardStyle,
+    marqueeEnabled:
+      typeof parsed.marqueeEnabled === "boolean" ? parsed.marqueeEnabled : DEFAULT_PREFS.marqueeEnabled,
+    whatsappFloatEnabled:
+      typeof parsed.whatsappFloatEnabled === "boolean" ? parsed.whatsappFloatEnabled : DEFAULT_PREFS.whatsappFloatEnabled,
+  };
+}
+
 function loadPrefs(): Omit<ThemePreferences, "resolved"> {
   if (typeof window === "undefined") return { ...DEFAULT_PREFS };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_PREFS };
-    const parsed = JSON.parse(raw) as Partial<ThemePreferences>;
-    return {
-      mode: (["light", "dark", "system"].includes(parsed.mode as string) ? parsed.mode : DEFAULT_PREFS.mode) as ThemeMode,
-      fontScale:
-        typeof parsed.fontScale === "number" &&
-        parsed.fontScale >= FONT_SCALE_MIN &&
-        parsed.fontScale <= FONT_SCALE_MAX
-          ? parsed.fontScale
-          : DEFAULT_PREFS.fontScale,
-      gridLayout: (["grid", "compact", "cards", "list", "gallery"].includes(parsed.gridLayout as string) ? parsed.gridLayout : DEFAULT_PREFS.gridLayout) as GridLayout,
-      cardStyle: (["default", "minimal", "detailed", "service"].includes(parsed.cardStyle as string) ? parsed.cardStyle : DEFAULT_PREFS.cardStyle) as CardStyle,
-      marqueeEnabled:
-        typeof parsed.marqueeEnabled === "boolean" ? parsed.marqueeEnabled : DEFAULT_PREFS.marqueeEnabled,
-      whatsappFloatEnabled:
-        typeof parsed.whatsappFloatEnabled === "boolean" ? parsed.whatsappFloatEnabled : DEFAULT_PREFS.whatsappFloatEnabled,
-    };
+    const current = localStorage.getItem(STORAGE_KEY);
+    if (current) return parseStoredPrefs(current);
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      const migrated = parseStoredPrefs(legacy);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      } catch { /* ignore */ }
+      return migrated;
+    }
+    return { ...DEFAULT_PREFS };
   } catch {
     return { ...DEFAULT_PREFS };
   }

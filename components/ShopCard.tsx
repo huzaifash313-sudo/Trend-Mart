@@ -8,6 +8,7 @@ import {
   buildShopOfferSlides,
   type ShopOfferSlide,
 } from "@/lib/shopOfferTicker";
+import CompactRating from "@/components/CompactRating";
 
 export interface ShopCardData {
   id: string;
@@ -23,6 +24,8 @@ export interface ShopCardData {
   announcement?: string | null;
   announcement_expires_at?: string | null;
   free_delivery_threshold?: number | null;
+  avg_rating?: number | null;
+  review_count?: number | null;
   /** Pre-built slides; if omitted, built from announcement / free delivery / coupons */
   offerSlides?: ShopOfferSlide[];
   coupons?: Array<{
@@ -44,6 +47,8 @@ interface ShopCardProps {
   onBannerError?: () => void;
   onLogoError?: () => void;
   onToggleFavorite?: () => void;
+  /** Eager-load banner for above-the-fold cards (smoother first paint). */
+  priority?: boolean;
 }
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -93,6 +98,7 @@ export default function ShopCard({
   onBannerError,
   onLogoError,
   onToggleFavorite,
+  priority = false,
 }: ShopCardProps) {
   const href = `/shop/${shop.id}`;
   const isLive = !!shop.is_live;
@@ -128,6 +134,7 @@ export default function ShopCard({
           logoBroken={logoBroken}
           onBannerError={onBannerError}
           onLogoError={onLogoError}
+          priority={priority}
         >
           <span
             className={`absolute left-1.5 top-1.5 z-[1] inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm backdrop-blur-[2px] ${
@@ -182,6 +189,12 @@ export default function ShopCard({
             </button>
           ) : null}
         </div>
+
+        <CompactRating
+          average={shop.avg_rating}
+          count={shop.review_count}
+          className="mt-1"
+        />
 
         {offerSlides.length > 0 ? (
           <div className="mt-1.5">

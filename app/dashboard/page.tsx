@@ -36,6 +36,8 @@ import {
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
+import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
+import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import ImageUpload from "@/components/ImageUpload";
@@ -1074,7 +1076,19 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">WhatsApp Number</label>
-                <input type="text" value={shopForm.whatsapp_number} onChange={(e) => setShopForm((f) => ({ ...f, whatsapp_number: e.target.value }))} placeholder="923001234567" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={shopForm.whatsapp_number}
+                  onChange={(e) =>
+                    setShopForm((f) => ({
+                      ...f,
+                      whatsapp_number: formatPkPhoneInput(e.target.value),
+                    }))
+                  }
+                  placeholder={PK_PHONE_PLACEHOLDER}
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                />
               </div>
               <ImageUpload label="Logo" currentUrl={shopForm.logo_url} onUploaded={(url) => setShopForm((f) => ({ ...f, logo_url: url }))} folder="shops" fileId={activeShopId ?? userId ?? "new-shop"} showPreview />
               <ImageUpload label="Store Banner" currentUrl={shopForm.banner_url} onUploaded={(url) => setShopForm((f) => ({ ...f, banner_url: url }))} folder="shops" fileId={(activeShopId ?? userId ?? "new-shop") + "-banner"} showPreview />
@@ -1377,7 +1391,7 @@ export default function DashboardPage() {
             <div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Promotional Story</h2><button type="button" onClick={() => setShowStoryForm(!showStoryForm)} className="text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400">{showStoryForm ? "Cancel" : "+ Add Story"}</button></div>
             {showStoryForm && (
               <form onSubmit={handleCreateStory} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Stories are visible on the homepage for 24 hours. Upload an image and optional caption.</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">One active story per store. New posts replace the current story. Visible on the homepage for 24 hours.</p>
                 <ImageUpload label="Story Image" currentUrl={storyImageUrl} onUploaded={setStoryImageUrl} folder="stories" fileId={activeShopId} showPreview />
                 <div><label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Caption (optional)</label><input type="text" value={storyCaption} onChange={(e) => setStoryCaption(e.target.value)} placeholder="New arrivals! 🎉" maxLength={80} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" /></div>
                 <button type="submit" disabled={storyCreating || !storyImageUrl.trim()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900">{storyCreating ? "Posting…" : "Post Story"}</button>
@@ -1593,7 +1607,7 @@ export default function DashboardPage() {
               <div className="flex gap-2">
                 <button type="submit" disabled={productSaving} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900">
                   <PlusIcon />
-                  {productSaving ? "Saving…" : editingProductId ? "Update Product" : "Add Product"}
+                  {productSaving ? "Saving…" : editingProductId ? "Update Product" : "Done"}
                 </button>
                 {editingProductId && (
                   <button type="button" onClick={handleCancelEdit} className="rounded-xl px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">

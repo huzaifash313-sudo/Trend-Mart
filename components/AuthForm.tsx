@@ -381,6 +381,16 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             {getFieldError("password")}
           </motion.p>
         )}
+        {mode === "sign-in" && (
+          <div className="mt-1.5 text-right">
+            <Link
+              href="/forgot-password"
+              className="text-xs font-medium text-emerald-600 underline dark:text-emerald-400"
+            >
+              Forgot password?
+            </Link>
+          </div>
+        )}
 
         {/* Password strength indicator (sign-up only) */}
         {mode === "sign-up" && password.length > 0 && (

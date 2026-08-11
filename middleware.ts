@@ -333,9 +333,11 @@ async function isEmailConfirmed(request: NextRequest): Promise<boolean> {
 const VERIFY_EXEMPT_PATHS = [
   "/login",
   "/signup",
+  "/forgot-password",
   "/auth",
   "/auth/verify-notice",
   "/auth/callback",
+  "/auth/reset-password",
   "/settings",
   "/search",
   "/products",
@@ -688,9 +690,8 @@ export async function middleware(request: NextRequest) {
   });
 
   // ── 5. Email verification gate (AFTER session refresh) ────────────────
-  //    Only check if user has session AND the path requires verification.
-  //    FIX: /dashboard is now in VERIFY_EXEMPT_PATHS, so unverified users
-  //    can access their dashboard (the page will show a warning client-side).
+  //    Authenticated but unverified users cannot enter account/dashboard/admin
+  //    (or any non-exempt path). Guests may still browse public storefront.
   if (authenticatedAfterRefresh && !isVerifyExempt(pathname)) {
     const emailConfirmed = await isEmailConfirmed(request);
     authDebug("Email verification check", {

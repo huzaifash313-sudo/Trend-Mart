@@ -21,6 +21,8 @@ export interface ShopMediaHeaderProps {
   className?: string;
   children?: ReactNode;
   useNextImage?: boolean;
+  /** Force eager load (first-screen cards). */
+  priority?: boolean;
 }
 
 export interface ShopLogoAvatarProps {
@@ -102,6 +104,7 @@ export default function ShopMediaHeader({
   className = "",
   children,
   useNextImage = true,
+  priority = false,
 }: ShopMediaHeaderProps) {
   const banner = (bannerUrl ?? "").trim();
   const logo = (logoUrl ?? "").trim();
@@ -110,6 +113,7 @@ export default function ShopMediaHeader({
   const initial = shopName.charAt(0).toUpperCase() || "S";
 
   const isHero = size === "hero";
+  const eager = isHero || priority;
   const placement = logoPlacement ?? (isHero ? "overlay" : "hidden");
 
   const frameClass = isHero
@@ -143,7 +147,7 @@ export default function ShopMediaHeader({
                   ? "100vw"
                   : "(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               }
-              priority={isHero}
+              priority={eager}
               onError={onBannerError}
             />
           ) : (
@@ -152,7 +156,7 @@ export default function ShopMediaHeader({
               src={banner}
               alt={`${shopName} banner`}
               className="absolute inset-0 h-full w-full object-cover object-center"
-              loading={isHero ? "eager" : "lazy"}
+              loading={eager ? "eager" : "lazy"}
               onError={onBannerError}
             />
           )

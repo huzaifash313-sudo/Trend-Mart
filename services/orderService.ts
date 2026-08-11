@@ -44,6 +44,8 @@ export interface PlaceOrderParams {
     variant?: string;
     /** Group name (e.g. "Size", "Color") — used for stock lookup. */
     variantGroup?: string;
+    /** Per-item special instructions. */
+    notes?: string;
   }>;
   /** Optional coupon code applied (for metadata logging). */
   couponCode?: string;
@@ -498,11 +500,16 @@ export async function placeOrderAtomic(
         price: item.price,
         quantity: item.quantity ?? 1,
         variant: item.variant,
+        ...(item.notes ? { notes: item.notes } : {}),
       }));
 
       const customerPhone =
         normalizePkPhoneDigits(params.customerPhone) ||
         params.customerPhone.replace(/\D/g, "");
+
+      const {
+        data: { user: buyer },
+      } = await supabase.auth.getUser();
 
       const orderPayload: Record<string, unknown> = {
         shop_id: params.shopId,
@@ -513,15 +520,29 @@ export async function placeOrderAtomic(
         status: "Pending",
       };
 
+      if (buyer?.id) {
+        orderPayload.customer_user_id = buyer.id;
+      }
+
       if (params.notes?.trim()) {
         orderPayload.notes = params.notes.trim().slice(0, 500);
       }
 
-      const { data: orderData, error: orderError } = await supabase
+      let { data: orderData, error: orderError } = await supabase
         .from("orders")
         .insert(orderPayload)
         .select()
         .single();
+
+      // Older DBs may not have customer_user_id yet — retry without it.
+      if (orderError && /customer_user_id/i.test(orderError.message || "")) {
+        delete orderPayload.customer_user_id;
+        ({ data: orderData, error: orderError } = await supabase
+          .from("orders")
+          .insert(orderPayload)
+          .select()
+          .single());
+      }
 
       if (orderError) {
         // ── Phase 5: Rollback stock using pre-deduction snapshots ───────
@@ -604,6 +625,7 @@ export async function createOrder(params: {
       price: item.price,
       quantity: Math.max(1, Math.min(99, Math.round(item.quantity ?? 1))),
       variant: item.variant,
+      notes: item.notes,
     })),
   });
 
@@ -716,9 +738,22 @@ export async function updateOrderStatus(
       .single();
 
     if (error) throw error;
+
+    const parsed = parseOrder(data as Record<string, unknown>);
+    // Best-effort OS / web push (never blocks merchant UI).
+    void fetch("/api/push/notify-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        status,
+        shopId: parsed.shop_id,
+      }),
+    }).catch(() => undefined);
+
     return {
       success: true,
-      data: parseOrder(data as Record<string, unknown>),
+      data: parsed,
     };
   } catch (err) {
     logError(err, {

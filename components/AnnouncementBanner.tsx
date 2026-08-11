@@ -72,17 +72,45 @@ function normalizeSegments(text?: string, segments?: string[]): string[] {
   return t ? [t] : [];
 }
 
+function segmentKind(text: string): "coupon" | "delivery" | "discount" | "offer" {
+  const t = text.toLowerCase();
+  if (/\bcode\b|\bcoupon\b/.test(t)) return "coupon";
+  if (/free delivery|delivery/.test(t)) return "delivery";
+  if (/%|off|discount|rs\./i.test(t)) return "discount";
+  return "offer";
+}
+
+function SegmentChip({ text }: { text: string }) {
+  const kind = segmentKind(text);
+  const styles =
+    kind === "coupon"
+      ? "bg-amber-400 text-amber-950 shadow-amber-500/30"
+      : kind === "delivery"
+        ? "bg-white text-emerald-800 shadow-white/20 dark:bg-emerald-50"
+        : kind === "discount"
+          ? "bg-rose-500 text-white shadow-rose-500/30"
+          : "bg-emerald-950/25 text-white ring-1 ring-white/25";
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-3 py-1 text-[0.72rem] font-bold uppercase tracking-wide shadow-sm ${styles}`}
+    >
+      {text}
+    </span>
+  );
+}
+
 function SegmentRow({ items }: { items: string[] }) {
   return (
-    <span className="inline-flex items-center whitespace-nowrap">
+    <span className="inline-flex items-center gap-2.5 whitespace-nowrap">
       {items.map((item, i) => (
-        <span key={`${item}-${i}`} className="inline-flex items-center">
+        <span key={`${item}-${i}`} className="inline-flex items-center gap-2.5">
           {i > 0 ? (
-            <span className="mx-3 inline-block text-emerald-400/70 dark:text-emerald-500/60" aria-hidden="true">
-              ·
+            <span className="text-white/50" aria-hidden="true">
+              •
             </span>
           ) : null}
-          <span>{item}</span>
+          <SegmentChip text={item} />
         </span>
       ))}
     </span>
@@ -132,22 +160,24 @@ export default function AnnouncementBanner({
 
   const displayText = items.join(" · ");
   const baseClasses =
-    "relative w-full overflow-hidden flex items-center gap-2 px-4 py-2.5 text-sm font-medium";
+    "relative w-full overflow-hidden flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold";
 
   if (variant === "alert") {
     return (
       <div
-        className={`${baseClasses} bg-amber-50 text-amber-800 border-b border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800 ${className}`}
+        className={`${baseClasses} border-b border-amber-300 bg-gradient-to-r from-amber-100 via-amber-50 to-orange-100 text-amber-900 dark:border-amber-700 dark:from-amber-900/50 dark:via-amber-950/40 dark:to-orange-950/40 dark:text-amber-100 ${className}`}
         role="alert"
-        style={{ borderLeftColor: accentColor, borderLeftWidth: "3px" }}
+        style={{ borderLeftColor: accentColor, borderLeftWidth: "4px" }}
       >
-        <MegaphoneIcon />
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm">
+          <MegaphoneIcon />
+        </span>
         <span className="flex-1 truncate">{displayText}</span>
         {dismissible && (
           <button
             type="button"
             onClick={handleDismiss}
-            className="ml-auto shrink-0 rounded-full p-1 text-amber-500 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors"
+            className="ml-auto shrink-0 rounded-full p-1 text-amber-700 hover:bg-amber-200 dark:text-amber-200 dark:hover:bg-amber-800/50 transition-colors"
             aria-label="Dismiss announcement"
           >
             <CloseIcon />
@@ -159,18 +189,20 @@ export default function AnnouncementBanner({
 
   return (
     <div
-      className={`${baseClasses} bg-gradient-to-r from-emerald-50 via-white to-emerald-50 text-emerald-800 border-b border-emerald-200 dark:from-emerald-900/20 dark:via-zinc-900 dark:to-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 ${className}`}
-      style={{ borderLeftColor: accentColor, borderLeftWidth: "3px" }}
+      className={`${baseClasses} tm-promo-strip border-b border-emerald-400/40 text-white ${className}`}
+      style={{ borderLeftColor: accentColor, borderLeftWidth: "4px" }}
       role="marquee"
       aria-live="off"
     >
-      <MegaphoneIcon />
-      <div className="relative flex-1 overflow-hidden" ref={marqueeRef}>
-        <div className="animate-marquee inline-block whitespace-nowrap">
-          <span className="inline-block pr-12">
+      <span className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white ring-2 ring-white/30">
+        <MegaphoneIcon />
+      </span>
+      <div className="relative z-[1] flex-1 overflow-hidden" ref={marqueeRef}>
+        <div className="animate-marquee inline-block whitespace-nowrap py-0.5">
+          <span className="inline-block pr-16">
             <SegmentRow items={items} />
           </span>
-          <span className="inline-block pr-12" aria-hidden="true">
+          <span className="inline-block pr-16" aria-hidden="true">
             <SegmentRow items={items} />
           </span>
         </div>
@@ -179,7 +211,7 @@ export default function AnnouncementBanner({
         <button
           type="button"
           onClick={handleDismiss}
-          className="ml-auto shrink-0 rounded-full p-1 text-emerald-500 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 transition-colors"
+          className="relative z-[1] ml-auto shrink-0 rounded-full p-1 text-white/80 hover:bg-white/15 transition-colors"
           aria-label="Dismiss announcement"
         >
           <CloseIcon />

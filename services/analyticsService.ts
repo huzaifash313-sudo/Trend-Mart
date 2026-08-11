@@ -139,11 +139,61 @@ function getSessionId(): string {
 
 // ─── Event Logging (Public — Fire-and-Forget) ─────────────────────────────────
 
+const SHOP_VIEW_DEDUPE_MS = 45 * 60 * 1000; // 45 minutes per visitor per shop
+const SHOP_VIEW_STORAGE_PREFIX = "trendmart_shop_view_at_";
+
+function recentlyLoggedShopView(shopId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(`${SHOP_VIEW_STORAGE_PREFIX}${shopId}`);
+    if (!raw) return false;
+    const ts = Number(raw);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < SHOP_VIEW_DEDUPE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markShopViewLogged(shopId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`${SHOP_VIEW_STORAGE_PREFIX}${shopId}`, String(Date.now()));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+async function isCurrentUserShopOwner(shopId: string): Promise<boolean> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data } = await supabase
+      .from("shops")
+      .select("id")
+      .eq("id", shopId)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    return Boolean(data?.id);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Log a shop view event.
- * Uses batched queue for performance under high traffic.
+ * Skips the shop owner and repeat visits from the same browser within 45 minutes.
+ * Product clicks stay separate so genuine browsing still counts.
  */
 export async function logShopView(shopId: string): Promise<void> {
+  if (!shopId) return;
+  if (recentlyLoggedShopView(shopId)) return;
+  if (await isCurrentUserShopOwner(shopId)) return;
+
+  markShopViewLogged(shopId);
   eventQueue.push({
     shop_id: shopId,
     event_type: "shop_view",
@@ -151,7 +201,6 @@ export async function logShopView(shopId: string): Promise<void> {
   });
   scheduleFlush();
 
-  // Also trigger real-time push to any active subscribers
   notifyMetricsSubscribers(shopId, "shop_view");
 }
 
