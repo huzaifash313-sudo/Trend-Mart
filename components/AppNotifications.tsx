@@ -107,7 +107,7 @@ function NotificationChrome() {
     <>
       <BrowserNotifyBridge />
       <AutoRegisterMerchantShops />
-      <div className="fixed right-3 top-[calc(var(--tm-navbar-sticky-offset,3.5rem)+0.4rem)] z-[120] sm:right-5">
+      <div className="fixed right-3 top-[calc(var(--tm-navbar-sticky-offset,4.35rem)+0.4rem)] z-[120] sm:right-5">
         <NotificationBell
           onClick={toggle}
           className={`rounded-full border bg-white/95 text-zinc-700 shadow-md backdrop-blur transition-transform hover:scale-105 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-200 ${

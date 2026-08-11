@@ -175,7 +175,7 @@ body {
   overflow-x: clip;
   min-height: 100dvh;
   /* Fixed navbar occupies this offset so scroll never shows a gap above the bar */
-  padding-top: var(--tm-navbar-sticky-offset, calc(3.5rem + env(safe-area-inset-top, 0px)));
+  padding-top: var(--tm-navbar-sticky-offset, calc(4.35rem + env(safe-area-inset-top, 0px)));
   padding-bottom: var(--safe-area-inset-bottom);
   padding-left: var(--safe-area-inset-left);
   padding-right: var(--safe-area-inset-right);
@@ -626,10 +626,69 @@ html.dark .trend-card:hover {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 34px rgba(0, 0, 0, 0.38);
 }
 
-/* ── Brand navbar: edge-to-edge fixed bar (stable height + full width) ───── */
+/* ── Brand navbar: edge-to-edge fixed bar (taller + living brand motion) ─── */
 :root {
-  --tm-navbar-content-height: 3.5rem;
+  --tm-navbar-content-height: 4.35rem;
   --tm-navbar-sticky-offset: calc(var(--safe-area-inset-top) + var(--tm-navbar-content-height));
+}
+
+@media (min-width: 640px) {
+  :root {
+    --tm-navbar-content-height: 4.6rem;
+  }
+}
+
+@keyframes tm-navbar-gradient-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes tm-navbar-glow-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate3d(12%, 4%, 0) scale(1.08);
+    opacity: 0.85;
+  }
+}
+
+@keyframes tm-navbar-line-draw {
+  0% {
+    stroke-dashoffset: 420;
+    opacity: 0.35;
+  }
+  35% {
+    stroke-dashoffset: 0;
+    opacity: 0.95;
+  }
+  70% {
+    stroke-dashoffset: 0;
+    opacity: 0.85;
+  }
+  100% {
+    stroke-dashoffset: -40;
+    opacity: 0.55;
+  }
+}
+
+@keyframes tm-navbar-arrow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(3px);
+  }
 }
 
 .tm-navbar-wrap {
@@ -660,16 +719,22 @@ html.dark .trend-card:hover {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-/* Soft static edge highlight (no spinning border — keeps header steady) */
 .tm-navbar-border {
   pointer-events: none;
   position: absolute;
   inset: 0;
   z-index: 3;
   border-radius: 0;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
-  background: transparent;
-  opacity: 1;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.14) 45%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  animation: tm-navbar-gradient-drift 10s ease-in-out infinite;
+  opacity: 0.55;
 }
 
 .tm-navbar-fx {
@@ -682,27 +747,34 @@ html.dark .trend-card:hover {
 
 .tm-navbar-bg-shift {
   position: absolute;
-  inset: 0;
+  inset: -8% -20%;
+  width: 140%;
+  height: 116%;
   background: linear-gradient(
-    105deg,
+    115deg,
     #047857 0%,
-    #059669 38%,
-    #0d9488 72%,
+    #059669 28%,
+    #14b8a6 52%,
+    #0d9488 74%,
     #0f766e 100%
   );
-  /* Static — animated background-position made the bar feel shaky */
+  background-size: 220% 220%;
+  animation: tm-navbar-gradient-drift 14s ease-in-out infinite;
+  will-change: background-position;
 }
 
 .tm-navbar-soft-glow {
   position: absolute;
-  inset: -40% 20% auto -5%;
-  height: 160%;
+  inset: -45% 10% auto -10%;
+  height: 180%;
   background: radial-gradient(
-    ellipse at 28% 45%,
-    rgba(255, 255, 255, 0.12) 0%,
+    ellipse at 30% 45%,
+    rgba(255, 255, 255, 0.18) 0%,
     transparent 58%
   );
   opacity: 0.7;
+  animation: tm-navbar-glow-drift 9s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 .tm-navbar-trend-svg {
@@ -710,22 +782,25 @@ html.dark .trend-card:hover {
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.42;
+  opacity: 0.55;
 }
 
 .tm-navbar-trend-area {
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
-/* One-shot subtle draw on load only — no infinite loop (stops “hilna”) */
 .tm-navbar-trend-line {
-  stroke-dasharray: 100;
+  stroke-dasharray: 420;
   stroke-dashoffset: 0;
-  opacity: 0.9;
+  opacity: 0.95;
+  animation: tm-navbar-line-draw 7.5s ease-in-out infinite;
 }
 
 .tm-navbar-trend-arrow {
-  opacity: 0.4;
+  opacity: 0.55;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tm-navbar-arrow-pulse 3.2s ease-in-out infinite;
 }
 
 .tm-navbar-inner {
@@ -756,7 +831,7 @@ html.dark .trend-card:hover {
 .tm-navbar-brand {
   display: inline-flex;
   align-items: center;
-  font-size: 1.2rem;
+  font-size: 1.32rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #fff;
@@ -765,7 +840,7 @@ html.dark .trend-card:hover {
 }
 @media (min-width: 640px) {
   .tm-navbar-brand {
-    font-size: 1.35rem;
+    font-size: 1.48rem;
   }
 }
 
@@ -825,6 +900,13 @@ html.dark .trend-card:hover {
   .tm-navbar-icon-btn,
   .tm-navbar-search-btn {
     transition: none;
+  }
+  .tm-navbar-border,
+  .tm-navbar-bg-shift,
+  .tm-navbar-soft-glow,
+  .tm-navbar-trend-line,
+  .tm-navbar-trend-arrow {
+    animation: none !important;
   }
 }
 

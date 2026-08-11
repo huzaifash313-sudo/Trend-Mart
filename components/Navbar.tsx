@@ -26,7 +26,7 @@ function SearchIcon() {
   );
 }
 
-/** Quiet brand mark — static trend silhouette (no looping motion). */
+/** Brand mark — soft looping gradient + trend-line motion. */
 function TrendBackdrop() {
   const line =
     "M8 72 L48 58 L78 64 L120 42 L152 50 L200 28 L236 36 L286 18 L322 24 L368 10";
