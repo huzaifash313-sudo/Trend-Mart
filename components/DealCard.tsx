@@ -26,10 +26,10 @@ interface DealCardProps {
   deal: ShopDeal;
   href?: string;
   offerTags?: string[];
+  /** Slightly tighter type — parent sets width (same as product cells). */
   compact?: boolean;
   priority?: boolean;
   className?: string;
-  /** Shop whatsapp override when join didn't include it */
   shopWhatsapp?: string | null;
 }
 
@@ -62,8 +62,8 @@ function dealToProduct(deal: ShopDeal): Product {
 }
 
 /**
- * Product-parity deal card: photos, price/% OFF, wishlist, add to cart,
- * Order only on the deal day, Visit store anytime.
+ * Same chrome as ProductGrid cards (tm-product-*). Parent grid/strip owns width.
+ * Cart + wishlist anytime; WhatsApp Order only on the deal day.
  */
 export default function DealCard({
   deal,
@@ -196,12 +196,15 @@ export default function DealCard({
     },
   ];
 
+  const priceClass = compact
+    ? "text-[13px] sm:text-sm"
+    : "text-sm sm:text-[15px]";
+  const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
+
   return (
     <>
       <article
-        className={`tm-product-card group relative flex h-full flex-col overflow-hidden ${
-          compact ? "w-[9.75rem] shrink-0" : "w-full"
-        } ${className}`}
+        className={`tm-product-card group relative flex h-full w-full flex-col overflow-hidden ${className}`}
       >
         <div className="tm-product-media relative shrink-0 overflow-hidden">
           {showPhoto && safeSrc ? (
@@ -210,7 +213,7 @@ export default function DealCard({
               alt={deal.title}
               fill
               className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-              sizes={compact ? "10rem" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               priority={priority}
               loading={priority ? "eager" : "lazy"}
               quality={75}
@@ -233,10 +236,6 @@ export default function DealCard({
             <span className="absolute right-1.5 top-1.5 z-10 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
               {discountPercent}% OFF
             </span>
-          ) : deal.is_featured ? (
-            <span className="absolute right-1.5 top-1.5 z-10 rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 shadow-sm backdrop-blur-[2px]">
-              Featured
-            </span>
           ) : null}
 
           {gallery.length > 1 ? (
@@ -245,12 +244,22 @@ export default function DealCard({
             </span>
           ) : null}
 
-          {!compact && gallery.length > 1 ? (
+          {gallery.length > 1 ? (
             <>
-              <button type="button" aria-label="Previous photo" onClick={(e) => cycleImage(e, -1)} className="absolute left-1 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950/55 text-white opacity-0 transition group-hover:flex group-hover:opacity-100">
+              <button
+                type="button"
+                aria-label="Previous photo"
+                onClick={(e) => cycleImage(e, -1)}
+                className="absolute left-1 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950/55 text-white opacity-0 transition group-hover:flex group-hover:opacity-100"
+              >
                 ‹
               </button>
-              <button type="button" aria-label="Next photo" onClick={(e) => cycleImage(e, 1)} className="absolute right-1 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950/55 text-white opacity-0 transition group-hover:flex group-hover:opacity-100">
+              <button
+                type="button"
+                aria-label="Next photo"
+                onClick={(e) => cycleImage(e, 1)}
+                className="absolute right-1 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950/55 text-white opacity-0 transition group-hover:flex group-hover:opacity-100"
+              >
                 ›
               </button>
             </>
@@ -260,18 +269,26 @@ export default function DealCard({
         </div>
 
         <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-0.5">
-          <h3
-            className={`tm-product-title ${compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"}`}
-            title={deal.title}
-          >
+          <h3 className={`tm-product-title ${titleClass}`} title={deal.title}>
             {deal.title}
           </h3>
 
           {deal.shop_name ? (
-            <div className="flex min-w-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                stop(e);
+                window.location.href = storeHref;
+              }}
+              className="flex min-w-0 items-center gap-1 text-left"
+            >
               {deal.shop_logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={getSafeImageUrl(deal.shop_logo_url, "shop")} alt="" className="h-3 w-3 shrink-0 rounded-full object-cover" />
+                <img
+                  src={getSafeImageUrl(deal.shop_logo_url, "shop")}
+                  alt=""
+                  className="h-3 w-3 shrink-0 rounded-full object-cover"
+                />
               ) : (
                 <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[7px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                   {deal.shop_name.charAt(0).toUpperCase()}
@@ -280,27 +297,30 @@ export default function DealCard({
               <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
                 {deal.shop_name}
               </span>
-            </div>
+            </button>
           ) : null}
 
-          <p className="truncate text-[10px] leading-none text-zinc-400 sm:text-[11px]">
-            {whenTag} · {schedule}
+          <p className="truncate text-[10px] leading-none text-zinc-400 sm:text-[11px]" title={schedule}>
+            {whenTag}
           </p>
 
-          <div className="tm-product-footer mt-auto flex items-end justify-between gap-1 pt-1">
+          {/* Same footer pattern as ProductGrid */}
+          <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
             <div className="min-w-0 flex-1">
               {hasPrice ? (
                 <>
-                  <p className={`font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${compact ? "text-[13px]" : "text-sm"}`}>
+                  <p
+                    className={`font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${priceClass}`}
+                  >
                     {formatRupees(Number(deal.price))}
                   </p>
                   {hasDiscount && originalPrice != null ? (
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                      <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums">
+                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
+                      <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
                         {formatRupees(originalPrice)}
                       </span>
                       {discountPercent > 0 ? (
-                        <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                        <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
                           {discountPercent}% OFF
                         </span>
                       ) : null}
@@ -311,39 +331,49 @@ export default function DealCard({
                 <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{whenTag}</p>
               )}
             </div>
+
+            <div className="flex shrink-0 items-center gap-0.5 pb-px">
+              <button
+                type="button"
+                onClick={handleWishlist}
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                  favorited
+                    ? "text-rose-500"
+                    : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                }`}
+                aria-label="Wishlist"
+              >
+                <HeartIcon filled={favorited} />
+              </button>
+              <button
+                type="button"
+                onClick={handleAdd}
+                className="tm-product-add-text shrink-0 px-0.5"
+                aria-label={`Add ${deal.title} to cart`}
+              >
+                Add
+              </button>
+            </div>
           </div>
 
-          <div className={`mt-1.5 flex flex-wrap items-center gap-1 ${compact ? "gap-0.5" : ""}`}>
-            <button
-              type="button"
-              onClick={handleWishlist}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
-                favorited ? "text-rose-500" : "text-zinc-400 hover:text-rose-500"
-              }`}
-              aria-label="Wishlist"
-            >
-              <HeartIcon filled={favorited} />
-            </button>
-            <button
-              type="button"
-              onClick={handleAdd}
-              className="rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200"
-            >
-              Add
-            </button>
+          <div className="flex items-center justify-between gap-2 pt-0.5">
             <button
               type="button"
               onClick={handleOrder}
               disabled={!canOrderToday}
               title={canOrderToday ? "Order today via WhatsApp" : `Order only on ${whenTag}`}
-              className="rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-700"
+              className={`text-[11px] font-semibold transition ${
+                canOrderToday
+                  ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                  : "cursor-not-allowed text-zinc-400 dark:text-zinc-500"
+              }`}
             >
-              {canOrderToday ? "Order" : "Day only"}
+              {canOrderToday ? "Order" : "Order on day"}
             </button>
             <Link
               href={storeHref}
               onClick={(e) => e.stopPropagation()}
-              className="ml-auto text-[10px] font-semibold text-emerald-700 dark:text-emerald-400"
+              className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
             >
               Visit
             </Link>

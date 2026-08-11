@@ -353,17 +353,8 @@ function HomeInner() {
         onSelect={setOfferDateKey}
       />
 
-      <FeaturedDealsStrip
-        deals={activeDeals}
-        dateKey={offerDateKey}
-        title="Featured deals"
-        seeAllHref="/deals"
-        className="mb-1"
-        getOfferTags={getDealStripOfferTags}
-      />
-
-      {/* ── Stories Section ───────────────────────────────────────── */}
-      <section aria-label="Merchant stories">
+      {/* Stories first (above deals) */}
+      <section aria-label="Merchant stories" className="mb-1">
         <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Stories</h2>
         <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-1 scrollbar-none">
           {myShop ? (
@@ -443,7 +434,6 @@ function HomeInner() {
         </div>
       </section>
 
-      {/* ── Stories Viewer ────────────────────────────────────────── */}
       {storyViewerOpen && (
         <StoriesViewer
           stories={stories}
@@ -454,6 +444,15 @@ function HomeInner() {
           }}
         />
       )}
+
+      <FeaturedDealsStrip
+        deals={activeDeals}
+        dateKey={offerDateKey}
+        title="Featured deals"
+        seeAllHref="/deals"
+        className="mb-1"
+        getOfferTags={getDealStripOfferTags}
+      />
 
       {/* ── Sponsored / Promotional Ads Carousel ───────────────────── */}
       <PromoAdsCarousel placement="homepage_top" />

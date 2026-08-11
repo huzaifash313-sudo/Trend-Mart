@@ -30,16 +30,13 @@ function DealsTabIcon({ active }: { active: boolean }) {
   );
 }
 
-function OrdersTabIcon({ active }: { active: boolean }) {
+function ProductsTabIcon({ active }: { active: boolean }) {
   return (
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      {!active && (
-        <>
-          <polyline points="3.29 7 12 12 20.71 7" />
-          <line x1="12" y1="22" x2="12" y2="12" />
-        </>
-      )}
+      <rect x="3" y="3" width="7" height="7" rx="1.2" />
+      <rect x="14" y="3" width="7" height="7" rx="1.2" />
+      <rect x="3" y="14" width="7" height="7" rx="1.2" />
+      <rect x="14" y="14" width="7" height="7" rx="1.2" />
     </svg>
   );
 }
@@ -62,7 +59,7 @@ function PlusIcon() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  BottomNav — Home | Deals | Add/Store | Orders | Account                   */
+/*  BottomNav — Home | Deals | Add/Store | Products | Account                 */
 /* -------------------------------------------------------------------------- */
 
 export default function BottomNav() {
@@ -147,9 +144,9 @@ export default function BottomNav() {
 
   const isHomeActive = pathname === "/";
   const isDealsActive = pathname === "/deals" || pathname.startsWith("/deals/");
-  const isOrdersActive =
-    pathname === "/orders" ||
-    pathname.startsWith("/orders/");
+  const isProductsActive =
+    pathname === "/products" ||
+    pathname.startsWith("/products/");
   const isAccountActive =
     pathname === accountHref ||
     pathname.startsWith("/dashboard") ||
@@ -227,13 +224,13 @@ export default function BottomNav() {
         </div>
 
         <Link
-          href="/orders/tracking"
-          className={sideTabClass(isOrdersActive)}
-          aria-label="Track orders"
-          aria-current={isOrdersActive ? "page" : undefined}
+          href="/products"
+          className={sideTabClass(isProductsActive)}
+          aria-label="Products"
+          aria-current={isProductsActive ? "page" : undefined}
         >
-          <OrdersTabIcon active={isOrdersActive} />
-          <span>Orders</span>
+          <ProductsTabIcon active={isProductsActive} />
+          <span>Products</span>
         </Link>
 
         <Link

@@ -429,17 +429,21 @@ function ShopDetailInner({ id }: { id: string }) {
                 All deals →
               </Link>
             </div>
-            <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 scrollbar-none">
+            <div className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
               {liveShopDeals.map((deal, i) => (
-                <DealCard
+                <div
                   key={deal.id}
-                  deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
-                  compact
-                  priority={i < 2}
-                  href={`${getShopPath(shop)}#deals`}
-                  shopWhatsapp={shop.whatsapp_number}
-                  offerTags={shopDealOfferTags}
-                />
+                  className="w-[calc(50%-0.25rem)] shrink-0 snap-start sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
+                >
+                  <DealCard
+                    deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
+                    compact
+                    priority={i < 2}
+                    href={`${getShopPath(shop)}#deals`}
+                    shopWhatsapp={shop.whatsapp_number}
+                    offerTags={shopDealOfferTags}
+                  />
+                </div>
               ))}
             </div>
           </section>
