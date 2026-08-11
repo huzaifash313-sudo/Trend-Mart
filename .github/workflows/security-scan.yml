@@ -268,7 +268,7 @@ jobs:
       # it still runs weekly via the dedicated `codeql` job below.
 
   # ===========================================================================
-  # JOB 3b: CodeQL — weekly / Main only (slow; not required for every PR tick)
+  # JOB 3b: CodeQL — weekly only (slow; does not block PR / Main green ticks)
   # ===========================================================================
   codeql:
     name: 🔬 CodeQL Deep Scan (weekly)
