@@ -347,14 +347,8 @@ function HomeInner() {
         />
       )}
 
-      <OfferDaysStrip
-        deals={activeDeals}
-        selectedDateKey={offerDateKey}
-        onSelect={setOfferDateKey}
-      />
-
-      {/* Stories first (above deals) */}
-      <section aria-label="Merchant stories" className="mb-1">
+      {/* Stories — first content under category tabs */}
+      <section aria-label="Merchant stories" className="mt-1 mb-3">
         <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Stories</h2>
         <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-1 scrollbar-none">
           {myShop ? (
@@ -445,14 +439,22 @@ function HomeInner() {
         />
       )}
 
-      <FeaturedDealsStrip
-        deals={activeDeals}
-        dateKey={offerDateKey}
-        title="Featured deals"
-        seeAllHref="/deals"
-        className="mb-1"
-        getOfferTags={getDealStripOfferTags}
-      />
+      {/* Deals block — day chips + cards together (not split by Stories) */}
+      <section aria-label="Featured deals" className="mb-3 space-y-2">
+        <OfferDaysStrip
+          deals={activeDeals}
+          selectedDateKey={offerDateKey}
+          onSelect={setOfferDateKey}
+          variant="pills"
+        />
+        <FeaturedDealsStrip
+          deals={activeDeals}
+          dateKey={offerDateKey}
+          title="Featured deals"
+          seeAllHref="/deals"
+          getOfferTags={getDealStripOfferTags}
+        />
+      </section>
 
       {/* ── Sponsored / Promotional Ads Carousel ───────────────────── */}
       <PromoAdsCarousel placement="homepage_top" />

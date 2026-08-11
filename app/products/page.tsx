@@ -583,6 +583,8 @@ function ProductsPageInner() {
         deals={activeDeals}
         selectedDateKey={offerDateKey}
         onSelect={setOfferDateKey}
+        variant="pills"
+        className="mb-1.5"
       />
 
       <FeaturedDealsStrip
