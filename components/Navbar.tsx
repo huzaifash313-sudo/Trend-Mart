@@ -103,7 +103,7 @@ export default function Navbar() {
     setPortalReady(true);
   }, []);
 
-  const navigateToProducts = useCallback(() => router.push("/products"), [router]);
+  const navigateToSearch = useCallback(() => router.push("/products"), [router]);
 
   return (
     <header className="tm-navbar-wrap">
@@ -130,12 +130,12 @@ export default function Navbar() {
             {!onProductsPage ? (
               <button
                 type="button"
-                onClick={navigateToProducts}
+                onClick={navigateToSearch}
                 className="tm-navbar-search-btn w-10 sm:w-auto"
-                aria-label="Browse products"
+                aria-label="Search products and shops"
               >
                 <SearchIcon />
-                <span className="hidden text-sm font-medium text-white sm:inline">Products</span>
+                <span className="hidden text-sm font-medium text-white sm:inline">Search</span>
               </button>
             ) : null}
           </div>

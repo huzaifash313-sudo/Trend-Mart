@@ -277,7 +277,7 @@ function OrdersInner() {
                 <input
                   type="tel"
                   inputMode="tel"
-                  placeholder="03XX-XXXXXXX"
+                  placeholder="0300-1234567"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleSearch(phone); }}

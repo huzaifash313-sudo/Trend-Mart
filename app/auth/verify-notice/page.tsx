@@ -114,7 +114,7 @@ function VerifyNoticeInner() {
           router.replace(target);
         }, 1500);
       } else {
-        addToast("Email not yet verified. Please check your inbox and click the confirmation link.", "info");
+        addToast("Email not yet verified. Check your inbox for the confirmation link or 6-digit code.", "info");
       }
     } catch {
       addToast("Could not check verification status.", "error");
@@ -154,7 +154,7 @@ function VerifyNoticeInner() {
           {verified
             ? "Your email has been confirmed. Redirecting you now..."
             : email
-              ? `We sent a verification email to ${email}. Please check your inbox and click the confirmation link to continue.`
+              ? `We sent a verification email to ${email}. Open it and tap the confirmation link (some setups also show a 6-digit code). After that, return here or go back to checkout — your cart is saved.`
               : "Please verify your email address to access this feature."}
         </p>
 

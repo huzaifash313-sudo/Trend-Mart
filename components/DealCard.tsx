@@ -185,7 +185,7 @@ export default function DealCard({
             </p>
           </div>
           <span className="tm-product-add-text shrink-0 px-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-            View
+            View store
           </span>
         </div>
       </div>
@@ -196,7 +196,7 @@ export default function DealCard({
     <Link
       href={target}
       className={compact ? "block shrink-0" : "block h-full"}
-      aria-label={`Deal: ${deal.title}${deal.shop_name ? ` at ${deal.shop_name}` : ""}`}
+      aria-label={`Deal: ${deal.title}${deal.shop_name ? ` at ${deal.shop_name}` : ""} — open store`}
     >
       {card}
     </Link>

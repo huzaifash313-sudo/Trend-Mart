@@ -62,7 +62,7 @@ export default function FeaturedDealsStrip({
             {title}
           </h2>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Labeled Deals · coupons &amp; delivery included · tap for all
+            Tap a deal to open the shop · schedule shown on each card
           </p>
         </div>
         <Link

@@ -37,14 +37,19 @@ export function ShopCardGridSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-/** A full product card skeleton. */
+/** A full product card skeleton — matches live `tm-product-card` chrome. */
 export function ProductCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-3 h-48 rounded-xl bg-zinc-200 dark:bg-zinc-800" />
-      <div className="mb-2 h-4 w-3/4 rounded bg-zinc-200 dark:bg-zinc-800" />
-      <div className="mb-2 h-3 w-full rounded bg-zinc-200 dark:bg-zinc-800" />
-      <div className="h-10 w-full rounded-full bg-zinc-200 dark:bg-zinc-800" />
+    <div className="tm-product-card flex h-full flex-col overflow-hidden">
+      <div className="tm-product-media animate-pulse bg-teal-50 dark:bg-teal-950/30" />
+      <div className="tm-product-body flex flex-col gap-0.5">
+        <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="mt-auto flex items-end justify-between pt-1">
+          <div className="h-4 w-14 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+          <div className="h-3 w-14 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -52,7 +57,7 @@ export function ProductCardSkeleton() {
 /** A grid of product card skeletons. */
 export function ProductGridSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 sm:gap-2.5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {Array.from({ length: count }).map((_, i) => (
         <ProductCardSkeleton key={i} />
       ))}

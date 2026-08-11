@@ -4,10 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import {
-  getUnseenFavoriteCount,
-  markWishlistSeen,
-} from "@/services/wishlistService";
 import { fetchMyShop } from "@/services/shopService";
 import { detectUserRole, type AuthRole } from "@/services/authService";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
@@ -25,7 +21,16 @@ function HomeIcon({ active }: { active: boolean }) {
   );
 }
 
-function ProductsTabIcon({ active }: { active: boolean }) {
+function DealsTabIcon({ active }: { active: boolean }) {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function OrdersTabIcon({ active }: { active: boolean }) {
   return (
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -47,14 +52,6 @@ function UserIcon({ active }: { active: boolean }) {
   );
 }
 
-function HeartIcon({ active }: { active: boolean }) {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-}
-
 function PlusIcon() {
   return (
     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
@@ -64,17 +61,8 @@ function PlusIcon() {
   );
 }
 
-function Badge({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <span className="absolute -right-1.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[0.55rem] font-bold leading-none text-white">
-      {count > 99 ? "99+" : count}
-    </span>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
-/*  BottomNav — role-aware tabs + center merchant Add                         */
+/*  BottomNav — Home | Deals | Add/Store | Orders | Account                   */
 /* -------------------------------------------------------------------------- */
 
 export default function BottomNav() {
@@ -85,7 +73,6 @@ export default function BottomNav() {
   const [session, setSession] = useState(false);
   const [role, setRole] = useState<AuthRole | "admin" | null>(null);
   const [merchantShop, setMerchantShop] = useState<{ id: string; category: string } | null>(null);
-  const [wishlistCount, setWishlistCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,32 +129,6 @@ export default function BottomNav() {
     };
   }, []);
 
-  const isWishlistActive = pathname === "/wishlist";
-
-  useEffect(() => {
-    if (isWishlistActive) markWishlistSeen();
-  }, [isWishlistActive]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const updateCount = async () => {
-      if (pathname === "/wishlist") {
-        if (!cancelled) setWishlistCount(0);
-        return;
-      }
-      const count = await getUnseenFavoriteCount();
-      if (!cancelled) setWishlistCount(count);
-    };
-    updateCount();
-    window.addEventListener("storage", updateCount);
-    window.addEventListener("favoritesUpdated", updateCount);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("storage", updateCount);
-      window.removeEventListener("favoritesUpdated", updateCount);
-    };
-  }, [pathname]);
-
   const isMerchant = role === "merchant" || role === "admin" || !!merchantShop;
   const accountHref = !session
     ? "/login"
@@ -185,7 +146,10 @@ export default function BottomNav() {
         : "Account";
 
   const isHomeActive = pathname === "/";
-  const isProductsActive = pathname === "/products" || pathname.startsWith("/products/");
+  const isDealsActive = pathname === "/deals" || pathname.startsWith("/deals/");
+  const isOrdersActive =
+    pathname === "/orders" ||
+    pathname.startsWith("/orders/");
   const isAccountActive =
     pathname === accountHref ||
     pathname.startsWith("/dashboard") ||
@@ -207,17 +171,18 @@ export default function BottomNav() {
       router.push("/account/become-merchant");
       return;
     }
-    router.push("/login?next=/account/become-merchant");
+    router.push("/login?redirect=/account/become-merchant");
   };
 
-  const centerLabel = merchantShop ? "Add" : session ? (isMerchant ? "Post" : "Sell") : "Sell";
+  // Merchants: Add / Post. Shoppers: clear “Store” (open a shop), not confusing “Sell”.
+  const centerLabel = merchantShop ? "Add" : session && isMerchant ? "Post" : "Store";
   const centerAria = merchantShop
     ? "Add product"
-    : session
-      ? isMerchant
-        ? "Open product tools"
-        : "Register your store"
-      : "Sign in to sell";
+    : session && isMerchant
+      ? "Open product tools"
+      : session
+        ? "Open your store on TrendMart"
+        : "Sign in to open a store";
 
   const sideTabClass = (active: boolean) =>
     `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
@@ -238,13 +203,13 @@ export default function BottomNav() {
         </Link>
 
         <Link
-          href="/products"
-          className={sideTabClass(isProductsActive)}
-          aria-label="Products"
-          aria-current={isProductsActive ? "page" : undefined}
+          href="/deals"
+          className={sideTabClass(isDealsActive)}
+          aria-label="Deals"
+          aria-current={isDealsActive ? "page" : undefined}
         >
-          <ProductsTabIcon active={isProductsActive} />
-          <span>Products</span>
+          <DealsTabIcon active={isDealsActive} />
+          <span>Deals</span>
         </Link>
 
         <div className="flex flex-col items-center justify-end">
@@ -262,16 +227,13 @@ export default function BottomNav() {
         </div>
 
         <Link
-          href="/wishlist"
-          className={sideTabClass(isWishlistActive)}
-          aria-label="Wishlist"
-          aria-current={isWishlistActive ? "page" : undefined}
+          href="/orders/tracking"
+          className={sideTabClass(isOrdersActive)}
+          aria-label="Track orders"
+          aria-current={isOrdersActive ? "page" : undefined}
         >
-          <div className="relative">
-            <HeartIcon active={isWishlistActive} />
-            <Badge count={wishlistCount} />
-          </div>
-          <span>Wishlist</span>
+          <OrdersTabIcon active={isOrdersActive} />
+          <span>Orders</span>
         </Link>
 
         <Link

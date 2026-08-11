@@ -826,7 +826,7 @@ export default function WhatsAppCheckoutModal({
                 {step === "review" && "WhatsApp Checkout"}
                 {step === "shipping" && "Delivery Details"}
                 {step === "confirm" && "Confirm Order"}
-                {step === "success" && "Order Sent!"}
+                {step === "success" && "Order placed"}
               </h3>
             </div>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
@@ -837,7 +837,7 @@ export default function WhatsAppCheckoutModal({
               {step === "review" && `Sending order to ${shop.name}`}
               {step === "shipping" && "Enter your delivery information"}
               {step === "confirm" && "Review everything before sending"}
-              {step === "success" && "Opening WhatsApp for you..."}
+              {step === "success" && "Tap Open WhatsApp to message the shop"}
             </p>
           </div>
           <button
@@ -898,14 +898,28 @@ export default function WhatsAppCheckoutModal({
                   <Link
                     href="/login?redirect=/"
                     className={`rounded-full ${accentBg} px-5 py-2.5 text-sm font-semibold text-white ${accentBgHover}`}
-                    onClick={onClose}
+                    onClick={() => {
+                      try {
+                        sessionStorage.setItem("tm_resume_checkout", "1");
+                      } catch {
+                        /* ignore */
+                      }
+                      onClose();
+                    }}
                   >
                     Sign in
                   </Link>
                   <Link
-                    href="/signup"
+                    href="/signup?redirect=/"
                     className="rounded-full border border-zinc-200 px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                    onClick={onClose}
+                    onClick={() => {
+                      try {
+                        sessionStorage.setItem("tm_resume_checkout", "1");
+                      } catch {
+                        /* ignore */
+                      }
+                      onClose();
+                    }}
                   >
                     Create account
                   </Link>
@@ -915,8 +929,13 @@ export default function WhatsAppCheckoutModal({
                 <button
                   type="button"
                   onClick={() => {
+                    try {
+                      sessionStorage.setItem("tm_resume_checkout", "1");
+                    } catch {
+                      /* ignore */
+                    }
                     onClose();
-                    router.push("/auth/verify-notice");
+                    router.push("/auth/verify-notice?redirect=/");
                   }}
                   className={`rounded-full ${accentBg} px-5 py-2.5 text-sm font-semibold text-white ${accentBgHover}`}
                 >
@@ -1211,7 +1230,8 @@ export default function WhatsAppCheckoutModal({
               <div>
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <label htmlFor="wc-shipping-address" className="flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                    <MapPinIcon /> Delivery Address <span className="font-normal text-zinc-400">(optional)</span>
+                    <MapPinIcon /> Delivery Address{" "}
+                    <span className="font-normal text-zinc-400">(recommended — helps the shop find you)</span>
                   </label>
                   <button
                     type="button"

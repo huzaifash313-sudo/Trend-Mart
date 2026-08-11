@@ -162,7 +162,7 @@ function ProductCard({
     [product, isFavorite, onFavoriteToggle],
   );
 
-  const { hasDiscount, originalPrice } = getProductDiscount(product);
+  const { hasDiscount, originalPrice, discountPercent } = getProductDiscount(product);
   const offerTags = useMemo(
     () => buildProductOfferTags(product, offerContext),
     [product, offerContext],
@@ -206,6 +206,16 @@ function ProductCard({
         {categoryLabel ? (
           <span className="absolute left-1.5 top-1.5 z-10 max-w-[70%] truncate rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/95 shadow-sm backdrop-blur-[2px]">
             {categoryLabel}
+          </span>
+        ) : null}
+
+        {hasDiscount && discountPercent > 0 ? (
+          <span
+            className={`absolute z-10 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm ${
+              categoryLabel ? "right-1.5 top-1.5" : "left-1.5 top-1.5"
+            }`}
+          >
+            {discountPercent}% OFF
           </span>
         ) : null}
 
@@ -284,6 +294,11 @@ function ProductCard({
                 <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
                   {formatRupees(originalPrice)}
                 </span>
+                {discountPercent > 0 ? (
+                  <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                    {discountPercent}% OFF
+                  </span>
+                ) : null}
               </div>
             ) : null}
           </div>

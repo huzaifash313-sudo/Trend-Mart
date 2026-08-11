@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { formatRupees } from "@/lib/formatters";
 import WhatsAppCheckoutModal from "@/components/WhatsAppCheckoutModal";
 import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import type { Shop } from "@/types";
+import { fetchShopById } from "@/services/shopService";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline Icons                                                               */
@@ -102,6 +103,15 @@ function groupItemsByShop(items: CartItem[]): ShopGroup[] {
   return Array.from(map.values());
 }
 
+function stubShopFromGroup(group: ShopGroup): Shop {
+  return {
+    id: group.shopId,
+    name: group.shopName,
+    whatsapp_number: group.shopWhatsapp,
+    location: "",
+  } as Shop;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  CartBar Component                                                          */
 /* -------------------------------------------------------------------------- */
@@ -110,13 +120,50 @@ export default function CartBar() {
   const { items, removeItem, updateQuantity, updateItemNotes, totalItems, totalAmount, clearCart } = useCart();
   const [expanded, setExpanded] = useState(false);
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
+  const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
 
-  // Group items by shop
   const shopGroups = useMemo(() => groupItemsByShop(items), [items]);
+
+  // After login/verify — reopen first shop checkout if cart still has items
+  useEffect(() => {
+    if (totalItems === 0 || shopGroups.length === 0) return;
+    try {
+      if (sessionStorage.getItem("tm_resume_checkout") === "1") {
+        sessionStorage.removeItem("tm_resume_checkout");
+        setExpanded(true);
+        setCheckoutShop(shopGroups[0]!);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [totalItems, shopGroups]);
+
+  // Load full shop row for radius / hours / delivery rules
+  useEffect(() => {
+    if (!checkoutShop) {
+      setResolvedShop(null);
+      return;
+    }
+    let cancelled = false;
+    const fallback = stubShopFromGroup(checkoutShop);
+    setResolvedShop(fallback);
+    void fetchShopById(checkoutShop.shopId).then((res) => {
+      if (cancelled) return;
+      if (res.success && res.data.shop) {
+        setResolvedShop({
+          ...res.data.shop,
+          whatsapp_number: res.data.shop.whatsapp_number || checkoutShop.shopWhatsapp,
+          name: res.data.shop.name || checkoutShop.shopName,
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutShop]);
 
   if (totalItems === 0) return null;
 
-  // Build checkout items for the selected shop group
   const checkoutItems: WhatsAppCartItem[] = (checkoutShop?.items ?? []).map((i) => ({
     id: i.id,
     productId: i.productId,
@@ -131,25 +178,27 @@ export default function CartBar() {
     originalPrice: i.originalPrice ?? undefined,
   }));
 
+  const handleClearCart = () => {
+    if (typeof window !== "undefined" && !window.confirm("Clear your entire cart?")) return;
+    clearCart();
+  };
+
   return (
     <>
-      {/* ── Floating Cart Bar ─────────────────────────────────────────── */}
       <div className="fixed bottom-16 left-0 right-0 z-50 md:bottom-0">
         <div className="mx-auto max-w-lg px-3">
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg transition-all dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
-            {/* ── Expanded Items List (grouped by shop) ────────────────── */}
             {expanded && (
               <div className="max-h-72 overflow-y-auto border-b border-zinc-100 dark:border-zinc-800">
                 {shopGroups.length > 1 && (
                   <p className="px-3 pt-2 pb-1 text-[0.6rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                    {shopGroups.length} shops in cart
+                    {shopGroups.length} shops — checkout each shop separately
                   </p>
                 )}
 
                 {shopGroups.map((group) => (
                   <div key={group.shopId}>
-                    {/* Shop header */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800/50">
+                    <div className="flex items-center gap-1.5 bg-zinc-50 px-3 py-1.5 dark:bg-zinc-800/50">
                       <StoreIcon />
                       <span className="truncate text-[0.65rem] font-semibold text-zinc-600 dark:text-zinc-400">
                         {group.shopName}
@@ -157,30 +206,24 @@ export default function CartBar() {
                       <span className="ml-auto text-[0.65rem] font-bold text-emerald-600 dark:text-emerald-400">
                         {formatRupees(group.subtotal)}
                       </span>
-                      {/* Per-shop checkout button */}
                       <button
                         type="button"
                         onClick={() => setCheckoutShop(group)}
-                        className="ml-2 shrink-0 rounded-full bg-emerald-600 px-2.5 py-1 text-[0.6rem] font-semibold text-white hover:bg-emerald-700 active:scale-95 transition-all"
+                        className="ml-2 shrink-0 rounded-full bg-emerald-600 px-2.5 py-1 text-[0.6rem] font-semibold text-white transition-all hover:bg-emerald-700 active:scale-95"
                       >
                         Checkout
                       </button>
                     </div>
 
-                    {/* Items in this shop group */}
                     {group.items.map((item) => (
                       <div
                         key={item.id}
                         className="flex items-center gap-2 border-b border-zinc-50 px-3 py-2 last:border-b-0 dark:border-zinc-800/50"
                       >
-                        {/* Thumbnail */}
                         <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
                           {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.name}
-                              className="h-full w-full object-cover"
-                            />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center text-[0.6rem] font-bold text-zinc-400">
                               {item.name.charAt(0)}
@@ -188,15 +231,12 @@ export default function CartBar() {
                           )}
                         </div>
 
-                        {/* Info */}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-semibold text-zinc-800 dark:text-zinc-200">
                             {item.name}
                           </p>
                           {item.variant && (
-                            <p className="text-[0.6rem] text-zinc-400 truncate">
-                              {item.variant}
-                            </p>
+                            <p className="truncate text-[0.6rem] text-zinc-400">{item.variant}</p>
                           )}
                           <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                             {formatRupees(item.price)}
@@ -211,8 +251,7 @@ export default function CartBar() {
                           />
                         </div>
 
-                        {/* Quantity controls */}
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
                             onClick={() =>
@@ -245,9 +284,7 @@ export default function CartBar() {
               </div>
             )}
 
-            {/* ── Bottom Bar ────────────────────────────────────────── */}
             <div className="flex items-center gap-2 px-3 py-2.5">
-              {/* Expand toggle */}
               <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
@@ -259,42 +296,40 @@ export default function CartBar() {
                 {expanded ? <ChevronDownIcon /> : <ChevronUpIcon />}
               </button>
 
-              {/* Total */}
               <div className="min-w-0 flex-1 text-right">
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {shopGroups.length > 1 ? `${shopGroups.length} shops` : shopGroups[0]?.shopName ?? ""}
+                  {shopGroups.length > 1
+                    ? `${shopGroups.length} shops`
+                    : (shopGroups[0]?.shopName ?? "")}
                 </p>
                 <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                   {formatRupees(totalAmount)}
                 </p>
               </div>
 
-              {/* Checkout button for single shop — when only one shop, direct checkout */}
               {shopGroups.length === 1 && (
                 <button
                   type="button"
-                  onClick={() => setCheckoutShop(shopGroups[0])}
-                  className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-sm"
+                  onClick={() => setCheckoutShop(shopGroups[0]!)}
+                  className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95"
                 >
                   Order via WhatsApp
                 </button>
               )}
 
-              {/* When multiple shops: expand to pick */}
               {shopGroups.length > 1 && !expanded && (
                 <button
                   type="button"
                   onClick={() => setExpanded(true)}
-                  className="shrink-0 rounded-full bg-zinc-200 px-3 py-1.5 text-[0.65rem] font-semibold text-zinc-600 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+                  className="shrink-0 rounded-full bg-emerald-600 px-3 py-1.5 text-[0.65rem] font-semibold text-white hover:bg-emerald-700"
                 >
-                  Review
+                  Checkout shops
                 </button>
               )}
 
-              {/* Clear cart */}
               <button
                 type="button"
-                onClick={clearCart}
+                onClick={handleClearCart}
                 className="shrink-0 rounded-full p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                 aria-label="Clear cart"
               >
@@ -305,20 +340,13 @@ export default function CartBar() {
         </div>
       </div>
 
-      {/* ── Checkout Modal — per shop group ────────────────────────────── */}
-      {checkoutShop && (
+      {checkoutShop && resolvedShop && (
         <WhatsAppCheckoutModal
           items={checkoutItems}
-          shop={{
-            id: checkoutShop.shopId,
-            name: checkoutShop.shopName,
-            whatsapp_number: checkoutShop.shopWhatsapp,
-            location: "",
-          } as Shop}
+          shop={resolvedShop}
           onClose={() => setCheckoutShop(null)}
           onOrderPlaced={() => {
             setCheckoutShop(null);
-            // Clear only items from this shop group
             checkoutShop.items.forEach((item) => removeItem(item.id));
           }}
         />

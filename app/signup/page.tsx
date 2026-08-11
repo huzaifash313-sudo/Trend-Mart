@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
 import { signUpWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
@@ -92,13 +93,31 @@ function GradientOrbs() {
 /*  Page                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export default function SignupPage() {
+function safeRedirect(path: string | null | undefined): string | null {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) return null;
+  return path;
+}
+
+function SignupPageInner() {
   const { addToast } = useToast();
+  const searchParams = useSearchParams();
+  const redirectTo = safeRedirect(searchParams.get("redirect"));
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [pendingRole, setPendingRole] = useState<AuthRole>("customer");
+
+  const goAfterAuth = useCallback(
+    (role: AuthRole | "admin") => {
+      if (redirectTo) {
+        window.location.href = redirectTo;
+        return;
+      }
+      redirectToDashboard(role);
+    },
+    [redirectTo],
+  );
 
   const handleSubmit = useCallback(
     async (values: SignInFormValues | SignUpFormValues) => {
@@ -127,7 +146,7 @@ export default function SignupPage() {
             : "Account created! Welcome to TrendMart.",
           "success",
         );
-        redirectToDashboard(result.role);
+        goAfterAuth(result.role);
         return;
       }
 
@@ -144,7 +163,7 @@ export default function SignupPage() {
       setServerError(result.error ?? "Sign up failed. Please try again.");
       addToast(result.error ?? "Registration failed.", "error");
     },
-    [addToast],
+    [addToast, goAfterAuth],
   );
 
   const handleOtpVerified = useCallback(async () => {
@@ -162,8 +181,8 @@ export default function SignupPage() {
         : "Email verified! Welcome to TrendMart.",
       "success",
     );
-    redirectToDashboard(pendingRole);
-  }, [addToast, pendingRole]);
+    goAfterAuth(pendingRole);
+  }, [addToast, pendingRole, goAfterAuth]);
 
   return (
     <div className="relative flex min-h-screen overflow-hidden">
@@ -333,5 +352,19 @@ export default function SignupPage() {
         onVerified={handleOtpVerified}
       />
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+        </div>
+      }
+    >
+      <SignupPageInner />
+    </Suspense>
   );
 }
