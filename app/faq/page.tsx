@@ -56,7 +56,7 @@ const MERCHANT_FAQS: FaqItem[] = [
   },
   {
     q: "How do I control which customers can order from me?",
-    a: "Set your shop's pinned location and delivery/service radius from Dashboard → Settings. Only customers within that radius will see your store and be able to place an order.",
+    a: "Set your shop's pinned location and delivery radius once from Dashboard → Settings → Delivery area. That pin stays fixed (orders leave from the dukaan). Only change it there if the shop moves. Customers still use their own live GPS for nearby distance.",
   },
   {
     q: "How do I show a discount badge on a product?",

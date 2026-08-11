@@ -165,6 +165,7 @@ function buildWhatsAppMessage(
   grandTotal: number,
   couponCode: string,
   orderRef: string,
+  customerCoords?: { latitude: number; longitude: number } | null,
 ): string {
   // ── Sanitize all inputs ──────────────────────────────────────────────
   const safeShopName = sanitizePayloadString(shopName, 100);
@@ -180,11 +181,30 @@ function buildWhatsAppMessage(
   const safeAddress = sanitizePayloadString(shipping.shippingAddress, 200);
   const safeNotes = sanitizePayloadString(shipping.deliveryNotes, 500);
 
+  const lat =
+    customerCoords &&
+    Number.isFinite(customerCoords.latitude) &&
+    customerCoords.latitude >= -90 &&
+    customerCoords.latitude <= 90
+      ? customerCoords.latitude
+      : null;
+  const lng =
+    customerCoords &&
+    Number.isFinite(customerCoords.longitude) &&
+    customerCoords.longitude >= -180 &&
+    customerCoords.longitude <= 180
+      ? customerCoords.longitude
+      : null;
+  const mapsPinUrl =
+    lat != null && lng != null
+      ? `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`
+      : null;
+
   const lines: string[] = [
     `🛒 *New Order via TrendMart*`,
     ``,
     `🏪 *Shop:* ${safeShopName}`,
-    `📍 *Location:* ${safeLocation}`,
+    `📍 *Shop area:* ${safeLocation}`,
     `🆔 *Order Ref:* ${safeOrderRef}`,
     ``,
     `──────────────────────────`,
@@ -238,6 +258,11 @@ function buildWhatsAppMessage(
 
   if (safeAddress) {
     lines.push(`   Address: ${safeAddress}`);
+  }
+
+  if (mapsPinUrl) {
+    lines.push(`   📌 Live pin (open in Maps):`);
+    lines.push(`   ${mapsPinUrl}`);
   }
 
   if (safeNotes) {
@@ -709,6 +734,22 @@ export default function WhatsAppCheckoutModal({
         notes: item.notes,
       }));
 
+      // Prefer live GPS from checkout; fall back to header map pin
+      let pinLat = location?.coordinates?.latitude ?? null;
+      let pinLng = location?.coordinates?.longitude ?? null;
+      if (pinLat == null || pinLng == null) {
+        try {
+          const fresh = await detectLocationDetailed();
+          const c = fresh.location?.coordinates;
+          if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
+            pinLat = c.latitude;
+            pinLng = c.longitude;
+          }
+        } catch {
+          /* optional — address text still goes through */
+        }
+      }
+
       const orderResult = await createOrder({
         shopId: shop.id,
         customerName: shipping.customerName.trim(),
@@ -720,8 +761,8 @@ export default function WhatsAppCheckoutModal({
         deliveryFee,
         notes: shipping.deliveryNotes,
         couponCode: couponResult?.valid ? couponCode : undefined,
-        customerLat: location?.coordinates?.latitude ?? null,
-        customerLng: location?.coordinates?.longitude ?? null,
+        customerLat: pinLat,
+        customerLng: pinLng,
       });
 
       if (!orderResult.success) {
@@ -743,7 +784,7 @@ export default function WhatsAppCheckoutModal({
         notes: shipping.deliveryNotes,
       });
 
-      // 3. Build WhatsApp message and keep modal open until user acts
+      // 3. Build WhatsApp message (address + Maps pin when GPS available)
       const whatsappText = buildWhatsAppMessage(
         shop.name,
         shop.location,
@@ -756,6 +797,9 @@ export default function WhatsAppCheckoutModal({
         grandTotal,
         couponCode,
         ref,
+        pinLat != null && pinLng != null
+          ? { latitude: pinLat, longitude: pinLng }
+          : null,
       );
 
       setPendingWhatsAppUrl(
@@ -790,6 +834,7 @@ export default function WhatsAppCheckoutModal({
     outsideServiceRadius,
     radiusKm,
     location,
+    detectLocationDetailed,
   ]);
 
   const finishOrder = useCallback(() => {
@@ -1273,7 +1318,7 @@ export default function WhatsAppCheckoutModal({
                 )}
                 {!locationFillError && (
                   <p className="mt-1 text-[0.65rem] text-zinc-400">
-                    Autofill from account / map pin, or tap precise location — always editable.
+                    Address autofills from account / map. GPS on hone par WhatsApp message mein Maps pin bhi chala jata hai shop ke liye.
                   </p>
                 )}
               </div>

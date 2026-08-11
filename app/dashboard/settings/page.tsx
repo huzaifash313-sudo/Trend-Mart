@@ -820,15 +820,15 @@ export default function DashboardSettingsPage() {
           </div>
 
           <div>
-            <FieldLabel>City / area location text</FieldLabel>
+            <FieldLabel>City / area (shop card text)</FieldLabel>
             <TextInput
               type="text"
               value={form.location}
               onChange={(e) => setForm((current) => ({ ...current, location: e.target.value }))}
-              placeholder="Gulberg, Lahore"
+              placeholder="Bahaar Colony, Gujranwala"
             />
             <p className="mt-1.5 text-[0.7rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
-              This text appears on cards and may be updated when you pin your delivery area.
+              Fixed shop address shown to customers. This is not the customer&apos;s live GPS — change only if the shop moves.
             </p>
           </div>
         </SectionShell>
@@ -980,8 +980,11 @@ export default function DashboardSettingsPage() {
           id="delivery-area"
           icon={<MapPinIcon />}
           title="Delivery area"
-          helper="Pin your shop and choose exactly how far you can deliver."
+          helper="Your shop’s fixed dispatch pin. Customers’ GPS stays dynamic for distance — yours only changes here when the dukaan moves."
         >
+          <div className="mb-3 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2.5 text-[0.75rem] leading-relaxed text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+            Set once carefully. Orders leave from this pin. Avoid changing it daily — update only if you relocate the store.
+          </div>
           <ShopLocationRadiusPicker
             value={{
               latitude: form.latitude,

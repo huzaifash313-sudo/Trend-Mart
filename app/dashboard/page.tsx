@@ -1051,25 +1051,58 @@ export default function DashboardPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Location</label>
-                <input type="text" value={shopForm.location} onChange={(e) => setShopForm((f) => ({ ...f, location: e.target.value }))} placeholder="Lahore" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  {shop ? "Shop address (fixed)" : "Location"}
+                </label>
+                {shop ? (
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-800/80">
+                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                      {shopForm.location?.trim() || shopForm.address_display?.trim() || "Not set yet"}
+                    </p>
+                    <p className="mt-1 text-[0.7rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                      Fixed dispatch point for orders — not customer GPS. Change only in{" "}
+                      <Link
+                        href="/dashboard/settings#delivery-area"
+                        className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                      >
+                        Settings → Delivery area
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={shopForm.location}
+                    onChange={(e) => setShopForm((f) => ({ ...f, location: e.target.value }))}
+                    placeholder="Bahaar Colony, Gujranwala"
+                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                )}
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Delivery Radius & Pin</label>
-              <ShopLocationRadiusPicker
-                compact
-                value={{
-                  latitude: shopForm.latitude,
-                  longitude: shopForm.longitude,
-                  service_radius_km: shopForm.service_radius_km,
-                  address_display: shopForm.address_display,
-                  location: shopForm.location,
-                  delivery_zones: shopForm.delivery_zones,
-                }}
-                onChange={(patch) => setShopForm((f) => ({ ...f, ...patch }))}
-              />
-            </div>
+            {!shop ? (
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  Delivery pin (set once)
+                </label>
+                <p className="mb-2 text-[0.7rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  Pin your shop once — this stays fixed for distance &amp; delivery. Later updates only from Settings.
+                </p>
+                <ShopLocationRadiusPicker
+                  compact
+                  value={{
+                    latitude: shopForm.latitude,
+                    longitude: shopForm.longitude,
+                    service_radius_km: shopForm.service_radius_km,
+                    address_display: shopForm.address_display,
+                    location: shopForm.location,
+                    delivery_zones: shopForm.delivery_zones,
+                  }}
+                  onChange={(patch) => setShopForm((f) => ({ ...f, ...patch }))}
+                />
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">WhatsApp Number</label>
