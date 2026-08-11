@@ -95,7 +95,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for complete scan
+          # Full history only on schedule; shallow on PR/push keeps this job ~seconds
+          fetch-depth: ${{ github.event_name == 'schedule' && 0 || 1 }}
 
       - name: Run TrendMart secret scanner
         run: |
@@ -263,6 +264,22 @@ jobs:
             echo "✅ No dangerous code patterns detected."
           fi
 
+      # CodeQL is heavy (~4–6 min). Keep it off the PR/push critical path —
+      # it still runs weekly via the dedicated `codeql` job below.
+
+  # ===========================================================================
+  # JOB 3b: CodeQL — weekly / Main only (slow; not required for every PR tick)
+  # ===========================================================================
+  codeql:
+    name: 🔬 CodeQL Deep Scan (weekly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only the Monday cron — never block PR or Main push green ticks.
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
@@ -307,21 +324,34 @@ jobs:
   security-gate:
     name: 🛡️ Security Gate — Block Unsafe Builds
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
+    # Do NOT wait on CodeQL — that was the long spinner. Gate clears after fast jobs.
     needs: [npm-audit, secret-scan, sast, typescript-check]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Main' || github.ref == 'refs/heads/master'
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Main' || github.ref == 'refs/heads/master') && !cancelled()
 
     steps:
+      - name: Require fast security jobs
+        run: |
+          echo "npm-audit=${{ needs.npm-audit.result }}"
+          echo "secret-scan=${{ needs.secret-scan.result }}"
+          echo "sast=${{ needs.sast.result }}"
+          echo "typescript=${{ needs.typescript-check.result }}"
+          if [ "${{ needs.npm-audit.result }}" != "success" ] || \
+             [ "${{ needs.secret-scan.result }}" != "success" ] || \
+             [ "${{ needs.sast.result }}" != "success" ] || \
+             [ "${{ needs.typescript-check.result }}" != "success" ]; then
+            echo "::error::Security gate blocked — a required scan failed."
+            exit 1
+          fi
+
       - name: Security Gate Summary
         run: |
           echo "============================================"
           echo "  🛡️  TRENDMART SECURITY GATE — PASSED"
           echo "============================================"
           echo ""
-          echo "✅ npm Audit: No high/critical vulnerabilities"
-          echo "✅ Secret Scan: No hardcoded credentials"
-          echo "✅ Static Analysis: CodeQL + ESLint passed"
-          echo "✅ TypeScript: No compilation errors"
+          echo "✅ npm Audit / Secret Scan / ESLint SAST / TypeScript"
+          echo "ℹ️  CodeQL deep scan runs weekly (and on Main) separately — does not block this gate."
           echo ""
           echo "🔒 Build is cleared for production deployment."
           echo "============================================"
