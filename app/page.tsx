@@ -33,6 +33,7 @@ import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponServic
 import { fetchActiveDeals } from "@/services/dealService";
 import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
+import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 
 /* -------------------------------------------------------------------------- */
 /*  HomeInner Component                                                        */
@@ -203,6 +204,19 @@ function HomeInner() {
     ).map((r) => r.item);
   }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds, offerDateKey, activeDeals]);
 
+  const getDealStripOfferTags = useCallback(
+    (shopId: string) => {
+      const shop = shops.find((s) => s.id === shopId);
+      return buildShopTickerTags({
+        coupons: shopCoupons[shopId] ?? [],
+        freeDeliveryThreshold: shop?.free_delivery_threshold,
+        deliveryFeeFlat: shop?.delivery_fee_flat,
+        deliveryFeePerKm: shop?.delivery_fee_per_km,
+      });
+    },
+    [shops, shopCoupons],
+  );
+
   /* Geo filter — Near me (range) / This city / All Pakistan */
   useEffect(() => {
     let cancelled = false;
@@ -344,6 +358,7 @@ function HomeInner() {
         title="Featured deals"
         seeAllHref="/deals"
         className="mb-1"
+        getOfferTags={getDealStripOfferTags}
       />
 
       {/* ── Stories Section ───────────────────────────────────────── */}

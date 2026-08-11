@@ -10,6 +10,9 @@ import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
 import CompactRating from "@/components/CompactRating";
+import { buildShopTickerTags } from "@/lib/shopOfferLabels";
+
+export { buildDeliveryTickerLabel } from "@/lib/shopOfferLabels";
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
@@ -43,65 +46,27 @@ export interface ProductOfferContext {
   couponLabel?: string | null;
 }
 
-export function buildDeliveryTickerLabel(input: {
-  freeDeliveryThreshold?: number | null;
-  deliveryFeeFlat?: number | null;
-  deliveryFeePerKm?: number | null;
-}): string | null {
-  const free = input.freeDeliveryThreshold;
-  if (free != null && free > 0) {
-    return `Free delivery over Rs. ${Math.round(free).toLocaleString()}`;
-  }
-  const flat = input.deliveryFeeFlat;
-  if (flat != null && flat > 0) {
-    return `Delivery Rs. ${Math.round(flat).toLocaleString()}`;
-  }
-  const perKm = input.deliveryFeePerKm;
-  if (perKm != null && perKm > 0) {
-    return `Delivery Rs. ${Math.round(perKm).toLocaleString()}/km`;
-  }
-  return null;
-}
-
 function buildProductOfferTags(
   product: Product,
   offerContext?: ProductOfferContext | null,
 ): string[] {
-  const tags: string[] = [];
-
-  const dealLabels = offerContext?.dealLabels?.filter(Boolean) ?? [];
-  for (const label of dealLabels) {
-    const short = label.length > 32 ? `${label.slice(0, 30)}…` : label;
-    if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) tags.push(short);
-  }
-
-  const couponLabels = [
-    ...(offerContext?.couponLabels ?? []),
-    ...(offerContext?.couponLabel ? [offerContext.couponLabel] : []),
-  ];
-  for (const label of couponLabels) {
-    const trimmed = label.trim();
-    if (!trimmed) continue;
-    const short = trimmed.length > 32 ? `${trimmed.slice(0, 30)}…` : trimmed;
-    if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) tags.push(short);
-  }
-
-  const delivery = buildDeliveryTickerLabel({
+  return buildShopTickerTags({
+    dealLabels: offerContext?.dealLabels,
+    couponLabels: [
+      ...(offerContext?.couponLabels ?? []),
+      ...(offerContext?.couponLabel ? [offerContext.couponLabel] : []),
+    ],
     freeDeliveryThreshold:
       offerContext?.freeDeliveryThreshold ?? product.shop_free_delivery_threshold,
     deliveryFeeFlat: offerContext?.deliveryFeeFlat ?? product.shop_delivery_fee_flat,
     deliveryFeePerKm: offerContext?.deliveryFeePerKm ?? product.shop_delivery_fee_per_km,
   });
-  if (delivery) tags.push(delivery);
-
-  return tags;
 }
 
-/** Dark continuous ticker over product image. */
-function ProductOfferMarquee({ tags }: { tags: string[] }) {
+/** Dark continuous ticker over product / deal image. */
+export function OfferTickerMarquee({ tags }: { tags: string[] }) {
   if (tags.length === 0) return null;
 
-  // Keep each unique line once, then loop the full sequence continuously.
   const unique = tags.filter((t, i) => tags.indexOf(t) === i);
   const sequence = unique.length === 1 ? [unique[0], unique[0], unique[0]] : unique;
   const track = [...sequence, ...sequence];
@@ -243,7 +208,7 @@ function ProductCard({
           </span>
         ) : null}
 
-        <ProductOfferMarquee tags={offerTags} />
+        <OfferTickerMarquee tags={offerTags} />
 
         {!product.is_available ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-900/45">

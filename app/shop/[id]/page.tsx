@@ -17,6 +17,7 @@ import ProductGrid from "@/components/ProductGrid";
 import DealCard from "@/components/DealCard";
 import { isDealActiveOnDate, toPkDateKey } from "@/lib/dealSchedule";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
+import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
@@ -211,6 +212,16 @@ function ShopDetailInner({ id }: { id: string }) {
       dealLabels,
     };
   }, [shop, coupons, deals]);
+
+  const shopDealOfferTags = useMemo(() => {
+    if (!shop) return [];
+    return buildShopTickerTags({
+      coupons,
+      freeDeliveryThreshold: shop.free_delivery_threshold,
+      deliveryFeeFlat: shop.delivery_fee_flat,
+      deliveryFeePerKm: shop.delivery_fee_per_km,
+    });
+  }, [shop, coupons]);
 
   const liveShopDeals = useMemo(() => {
     if (!shop) return [];
@@ -629,6 +640,7 @@ function ShopDetailInner({ id }: { id: string }) {
                   compact
                   priority={i < 2}
                   href={`#products`}
+                  offerTags={shopDealOfferTags}
                 />
               ))}
             </div>

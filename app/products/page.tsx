@@ -29,7 +29,7 @@ import {
   toPkDateKey,
   type ShopDeal,
 } from "@/lib/dealSchedule";
-import { isOfferActive } from "@/lib/shopOfferTicker";
+import { buildShopTickerTags, formatCouponTickerLabels } from "@/lib/shopOfferLabels";
 import type { ProductOfferContext } from "@/components/ProductGrid";
 import {
   fuzzyFilterAndRank,
@@ -193,12 +193,21 @@ function ProductsPageInner() {
         if (!cancelled && result.success) setActiveDeals(result.data);
       });
     };
+    const onCoupons = () => {
+      const shopIds = [...new Set(products.map((p) => p.shop_id).filter(Boolean))];
+      if (!shopIds.length) return;
+      void fetchActiveCouponsForShops(shopIds).then((cRes) => {
+        if (!cancelled && cRes.success) setShopCoupons(cRes.data);
+      });
+    };
     window.addEventListener("trendmart:deals-updated", onDeals);
+    window.addEventListener("trendmart:coupons-updated", onCoupons);
     return () => {
       cancelled = true;
       window.removeEventListener("trendmart:deals-updated", onDeals);
+      window.removeEventListener("trendmart:coupons-updated", onCoupons);
     };
-  }, []);
+  }, [products]);
 
   // Favorites
   useEffect(() => {
@@ -255,7 +264,12 @@ function ProductsPageInner() {
   }, [products, geoFilter, globalCoords, sort, offerDateKey, activeDeals]);
 
   const getOfferContext = useCallback(
-    (product: { shop_id?: string; shop_free_delivery_threshold?: number | null; shop_delivery_fee_flat?: number | null; shop_delivery_fee_per_km?: number | null }): ProductOfferContext => {
+    (product: {
+      shop_id?: string;
+      shop_free_delivery_threshold?: number | null;
+      shop_delivery_fee_flat?: number | null;
+      shop_delivery_fee_per_km?: number | null;
+    }): ProductOfferContext => {
       const shopId = product.shop_id || "";
       const today = toPkDateKey();
       const dealLabels = activeDeals
@@ -264,20 +278,8 @@ function ProductsPageInner() {
           const badge = (d.badge_text || "").trim();
           return badge ? `${badge} · ${d.title}` : d.title;
         });
-      const couponLabels = (shopCoupons[shopId] ?? [])
-        .filter((c) => c.is_active !== false && isOfferActive(c.expiry_date))
-        .map((c) => {
-          const code = (c.code || "").trim().toUpperCase();
-          if (!code) return "";
-          if (c.discount_percent != null && c.discount_percent > 0) {
-            return `Code ${code} · ${c.discount_percent}% OFF`;
-          }
-          if (c.discount_amount != null && c.discount_amount > 0) {
-            return `Code ${code} · Rs. ${Math.round(c.discount_amount).toLocaleString()} OFF`;
-          }
-          return `Code ${code}`;
-        })
-        .filter(Boolean);
+      const couponLabels = formatCouponTickerLabels(shopCoupons[shopId] ?? []);
+      // Coupons + delivery always — even when this product isn't part of a deal.
       return {
         freeDeliveryThreshold: product.shop_free_delivery_threshold,
         deliveryFeeFlat: product.shop_delivery_fee_flat,
@@ -287,6 +289,19 @@ function ProductsPageInner() {
       };
     },
     [activeDeals, shopCoupons],
+  );
+
+  const getDealStripOfferTags = useCallback(
+    (shopId: string) => {
+      const sample = products.find((p) => p.shop_id === shopId);
+      return buildShopTickerTags({
+        coupons: shopCoupons[shopId] ?? [],
+        freeDeliveryThreshold: sample?.shop_free_delivery_threshold,
+        deliveryFeeFlat: sample?.shop_delivery_fee_flat,
+        deliveryFeePerKm: sample?.shop_delivery_fee_per_km,
+      });
+    },
+    [products, shopCoupons],
   );
 
   const matchingDealCount = useMemo(() => {
@@ -535,6 +550,7 @@ function ProductsPageInner() {
         title={sort === "for_you" || sort === "discount" ? "For You · deals" : "Live deals"}
         seeAllHref={query.trim() ? `/deals?q=${encodeURIComponent(query.trim())}` : "/deals"}
         className="mb-3"
+        getOfferTags={getDealStripOfferTags}
       />
 
       {/* Sticky mobile filter strip */}

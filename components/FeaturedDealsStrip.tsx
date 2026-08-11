@@ -19,6 +19,8 @@ interface FeaturedDealsStripProps {
   seeAllHref?: string;
   limit?: number;
   className?: string;
+  /** Per-shop coupon + delivery ticker tags (same as product cards). */
+  getOfferTags?: (shopId: string) => string[];
 }
 
 export default function FeaturedDealsStrip({
@@ -29,6 +31,7 @@ export default function FeaturedDealsStrip({
   seeAllHref = "/deals",
   limit = 12,
   className = "",
+  getOfferTags,
 }: FeaturedDealsStripProps) {
   const day = dateKey ?? toPkDateKey();
 
@@ -38,7 +41,6 @@ export default function FeaturedDealsStrip({
 
     const featured = live.filter((d) => d.is_featured);
     const rest = live.filter((d) => !d.is_featured);
-    // Prefer deals with images for a richer strip
     const rank = (a: ShopDeal, b: ShopDeal) => {
       const ai = a.image_url ? 1 : 0;
       const bi = b.image_url ? 1 : 0;
@@ -60,19 +62,25 @@ export default function FeaturedDealsStrip({
             {title}
           </h2>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Live today · tap a deal or browse all
+            Labeled Deals · coupons &amp; delivery included · tap for all
           </p>
         </div>
         <Link
           href={seeAllHref}
-          className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+          className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
         >
           All deals →
         </Link>
       </div>
       <div className="-mx-3 flex gap-2.5 overflow-x-auto px-3 pb-1 scrollbar-none sm:-mx-0 sm:px-0">
         {visible.map((deal, i) => (
-          <DealCard key={deal.id} deal={deal} compact priority={i < 2} />
+          <DealCard
+            key={deal.id}
+            deal={deal}
+            compact
+            priority={i < 2}
+            offerTags={getOfferTags?.(deal.shop_id) ?? []}
+          />
         ))}
       </div>
     </section>
