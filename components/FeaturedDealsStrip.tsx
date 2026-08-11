@@ -76,9 +76,9 @@ export default function FeaturedDealsStrip({
           All deals →
         </Link>
       </div>
-      <div className="-mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3 pb-1 scrollbar-none sm:mx-0 sm:px-0">
+      <div className="-mx-3 flex snap-x snap-mandatory items-stretch gap-2 overflow-x-auto px-3 pb-1 scrollbar-none sm:mx-0 sm:px-0">
         {visible.map((deal, i) => (
-          <div key={deal.id} className={`${SLOT} self-start`}>
+          <div key={deal.id} className={`${SLOT} flex`}>
             <DealCard
               deal={deal}
               compact

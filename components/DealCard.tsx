@@ -193,12 +193,11 @@ export default function DealCard({
   ];
 
   const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
-  const priceClass = compact ? "text-[13px] sm:text-sm" : "text-sm sm:text-[15px]";
 
   return (
     <>
       <article
-        className={`tm-product-card group relative flex w-full flex-col overflow-hidden ${className}`}
+        className={`tm-product-card group relative flex h-full w-full flex-col overflow-hidden ${className}`}
       >
         <div className="tm-product-media relative shrink-0 overflow-hidden">
           {showPhoto && safeSrc ? (
@@ -262,8 +261,8 @@ export default function DealCard({
           {tickerTags.length > 0 ? <OfferTickerMarquee tags={tickerTags} /> : null}
         </div>
 
-        {/* Packed body — no flex-1 stretch (avoids “broken” empty gaps) */}
-        <div className="tm-product-body flex flex-col gap-1">
+        {/* Equal-height body: spacer + fixed price slot so no-price cards match */}
+        <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
           <h3
             className={`tm-product-title min-h-[2.45em] ${titleClass}`}
             title={deal.title}
@@ -271,7 +270,7 @@ export default function DealCard({
             {deal.title}
           </h3>
 
-          <div className="flex min-w-0 items-center gap-1">
+          <div className="flex min-h-[0.875rem] min-w-0 items-center gap-1">
             <button
               type="button"
               onClick={goStore}
@@ -296,36 +295,43 @@ export default function DealCard({
             </button>
           </div>
 
-          <div className="tm-product-footer flex items-end justify-between gap-1 pt-0.5">
-            <div className="min-h-[2rem] min-w-0 flex-1">
+          <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
+            {/* Fixed-height price column — keeps cards aligned with/without price */}
+            <div className="flex h-[2.35rem] min-w-0 flex-1 flex-col justify-end overflow-hidden">
               {hasPrice ? (
                 <>
                   <p
-                    className={`font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${priceClass}`}
+                    className="whitespace-nowrap text-[12px] font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-[13px]"
+                    title={formatRupees(Number(deal.price))}
                   >
-                    {formatRupees(Number(deal.price))}
+                    Rs {Number(deal.price).toLocaleString("en-PK")}
                   </p>
-                  {hasDiscount && originalPrice != null ? (
-                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-                      <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
-                        {formatRupees(originalPrice)}
-                      </span>
-                      {discountPercent > 0 ? (
-                        <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-                          {discountPercent}% OFF
+                  <div className="mt-0.5 flex h-[0.95rem] items-center gap-1 overflow-hidden whitespace-nowrap">
+                    {hasDiscount && originalPrice != null ? (
+                      <>
+                        <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums">
+                          Rs {originalPrice.toLocaleString("en-PK")}
                         </span>
-                      ) : null}
-                    </div>
-                  ) : null}
+                        {discountPercent > 0 ? (
+                          <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                            {discountPercent}% OFF
+                          </span>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
                 </>
               ) : (
-                <p className="text-[11px] font-semibold leading-tight text-zinc-500 dark:text-zinc-400">
+                <p
+                  className="whitespace-nowrap text-[11px] font-semibold leading-none text-zinc-500 dark:text-zinc-400"
+                  title={whenTag}
+                >
                   {whenTag}
                 </p>
               )}
             </div>
 
-            <div className="flex shrink-0 items-center gap-0.5 pb-px">
+            <div className="flex shrink-0 items-center gap-0 pb-px">
               <button
                 type="button"
                 onClick={handleWishlist}
