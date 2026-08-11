@@ -247,7 +247,7 @@ export default function CartBar() {
                             onChange={(e) => updateItemNotes(item.id, e.target.value)}
                             placeholder="Note (flavour, spice…)"
                             maxLength={200}
-                            className="mt-1 w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[0.6rem] text-zinc-700 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                            className="mt-1 w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[0.6rem] text-zinc-700 placeholder:text-zinc-300/50 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                           />
                         </div>
 

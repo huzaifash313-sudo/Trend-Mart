@@ -55,7 +55,7 @@ function toDatetimeLocalValue(iso: string): string {
 }
 
 const fieldClass =
-  "w-full min-w-0 rounded-lg border border-teal-200/70 bg-white px-2.5 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-teal-900/50 dark:bg-zinc-900 dark:text-zinc-100";
+  "w-full min-w-0 rounded-lg border border-teal-200/70 bg-white px-2.5 py-2 text-sm text-zinc-900 placeholder:text-zinc-300/50 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-teal-900/50 dark:bg-zinc-900 dark:text-zinc-100";
 
 const labelClass =
   "mb-1 block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400";

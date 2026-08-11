@@ -136,7 +136,15 @@ html.dark textarea {
 }
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #7c8498;
+  color: rgb(113 113 122 / 0.45); /* zinc-500 @ 45% — label already names the field */
+  opacity: 1;
+}
+
+/* Light-mode placeholders: very muted — field labels carry the meaning */
+input::placeholder,
+textarea::placeholder {
+  color: rgb(161 161 170 / 0.45); /* zinc-400 @ 45% */
+  opacity: 1;
 }
 
 html.dark ::-webkit-scrollbar-thumb {

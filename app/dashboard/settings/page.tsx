@@ -305,8 +305,8 @@ function sectionScroll(id: SectionId) {
 function inputClasses(hasError?: boolean) {
   return [
     "w-full rounded-2xl border bg-white px-4 py-3 text-sm text-zinc-900 shadow-sm outline-none transition",
-    "placeholder:text-zinc-400 focus:ring-2",
-    "dark:bg-[color:var(--tm-elevated)] dark:text-zinc-100 dark:placeholder:text-zinc-500",
+    "placeholder:text-zinc-300/50 focus:ring-2",
+    "dark:bg-[color:var(--tm-elevated)] dark:text-zinc-100 dark:placeholder:text-zinc-500/40",
     hasError
       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20 dark:border-red-800"
       : "border-zinc-200 focus:border-emerald-500 focus:ring-emerald-500/20 dark:border-[color:var(--tm-border)]",

@@ -112,7 +112,7 @@ export default function ContactModal({ shopName, whatsappNumber, shopId, product
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={`Hi ${shopName}, I'd like to inquire about...`}
-          className="mb-4 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          className="mb-4 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />
 
         {/* Send via WhatsApp */}

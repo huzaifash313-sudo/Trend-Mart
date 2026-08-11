@@ -232,7 +232,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
   };
 
   const inputClassName = (field: string) =>
-    `w-full rounded-xl border bg-white/70 backdrop-blur-sm px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 outline-none dark:bg-zinc-800/70 dark:text-zinc-100 ${
+    `w-full rounded-xl border bg-white/70 backdrop-blur-sm px-4 py-3 text-sm text-zinc-900 placeholder-zinc-300/50 transition-all duration-200 outline-none dark:bg-zinc-800/70 dark:text-zinc-100 ${
       getFieldError(field)
         ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-red-500"
         : touched[field] && !getFieldError(field)

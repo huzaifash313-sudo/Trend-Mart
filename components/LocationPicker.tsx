@@ -350,7 +350,7 @@ export default function LocationPicker() {
                           onChange={(e) => setPlaceQuery(e.target.value)}
                           placeholder="Search shop, hospital, academy, colony…"
                           autoComplete="off"
-                          className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50"
+                          className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-300/50 dark:text-zinc-50"
                         />
                         {placeQuery && (
                           <button

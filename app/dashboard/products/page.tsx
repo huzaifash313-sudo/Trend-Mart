@@ -960,7 +960,7 @@ export default function ProductsDashboardPage() {
                   value={form.originalPrice}
                   onChange={(e) => setForm(f => ({ ...f, originalPrice: e.target.value }))}
                   placeholder="3999 (before discount)"
-                  className="w-full max-w-xs rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full max-w-xs rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
                 {form.originalPrice && parseFloat(form.originalPrice) <= form.basePrice && (
                   <p className="mt-1 text-[0.65rem] text-amber-600 dark:text-amber-400">
