@@ -55,3 +55,39 @@ export async function POST(request: Request) {
     });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json(buildSafeErrorResponse(401, "Sign in required."), {
+        status: 401,
+      });
+    }
+
+    const body = (await request.json().catch(() => ({}))) as { endpoint?: string };
+    const endpoint = body.endpoint?.trim();
+
+    let query = supabase.from("push_subscriptions").delete().eq("user_id", user.id);
+    if (endpoint) {
+      query = query.eq("endpoint", endpoint);
+    }
+
+    const { error } = await query;
+    if (error) {
+      return NextResponse.json(
+        buildSafeErrorResponse(500, "Could not remove push subscription."),
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json(buildSafeErrorResponse(500, "Unsubscribe failed."), {
+      status: 500,
+    });
+  }
+}

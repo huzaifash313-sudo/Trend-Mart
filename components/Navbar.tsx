@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import SidebarDrawer from "@/components/SidebarDrawer";
+import NavbarNotificationButton from "@/components/NavbarNotificationButton";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -124,7 +125,8 @@ export default function Navbar() {
             TrendMart
           </Link>
 
-          <div className="ml-auto flex shrink-0 items-center">
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
+            <NavbarNotificationButton />
             {!onProductsPage ? (
               <button
                 type="button"

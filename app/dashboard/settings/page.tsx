@@ -1009,7 +1009,7 @@ export default function DashboardSettingsPage() {
           id="alerts"
           icon={<BellIcon />}
           title="Alerts"
-          helper="Get a ping when a new order arrives (requires VAPID env in production)."
+          helper="Get a ping when a new order arrives. Needs NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY."
         >
           <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/70 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">

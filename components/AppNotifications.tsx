@@ -1,25 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
-  NotificationBell,
   NotificationListenerProvider,
   NotificationPanel,
   useNotifications,
 } from "@/components/NotificationListener";
 import { createClient } from "@/lib/supabase/client";
+import {
+  getPushPermissionState,
+  isPushClientSupported,
+  subscribeToPushNotifications,
+} from "@/lib/pushClient";
 
 function BrowserNotifyBridge() {
-  const { notifications } = useNotifications();
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    // Only ask after the user is engaged (merchant/dashboard sessions register shops).
-  }, []);
+  const { notifications, isMuted } = useNotifications();
 
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
+    if (isMuted) return;
     const latest = notifications[0];
     if (!latest || latest.read) return;
     try {
@@ -36,7 +36,7 @@ function BrowserNotifyBridge() {
     } catch {
       /* ignore */
     }
-  }, [notifications]);
+  }, [notifications, isMuted]);
 
   return null;
 }
@@ -62,12 +62,6 @@ function AutoRegisterMerchantShops() {
 
       if (!shops?.length || cancelled) return;
 
-      if (typeof window !== "undefined" && "Notification" in window) {
-        if (Notification.permission === "default") {
-          void Notification.requestPermission().catch(() => undefined);
-        }
-      }
-
       for (const shop of shops) {
         if (shop.id) cleanups.push(registerShop(shop.id));
       }
@@ -82,47 +76,95 @@ function AutoRegisterMerchantShops() {
   return null;
 }
 
-function NotificationChrome() {
-  const [open, setOpen] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const { unreadCount, notifications } = useNotifications();
-  const toggle = useCallback(() => setOpen((v) => !v), []);
+function AutoRegisterCustomerOrders() {
+  const { registerCustomer } = useNotifications();
 
   useEffect(() => {
     const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }) => {
-      setVisible(!!data.user);
-    });
+    let cleanup: (() => void) | undefined;
+    let cancelled = false;
+
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      cleanup = registerCustomer(user.id);
+    })();
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setVisible(!!session?.user);
+      cleanup?.();
+      cleanup = undefined;
+      if (session?.user) {
+        cleanup = registerCustomer(session.user.id);
+      }
     });
+
     return () => {
+      cancelled = true;
+      cleanup?.();
+      sub.subscription.unsubscribe();
+    };
+  }, [registerCustomer]);
+
+  return null;
+}
+
+function AutoSubscribeWebPush() {
+  useEffect(() => {
+    if (!isPushClientSupported()) return;
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    const trySubscribe = async () => {
+      if (cancelled) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const permission = await getPushPermissionState();
+      if (permission === "denied" || permission === "unsupported") return;
+
+      const already =
+        typeof window !== "undefined" &&
+        localStorage.getItem("trendmart_push_subscribed") === "true";
+
+      if (permission === "granted" || already) {
+        await subscribeToPushNotifications();
+      }
+    };
+
+    void trySubscribe();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) void trySubscribe();
+    });
+
+    return () => {
+      cancelled = true;
       sub.subscription.unsubscribe();
     };
   }, []);
 
-  if (!visible) return null;
+  return null;
+}
+
+function NotificationChrome() {
+  const { isPanelOpen, closePanel } = useNotifications();
 
   return (
     <>
       <BrowserNotifyBridge />
       <AutoRegisterMerchantShops />
-      <div className="fixed right-3 top-[calc(var(--tm-navbar-sticky-offset,4.35rem)+0.4rem)] z-[120] sm:right-5">
-        <NotificationBell
-          onClick={toggle}
-          className={`rounded-full border bg-white/95 text-zinc-700 shadow-md backdrop-blur transition-transform hover:scale-105 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-200 ${
-            unreadCount > 0 || notifications.length > 0
-              ? "border-emerald-200 dark:border-emerald-800"
-              : "border-zinc-200/80"
-          }`}
-        />
-      </div>
-      <NotificationPanel isOpen={open} onClose={() => setOpen(false)} />
+      <AutoRegisterCustomerOrders />
+      <AutoSubscribeWebPush />
+      <NotificationPanel isOpen={isPanelOpen} onClose={closePanel} />
     </>
   );
 }
 
-/** Mounts realtime + OS notification bridge app-wide. */
 export default function AppNotifications({ children }: { children: ReactNode }) {
   return (
     <NotificationListenerProvider>

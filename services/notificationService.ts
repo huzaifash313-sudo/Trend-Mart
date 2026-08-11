@@ -187,6 +187,7 @@ export async function transitionOrderStatus(
             orderId,
             shopId,
             status: newStatus,
+            event: "status",
           }),
         )
         .catch(() => undefined);
