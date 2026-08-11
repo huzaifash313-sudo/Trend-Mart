@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Clean Product Grid with Cart Integration                        */
+/*  TrendMart — Compact Product Grid                                          */
 /* -------------------------------------------------------------------------- */
 
 "use client";
@@ -10,8 +10,6 @@ import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
 import CompactRating from "@/components/CompactRating";
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
@@ -40,26 +38,20 @@ function DiscountBadge({ originalPrice, currentPrice }: { originalPrice: number;
   );
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface ProductGridProps {
   products: Product[];
   loading?: boolean;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
   onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
-  /** When set, shows store name under the title (marketplace feed). */
   onShopClick?: (product: Product) => void;
   favorites?: Set<string>;
   emptyState?: ReactNode;
   columns?: "2" | "3" | "4" | "auto";
   compact?: boolean;
   categoryLabel?: string;
-  /** Show joined shop_name / shop_logo on each card */
   showShopMeta?: boolean;
 }
-
-// ─── Product Card ─────────────────────────────────────────────────────────────
 
 function ProductCard({
   product,
@@ -125,7 +117,6 @@ function ProductCard({
         }
       }}
     >
-      {/* Fixed-ratio media — keeps every card aligned */}
       <div className="tm-product-media relative shrink-0 overflow-hidden">
         {product.image_url && !imgError ? (
           <Image
@@ -158,46 +149,28 @@ function ProductCard({
               Sold Out
             </span>
           </div>
-        ) : (
-          <span className="absolute bottom-1.5 left-1.5 z-10 text-[10px] font-semibold leading-none text-emerald-700 dark:text-emerald-300">
-            In stock
-          </span>
-        )}
-
-        {onFavoriteToggle ? (
-          <button
-            type="button"
-            onClick={handleFavorite}
-            className={`absolute right-1.5 top-1.5 z-10 p-0.5 transition-colors ${
-              isFavorite
-                ? "text-rose-500"
-                : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-            }`}
-            aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-          >
-            <HeartIcon filled={isFavorite} />
-          </button>
         ) : null}
       </div>
 
-      {/* Body — equal height footer across the row */}
-      <div className="tm-product-body flex min-h-0 flex-1 flex-col">
+      <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
         <h3
-          className={`tm-product-title ${compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"}`}
+          className={`tm-product-title ${compact || showShopMeta ? "tm-product-title--single" : ""} ${
+            compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"
+          }`}
           title={product.name}
         >
           {product.name}
         </h3>
 
         {showShopMeta && product.shop_name ? (
-          <div className="mt-0.5 min-w-0 space-y-0.5">
+          <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onShopClick?.(product);
               }}
-              className="flex max-w-full items-center gap-1 text-left"
+              className="flex min-w-0 flex-1 items-center gap-1 text-left"
               aria-label={`View store ${product.shop_name}`}
             >
               {product.shop_logo_url ? (
@@ -220,18 +193,19 @@ function ProductCard({
               average={product.shop_avg_rating}
               count={product.shop_review_count}
               size="xs"
+              className="shrink-0"
             />
           </div>
         ) : !compact && product.description ? (
-          <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-400 dark:text-zinc-500">
+          <p className="line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
             {product.description}
           </p>
         ) : null}
 
-        <div className="tm-product-footer mt-auto flex items-end justify-between gap-2 pt-2">
+        <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
           <div className="min-w-0 flex-1">
             <p
-              className={`truncate font-bold tabular-nums text-zinc-900 dark:text-zinc-50 ${
+              className={`truncate font-bold tabular-nums leading-tight text-zinc-900 dark:text-zinc-50 ${
                 compact ? "text-[13px] sm:text-sm" : "text-sm sm:text-[15px]"
               }`}
             >
@@ -244,52 +218,57 @@ function ProductCard({
                 </span>
                 <DiscountBadge originalPrice={originalPrice} currentPrice={product.price} />
               </div>
-            ) : (
-              /* Reserve one line so cards with/without discount stay equal height */
-              <div className="h-[14px]" aria-hidden="true" />
-            )}
+            ) : null}
           </div>
 
-          {product.is_available && onAddToCart ? (
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              className="tm-product-add-text shrink-0"
-              aria-label={`Add ${product.name} to cart`}
-            >
-              Add
-            </button>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-0.5">
+            {onFavoriteToggle ? (
+              <button
+                type="button"
+                onClick={handleFavorite}
+                className={`rounded-full p-1.5 transition-colors ${
+                  isFavorite
+                    ? "text-rose-500"
+                    : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                }`}
+                aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+              >
+                <HeartIcon filled={isFavorite} />
+              </button>
+            ) : null}
 
-          {product.is_available && !onAddToCart ? (
-            <span className="shrink-0 text-[12px] font-semibold text-teal-700 dark:text-teal-300">
-              Available
-            </span>
-          ) : null}
+            {product.is_available && onAddToCart ? (
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="tm-product-add-text shrink-0"
+                aria-label={`Add ${product.name} to cart`}
+              >
+                Add
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>
   );
 }
 
-// ─── Skeleton Card ────────────────────────────────────────────────────────────
-
 function SkeletonCard() {
   return (
     <div className="tm-product-card flex h-full flex-col overflow-hidden">
       <div className="tm-product-media animate-pulse bg-teal-50 dark:bg-teal-950/30" />
-      <div className="tm-product-body flex flex-1 flex-col">
-        <div className="h-8 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-        <div className="mt-auto flex items-end justify-between pt-2">
-          <div className="h-4 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+      <div className="tm-product-body flex flex-col gap-1">
+        <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="mt-1 flex items-end justify-between">
+          <div className="h-4 w-14 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
           <div className="h-3 w-8 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         </div>
       </div>
     </div>
   );
 }
-
-// ─── Product Grid Component ───────────────────────────────────────────────────
 
 export default function ProductGrid({
   products,
@@ -314,7 +293,7 @@ export default function ProductGrid({
           ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
           : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 
-  const gap = "gap-2.5 sm:gap-3";
+  const gap = "gap-2 sm:gap-2.5";
 
   if (loading) {
     return (

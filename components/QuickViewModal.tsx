@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
@@ -93,6 +93,8 @@ export default function QuickViewModal({
   const displayPrice = product.price + priceAdj;
   const variantsReady = !hasVariants || selectedVariants.length === (product.variants?.length ?? 0);
 
+  const pauseAutoUntil = useRef(0);
+
   useEffect(() => {
     setActiveIndex(0);
     setBroken(new Set());
@@ -101,7 +103,33 @@ export default function QuickViewModal({
     setItemNotes("");
     setQuantity(1);
     setAdded(false);
+    pauseAutoUntil.current = 0;
   }, [product.id]);
+
+  // Auto-advance gallery when user isn't interacting.
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const timer = window.setInterval(() => {
+      if (Date.now() < pauseAutoUntil.current) return;
+      if (galleryOpen) return;
+      setActiveIndex((i) => (i + 1) % images.length);
+    }, 3200);
+    return () => window.clearInterval(timer);
+  }, [images.length, galleryOpen, product.id]);
+
+  const goManual = useCallback(
+    (delta: number) => {
+      if (images.length <= 1) return;
+      pauseAutoUntil.current = Date.now() + 6000;
+      setActiveIndex((i) => (i + delta + images.length) % images.length);
+    },
+    [images.length],
+  );
+
+  const selectManual = useCallback((index: number) => {
+    pauseAutoUntil.current = Date.now() + 6000;
+    setActiveIndex(index);
+  }, []);
 
   const handleAddToCart = useCallback(() => {
     if (!variantsReady) {
@@ -120,11 +148,6 @@ export default function QuickViewModal({
 
   const { hasDiscount, originalPrice, discountPercent: discountPct } = getProductDiscount(product);
 
-  const go = (delta: number) => {
-    if (images.length <= 1) return;
-    setActiveIndex((i) => (i + delta + images.length) % images.length);
-  };
-
   return (
     <div
       className="fixed inset-0 z-[150] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center"
@@ -134,8 +157,8 @@ export default function QuickViewModal({
         className="w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-zinc-900 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Image carousel ───────────────────────────────────────────── */}
-        <div className="relative h-64 sm:h-72 bg-gradient-to-br from-teal-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-700">
+        {/* ── Image carousel (thumbs below — no top dots) ──────────────── */}
+        <div className="relative h-56 sm:h-64 bg-gradient-to-br from-teal-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-700">
           {currentUrl && !broken.has(safeIndex) ? (
             <button
               type="button"
@@ -144,17 +167,19 @@ export default function QuickViewModal({
               aria-label="Open image gallery"
             >
               <Image
+                key={`${product.id}-${safeIndex}`}
                 src={getSafeImageUrl(currentUrl, "product")}
                 alt={`${product.name} photo ${safeIndex + 1}`}
                 fill
-                className="object-contain"
+                priority
+                className="object-contain transition-opacity duration-500 ease-out"
                 sizes="(max-width: 640px) 100vw, 28rem"
                 onError={() => setBroken((prev) => new Set(prev).add(safeIndex))}
               />
             </button>
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <span className="text-6xl text-zinc-300 dark:text-zinc-600">📦</span>
+              <span className="text-5xl text-zinc-300 dark:text-zinc-600">📦</span>
             </div>
           )}
 
@@ -177,78 +202,66 @@ export default function QuickViewModal({
             <>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); go(-1); }}
-                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-sm hover:bg-black/60"
+                onClick={(e) => { e.stopPropagation(); goManual(-1); }}
+                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/35 p-1.5 text-white backdrop-blur-sm hover:bg-black/55"
                 aria-label="Previous photo"
               >
                 <Chevron dir="left" />
               </button>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); go(1); }}
-                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur-sm hover:bg-black/60"
+                onClick={(e) => { e.stopPropagation(); goManual(1); }}
+                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/35 p-1.5 text-white backdrop-blur-sm hover:bg-black/55"
                 aria-label="Next photo"
               >
                 <Chevron dir="right" />
               </button>
-              <div className="absolute bottom-2 left-0 right-0 z-10 flex justify-center gap-1.5 px-3">
-                {images.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setActiveIndex(i); }}
-                    className={`h-1.5 rounded-full transition-all ${
-                      i === safeIndex ? "w-4 bg-white" : "w-1.5 bg-white/50"
-                    }`}
-                    aria-label={`Photo ${i + 1}`}
-                  />
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setGalleryOpen(true)}
-                className="absolute bottom-2 right-3 z-10 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm"
-              >
-                {safeIndex + 1}/{images.length} · Gallery
-              </button>
+              <span className="absolute bottom-2 right-3 z-10 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                {safeIndex + 1}/{images.length}
+              </span>
             </>
           )}
         </div>
 
-        {/* Thumbnail strip */}
+        {/* Thumbnail strip — primary jump control */}
         {images.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto px-3 py-2 scrollbar-none">
+          <div className="flex gap-1.5 overflow-x-auto px-3 py-1.5 scrollbar-none">
             {images.map((url, i) => (
               <button
                 key={`${url}-${i}`}
                 type="button"
-                onClick={() => setActiveIndex(i)}
-                className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border-2 ${
+                onClick={() => selectManual(i)}
+                className={`relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                   i === safeIndex
                     ? "border-teal-500"
-                    : "border-transparent opacity-80 hover:opacity-100"
+                    : "border-transparent opacity-75 hover:opacity-100"
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={getSafeImageUrl(url, "product")} alt="" className="h-full w-full object-contain bg-zinc-50 dark:bg-zinc-800" />
+                <img
+                  src={getSafeImageUrl(url, "product")}
+                  alt=""
+                  loading={i < 4 ? "eager" : "lazy"}
+                  className="h-full w-full object-contain bg-zinc-50 dark:bg-zinc-800"
+                />
               </button>
             ))}
           </div>
         )}
 
         {/* ── Details ──────────────────────────────────────────────────── */}
-        <div className="space-y-3 p-4">
+        <div className="space-y-2.5 p-3.5 sm:p-4">
           <div>
-            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{product.name}</h3>
+            <h3 className="text-base font-bold leading-snug text-zinc-900 dark:text-zinc-100">{product.name}</h3>
             {product.description && (
-              <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="mt-0.5 line-clamp-3 text-sm leading-snug text-zinc-500 dark:text-zinc-400">
                 {product.description}
               </p>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
               {formatRupees(displayPrice)}
             </span>
             {hasDiscount && originalPrice != null && (
@@ -381,7 +394,7 @@ export default function QuickViewModal({
             {images.length > 1 && (
               <button
                 type="button"
-                onClick={() => go(-1)}
+                onClick={() => goManual(-1)}
                 className="absolute left-3 z-10 rounded-full bg-white/15 p-3 text-white hover:bg-white/25"
                 aria-label="Previous"
               >
@@ -392,12 +405,12 @@ export default function QuickViewModal({
             <img
               src={getSafeImageUrl(images[safeIndex]!, "product")}
               alt={`${product.name} ${safeIndex + 1}`}
-              className="max-h-[75vh] max-w-full object-contain"
+              className="max-h-[75vh] max-w-full object-contain transition-opacity duration-300"
             />
             {images.length > 1 && (
               <button
                 type="button"
-                onClick={() => go(1)}
+                onClick={() => goManual(1)}
                 className="absolute right-3 z-10 rounded-full bg-white/15 p-3 text-white hover:bg-white/25"
                 aria-label="Next"
               >
@@ -410,7 +423,7 @@ export default function QuickViewModal({
               <button
                 key={`g-${url}-${i}`}
                 type="button"
-                onClick={() => setActiveIndex(i)}
+                onClick={() => selectManual(i)}
                 className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 ${
                   i === safeIndex ? "border-teal-400" : "border-white/20"
                 }`}
