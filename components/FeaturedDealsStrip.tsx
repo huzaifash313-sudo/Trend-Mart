@@ -287,6 +287,11 @@ function HomeShiftShelf({
   const activeDot = ((index % count) + count) % count;
   const slotBasis = `calc((100% - ${(perView - 1) * HOME_GAP_PX}px) / ${perView})`;
 
+  const pauseThenResume = () => {
+    setPaused(true);
+    window.setTimeout(() => setPaused(false), 5000);
+  };
+
   return (
     <section aria-label={title} className={`tm-home-deals ${className ?? ""}`}>
       <div className="mb-2.5 flex items-center justify-between gap-2">
@@ -295,52 +300,44 @@ function HomeShiftShelf({
           <h2 className="truncate text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-[0.95rem]">
             {title}
           </h2>
-          <span className="hidden rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-teal-700 dark:bg-teal-950/50 dark:text-teal-300 sm:inline">
-            Auto
-          </span>
+          <span className="tm-home-deals-sponsored hidden sm:inline">Premium</span>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {canSlide ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                aria-label="Previous deal"
-                onClick={() => {
-                  go(-1);
-                  setPaused(true);
-                  window.setTimeout(() => setPaused(false), 5000);
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200/90 bg-white text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-              >
-                <Chevron dir="left" />
-              </button>
-              <button
-                type="button"
-                aria-label="Next deal"
-                onClick={() => {
-                  go(1);
-                  setPaused(true);
-                  window.setTimeout(() => setPaused(false), 5000);
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200/90 bg-white text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-              >
-                <Chevron dir="right" />
-              </button>
-            </div>
-          ) : null}
-          <Link
-            href={seeAllHref}
-            className="rounded-full bg-gradient-to-r from-amber-50 to-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800 transition hover:from-amber-100 hover:to-teal-100 dark:from-amber-950/30 dark:to-teal-950/40 dark:text-teal-200"
-          >
-            All deals →
-          </Link>
-        </div>
+        <Link href={seeAllHref} className="tm-home-deals-all">
+          All deals →
+        </Link>
       </div>
 
       <div className="tm-home-deals-stage relative overflow-hidden rounded-2xl">
+        {canSlide ? (
+          <div className="tm-home-deals-nav" aria-label="Deal navigation">
+            <button
+              type="button"
+              aria-label="Previous deal"
+              className="tm-home-deals-nav-btn"
+              onClick={() => {
+                go(-1);
+                pauseThenResume();
+              }}
+            >
+              <Chevron dir="left" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next deal"
+              className="tm-home-deals-nav-btn"
+              onClick={() => {
+                go(1);
+                pauseThenResume();
+              }}
+            >
+              <Chevron dir="right" />
+            </button>
+          </div>
+        ) : null}
+
         <div
           ref={viewportRef}
-          className="relative overflow-hidden"
+          className={`relative overflow-hidden ${canSlide ? "tm-home-deals-viewport" : ""}`}
           style={{ touchAction: "pan-y" }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -389,45 +386,15 @@ function HomeShiftShelf({
           </div>
         </div>
 
-        {canSlide ? (
-          <div className="mt-2.5 flex items-center justify-between gap-3 px-0.5">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              {deals.map((d, i) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  aria-label={`Go to deal ${i + 1}`}
-                  aria-current={i === activeDot ? "true" : undefined}
-                  onClick={() => {
-                    setIndex(i);
-                    setProgressKey((k) => k + 1);
-                  }}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === activeDot
-                      ? "w-6 bg-teal-600 dark:bg-teal-400"
-                      : "w-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700"
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="shrink-0 text-[11px] font-semibold tabular-nums text-zinc-500 dark:text-zinc-400">
-              {activeDot + 1}/{count}
-              <span className="ml-1.5 hidden font-medium text-zinc-400 sm:inline">
-                · {perView} up
-              </span>
-            </span>
-          </div>
-        ) : null}
-
         {canSlide && !reduceMotion && !paused && !openDeal ? (
-          <div key={progressKey} className="tm-home-deals-progress mt-1.5" aria-hidden>
+          <div key={progressKey} className="tm-home-deals-progress mt-2" aria-hidden>
             <span
               className="tm-home-deals-progress-bar"
               style={{ animationDuration: `${HOME_HOLD_MS}ms` }}
             />
           </div>
         ) : (
-          <div className="mt-1.5 h-0.5" aria-hidden />
+          <div className="mt-2 h-0.5" aria-hidden />
         )}
       </div>
 

@@ -221,7 +221,7 @@ export default function DealCard({
     />
   ) : null;
 
-  /* ── Home: horizontal compact spotlight (short height, readable type) ── */
+  /* ── Home: ultra-premium ad spotlight (image ≥ half) ── */
   if (isHomeDensity) {
     return (
       <>
@@ -241,41 +241,40 @@ export default function DealCard({
           tabIndex={onOpen ? 0 : undefined}
           aria-label={onOpen ? `View ${deal.title}` : undefined}
         >
-          <div className="relative h-[7.25rem] w-[7.25rem] shrink-0 overflow-hidden sm:h-[8.5rem] sm:w-[8.5rem] md:h-[9.5rem] md:w-[9.5rem] lg:h-[10.25rem] lg:w-[10.25rem]">
+          <div className="tm-home-deal-media relative w-1/2 min-w-[46%] shrink-0 self-stretch overflow-hidden">
             {showPhoto && safeSrc ? (
               <Image
                 src={safeSrc}
                 alt={deal.title}
                 fill
-                className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                sizes="(max-width: 640px) 7.25rem, (max-width: 768px) 8.5rem, 10rem"
+                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 28vw, 18vw"
                 priority={priority}
                 loading={priority ? "eager" : "lazy"}
-                quality={78}
+                quality={82}
                 unoptimized={/\.supabase\.(co|in)\//i.test(safeSrc)}
                 onError={() => setImgError(true)}
               />
             ) : (
-              <div className="tm-product-placeholder flex h-full w-full items-center justify-center">
-                <span className="select-none text-2xl font-bold text-teal-700/40 dark:text-teal-300/35">
+              <div className="tm-product-placeholder flex h-full min-h-[9rem] w-full items-center justify-center sm:min-h-[10rem]">
+                <span className="select-none text-3xl font-bold text-teal-700/35 dark:text-teal-300/30">
                   {deal.title.charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
-            <span className="absolute left-1.5 top-1.5 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-white shadow-sm">
-              Deal
-            </span>
+            <div className="tm-home-deal-media-shine" aria-hidden />
+            <span className="tm-home-deal-badge-deal absolute left-2 top-2">Deal</span>
             {hasDiscount && discountPercent > 0 ? (
-              <span className="absolute bottom-1.5 left-1.5 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm sm:text-[11px]">
+              <span className="tm-home-deal-badge-off absolute bottom-2 left-2">
                 {discountPercent}% OFF
               </span>
             ) : null}
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col justify-between gap-1.5 p-2.5 sm:gap-2 sm:p-3 md:p-3.5">
-            <div className="min-w-0 space-y-1">
+          <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-2 p-3 sm:gap-2.5 sm:p-3.5 md:p-4">
+            <div className="min-w-0 space-y-1.5">
               <h3
-                className="line-clamp-2 text-[0.9rem] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-base md:text-[1.05rem]"
+                className="line-clamp-2 text-[0.95rem] font-bold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-[1.05rem] md:text-lg"
                 title={deal.title}
               >
                 {deal.title}
@@ -294,14 +293,14 @@ export default function DealCard({
                   <img
                     src={getSafeImageUrl(deal.shop_logo_url, "shop")}
                     alt=""
-                    className="h-4 w-4 shrink-0 rounded-full object-cover sm:h-[1.125rem] sm:w-[1.125rem]"
+                    className="h-5 w-5 shrink-0 rounded-full object-cover ring-2 ring-teal-500/20"
                   />
                 ) : (
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[8px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 text-[9px] font-bold text-white">
                     {(deal.shop_name || "?").charAt(0).toUpperCase()}
                   </span>
                 )}
-                <span className="truncate text-xs font-medium text-emerald-700 dark:text-emerald-400 sm:text-[0.8125rem]">
+                <span className="truncate text-xs font-semibold text-teal-700 dark:text-teal-300 sm:text-sm">
                   {deal.shop_name || "Store"}
                 </span>
               </button>
@@ -312,15 +311,15 @@ export default function DealCard({
               ) : null}
             </div>
 
-            <div className="flex items-end justify-between gap-2">
+            <div className="flex flex-wrap items-end justify-between gap-2">
               <div className="min-w-0">
                 {hasPrice && priceLabel ? (
                   <>
-                    <p className="text-base font-bold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-lg md:text-[1.2rem]">
+                    <p className="text-lg font-extrabold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-xl md:text-[1.35rem]">
                       {priceLabel}
                     </p>
                     {hasDiscount && originalPrice != null ? (
-                      <span className="mt-0.5 inline-block text-xs text-zinc-400 line-through tabular-nums sm:text-[0.8125rem]">
+                      <span className="mt-1 inline-block text-xs text-zinc-400 line-through tabular-nums sm:text-sm">
                         {formatDealPrice(originalPrice)}
                       </span>
                     ) : null}
@@ -333,7 +332,7 @@ export default function DealCard({
                 <button
                   type="button"
                   onClick={handleWishlist}
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-100 bg-white/80 transition-colors dark:border-zinc-700 dark:bg-zinc-900/60 ${
                     favorited
                       ? "text-rose-500"
                       : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
@@ -345,7 +344,7 @@ export default function DealCard({
                 <button
                   type="button"
                   onClick={handleAdd}
-                  className="tm-product-add-text text-[0.8125rem] sm:text-sm"
+                  className="tm-home-deal-add"
                   aria-label={`Add ${deal.title} to cart`}
                 >
                   Add
@@ -355,10 +354,8 @@ export default function DealCard({
                   onClick={handleOrder}
                   disabled={!canOrderToday}
                   title={canOrderToday ? "Order via WhatsApp" : `Order on ${whenTag}`}
-                  className={`rounded-full px-2.5 py-1 text-[0.8125rem] font-bold transition sm:px-3 sm:text-sm ${
-                    canOrderToday
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "cursor-not-allowed bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600"
+                  className={`tm-home-deal-order ${
+                    canOrderToday ? "" : "tm-home-deal-order--disabled"
                   }`}
                   aria-label={canOrderToday ? "Order now" : `Order only on ${whenTag}`}
                 >
