@@ -781,6 +781,7 @@ export async function placeOrderAtomic(
               orderId: order.id,
               shopId: params.shopId,
               status: order.status || "Pending",
+              event: "new",
             }),
           )
           .catch(() => undefined);
@@ -973,6 +974,7 @@ export async function updateOrderStatus(
         orderId,
         status,
         shopId: parsed.shop_id,
+        event: "status",
       }),
     }).catch(() => undefined);
 

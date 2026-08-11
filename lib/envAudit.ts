@@ -60,10 +60,16 @@ const KNOWN_SAFE_PUBLIC_VARS = [
   "NEXT_PUBLIC_VERCEL_URL",
   "NEXT_PUBLIC_VERCEL_ENV",
   "NEXT_PUBLIC_SITE_URL",
+  "NEXT_PUBLIC_SITE_NAME",
   "NEXT_PUBLIC_GOOGLE_MAPS_KEY",
   "NEXT_PUBLIC_MAPBOX_TOKEN",
   "NEXT_PUBLIC_SENTRY_DSN",
   "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+  "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
+  "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME",
+  "NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+  "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+  "NEXT_PUBLIC_FACEBOOK_APP_ID",
 ] as const;
 
 /**
@@ -91,7 +97,6 @@ const REQUIRED_SERVER_VARS = [
  * Their absence generates a warning, not an error.
  */
 const RECOMMENDED_SERVER_VARS = [
-  // Direct Postgres URL only if you use migrations/psql outside Supabase client
   "DATABASE_URL",
   "SENTRY_DSN",
   "SENTRY_ORG",
@@ -102,10 +107,12 @@ const RECOMMENDED_SERVER_VARS = [
   "NEXT_PUBLIC_SITE_NAME",
   "NEXTAUTH_URL",
   "NEXTAUTH_SECRET",
-  // Branded transactional email (Resend) — see lib/email.ts
   "RESEND_API_KEY",
   "EMAIL_FROM",
   "SUPPORT_TEAM_EMAIL",
+  "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
+  "VAPID_PRIVATE_KEY",
+  "VAPID_SUBJECT",
 ] as const;
 
 /**
@@ -427,40 +434,24 @@ export function runEnvAudit(): void {
  * Useful for onboarding new developers.
  */
 export function generateEnvExample(): string {
-  const lines: string[] = [
-    "# TrendMart — Environment Variables",
-    "# Copy this file to .env.local and fill in the values.",
-    "# NEVER commit .env.local or .env files to version control.",
-    "",
-    "# ── Supabase Configuration ─────────────────────────────────────────",
-    "NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anonymous-key",
-    "SUPABASE_SERVICE_ROLE_KEY=your-service-role-key",
-    "",
-    "# ── Database ───────────────────────────────────────────────────────",
-    "DATABASE_URL=postgresql://localhost:5432/postgres",
-    "",
-    "# ── Storage ────────────────────────────────────────────────────────",
-    "SUPABASE_STORAGE_BUCKET=trendmart-media",
-    "",
-    "# ── Monitoring (Optional) ──────────────────────────────────────────",
-    "# SENTRY_DSN=https://your-sentry-dsn.ingest.sentry.io/123",
-    "# SENTRY_ORG=your-org",
-    "# SENTRY_PROJECT=your-project",
-    "",
-    "# ── Redis / Rate Limiting (Optional) ───────────────────────────────",
-    "# UPSTASH_REDIS_URL=https://your-redis.upstash.io",
-    "# UPSTASH_REDIS_TOKEN=your-token",
-    "",
-    "# ── Branded Email — Resend (Optional, see lib/email.ts) ─────────────",
-    "# RESEND_API_KEY=re_your_api_key",
-    "# EMAIL_FROM=TrendMart <notifications@trendmart.pk>",
-    "# SUPPORT_TEAM_EMAIL=support@yourdomain.com",
-    "",
-    "# ── Application ────────────────────────────────────────────────────",
+  return [
+    "# mandatory",
     "NODE_ENV=development",
     "NEXT_PUBLIC_APP_URL=http://localhost:3000",
-  ];
-
-  return lines.join("\n");
+    "NEXT_PUBLIC_SITE_URL=http://localhost:3000",
+    "NEXT_PUBLIC_SITE_NAME=TrendMart",
+    "NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY=",
+    "SUPABASE_SERVICE_ROLE_KEY=",
+    "SUPABASE_STORAGE_BUCKET=trendmart-media",
+    "",
+    "# optional",
+    "DATABASE_URL=",
+    "RESEND_API_KEY=",
+    "EMAIL_FROM=",
+    "SUPPORT_TEAM_EMAIL=",
+    "NEXT_PUBLIC_VAPID_PUBLIC_KEY=",
+    "VAPID_PRIVATE_KEY=",
+    "VAPID_SUBJECT=",
+  ].join("\n");
 }

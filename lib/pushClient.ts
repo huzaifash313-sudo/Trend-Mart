@@ -1,7 +1,4 @@
-/* -------------------------------------------------------------------------- */
-/*  Client-side Web Push subscribe helper                                     */
-/*  Best-effort: no-ops when VAPID public key is missing or permission denied */
-/* -------------------------------------------------------------------------- */
+/* Client Web Push subscribe / notify helpers. */
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
@@ -14,6 +11,23 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
     output[i] = raw.charCodeAt(i);
   }
   return output;
+}
+
+async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
+  const secure =
+    window.location.protocol === "https:" || window.location.hostname === "localhost";
+  if (!secure) return null;
+
+  let registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) {
+    try {
+      registration = await navigator.serviceWorker.register("/sw.js");
+    } catch {
+      return null;
+    }
+  }
+  return navigator.serviceWorker.ready;
 }
 
 export function isPushClientSupported(): boolean {
@@ -31,9 +45,6 @@ export async function getPushPermissionState(): Promise<NotificationPermission |
   return Notification.permission;
 }
 
-/**
- * Request permission, subscribe via service worker, and POST to /api/push/subscribe.
- */
 export async function subscribeToPushNotifications(): Promise<
   | { ok: true }
   | { ok: false; reason: "unsupported" | "denied" | "failed" }
@@ -48,7 +59,9 @@ export async function subscribeToPushNotifications(): Promise<
 
     if (permission !== "granted") return { ok: false, reason: "denied" };
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await ensureServiceWorker();
+    if (!registration) return { ok: false, reason: "failed" };
+
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
@@ -68,17 +81,55 @@ export async function subscribeToPushNotifications(): Promise<
     });
 
     if (!res.ok) return { ok: false, reason: "failed" };
+    try {
+      localStorage.setItem("trendmart_push_subscribed", "true");
+    } catch {
+      /* ignore */
+    }
     return { ok: true };
   } catch {
     return { ok: false, reason: "failed" };
   }
 }
 
-/** Fire-and-forget order push notify (never throws). */
+export async function unsubscribeFromPushNotifications(): Promise<
+  | { ok: true }
+  | { ok: false; reason: "unsupported" | "failed" }
+> {
+  if (!isPushClientSupported()) return { ok: false, reason: "unsupported" };
+
+  try {
+    const registration = await ensureServiceWorker();
+    if (!registration) return { ok: false, reason: "failed" };
+
+    const subscription = await registration.pushManager.getSubscription();
+    const endpoint = subscription?.endpoint;
+    if (subscription) {
+      await subscription.unsubscribe();
+    }
+    if (endpoint) {
+      await fetch("/api/push/subscribe", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint }),
+      }).catch(() => undefined);
+    }
+    try {
+      localStorage.removeItem("trendmart_push_subscribed");
+    } catch {
+      /* ignore */
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
+}
+
 export async function notifyOrderPush(input: {
   orderId: string;
   shopId: string;
   status: string;
+  event?: "new" | "status";
 }): Promise<void> {
   try {
     await fetch("/api/push/notify-order", {

@@ -1,15 +1,22 @@
 "use client";
+
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
+import {
+  getPushPermissionState,
+  isPushClientSupported,
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+} from "@/lib/pushClient";
 
 function ChevronLeftIcon() {
-  return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>);
-}
-
-function BellIcon() {
-  return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>);
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
 }
 
 interface NotificationToggle {
@@ -20,20 +27,55 @@ interface NotificationToggle {
 }
 
 const DEFAULT_TOGGLES: NotificationToggle[] = [
-  { key: "order_updates", label: "Order Updates", description: "Get notified when your order status changes", enabled: true },
-  { key: "new_products", label: "New Products", description: "Be the first to know about new product listings", enabled: true },
-  { key: "promotions", label: "Promotions & Offers", description: "Receive special deals and discount alerts", enabled: false },
-  { key: "merchant_alerts", label: "Merchant Alerts", description: "Stock alerts and merchant dashboard notifications", enabled: true },
-  { key: "newsletter", label: "Weekly Newsletter", description: "Weekly roundup of trending shops and products", enabled: false },
+  {
+    key: "order_updates",
+    label: "Order Updates",
+    description: "In-app alerts when order status changes",
+    enabled: true,
+  },
+  {
+    key: "merchant_alerts",
+    label: "Merchant Alerts",
+    description: "New orders and customer inquiries for your shops",
+    enabled: true,
+  },
+  {
+    key: "promotions",
+    label: "Promotions & Offers",
+    description: "Special deals (local preference only)",
+    enabled: false,
+  },
 ];
+
+type PushUiStatus = "checking" | "unsupported" | "off" | "on" | "denied";
 
 export default function NotificationsPage() {
   const [toggles, setToggles] = useState<NotificationToggle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pushStatus, setPushStatus] = useState<PushUiStatus>("checking");
+  const [pushBusy, setPushBusy] = useState(false);
   const { addToast } = useToast();
 
+  const refreshPushStatus = useCallback(async () => {
+    if (!isPushClientSupported()) {
+      setPushStatus("unsupported");
+      return;
+    }
+    const permission = await getPushPermissionState();
+    if (permission === "denied") {
+      setPushStatus("denied");
+      return;
+    }
+    if (permission === "granted") {
+      setPushStatus(
+        localStorage.getItem("trendmart_push_subscribed") === "true" ? "on" : "off",
+      );
+      return;
+    }
+    setPushStatus("off");
+  }, []);
+
   useEffect(() => {
-    // Load saved preferences from localStorage
     try {
       const saved = localStorage.getItem("trendmart_notifications");
       if (saved) {
@@ -51,23 +93,55 @@ export default function NotificationsPage() {
       setToggles(DEFAULT_TOGGLES);
     }
     setLoading(false);
-  }, []);
+    void refreshPushStatus();
+  }, [refreshPushStatus]);
 
   const toggleSwitch = useCallback((key: string) => {
     setToggles((prev) => {
       const updated = prev.map((t) =>
         t.key === key ? { ...t, enabled: !t.enabled } : t,
       );
-      // Save to localStorage
       const prefs: Record<string, boolean> = {};
-      updated.forEach((t) => { prefs[t.key] = t.enabled; });
+      updated.forEach((t) => {
+        prefs[t.key] = t.enabled;
+      });
       localStorage.setItem("trendmart_notifications", JSON.stringify(prefs));
       return updated;
     });
   }, []);
 
-  const handleSave = useCallback(() => {
-    addToast("Notification preferences saved!", "success");
+  const handleEnablePush = useCallback(async () => {
+    setPushBusy(true);
+    const result = await subscribeToPushNotifications();
+    setPushBusy(false);
+    if (result.ok) {
+      setPushStatus("on");
+      addToast("Browser notifications enabled.", "success");
+      return;
+    }
+    if (result.reason === "denied") {
+      setPushStatus("denied");
+      addToast("Notification permission blocked in browser settings.", "error");
+      return;
+    }
+    if (result.reason === "unsupported") {
+      setPushStatus("unsupported");
+      addToast("Push is not available (needs HTTPS + VAPID keys).", "error");
+      return;
+    }
+    addToast("Could not enable push on this device.", "error");
+  }, [addToast]);
+
+  const handleDisablePush = useCallback(async () => {
+    setPushBusy(true);
+    const result = await unsubscribeFromPushNotifications();
+    setPushBusy(false);
+    if (result.ok) {
+      setPushStatus("off");
+      addToast("Browser notifications disabled on this device.", "success");
+      return;
+    }
+    addToast("Could not disable push.", "error");
   }, [addToast]);
 
   if (loading) {
@@ -82,33 +156,68 @@ export default function NotificationsPage() {
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-3 py-3">
-          <Link href="/settings" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Back to settings"><ChevronLeftIcon /></Link>
+          <Link
+            href="/settings"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            aria-label="Back to settings"
+          >
+            <ChevronLeftIcon />
+          </Link>
           <h1 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Notifications</h1>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-5 space-y-6">
-        {/* Info banner */}
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-          <div className="flex items-start gap-3">
-            <span className="text-xl">🔔</span>
-            <div>
-              <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">Stay Updated</p>
-              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                Manage which notifications you receive. Changes are saved automatically to your device.
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* Notification Toggles */}
+      <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-3 py-5">
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+            Browser push alerts
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-emerald-800/80 dark:text-emerald-300/80">
+            Free OS notifications when the app is in the background. Needs VAPID keys in env and
+            HTTPS (or localhost).
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+              {pushStatus === "checking" && "Checking…"}
+              {pushStatus === "on" && "Enabled"}
+              {pushStatus === "off" && "Off"}
+              {pushStatus === "denied" && "Blocked"}
+              {pushStatus === "unsupported" && "Unavailable"}
+            </span>
+            {pushStatus === "on" ? (
+              <button
+                type="button"
+                disabled={pushBusy}
+                onClick={handleDisablePush}
+                className="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+              >
+                {pushBusy ? "Updating…" : "Disable on this device"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={
+                  pushBusy || pushStatus === "unsupported" || pushStatus === "denied" || pushStatus === "checking"
+                }
+                onClick={handleEnablePush}
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {pushBusy ? "Enabling…" : "Enable browser notifications"}
+              </button>
+            )}
+          </div>
+        </section>
+
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Notification Channels</h2>
-          <div className="trend-card divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            In-app preferences
+          </h2>
+          <div className="trend-card divide-y divide-zinc-100 overflow-hidden dark:divide-zinc-800">
             {toggles.map((toggle) => (
               <div key={toggle.key} className="flex items-center justify-between px-4 py-3.5">
-                <div className="flex-1 min-w-0 mr-3">
+                <div className="mr-3 min-w-0 flex-1">
                   <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{toggle.label}</p>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">{toggle.description}</p>
+                  <p className="truncate text-xs text-zinc-400 dark:text-zinc-500">{toggle.description}</p>
                 </div>
                 <ToggleSwitch
                   checked={toggle.enabled}
@@ -120,18 +229,8 @@ export default function NotificationsPage() {
           </div>
         </section>
 
-        {/* Save Button */}
-        <button
-          type="button"
-          onClick={handleSave}
-          className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-[0.98]"
-        >
-          Save Preferences
-        </button>
-
-        {/* Footer note */}
         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
-          Notification preferences are stored locally on your device.
+          Preferences save automatically on this device.
         </p>
       </main>
     </div>

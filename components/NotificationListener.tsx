@@ -23,9 +23,50 @@ import {
   type ReactNode,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { subscribeToOrders, subscribeToInquiries } from "@/lib/supabase/realtime";
+import {
+  subscribeToOrders,
+  subscribeToInquiries,
+  subscribeToCustomerOrders,
+} from "@/lib/supabase/realtime";
 import type { OrderPayload, InquiryPayload } from "@/lib/supabase/realtime";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+
+const HISTORY_KEY = "trendmart_notif_history_v1";
+const PREFS_KEY = "trendmart_notifications";
+
+function loadHistory(): Notification[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Notification[];
+    return Array.isArray(parsed) ? parsed.slice(0, 50) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(items: Notification[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 50)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function prefsAllow(type: "order" | "inquiry"): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return true;
+    const prefs = JSON.parse(raw) as Record<string, boolean>;
+    if (type === "order") return prefs.order_updates !== false;
+    return prefs.merchant_alerts !== false;
+  } catch {
+    return true;
+  }
+}
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 
@@ -57,6 +98,8 @@ interface NotificationContextValue {
   togglePanel: () => void;
   /** Register a shop to listen for notifications. Returns cleanup function. */
   registerShop: (shopId: string) => () => void;
+  /** Register customer order-status listening for the signed-in user. */
+  registerCustomer: (userId: string) => () => void;
 }
 
 /* ─── Context ──────────────────────────────────────────────────────────────── */
@@ -126,16 +169,28 @@ export function NotificationListenerProvider({
   children: ReactNode;
 }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [historyReady, setHistoryReady] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [muteHydrated, setMuteHydrated] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeShopIds, setActiveShopIds] = useState<Set<string>>(new Set());
   const channelRefs = useRef<Set<string>>(new Set());
+  const customerChannelRef = useRef<string | null>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const openPanel = useCallback(() => setIsPanelOpen(true), []);
   const closePanel = useCallback(() => setIsPanelOpen(false), []);
   const togglePanel = useCallback(() => setIsPanelOpen((v) => !v), []);
+
+  useEffect(() => {
+    setNotifications(loadHistory());
+    setHistoryReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!historyReady) return;
+    saveHistory(notifications);
+  }, [notifications, historyReady]);
 
   // ── Mute Toggle ────────────────────────────────────────────────────────────
   // Hydrate mute preference from localStorage after hydration to avoid SSR mismatch
@@ -168,6 +223,8 @@ export function NotificationListenerProvider({
   // ── Notification Management ────────────────────────────────────────────────
   const addNotification = useCallback(
     (notification: Omit<Notification, "id" | "timestamp" | "read">) => {
+      if (!prefsAllow(notification.type)) return;
+
       const newNotif: Notification = {
         ...notification,
         id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -175,14 +232,16 @@ export function NotificationListenerProvider({
         read: false,
       };
 
-      setNotifications((prev) => [newNotif, ...prev].slice(0, 50)); // Keep max 50
+      setNotifications((prev) => {
+        const next = [newNotif, ...prev].slice(0, 50);
+        saveHistory(next);
+        return next;
+      });
 
-      // Play chime if not muted
       if (!isMuted) {
         playChimeSound();
       }
 
-      // Dispatch custom event for toast integration
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("trendmart:toast", {
@@ -210,6 +269,7 @@ export function NotificationListenerProvider({
 
   const clearNotifications = useCallback(() => {
     setNotifications([]);
+    saveHistory([]);
   }, []);
 
   // ── Shop Registration for Realtime Subscriptions ───────────────────────────
@@ -232,7 +292,7 @@ export function NotificationListenerProvider({
             type: "order",
             title: `New Order from ${order.customer_name || "a customer"}`,
             body: `Amount: Rs. ${(order.total_amount ?? 0).toLocaleString()} — Status: ${order.status}`,
-            linkUrl: `/dashboard`,
+            linkUrl: `/dashboard/orders`,
             shopId,
           });
         },
@@ -243,7 +303,7 @@ export function NotificationListenerProvider({
             type: "order",
             title: `Order Updated: ${order.customer_name || "Customer"}`,
             body: `Status changed to: ${order.status} — Rs. ${(order.total_amount ?? 0).toLocaleString()}`,
-            linkUrl: `/dashboard`,
+            linkUrl: `/dashboard/orders`,
             shopId,
           });
         },
@@ -259,7 +319,7 @@ export function NotificationListenerProvider({
             type: "inquiry",
             title: `New Inquiry from ${inquiry.customer_name || "a customer"}`,
             body: inquiry.message?.slice(0, 120) ?? "No message content",
-            linkUrl: `/dashboard`,
+            linkUrl: `/dashboard/inquiries`,
             shopId,
           });
         },
@@ -271,7 +331,7 @@ export function NotificationListenerProvider({
               type: "inquiry",
               title: `Inquiry Read: ${inquiry.customer_name || "Customer"}`,
               body: "Inquiry marked as read",
-              linkUrl: `/dashboard`,
+              linkUrl: `/dashboard/inquiries`,
               shopId,
             });
           }
@@ -290,6 +350,37 @@ export function NotificationListenerProvider({
           next.delete(shopId);
           return next;
         });
+      };
+    },
+    [addNotification],
+  );
+
+  const registerCustomer = useCallback(
+    (userId: string): (() => void) => {
+      if (!userId) return () => {};
+
+      customerChannelRef.current = userId;
+      const unsub = subscribeToCustomerOrders(userId, (payload) => {
+        const order = (payload as RealtimePostgresChangesPayload<OrderPayload>).new;
+        if (!order || !("id" in order)) return;
+        addNotification({
+          type: "order",
+          title: `Order update: ${order.status}`,
+          body: `Your order is now ${order.status}${
+            typeof order.total_amount === "number"
+              ? ` — Rs. ${Math.round(order.total_amount).toLocaleString()}`
+              : ""
+          }.`,
+          linkUrl: `/orders/tracking?orderId=${encodeURIComponent(order.id)}`,
+          shopId: order.shop_id,
+        });
+      });
+
+      return () => {
+        unsub();
+        if (customerChannelRef.current === userId) {
+          customerChannelRef.current = null;
+        }
       };
     },
     [addNotification],
@@ -349,6 +440,7 @@ export function NotificationListenerProvider({
         closePanel,
         togglePanel,
         registerShop,
+        registerCustomer,
       }}
     >
       {children}

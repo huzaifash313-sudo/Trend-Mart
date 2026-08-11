@@ -1,9 +1,3 @@
-/* -------------------------------------------------------------------------- */
-/*  TrendMart — Web Push helpers                                              */
-/*  Sends optional OS notifications through VAPID web-push subscriptions.      */
-/*  In-app realtime notifications continue to work even when VAPID is unset.  */
-/* -------------------------------------------------------------------------- */
-
 import webPush from "web-push";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -25,9 +19,6 @@ export function isWebPushConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 }
 
-/**
- * Best-effort VAPID push fan-out for all saved subscriptions owned by a user.
- */
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,

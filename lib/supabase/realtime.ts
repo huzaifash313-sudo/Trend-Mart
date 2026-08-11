@@ -24,6 +24,7 @@ export type OrderPayload = {
   shop_id: string;
   customer_name: string;
   customer_phone: string;
+  customer_user_id?: string | null;
   items_json: unknown;
   total_amount: number;
   status: string;
@@ -221,6 +222,44 @@ export function subscribeToInquiries(
       if (status === "SUBSCRIBED") {
         console.log(`[Realtime] ✅ Subscribed to inquiries for shop: ${shopId}`);
         notifyStateChange("connected", channelKey);
+      }
+    });
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
+/**
+ * Subscribe to order status updates for a logged-in customer.
+ */
+export function subscribeToCustomerOrders(
+  userId: string,
+  onUpdate: RealtimeCallback<OrderPayload>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = `customer-orders-${userId}`;
+
+  unsubscribe(channelKey);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "orders",
+        filter: `customer_user_id=eq.${userId}`,
+      },
+      (payload) => {
+        onUpdate(payload as RealtimePostgresChangesPayload<OrderPayload>);
+      },
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        notifyStateChange("connected", channelKey);
+      } else if (status === "CHANNEL_ERROR") {
+        notifyStateChange("error", channelKey);
       }
     });
 
