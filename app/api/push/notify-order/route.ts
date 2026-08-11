@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       await sendPushToUser(shop.owner_id, {
         title: `Order ${body.status}`,
         body: `${order?.customer_name || "Customer"} — ${shop.name || "Shop"}`,
-        url: "/dashboard",
+        url: "/dashboard/orders",
         tag: `order-${body.orderId}`,
       });
     }
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       await sendPushToUser(order.customer_user_id, {
         title: `Order update: ${body.status}`,
         body: `Your order at ${shop?.name || "the shop"} is now ${body.status}.`,
-        url: `/orders/track?id=${body.orderId}`,
+        url: `/orders/tracking?orderId=${encodeURIComponent(body.orderId)}`,
         tag: `order-${body.orderId}`,
       });
     }

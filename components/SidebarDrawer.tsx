@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SHOP_CATEGORIES, CATEGORY_ICONS } from "@/types";
 import PwaInstallTip from "@/components/PwaInstallTip";
+import { useLanguage } from "@/context/LanguageContext";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons                                                          */
@@ -172,6 +173,7 @@ interface SidebarDrawerProps {
  */
 export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const router = useRouter();
+  const { lang, setLang, t } = useLanguage();
   const [session, setSession] = useState(false);
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
@@ -576,6 +578,34 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                 <span className="flex h-5 w-5 items-center justify-center text-base leading-none" aria-hidden="true">🎨</span>
                 Appearance
               </Link>
+            </li>
+
+            <li className="px-4 py-2">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-2.5 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {t.lang_switch}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5" role="group" aria-label={t.lang_switch}>
+                  {[
+                    { code: "en" as const, label: t.lang_english },
+                    { code: "ur" as const, label: t.lang_urdu },
+                  ].map((option) => (
+                    <button
+                      key={option.code}
+                      type="button"
+                      onClick={() => setLang(option.code)}
+                      className={`rounded-full px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                        lang === option.code
+                          ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/20"
+                          : "bg-white text-zinc-600 hover:bg-emerald-50 hover:text-emerald-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                      }`}
+                      aria-pressed={lang === option.code}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </li>
 
             {/* Divider */}

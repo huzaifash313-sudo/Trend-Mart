@@ -9,6 +9,8 @@ export interface Shop {
   /** FK to auth.users — nullable if user is deleted (ON DELETE SET NULL) */
   owner_id?: string | null;
   name: string;
+  /** Optional SEO-friendly storefront slug. Older schemas may not have this column. */
+  slug?: string | null;
   category: string;
   location: string;
   whatsapp_number: string;

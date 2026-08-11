@@ -36,12 +36,16 @@ export default function TermsPage() {
               without creating an account.
             </>,
             <>
-              <strong>Customers</strong> must create an account and verify their email before an
-              order is placed. Phone numbers are delivery contact details only (no phone OTP).
+              <strong>Customers</strong> must create an account with their full name and phone
+              number, and verify their email before an order is placed. Phone numbers are required
+              contact/delivery details. Phone SMS OTP verification is not enabled at this time
+              (email OTP only).
             </>,
             <>
-              <strong>Merchants</strong> must complete store registration and may be subject to
-              Super-Admin review/approval before their store becomes publicly visible.
+              <strong>Merchants</strong> must complete store registration with business name and
+              WhatsApp/phone number. New stores go live immediately after email verification
+              (auto-approved). TrendMart may later introduce a Super-Admin approval queue and may
+              still suspend stores that violate these Terms.
             </>,
           ]}
         />

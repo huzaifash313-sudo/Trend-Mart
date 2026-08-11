@@ -409,7 +409,7 @@ function HomeInner() {
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-[1.05rem]">
@@ -433,17 +433,19 @@ function HomeInner() {
               </p>
             )}
           </div>
-          <GeoRadiusFilter
-            onFilterChange={setGeoFilter}
-            isDetecting={geoDetecting}
-            onDetectStart={() => setGeoDetecting(true)}
-            onDetectEnd={() => setGeoDetecting(false)}
-          />
+          <div className="w-full sm:w-auto">
+            <GeoRadiusFilter
+              onFilterChange={setGeoFilter}
+              isDetecting={geoDetecting}
+              onDetectStart={() => setGeoDetecting(true)}
+              onDetectEnd={() => setGeoDetecting(false)}
+            />
+          </div>
         </div>
 
         {/* Loading skeletons */}
         {loading && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
@@ -518,9 +520,9 @@ function HomeInner() {
           </div>
         )}
 
-        {/* Shop cards — 2 mobile / 3 tablet / 4 laptop (readable width, less truncation) */}
+        {/* Shop cards — 2 mobile / 3 tablet / 4 laptop / 5 wide desktop */}
         {!loading && !error && displayShops.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {displayShops.map((shop, index) => {
               const bannerBroken = brokenImgs.has(`banner:${shop.id}`);
               const logoBroken = brokenImgs.has(`logo:${shop.id}`);
@@ -532,11 +534,13 @@ function HomeInner() {
                   shop={{
                     id: shop.id,
                     name: shop.name,
+                    slug: shop.slug,
                     category: shop.category,
                     location: shop.location,
                     logo_url: shop.logo_url,
                     banner_url: shop.banner_url,
                     is_live: shop.is_live,
+                    verification_status: shop.verification_status,
                     distance_km: withDistance.distance_km,
                     business_hours: shop.business_hours,
                     operating_status: shop.operating_status,

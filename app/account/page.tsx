@@ -33,7 +33,6 @@ export default function CustomerAccountPage() {
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
-  const [phoneVerified, setPhoneVerified] = useState(false);
 
   const localOrders = useMemo(() => {
     try {
@@ -90,21 +89,7 @@ export default function CustomerAccountPage() {
 
         setEmail(user.email ?? null);
         setEmailVerified(!!user.email_confirmed_at);
-        setPhoneVerified(!!user.phone_confirmed_at);
         setAuthed(true);
-
-        try {
-          const { data: profile } = await supabase
-            .from("user_profiles")
-            .select("phone_verified_at")
-            .eq("user_id", user.id)
-            .maybeSingle();
-          if (!cancelled && profile?.phone_verified_at) {
-            setPhoneVerified(true);
-          }
-        } catch {
-          /* ignore profile lookup failures */
-        }
       } catch {
         if (!cancelled) {
           window.location.replace("/login?redirect=/account");
@@ -174,7 +159,8 @@ export default function CustomerAccountPage() {
         <section className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Verification</h2>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Soft for testing — phone verifies at first order; we&apos;ll tighten this later.
+            Email verification is required for checkout. Phone number is a required contact
+            field — SMS OTP verification is disabled for now (coming later).
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span
@@ -186,14 +172,8 @@ export default function CustomerAccountPage() {
             >
               {emailVerified ? "Email verified" : "Email not verified"}
             </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                phoneVerified
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                  : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-              }`}
-            >
-              {phoneVerified ? "Phone verified" : "Phone verifies at first order"}
+            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              Phone OTP: coming later
             </span>
           </div>
           {!emailVerified && (

@@ -5,10 +5,10 @@
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Multi-attribute variant management (color swatches, clothing sizes)     */
-/*   - Bulk stock updates with SKU tracking                                    */
+/*   - In Stock / Out of Stock availability toggle                             */
 /*   - Discounted pricing tiers                                                 */
 /*   - Drag-and-drop image association with validation                         */
-/*   - Real-time inventory quantity tracking                                    */
+/*   - Real-time product availability updates                                   */
 /*   - Atomic database transactions via Supabase                                */
 /*   - CSV bulk import/export for products                                      */
 /*   - Advanced filtering, sorting, and search                                  */
@@ -59,15 +59,6 @@ import { isValidUUID } from "@/lib/sanitization";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-interface SkuRecord {
-  sku: string;
-  color?: string;
-  size?: string;
-  stock: number;
-  priceAdjustment: number;
-  barcode?: string;
-}
-
 interface PriceTier {
   label: string;
   minQuantity: number;
@@ -89,18 +80,12 @@ interface ProductFormState {
   skuPrefix: string;
   /** Multi-attribute variants */
   variantGroups: VariantGroup[];
-  /** Individual SKU-level stock records */
-  skuRecords: SkuRecord[];
   /** Discounted pricing tiers */
   priceTiers: PriceTier[];
   /** Additional product images */
   galleryImages: string[];
   /** Product tags for search */
   tags: string[];
-  /** Inventory quantity (for simple products without variants) */
-  stockQuantity: number;
-  /** Low stock alert threshold */
-  lowStockThreshold: number;
   /** Sub-category UUID under the shop's main category */
   subCategoryId: string;
 }
@@ -117,12 +102,9 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   isAvailable: true,
   skuPrefix: "",
   variantGroups: [],
-  skuRecords: [],
   priceTiers: [],
   galleryImages: [],
   tags: [],
-  stockQuantity: 0,
-  lowStockThreshold: 5,
   subCategoryId: "",
 };
 
@@ -173,7 +155,6 @@ function ChevronDownIcon() { return (<svg className="h-3.5 w-3.5" viewBox="0 0 2
 function DragIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="18" x2="16" y2="18" /></svg>); }
 function UploadIcon() { return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>); }
 function DownloadIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>); }
-function AlertTriangleIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>); }
 
 // ─── Color Swatch Component ─────────────────────────────────────────────────
 
@@ -365,15 +346,6 @@ export default function ProductsDashboardPage() {
     return filtered;
   }, [products, searchQuery, statusFilter, sortBy]);
 
-  // Low stock alerts
-  const lowStockProducts = useMemo(() => {
-    return filteredProducts.filter(p => {
-      // For products with variants, check if any variant is flagged
-      // For simple products, we check the is_available flag as a proxy
-      return p.is_available && filteredProducts.length < 5; // Heuristic
-    });
-  }, [filteredProducts]);
-
   // ── SKU Generation ──────────────────────────────────────────────────────
   const generateSkuPrefix = useCallback((name: string): string => {
     const words = name.trim().split(/\s+/);
@@ -382,36 +354,6 @@ export default function ProductsDashboardPage() {
     }
     return name.slice(0, 3).toUpperCase();
   }, []);
-
-  // ── Build variant combinations into SKU records ─────────────────────────
-  const buildSkuRecords = useCallback((): SkuRecord[] => {
-    const colorGroup = form.variantGroups.find(g => g.name === "Color");
-    const sizeGroup = form.variantGroups.find(g => g.name === "Size");
-
-    const colors = colorGroup?.options.map(o => o.label) ?? [""];
-    const sizes = sizeGroup?.options.map(o => o.label) ?? [""];
-
-    const records: SkuRecord[] = [];
-    for (const color of colors) {
-      for (const size of sizes) {
-        const sku = [
-          form.skuPrefix || "PRD",
-          color ? color.slice(0, 3).toUpperCase() : "",
-          size ? size.toUpperCase() : "",
-        ].filter(Boolean).join("-");
-
-        records.push({
-          sku,
-          color: color || undefined,
-          size: size || undefined,
-          stock: 0,
-          priceAdjustment: 0,
-        });
-      }
-    }
-
-    return records;
-  }, [form.skuPrefix, form.variantGroups]);
 
   // ── Form Handlers ───────────────────────────────────────────────────────
 
@@ -467,27 +409,10 @@ export default function ProductsDashboardPage() {
   }, [selectedColors, selectedSizes]);
 
   const clearVariants = useCallback(() => {
-    setForm(f => ({ ...f, variantGroups: [], skuRecords: [] }));
+    setForm(f => ({ ...f, variantGroups: [] }));
     setSelectedColors(new Set());
     setSelectedSizes(new Set());
     setActiveVariantGroup(null);
-  }, []);
-
-  // Derived SKU records computed synchronously from variant groups
-  // (avoiding setState-in-effect by deriving during render via useMemo above)
-  const derivedSkuRecords = useMemo(() => {
-    if (form.variantGroups.length === 0) return [];
-    return buildSkuRecords();
-  }, [form.variantGroups, buildSkuRecords]);
-
-  // Keep skuRecords in sync with derived value
-  const displaySkuRecords = form.skuRecords.length > 0 ? form.skuRecords : derivedSkuRecords;
-
-  const updateSkuStock = useCallback((skuIndex: number, stock: number) => {
-    setForm(f => ({
-      ...f,
-      skuRecords: f.skuRecords.map((r, i) => i === skuIndex ? { ...r, stock: Math.max(0, stock) } : r),
-    }));
   }, []);
 
   const addPriceTier = useCallback(() => {
@@ -596,6 +521,8 @@ export default function ProductsDashboardPage() {
       image_url: gallery.image_url,
       images: gallery.images,
       is_available: form.isAvailable,
+      stock_status: form.isAvailable ? "in_stock" : "out_of_stock",
+      // Availability toggle only — no numeric stock counts.
       variants: form.variantGroups.length > 0 ? form.variantGroups : null,
       category_id: shopCat || null,
       sub_category_id: subId && isValidUUID(subId) ? subId : null,
@@ -645,13 +572,10 @@ export default function ProductsDashboardPage() {
       isAvailable: product.is_available,
       skuPrefix: generateSkuPrefix(product.name),
       variantGroups: product.variants ?? [],
-      skuRecords: [],
       priceTiers: [],
       galleryImages: gallery,
       tags: [],
-      stockQuantity: 0,
       subCategoryId: product.sub_category_id ?? "",
-      lowStockThreshold: 5,
     });
 
     // Pre-populate variant selections
@@ -1235,46 +1159,12 @@ export default function ProductsDashboardPage() {
                 )}
               </div>
 
-              {/* SKU Stock Management (when variants exist) */}
-              {form.skuRecords.length > 0 && (
-                <div>
-                  <label className="mb-2 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                    SKU Inventory Stock Levels
-                  </label>
-                  <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
-                    {displaySkuRecords.map((sku, idx) => (
-                      <div key={idx} className="flex items-center gap-2 rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/50">
-                        <span className="flex-1 text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300">{sku.sku}</span>
-                        {sku.color && <span className="inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400"><span className="h-3 w-3 rounded-full border" style={{ backgroundColor: COLOR_OPTIONS.find(c => c.label === sku.color)?.hex ?? "#ccc" }} />{sku.color}</span>}
-                        {sku.size && <span className="text-xs text-zinc-500 dark:text-zinc-400">Size: {sku.size}</span>}
-                        <div className="flex items-center gap-1">
-                          <label className="text-xs text-zinc-400">Qty:</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={sku.stock}
-                            onChange={(e) => updateSkuStock(idx, Number(e.target.value))}
-                            className="w-16 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
-                          />
-                        </div>
-                        {sku.stock < form.lowStockThreshold && (
-                          <AlertTriangleIcon />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <label className="text-xs text-zinc-500 dark:text-zinc-400">Low stock alert at:</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={form.lowStockThreshold}
-                      onChange={(e) => setForm(f => ({ ...f, lowStockThreshold: Number(e.target.value) }))}
-                      className="w-16 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
-                    />
-                    <span className="text-xs text-zinc-400">units</span>
-                  </div>
-                </div>
+              {/* Availability only — no numeric stock counts */}
+              {form.variantGroups.length > 0 && (
+                <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
+                  Variants save with this product. Use the <strong>In Stock / Out of Stock</strong> toggle —
+                  TrendMart does not track numeric stock quantities.
+                </p>
               )}
 
               {/* Price Tiers (Bulk Discounts) */}
@@ -1283,11 +1173,13 @@ export default function ProductsDashboardPage() {
                   <div className="mb-2 flex items-center justify-between">
                     <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                       Discounted Pricing Tiers
+                      <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[0.6rem] font-semibold text-zinc-500 dark:bg-zinc-800">Coming soon</span>
                     </label>
                     <button
                       type="button"
-                      onClick={addPriceTier}
-                      className="text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                      disabled
+                      title="Bulk price tiers are not persisted yet"
+                      className="cursor-not-allowed text-xs font-medium text-zinc-400"
                     >
                       + Add Tier
                     </button>
@@ -1545,15 +1437,6 @@ export default function ProductsDashboardPage() {
 
             {!productsLoading && filteredProducts.length > 0 && (
               <div className="space-y-2">
-                {/* Low stock alerts */}
-                {lowStockProducts.length > 0 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-900/20">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                      <AlertTriangleIcon /> {lowStockProducts.length} product(s) may need restocking attention.
-                    </p>
-                  </div>
-                )}
-
                 {filteredProducts.map((product) => (
                   <div
                     key={product.id}

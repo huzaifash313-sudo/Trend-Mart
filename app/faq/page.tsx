@@ -17,7 +17,7 @@ interface FaqItem {
 const CUSTOMER_FAQS: FaqItem[] = [
   {
     q: "Do I need an account to browse shops?",
-    a: "No — you can freely browse shops, categories, and products, and even build a cart, without signing up. To place an order you need an account with a verified email (phone OTP is not required).",
+    a: "No — you can freely browse shops, categories, and products, and even build a cart, without signing up. To place an order you need an account with your full name, phone number, and a verified email. Phone SMS OTP is not required right now.",
   },
   {
     q: "How do I place an order?",

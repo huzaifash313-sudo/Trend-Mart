@@ -32,6 +32,7 @@ import { formatRupees } from "@/lib/formatters";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
 import { getDistanceToShop, locationErrorMessage } from "@/services/geoRadiusService";
+import { getShopHoursSummary } from "@/lib/shopHours";
 import { requireVerifiedEmailSession } from "@/services/authService";
 import { toWhatsAppDigits, normalizePkPhoneDigits } from "@/lib/sanitization";
 import {
@@ -352,17 +353,43 @@ export default function WhatsAppCheckoutModal({
   const minOrderAmount = shop.min_order_amount ?? 0;
   const belowMinimumOrder = minOrderAmount > 0 && subtotal > 0 && subtotal < minOrderAmount;
 
+  const qualifiesForFreeDelivery =
+    shop.free_delivery_threshold != null &&
+    shop.free_delivery_threshold > 0 &&
+    subtotal >= shop.free_delivery_threshold;
+
+  const perKmFee = shop.delivery_fee_per_km ?? 0;
+  const needsDistanceForFee = perKmFee > 0 && !qualifiesForFreeDelivery;
+  const missingDistanceForFee = needsDistanceForFee && distanceKm == null;
+
+  const shopHours = useMemo(
+    () =>
+      getShopHoursSummary({
+        business_hours: shop.business_hours,
+        operating_status: shop.operating_status,
+      }),
+    [shop.business_hours, shop.operating_status],
+  );
+  const shopClosed = shopHours.state === "closed";
+
+  const radiusKm = shop.service_radius_km ?? 0;
+  const zones = shop.delivery_zones ?? [];
+  const isNationwide = zones.some((z) => /pakistan|nationwide|all/i.test(String(z)));
+  const outsideServiceRadius =
+    !isNationwide &&
+    radiusKm > 0 &&
+    distanceKm != null &&
+    distanceKm > radiusKm;
+
   const deliveryFee = useMemo(() => {
     const freeThreshold = shop.free_delivery_threshold;
     if (freeThreshold != null && freeThreshold > 0 && subtotal >= freeThreshold) return 0;
     const flat = shop.delivery_fee_flat ?? 0;
     const perKm = shop.delivery_fee_per_km ?? 0;
+    // Without GPS distance, charge flat only and warn the shopper (see missingDistanceForFee).
     const distanceCharge = distanceKm != null && perKm > 0 ? distanceKm * perKm : 0;
     return Math.round((flat + distanceCharge) * 100) / 100;
   }, [shop, subtotal, distanceKm]);
-
-  const qualifiesForFreeDelivery =
-    shop.free_delivery_threshold != null && shop.free_delivery_threshold > 0 && subtotal >= shop.free_delivery_threshold;
 
   const grandTotal = useMemo(
     () => Math.max(0, subtotal - discountAmount + deliveryFee),
@@ -632,6 +659,22 @@ export default function WhatsAppCheckoutModal({
     setOrderError(null);
 
     try {
+      if (belowMinimumOrder) {
+        throw new Error(
+          `Minimum order for this shop is ${formatRupees(minOrderAmount)}. Add more items to continue.`,
+        );
+      }
+      if (shopClosed) {
+        throw new Error(
+          `This shop is closed right now (${shopHours.hoursText}). Try again during open hours.`,
+        );
+      }
+      if (outsideServiceRadius) {
+        throw new Error(
+          `You are outside this shop's delivery radius (${radiusKm} km).`,
+        );
+      }
+
       // Prefer cart WhatsApp; if stale/empty, refresh from shop row so checkout still works.
       let merchantPhone = phone;
       if (!merchantPhone && shop.id) {
@@ -677,6 +720,8 @@ export default function WhatsAppCheckoutModal({
         deliveryFee,
         notes: shipping.deliveryNotes,
         couponCode: couponResult?.valid ? couponCode : undefined,
+        customerLat: location?.coordinates?.latitude ?? null,
+        customerLng: location?.coordinates?.longitude ?? null,
       });
 
       if (!orderResult.success) {
@@ -738,6 +783,13 @@ export default function WhatsAppCheckoutModal({
     couponCode,
     couponResult,
     quantities,
+    belowMinimumOrder,
+    minOrderAmount,
+    shopClosed,
+    shopHours.hoursText,
+    outsideServiceRadius,
+    radiusKm,
+    location,
   ]);
 
   const finishOrder = useCallback(() => {
@@ -1034,6 +1086,35 @@ export default function WhatsAppCheckoutModal({
                 </div>
               )}
 
+              {/* Distance-based delivery needs GPS */}
+              {missingDistanceForFee && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs dark:bg-amber-900/20">
+                  <InfoIcon />
+                  <span className="text-amber-700 dark:text-amber-400">
+                    This shop charges per-km delivery. Share your location (or set it in Settings)
+                    for an accurate fee — right now only the flat fee ({formatRupees(shop.delivery_fee_flat ?? 0)}) is applied.
+                  </span>
+                </div>
+              )}
+
+              {shopClosed && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs dark:bg-red-900/20">
+                  <InfoIcon />
+                  <span className="text-red-700 dark:text-red-400">
+                    Shop is closed now ({shopHours.hoursText}). You can browse, but checkout is paused.
+                  </span>
+                </div>
+              )}
+
+              {outsideServiceRadius && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs dark:bg-red-900/20">
+                  <InfoIcon />
+                  <span className="text-red-700 dark:text-red-400">
+                    You are about {distanceKm?.toFixed(1)} km away — this shop delivers within {radiusKm} km only.
+                  </span>
+                </div>
+              )}
+
               {/* Shop info reminder */}
               <div className="mb-3 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs dark:bg-blue-900/20">
                 <InfoIcon />
@@ -1045,10 +1126,16 @@ export default function WhatsAppCheckoutModal({
               <button
                 type="button"
                 onClick={handleGoToShipping}
-                disabled={items.length === 0 || belowMinimumOrder}
+                disabled={items.length === 0 || belowMinimumOrder || shopClosed || outsideServiceRadius}
                 className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
-                {belowMinimumOrder ? "Add More Items to Continue" : "Continue to Delivery Details →"}
+                {shopClosed
+                  ? "Shop Closed — Come Back Later"
+                  : outsideServiceRadius
+                    ? "Outside Delivery Area"
+                    : belowMinimumOrder
+                      ? "Add More Items to Continue"
+                      : "Continue to Delivery Details →"}
               </button>
             </div>
           </div>
@@ -1294,7 +1381,7 @@ export default function WhatsAppCheckoutModal({
               <button
                 type="button"
                 onClick={handlePlaceOrder}
-                disabled={isSubmitting || !phone || belowMinimumOrder}
+                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting ? (

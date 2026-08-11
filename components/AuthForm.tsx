@@ -3,8 +3,8 @@
 import { useState, useCallback, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { z } from "zod";
 import { signInSchema, signUpSchema, type SignInFormValues, type SignUpFormValues } from "@/lib/validations";
+import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -40,7 +40,6 @@ function calculatePasswordStrength(password: string): StrengthResult {
   if (/[0-9]/.test(password)) score++;
   if (/[^a-zA-Z0-9]/.test(password)) score++;
 
-  // Normalize to 0-4 range
   const normalized = Math.min(4, score);
 
   const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
@@ -64,6 +63,8 @@ function calculatePasswordStrength(password: string): StrengthResult {
 /* -------------------------------------------------------------------------- */
 
 export default function AuthForm({ mode, onSubmit, isLoading, serverError }: AuthFormProps) {
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -77,18 +78,22 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
 
   const passwordStrength = calculatePasswordStrength(password);
 
-  // ── Validation ─────────────────────────────────────────────────────────────
   const validateField = useCallback(
     (field: string, value: string) => {
-      const data = {
-        email,
-        password,
-        confirmPassword,
-        [field]: value,
-      };
+      const data =
+        mode === "sign-in"
+          ? { email, password, [field]: value }
+          : {
+              full_name: fullName,
+              phone,
+              email,
+              password,
+              confirmPassword,
+              role,
+              [field]: value,
+            };
 
       const schema = mode === "sign-in" ? signInSchema : signUpSchema;
-
       const result = schema.safeParse(data);
 
       if (result.success) {
@@ -117,14 +122,14 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         });
       }
     },
-    [email, password, confirmPassword, mode],
+    [email, password, confirmPassword, fullName, phone, role, mode],
   );
 
   const validateAll = useCallback((): boolean => {
     const data =
       mode === "sign-in"
         ? { email, password }
-        : { email, password, confirmPassword, role };
+        : { full_name: fullName, phone, email, password, confirmPassword, role };
     const schema = mode === "sign-in" ? signInSchema : signUpSchema;
     const result = schema.safeParse(data);
 
@@ -142,15 +147,20 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
     }
     setFieldErrors(errors);
     return false;
-  }, [email, password, confirmPassword, role, mode]);
+  }, [email, password, confirmPassword, fullName, phone, role, mode]);
 
-  // ── Submit handler ─────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
 
-      // Mark all fields as touched
-      setTouched({ email: true, password: true, confirmPassword: true, role: true });
+      setTouched({
+        full_name: true,
+        phone: true,
+        email: true,
+        password: true,
+        confirmPassword: true,
+        role: true,
+      });
 
       if (!validateAll()) return;
 
@@ -162,36 +172,58 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
       const values =
         mode === "sign-in"
           ? { email, password }
-          : { email, password, confirmPassword, role };
+          : {
+              full_name: fullName.trim(),
+              phone,
+              email,
+              password,
+              confirmPassword,
+              role,
+            };
 
       await onSubmit(values);
     },
-    [email, password, confirmPassword, role, mode, onSubmit, validateAll, agreedToTerms],
+    [
+      email,
+      password,
+      confirmPassword,
+      fullName,
+      phone,
+      role,
+      mode,
+      onSubmit,
+      validateAll,
+      agreedToTerms,
+    ],
   );
 
-  // ── Input change handler ───────────────────────────────────────────────────
   const handleChange = useCallback(
     (field: string, value: string) => {
+      const nextValue = field === "phone" ? formatPkPhoneInput(value) : value;
       switch (field) {
+        case "full_name":
+          setFullName(nextValue);
+          break;
+        case "phone":
+          setPhone(nextValue);
+          break;
         case "email":
-          setEmail(value);
+          setEmail(nextValue);
           break;
         case "password":
-          setPassword(value);
+          setPassword(nextValue);
           break;
         case "confirmPassword":
-          setConfirmPassword(value);
+          setConfirmPassword(nextValue);
           break;
       }
 
-      // Mark as touched and validate
       setTouched((prev) => ({ ...prev, [field]: true }));
-      validateField(field, value);
+      validateField(field, nextValue);
     },
     [validateField],
   );
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
   const getFieldError = (field: string): string | undefined => {
     if (touched[field]) {
       return fieldErrors[field];
@@ -208,7 +240,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
           : "border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-600 dark:focus:border-emerald-400"
     }`;
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <motion.form
       onSubmit={handleSubmit}
@@ -217,7 +248,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
       animate={{ opacity: 1 }}
       transition={{ delay: 0.3, duration: 0.4 }}
     >
-      {/* Server-level error */}
       {serverError && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -228,7 +258,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         </motion.div>
       )}
 
-      {/* Account type — signup only */}
       {mode === "sign-up" && (
         <div>
           <p className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -268,17 +297,74 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
           </div>
           {role === "customer" ? (
             <p className="mt-2 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-              Verify your email to activate the account — required before checkout.
+              Name + phone required. Verify email before checkout. Phone SMS OTP is not required.
             </p>
           ) : (
             <p className="mt-2 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-              Email verify once — then register your store and go live immediately.
+              Name + phone required. Email verify once — then register your store and go live immediately (auto-approved).
             </p>
           )}
         </div>
       )}
 
-      {/* Email */}
+      {mode === "sign-up" && (
+        <>
+          <div>
+            <label
+              htmlFor="full_name"
+              className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
+              Full name <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="full_name"
+              type="text"
+              required
+              autoComplete="name"
+              placeholder="Your full name"
+              value={fullName}
+              onChange={(e) => handleChange("full_name", e.target.value)}
+              className={inputClassName("full_name")}
+              disabled={isLoading}
+            />
+            {getFieldError("full_name") && (
+              <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">
+                {getFieldError("full_name")}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="phone"
+              className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
+              Phone number <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              required
+              autoComplete="tel"
+              inputMode="numeric"
+              placeholder={PK_PHONE_PLACEHOLDER}
+              value={phone}
+              onChange={(e) => handleChange("phone", e.target.value)}
+              className={inputClassName("phone")}
+              disabled={isLoading}
+            />
+            <p className="mt-1 text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+              Required for orders & WhatsApp contact. SMS OTP verification is disabled for now.
+            </p>
+            {getFieldError("phone") && (
+              <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">
+                {getFieldError("phone")}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
       <div>
         <label
           htmlFor="email"
@@ -287,7 +373,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
           Email address
         </label>
         <div className="relative">
-          {/* Email icon */}
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
             <svg className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -298,13 +383,12 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             type="email"
             required
             autoComplete="email"
-            placeholder="merchant@example.com"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => handleChange("email", e.target.value)}
             className={`${inputClassName("email")} pl-10`}
             disabled={isLoading}
           />
-          {/* Validation icon */}
           {touched["email"] && !getFieldError("email") && email && (
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
               <svg className="h-4 w-4 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -324,7 +408,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         )}
       </div>
 
-      {/* Password */}
       <div>
         <label
           htmlFor="password"
@@ -333,7 +416,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
           Password
         </label>
         <div className="relative">
-          {/* Lock icon */}
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
             <svg className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -350,7 +432,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             className={`${inputClassName("password")} pl-10 pr-10`}
             disabled={isLoading}
           />
-          {/* Show/hide password toggle */}
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
@@ -359,12 +440,10 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             tabIndex={-1}
           >
             {showPassword ? (
-              /* Eye-off icon */
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
               </svg>
             ) : (
-              /* Eye icon */
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -392,7 +471,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
           </div>
         )}
 
-        {/* Password strength indicator (sign-up only) */}
         {mode === "sign-up" && password.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
@@ -418,7 +496,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         )}
       </div>
 
-      {/* Confirm Password (sign-up only) */}
       {mode === "sign-up" && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -431,7 +508,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             Confirm password
           </label>
           <div className="relative">
-            {/* Lock icon */}
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
               <svg className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -448,7 +524,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
               className={`${inputClassName("confirmPassword")} pl-10 pr-10`}
               disabled={isLoading}
             />
-            {/* Show/hide confirm password toggle */}
             <button
               type="button"
               onClick={() => setShowConfirmPassword((prev) => !prev)}
@@ -480,7 +555,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         </motion.div>
       )}
 
-      {/* Mandatory Terms & Privacy acceptance (sign-up only) */}
       {mode === "sign-up" && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -517,7 +591,6 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         </motion.div>
       )}
 
-      {/* Submit button with loading skeleton */}
       <motion.button
         type="submit"
         disabled={isLoading}

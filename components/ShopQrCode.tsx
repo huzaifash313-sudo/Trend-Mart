@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import QRCode from "qrcode";
 import { getPublicAppUrl } from "@/lib/appUrl";
+import { getShopPath } from "@/lib/shopSlug";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Downloadable Shop QR Code Generator                           */
@@ -93,7 +94,7 @@ export default function ShopQrCode({ shopId, shopName }: ShopQrCodeProps) {
     async function generate() {
       setGenerating(true);
       setError(null);
-      const url = `${getPublicAppUrl()}/shop/${shopId}`;
+      const url = `${getPublicAppUrl()}${getShopPath({ id: shopId, name: shopName })}`;
       setStoreUrl(url);
       try {
         const dataUrl = await buildQrDataUrl(url, DISPLAY_SIZE * 2);
@@ -112,7 +113,7 @@ export default function ShopQrCode({ shopId, shopName }: ShopQrCodeProps) {
     return () => {
       cancelled = true;
     };
-  }, [shopId]);
+  }, [shopId, shopName]);
 
   const handleDownload = useCallback(async () => {
     if (!storeUrl || error) return;

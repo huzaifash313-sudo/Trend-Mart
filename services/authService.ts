@@ -80,14 +80,18 @@ export async function signInWithEmail(
 /**
  * Sign up with email and password.
  * Pass `role` so the account is created as customer or merchant from day one.
+ * `fullName` + `phone` are mandatory contact fields (no phone SMS OTP yet).
  */
 export async function signUpWithEmail(
   email: string,
   password: string,
   role: AuthRole = "customer",
+  profile?: { fullName: string; phone: string },
 ): Promise<AuthResult & { needsOtpVerification: boolean }> {
   try {
     const signupRole: AuthRole = role === "merchant" ? "merchant" : "customer";
+    const fullName = (profile?.fullName ?? "").trim();
+    const phone = (profile?.phone ?? "").trim();
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
@@ -97,6 +101,10 @@ export async function signUpWithEmail(
         emailRedirectTo: getAuthCallbackUrl(),
         data: {
           role: signupRole,
+          full_name: fullName || undefined,
+          phone: phone || undefined,
+          // Phone SMS OTP is intentionally disabled (budget) — contact field only.
+          phone_otp_enabled: false,
         },
       },
     });
@@ -113,6 +121,7 @@ export async function signUpWithEmail(
     // Only when a session exists — otherwise claim after email OTP verifies.
     if (data.user && data.session) {
       await claimSignupRole(signupRole);
+      await upsertSignupProfile(data.user.id, fullName, phone);
     }
 
     if (!data.user) {
@@ -126,6 +135,7 @@ export async function signUpWithEmail(
     // Email confirmation is mandatory. Never treat signup as complete until verified.
     // If Supabase auto-created a session (confirm-email disabled), sign out and force OTP UI.
     if (!data.user.email_confirmed_at) {
+      // Persist profile when we have a user id even if session is cleared next.
       if (data.session) {
         await supabase.auth.signOut();
       }
@@ -137,6 +147,7 @@ export async function signUpWithEmail(
       };
     }
 
+    await upsertSignupProfile(data.user.id, fullName, phone);
     const resolved = await detectUserRole(data.user);
     return {
       success: true,
@@ -152,6 +163,41 @@ export async function signUpWithEmail(
       needsOtpVerification: false,
     };
   }
+}
+
+/** Save mandatory name/phone contact fields (no SMS OTP verification). */
+export async function upsertSignupProfile(
+  userId: string,
+  fullName: string,
+  phone: string,
+): Promise<void> {
+  if (!userId || (!fullName && !phone)) return;
+  try {
+    await supabase.from("user_profiles").upsert(
+      {
+        user_id: userId,
+        full_name: fullName || null,
+        phone: phone || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+  } catch {
+    // Non-fatal — checkout can still collect name/phone later.
+  }
+}
+
+/** After email OTP, copy contact fields from auth metadata into user_profiles. */
+export async function syncContactProfileFromMetadata(user: User): Promise<void> {
+  const fullName =
+    typeof user.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name.trim()
+      : "";
+  const phone =
+    typeof user.user_metadata?.phone === "string"
+      ? user.user_metadata.phone.trim()
+      : "";
+  await upsertSignupProfile(user.id, fullName, phone);
 }
 
 /**

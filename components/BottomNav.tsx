@@ -9,6 +9,7 @@ import {
   markWishlistSeen,
 } from "@/services/wishlistService";
 import { fetchMyShop } from "@/services/shopService";
+import { detectUserRole, type AuthRole } from "@/services/authService";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 
 /* -------------------------------------------------------------------------- */
@@ -73,7 +74,7 @@ function Badge({ count }: { count: number }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  BottomNav — 4 tabs + center merchant Add (TikTok-style)                     */
+/*  BottomNav — role-aware tabs + center merchant Add                         */
 /* -------------------------------------------------------------------------- */
 
 export default function BottomNav() {
@@ -82,49 +83,63 @@ export default function BottomNav() {
   const { openQuickAdd } = useMerchantQuickAdd();
 
   const [session, setSession] = useState(false);
+  const [role, setRole] = useState<AuthRole | "admin" | null>(null);
   const [merchantShop, setMerchantShop] = useState<{ id: string; category: string } | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    async function syncAuth(signedIn: boolean, userId?: string) {
+      if (!signedIn || !userId) {
+        if (!cancelled) {
+          setSession(false);
+          setRole(null);
+          setMerchantShop(null);
+        }
+        return;
+      }
+
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const detected = await detectUserRole(userData.user);
+      const shopResult = await fetchMyShop();
+
+      if (cancelled) return;
+      setSession(true);
+      setRole(detected);
+      if (shopResult.success && shopResult.data) {
+        setMerchantShop({ id: shopResult.data.id, category: shopResult.data.category });
+      } else {
+        setMerchantShop(null);
+      }
+    }
+
     async function init() {
       try {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
-        const signedIn = !!data.session;
-        if (!cancelled) setSession(signedIn);
-        if (signedIn) {
-          const shopResult = await fetchMyShop();
-          if (!cancelled && shopResult.success && shopResult.data) {
-            setMerchantShop({ id: shopResult.data.id, category: shopResult.data.category });
-          } else if (!cancelled) {
-            setMerchantShop(null);
-          }
-        } else if (!cancelled) {
-          setMerchantShop(null);
-        }
+        await syncAuth(!!data.session, data.session?.user?.id);
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
           if (cancelled) return;
-          setSession(!!s);
-          if (s) {
-            const shopResult = await fetchMyShop();
-            if (!cancelled && shopResult.success && shopResult.data) {
-              setMerchantShop({ id: shopResult.data.id, category: shopResult.data.category });
-            } else if (!cancelled) setMerchantShop(null);
-          } else {
-            setMerchantShop(null);
-          }
+          await syncAuth(!!s, s?.user?.id);
         });
-        if (cancelled) subscription.unsubscribe();
+        unsubscribe = () => subscription.unsubscribe();
       } catch {
         if (!cancelled) {
           setSession(false);
+          setRole(null);
           setMerchantShop(null);
         }
       }
     }
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   const isWishlistActive = pathname === "/wishlist";
@@ -153,12 +168,29 @@ export default function BottomNav() {
     };
   }, [pathname]);
 
-  const accountHref = session ? "/dashboard" : "/login";
+  const isMerchant = role === "merchant" || role === "admin" || !!merchantShop;
+  const accountHref = !session
+    ? "/login"
+    : role === "admin"
+      ? "/admin/dashboard"
+      : isMerchant
+        ? "/dashboard"
+        : "/account";
+  const accountLabel = !session
+    ? "Sign In"
+    : role === "admin"
+      ? "Admin"
+      : isMerchant
+        ? "Dashboard"
+        : "Account";
+
   const isHomeActive = pathname === "/";
   const isProductsActive = pathname === "/products" || pathname.startsWith("/products/");
   const isAccountActive =
-    pathname === "/dashboard" ||
+    pathname === accountHref ||
+    pathname.startsWith("/dashboard") ||
     pathname.startsWith("/account") ||
+    pathname.startsWith("/admin") ||
     pathname === "/login" ||
     pathname === "/signup";
 
@@ -167,12 +199,25 @@ export default function BottomNav() {
       openQuickAdd({ shopId: merchantShop.id, shopCategory: merchantShop.category, tab: "product" });
       return;
     }
-    if (session) {
-      router.push("/dashboard");
+    if (session && isMerchant) {
+      router.push("/dashboard/products/new");
       return;
     }
-    router.push("/login?next=/dashboard");
+    if (session) {
+      router.push("/account/become-merchant");
+      return;
+    }
+    router.push("/login?next=/account/become-merchant");
   };
+
+  const centerLabel = merchantShop ? "Add" : session ? (isMerchant ? "Post" : "Sell") : "Sell";
+  const centerAria = merchantShop
+    ? "Add product"
+    : session
+      ? isMerchant
+        ? "Open product tools"
+        : "Register your store"
+      : "Sign in to sell";
 
   const sideTabClass = (active: boolean) =>
     `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
@@ -207,12 +252,12 @@ export default function BottomNav() {
             type="button"
             onClick={handleCenterAdd}
             className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/35 ring-4 ring-white transition hover:bg-emerald-700 active:scale-95 dark:ring-[color:var(--tm-surface)]"
-            aria-label={merchantShop ? "Add product" : session ? "Open dashboard" : "Sign in to add products"}
+            aria-label={centerAria}
           >
             <PlusIcon />
           </button>
           <span className="mt-0.5 text-[0.58rem] font-semibold text-emerald-700 dark:text-emerald-400">
-            {merchantShop ? "Add" : "Post"}
+            {centerLabel}
           </span>
         </div>
 
@@ -232,11 +277,11 @@ export default function BottomNav() {
         <Link
           href={accountHref}
           className={sideTabClass(isAccountActive)}
-          aria-label={session ? "Dashboard" : "Sign In"}
+          aria-label={accountLabel}
           aria-current={isAccountActive ? "page" : undefined}
         >
           <UserIcon active={isAccountActive} />
-          <span>{session ? "Dashboard" : "Sign In"}</span>
+          <span>{accountLabel}</span>
         </Link>
       </div>
     </nav>

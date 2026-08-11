@@ -1,5 +1,7 @@
 # 🧾 TrendMart — Features Inventory (Kya Hai / Kya Nahi Hai)
 
+> **Status note:** This inventory is historical and is superseded for current status by the live codebase and `.cursorrules` requirements. Current operational rules: phone SMS OTP is disabled (email verification only), merchants are auto-approved/live on store creation, and product stock is strictly In Stock / Out of Stock only (no numeric stock counts).
+
 > Last updated: 8 April 2026  
 > Status after: Day 1 (DB Schema) + Day 2 (Home & Shop Detail) + Day 3 (Auth & Dashboard) + Day 4 (Production Polish)
 
