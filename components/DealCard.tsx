@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, type MouseEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -8,6 +8,7 @@ import {
   formatDealWhenTag,
   type ShopDeal,
 } from "@/lib/dealSchedule";
+import { getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
 import { OfferTickerMarquee } from "@/components/ProductGrid";
@@ -24,8 +25,7 @@ interface DealCardProps {
 }
 
 /**
- * Product-grid parity card for store deals.
- * Same layout language as products — only difference is the clear “Deal” label.
+ * Same product-card chrome as ProductGrid — only hard label difference is the Deal tag.
  */
 export default function DealCard({
   deal,
@@ -35,7 +35,11 @@ export default function DealCard({
   priority = false,
   className = "",
 }: DealCardProps) {
+  const gallery = useMemo(() => getDealImages(deal), [deal]);
+  const [imgIndex, setImgIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
+  const activeUrl = gallery[Math.min(imgIndex, Math.max(gallery.length - 1, 0))] ?? null;
+
   const shopHref = getShopPath({
     id: deal.shop_id,
     name: deal.shop_name || "Store",
@@ -43,13 +47,12 @@ export default function DealCard({
   });
   const target = href ?? shopHref;
   const badge = (deal.badge_text || "").trim() || null;
-  const hasImage = Boolean(deal.image_url && !imgError);
+  const hasImage = Boolean(activeUrl && !imgError);
   const whenTag = formatDealWhenTag(deal);
   const schedule = formatDealSchedule(deal);
 
   const tickerTags = useMemo(() => {
     const tags = [...offerTags];
-    // Always surface the when-tag (Monday deal / 14 August deal)
     if (whenTag && !tags.some((t) => t.toLowerCase() === whenTag.toLowerCase())) {
       tags.unshift(whenTag);
     }
@@ -62,6 +65,17 @@ export default function DealCard({
     return tags;
   }, [offerTags, badge, whenTag]);
 
+  const cycleImage = useCallback(
+    (e: MouseEvent, dir: 1 | -1) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (gallery.length < 2) return;
+      setImgError(false);
+      setImgIndex((i) => (i + dir + gallery.length) % gallery.length);
+    },
+    [gallery.length],
+  );
+
   const card = (
     <article
       className={`tm-product-card group flex h-full flex-col overflow-hidden ${
@@ -69,34 +83,63 @@ export default function DealCard({
       } ${className}`}
     >
       <div className="tm-product-media relative shrink-0 overflow-hidden">
-        {hasImage ? (
+        {hasImage && activeUrl ? (
           <Image
-            src={getSafeImageUrl(deal.image_url!, "product")}
+            src={getSafeImageUrl(activeUrl, "product")}
             alt={deal.title}
             fill
             className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             sizes={compact ? "10rem" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
             priority={priority}
             loading={priority ? "eager" : "lazy"}
+            quality={75}
             onError={() => setImgError(true)}
           />
         ) : (
-          <div className="tm-product-placeholder flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-800 via-teal-700 to-emerald-900">
-            <span className="select-none text-2xl font-semibold tracking-tight text-emerald-100/40 sm:text-3xl">
+          <div className="tm-product-placeholder flex h-full w-full items-center justify-center">
+            <span className="select-none text-2xl font-semibold tracking-tight text-teal-700/35 dark:text-teal-300/30 sm:text-3xl">
               {deal.title.charAt(0).toUpperCase()}
             </span>
           </div>
         )}
 
-        {/* Always label as Deal — the only hard difference from products */}
-        <span className="absolute left-1.5 top-1.5 z-10 rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-extrabold uppercase leading-none tracking-wide text-zinc-900 shadow-sm">
+        {/* Same corner chip style as product category — amber Deal label */}
+        <span className="absolute left-1.5 top-1.5 z-10 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-white shadow-sm">
           Deal
         </span>
 
         {deal.is_featured ? (
-          <span className="absolute right-1.5 top-1.5 z-10 rounded-md bg-white/95 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-800 shadow-sm backdrop-blur-sm">
+          <span className="absolute right-1.5 top-1.5 z-10 rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 shadow-sm backdrop-blur-[2px]">
             Featured
           </span>
+        ) : null}
+
+        {gallery.length > 1 ? (
+          <>
+            <span className="absolute bottom-7 right-1.5 z-10 rounded bg-zinc-950/75 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+              {Math.min(imgIndex, gallery.length - 1) + 1}/{gallery.length}
+            </span>
+            {!compact ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous deal photo"
+                  onClick={(e) => cycleImage(e, -1)}
+                  className="absolute left-1 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950/55 text-white opacity-0 transition group-hover:flex group-hover:opacity-100"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next deal photo"
+                  onClick={(e) => cycleImage(e, 1)}
+                  className="absolute right-1 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950/55 text-white opacity-0 transition group-hover:flex group-hover:opacity-100"
+                >
+                  ›
+                </button>
+              </>
+            ) : null}
+          </>
         ) : null}
 
         <OfferTickerMarquee tags={tickerTags} />
@@ -134,7 +177,7 @@ export default function DealCard({
 
         <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-bold leading-none text-amber-700 dark:text-amber-300 sm:text-[13px]">
+            <p className="truncate text-[12px] font-bold leading-none text-zinc-900 dark:text-zinc-100 sm:text-[13px]">
               {whenTag}
             </p>
             <p className="mt-0.5 truncate text-[10px] leading-none text-zinc-400 sm:text-[11px]">

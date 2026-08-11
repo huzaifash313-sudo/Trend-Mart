@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import dynamic from "next/dynamic";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -12,10 +13,15 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { MerchantQuickAddProvider } from "@/context/MerchantQuickAddContext";
 import { ToastProvider } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import MerchantQuickAddModal from "@/components/MerchantQuickAddModal";
 import AppNotifications from "@/components/AppNotifications";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
 import type { ReactNode } from "react";
+
+/** Merchant quick-add pulls DealManager / BulkProductCreator — keep off the critical path. */
+const MerchantQuickAddModal = dynamic(
+  () => import("@/components/MerchantQuickAddModal"),
+  { ssr: false },
+);
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

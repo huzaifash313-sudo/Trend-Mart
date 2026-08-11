@@ -159,7 +159,7 @@ function ProductsPageInner() {
         category: categoryParam === "All" ? undefined : categoryParam,
         subCategoryId: subParam,
         sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
-        limit: 240,
+        limit: 72,
       });
       if (cancelled) return;
       if (result.success) {
@@ -188,26 +188,33 @@ function ProductsPageInner() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchActiveDeals().then((result) => {
+    void fetchActiveDeals(80).then((result) => {
       if (!cancelled && result.success) setActiveDeals(result.data);
     });
     const onDeals = () => {
-      void fetchActiveDeals().then((result) => {
+      void fetchActiveDeals(80).then((result) => {
         if (!cancelled && result.success) setActiveDeals(result.data);
       });
     };
+    window.addEventListener("trendmart:deals-updated", onDeals);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("trendmart:deals-updated", onDeals);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const shopIds = [...new Set(products.map((p) => p.shop_id).filter(Boolean))];
     const onCoupons = () => {
-      const shopIds = [...new Set(products.map((p) => p.shop_id).filter(Boolean))];
       if (!shopIds.length) return;
       void fetchActiveCouponsForShops(shopIds).then((cRes) => {
         if (!cancelled && cRes.success) setShopCoupons(cRes.data);
       });
     };
-    window.addEventListener("trendmart:deals-updated", onDeals);
     window.addEventListener("trendmart:coupons-updated", onCoupons);
     return () => {
       cancelled = true;
-      window.removeEventListener("trendmart:deals-updated", onDeals);
       window.removeEventListener("trendmart:coupons-updated", onCoupons);
     };
   }, [products]);

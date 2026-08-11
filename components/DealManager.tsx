@@ -14,9 +14,10 @@ import {
   type DealScheduleType,
   type ShopDeal,
 } from "@/lib/dealSchedule";
-import ImageUpload from "@/components/ImageUpload";
+import MultiImageUpload from "@/components/MultiImageUpload";
 import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
+import { getDealImages, normalizeDealGallery, MAX_DEAL_IMAGES } from "@/lib/productImages";
 
 interface DealManagerProps {
   shopId: string;
@@ -32,7 +33,7 @@ const EMPTY = {
   starts_on: "",
   ends_on: "",
   day_of_month: "1",
-  image_url: "",
+  gallery: [] as string[],
   badge_text: "",
   is_featured: true,
 };
@@ -76,6 +77,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const gallery = normalizeDealGallery(form.gallery);
     const result = await createShopDeal(shopId, {
       title: form.title,
       description: form.description,
@@ -84,7 +86,8 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
       starts_on: form.starts_on || undefined,
       ends_on: form.ends_on || undefined,
       day_of_month: form.day_of_month ? Number(form.day_of_month) : undefined,
-      image_url: form.image_url || null,
+      image_url: gallery.image_url || null,
+      images: gallery.images,
       badge_text: form.badge_text || null,
       is_featured: form.is_featured,
     });
@@ -105,7 +108,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
         <div>
           <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Store deals</h3>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Add an image + badge — shows on For You, All Deals, and product tickers.
+            Same look as products — add up to {MAX_DEAL_IMAGES} photos + badge. Tagged Deal on For You & search.
           </p>
         </div>
         {!showForm ? (
@@ -124,14 +127,13 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
           onSubmit={handleSubmit}
           className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/60"
         >
-          <ImageUpload
-            currentUrl={form.image_url}
-            onUploaded={(url) => setForm((f) => ({ ...f, image_url: url }))}
+          <MultiImageUpload
+            urls={form.gallery}
+            onChange={(urls) => setForm((f) => ({ ...f, gallery: urls }))}
             folder="deals"
-            fileId={`${shopId}-deal-${Date.now()}`}
-            label="Deal image (recommended)"
-            showPreview
-            fallbackType="product"
+            fileIdPrefix={`${shopId}-deal`}
+            label="Deal photos (same as products — up to 6)"
+            maxImages={MAX_DEAL_IMAGES}
           />
 
           <div>
@@ -307,28 +309,36 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
       {loading ? (
         <p className="text-xs text-zinc-400">Loading deals…</p>
       ) : deals.length === 0 ? (
-        <p className="text-xs text-zinc-400">No deals yet. Add a visual deal with image + schedule.</p>
+        <p className="text-xs text-zinc-400">No deals yet. Add photos + schedule — looks like a product card with a Deal tag.</p>
       ) : (
         <ul className="space-y-2">
-          {deals.map((deal) => (
+          {deals.map((deal) => {
+            const thumbs = getDealImages(deal);
+            const cover = thumbs[0];
+            return (
             <li
               key={deal.id}
               className="flex items-start gap-2.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-2.5 dark:border-zinc-700 dark:bg-zinc-900"
             >
-              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-emerald-900">
-                {deal.image_url ? (
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                {cover ? (
                   <Image
-                    src={getSafeImageUrl(deal.image_url, "product")}
+                    src={getSafeImageUrl(cover, "product")}
                     alt=""
                     fill
                     className="object-cover"
                     sizes="56px"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[0.55rem] font-bold uppercase text-emerald-100">
+                  <div className="flex h-full w-full items-center justify-center text-[0.55rem] font-bold uppercase text-zinc-400">
                     Deal
                   </div>
                 )}
+                {thumbs.length > 1 ? (
+                  <span className="absolute bottom-0.5 right-0.5 rounded bg-zinc-950/70 px-1 text-[8px] font-bold text-white">
+                    {thumbs.length}
+                  </span>
+                ) : null}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
@@ -383,7 +393,8 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

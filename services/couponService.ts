@@ -142,7 +142,9 @@ export async function fetchActiveCouponsForShops(
     const now = Date.now();
     const { data, error } = await supabase
       .from("coupons")
-      .select("*")
+      .select(
+        "id, shop_id, code, discount_percent, discount_amount, expiry_date, is_active, created_at",
+      )
       .in("shop_id", unique)
       .eq("is_active", true);
 

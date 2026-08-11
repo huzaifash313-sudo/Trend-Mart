@@ -101,24 +101,29 @@ function HomeInner() {
       try {
         setLoading(true); setError(null);
         const result = await Promise.race([
-          Promise.all([fetchShops({ publicOnly: true }), fetchActiveStories()]),
+          Promise.all([
+            fetchShops({ publicOnly: true, limit: 80 }),
+            fetchActiveStories(),
+            fetchActiveDeals(80),
+            fetchCategoryCounts(),
+          ]),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Request timed out.")), LOADING_TIMEOUT_MS)),
         ]);
-        const [shopsResult, storiesResult] = result;
+        const [shopsResult, storiesResult, dealsResult, catResult] = result;
         if (!cancelled) {
           if (shopsResult.success) {
             setShops(shopsResult.data);
             const ids = shopsResult.data.map((s) => s.id);
-            fetchActiveCouponsForShops(ids).then((cRes) => {
+            // Coupons only for visible shops — fire after shops land, don't block paint
+            void fetchActiveCouponsForShops(ids).then((cRes) => {
               if (!cancelled && cRes.success) setShopCoupons(cRes.data);
-            });
-            fetchActiveDeals().then((dRes) => {
-              if (!cancelled && dRes.success) setActiveDeals(dRes.data);
             });
           } else setError(shopsResult.error);
           if (storiesResult.success) {
             setStories(sortStoriesUnseenFirst(storiesResult.data));
           }
+          if (dealsResult.success) setActiveDeals(dealsResult.data);
+          if (catResult.success) setCategoryCounts(catResult.data.categories);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data.");
@@ -147,15 +152,11 @@ function HomeInner() {
     };
     window.addEventListener("trendmart:stories-updated", onStoriesUpdated);
     const onDealsUpdated = () => {
-      void fetchActiveDeals().then((dRes) => {
+      void fetchActiveDeals(80).then((dRes) => {
         if (!cancelled && dRes.success) setActiveDeals(dRes.data);
       });
     };
     window.addEventListener("trendmart:deals-updated", onDealsUpdated);
-    const catTimeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), LOADING_TIMEOUT_MS));
-    Promise.race([fetchCategoryCounts(), catTimeout])
-      .then((r) => { if (!cancelled && r && typeof r === "object" && "success" in r && r.success) setCategoryCounts(r.data.categories); })
-      .catch(() => { /* ignore */ });
     return () => {
       cancelled = true;
       window.removeEventListener("trendmart:stories-updated", onStoriesUpdated);
@@ -592,7 +593,7 @@ function HomeInner() {
               return (
                 <ShopCard
                   key={shop.id}
-                  priority={index < 8}
+                  priority={index < 2}
                   shop={{
                     id: shop.id,
                     name: shop.name,

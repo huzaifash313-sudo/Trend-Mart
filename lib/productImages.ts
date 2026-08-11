@@ -2,13 +2,11 @@
 /*  Product gallery helpers — cover + extra images                             */
 /* -------------------------------------------------------------------------- */
 
-import type { Product } from "@/types";
-
 const MAX_PRODUCT_IMAGES = 6;
 
 /** Normalize a product's gallery into a clean URL list (cover first). */
 export function getProductImages(
-  product: Pick<Product, "image_url" | "images"> | null | undefined,
+  product: { image_url?: string | null; images?: string[] | null } | null | undefined,
 ): string[] {
   if (!product) return [];
   const fromGallery = Array.isArray(product.images)
@@ -51,4 +49,20 @@ export function normalizeProductGallery(urls: string[]): {
   };
 }
 
+/** Same gallery helpers for deals (shared max + normalize). */
+export function getDealImages(
+  deal: Pick<{ image_url?: string | null; images?: string[] | null }, "image_url" | "images"> | null | undefined,
+): string[] {
+  return getProductImages(deal);
+}
+
+export function normalizeDealGallery(urls: string[]): {
+  image_url: string;
+  images: string[];
+} {
+  return normalizeProductGallery(urls);
+}
+
 export { MAX_PRODUCT_IMAGES };
+/** Alias — deals use the same cap as products. */
+export const MAX_DEAL_IMAGES = MAX_PRODUCT_IMAGES;

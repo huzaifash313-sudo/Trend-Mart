@@ -96,11 +96,39 @@ export async function fetchShops(opts?: {
    * need to see a shop regardless of its live/approval state.
    */
   publicOnly?: boolean;
+  /** Cap rows for customer listings (homepage). Omit for full admin lists. */
+  limit?: number;
 }): Promise<ServiceResult<Shop[]>> {
   const supabase = createClient();
 
+  const SHOP_LIST_SELECT = [
+    "id",
+    "name",
+    "slug",
+    "category",
+    "location",
+    "logo_url",
+    "banner_url",
+    "is_live",
+    "verification_status",
+    "latitude",
+    "longitude",
+    "service_radius_km",
+    "free_delivery_threshold",
+    "delivery_fee_flat",
+    "delivery_fee_per_km",
+    "min_order_amount",
+    "avg_rating",
+    "review_count",
+    "announcement",
+    "announcement_expires_at",
+    "whatsapp_number",
+    "owner_id",
+    "created_at",
+  ].join(", ");
+
   try {
-    let query = supabase.from("shops").select("*");
+    let query = supabase.from("shops").select(SHOP_LIST_SELECT);
 
     if (opts?.publicOnly) {
       query = query.eq("is_live", true).eq("verification_status", "approved");
@@ -115,14 +143,35 @@ export async function fetchShops(opts?: {
         `name.ilike.%${opts.search}%,category.ilike.%${opts.search}%`,
       );
     }
-    
 
     query = query.order("name", { ascending: true });
 
+    if (opts?.limit && opts.limit > 0) {
+      query = query.limit(Math.min(opts.limit, 200));
+    }
+
     const { data, error } = await query;
 
+    if (error && isMissingColumnError(error)) {
+      // Older schemas — fall back to * without crashing the homepage.
+      let fallback = supabase.from("shops").select("*");
+      if (opts?.publicOnly) {
+        fallback = fallback.eq("is_live", true).eq("verification_status", "approved");
+      }
+      if (opts?.category && opts.category !== "All") {
+        fallback = fallback.eq("category", opts.category);
+      }
+      if (opts?.limit && opts.limit > 0) {
+        fallback = fallback.limit(Math.min(opts.limit, 200));
+      }
+      fallback = fallback.order("name", { ascending: true });
+      const retry = await fallback;
+      if (retry.error) throw retry.error;
+      return { success: true, data: (retry.data as unknown as Shop[]) ?? [] };
+    }
+
     if (error) throw error;
-    return { success: true, data: (data as Shop[]) ?? [] };
+    return { success: true, data: (data as unknown as Shop[]) ?? [] };
   } catch (err) {
     logError(err, { module: "shopService.fetchShops", meta: { opts } });
     return { success: false, error: toError(err) };
@@ -204,12 +253,15 @@ export async function fetchShopById(
 
     if (!shop) throw new Error("Shop not found.");
 
-    // Fetch products
+    // Fetch products (capped — storefront paginates client-side / load-more)
     const { data: products, error: productError } = await supabase
       .from("products")
-      .select("*")
+      .select(
+        "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, stock_status, category_id, sub_category_id, created_at",
+      )
       .eq("shop_id", shop.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(120);
 
     if (productError) throw productError;
 

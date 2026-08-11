@@ -192,6 +192,7 @@ function ProductCard({
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             priority={priority}
             loading={priority ? "eager" : "lazy"}
+            quality={75}
             onError={() => setImgError(true)}
           />
         ) : (
@@ -393,7 +394,7 @@ export default function ProductGrid({
           categoryLabel={categoryLabel}
           showShopMeta={showShopMeta}
           offerContext={getOfferContext?.(product) ?? offerContext}
-          priority={index < 8}
+          priority={index < 2}
           onProductClick={onProductClick}
           onAddToCart={onAddToCart}
           onFavoriteToggle={onFavoriteToggle}

@@ -71,7 +71,7 @@ function DealsInner() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const result = await fetchActiveDeals();
+    const result = await fetchActiveDeals(100);
     if (result.success) {
       setDeals(result.data);
       void loadOffersForShops(result.data.map((d) => d.shop_id));
@@ -372,7 +372,7 @@ function DealsInner() {
             <DealCard
               key={deal.id}
               deal={deal}
-              priority={i < 4}
+              priority={i < 2}
               offerTags={getOfferTags(deal.shop_id)}
             />
           ))}

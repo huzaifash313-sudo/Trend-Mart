@@ -13,8 +13,10 @@ export interface ShopDeal {
   ends_on: string | null;
   day_of_month: number | null;
   is_active: boolean;
-  /** Optional deal banner / card image (Cloudinary / storage URL). */
+  /** Cover / primary deal image (storage URL). */
   image_url?: string | null;
+  /** Extra gallery URLs (same pattern as products.images); cover first in UI. */
+  images?: string[] | null;
   /** Short badge e.g. "20% OFF", "Buy 1 Get 1". */
   badge_text?: string | null;
   /** Highlight on For You / Featured Deals strip. */

@@ -341,9 +341,9 @@ function sortMarketplaceProducts(
 }
 
 const MARKETPLACE_SELECT = `
-  id, shop_id, name, title, description, price, original_price, compare_at_price,
+  id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
-  variants, category_id, sub_category_id, created_at,
+  category_id, sub_category_id, created_at,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude,
@@ -355,9 +355,9 @@ const MARKETPLACE_SELECT = `
 
 /** Pre-migration fallback if avg_rating / offer columns are not applied yet. */
 const MARKETPLACE_SELECT_LEGACY = `
-  id, shop_id, name, title, description, price, original_price, compare_at_price,
+  id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
-  variants, category_id, sub_category_id, created_at,
+  category_id, sub_category_id, created_at,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude
@@ -416,14 +416,14 @@ async function topUpMarketplaceDiversity(
     .eq("shops.is_live", true)
     .eq("shops.verification_status", "approved")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(120);
 
   if (opts.availableOnly) builder = builder.eq("is_available", true);
   builder = builder.not("shop_id", "in", `(${excludeIds.join(",")})`);
   if (opts.subCategoryId) builder = builder.eq("sub_category_id", opts.subCategoryId);
 
   const fuzzyOr = opts.query
-    ? buildFuzzyIlikeOr(opts.query, ["name", "description", "title"], 6)
+    ? buildFuzzyIlikeOr(opts.query, ["name", "title"], 6)
     : null;
   if (fuzzyOr) {
     builder = builder.or(fuzzyOr);
@@ -432,7 +432,7 @@ async function topUpMarketplaceDiversity(
     if (safe) {
       const pattern = `%${safe}%`;
       builder = builder.or(
-        `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+        `name.ilike.${pattern},title.ilike.${pattern}`,
       );
     }
   }
@@ -472,7 +472,7 @@ export async function fetchMarketplaceProducts(
     category,
     subCategoryId,
     sort = "for_you",
-    limit = 160,
+    limit = 72,
     availableOnly = true,
   } = filters;
 
@@ -483,7 +483,7 @@ export async function fetchMarketplaceProducts(
       .eq("shops.is_live", true)
       .eq("shops.verification_status", "approved")
       .order("created_at", { ascending: false })
-      .limit(Math.min(Math.max(limit, 20), 240));
+      .limit(Math.min(Math.max(limit, 20), 120));
 
     if (availableOnly) {
       builder = builder.eq("is_available", true);
@@ -491,7 +491,7 @@ export async function fetchMarketplaceProducts(
 
     const q = query.trim();
     if (q) {
-      const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "description", "title"], 6);
+      const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 6);
       if (fuzzyOr) {
         builder = builder.or(fuzzyOr);
       } else {
@@ -499,7 +499,7 @@ export async function fetchMarketplaceProducts(
         if (safe) {
           const pattern = `%${safe}%`;
           builder = builder.or(
-            `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+            `name.ilike.${pattern},title.ilike.${pattern}`,
           );
         }
       }
@@ -522,10 +522,10 @@ export async function fetchMarketplaceProducts(
         .eq("shops.is_live", true)
         .eq("shops.verification_status", "approved")
         .order("created_at", { ascending: false })
-        .limit(Math.min(Math.max(limit, 20), 240));
+        .limit(Math.min(Math.max(limit, 20), 120));
       if (availableOnly) legacy = legacy.eq("is_available", true);
       if (q) {
-        const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "description", "title"], 6);
+        const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 6);
         if (fuzzyOr) {
           legacy = legacy.or(fuzzyOr);
         } else {
@@ -533,7 +533,7 @@ export async function fetchMarketplaceProducts(
           if (safe) {
             const pattern = `%${safe}%`;
             legacy = legacy.or(
-              `name.ilike.${pattern},description.ilike.${pattern},title.ilike.${pattern}`,
+              `name.ilike.${pattern},title.ilike.${pattern}`,
             );
           }
         }
@@ -561,7 +561,7 @@ export async function fetchMarketplaceProducts(
           .eq("is_available", true)
           .in("shop_id", subRes.data)
           .order("created_at", { ascending: false })
-          .limit(Math.min(Math.max(limit, 20), 240));
+          .limit(Math.min(Math.max(limit, 20), 120));
         if (!fbErr && fallbackRows) {
           items = (fallbackRows as Record<string, unknown>[])
             .map(mapMarketplaceRow)
@@ -579,15 +579,15 @@ export async function fetchMarketplaceProducts(
       });
     }
 
-    // Typo / near-miss rescue: widen the pool, then keep only fuzzy-ranked matches.
-    if (q && items.length < 8) {
+    // Typo rescue only when the primary query returned almost nothing (avoid 240-row storm).
+    if (q && items.length < 3) {
       let broad = supabase
         .from("products")
         .select(MARKETPLACE_SELECT)
         .eq("shops.is_live", true)
         .eq("shops.verification_status", "approved")
         .order("created_at", { ascending: false })
-        .limit(240);
+        .limit(Math.min(Math.max(limit, 40), 120));
       if (availableOnly) broad = broad.eq("is_available", true);
       if (subCategoryId) broad = broad.eq("sub_category_id", subCategoryId);
       const broadRes = await broad;
@@ -609,8 +609,8 @@ export async function fetchMarketplaceProducts(
       const ranked = fuzzyFilterAndRank(
         items,
         q,
-        (p) => [p.name, p.title, p.description, p.shop_name, p.shop_category],
-        { minScore: FUZZY_MIN_SCORE, weights: [1, 0.95, 0.75, 0.7, 0.55] },
+        (p) => [p.name, p.title, p.shop_name, p.shop_category],
+        { minScore: FUZZY_MIN_SCORE, weights: [1, 0.95, 0.7, 0.55] },
       );
       // Relevance first (exact → similar). Skip For You mix so typos still surface best hits.
       return { success: true, data: ranked.map((r) => r.item) };
