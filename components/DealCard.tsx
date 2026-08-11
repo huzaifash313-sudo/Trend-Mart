@@ -1,10 +1,8 @@
 "use client";
 
 import { useMemo, useState, useCallback, type MouseEvent } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import {
-  formatDealSchedule,
   formatDealWhenTag,
   isDealOrderableToday,
   type ShopDeal,
@@ -26,7 +24,6 @@ interface DealCardProps {
   deal: ShopDeal;
   href?: string;
   offerTags?: string[];
-  /** Slightly tighter type — parent sets width (same as product cells). */
   compact?: boolean;
   priority?: boolean;
   className?: string;
@@ -62,8 +59,8 @@ function dealToProduct(deal: ShopDeal): Product {
 }
 
 /**
- * Same chrome as ProductGrid cards (tm-product-*). Parent grid/strip owns width.
- * Cart + wishlist anytime; WhatsApp Order only on the deal day.
+ * ProductGrid twin: title → shop → price | ♡ Add Order.
+ * No extra rows (Visit = shop tap). Order only on deal day.
  */
 export default function DealCard({
   deal,
@@ -93,27 +90,21 @@ export default function DealCard({
     slug: deal.shop_slug,
   });
   const storeHref = href ?? `${shopHref}#deals`;
-  const badge = (deal.badge_text || "").trim() || null;
   const whenTag = formatDealWhenTag(deal);
-  const schedule = formatDealSchedule(deal);
   const canOrderToday = isDealOrderableToday(deal);
   const product = useMemo(() => dealToProduct(deal), [deal]);
   const { hasDiscount, originalPrice, discountPercent } = getProductDiscount(product);
   const hasPrice = deal.price != null && Number.isFinite(Number(deal.price));
 
+  // Ticker: delivery/coupons + when-tag once (no badge spam)
   const tickerTags = useMemo(() => {
-    const tags = [...offerTags];
-    if (whenTag && !tags.some((t) => t.toLowerCase() === whenTag.toLowerCase())) {
-      tags.unshift(whenTag);
+    const tags: string[] = [];
+    if (whenTag) tags.push(whenTag);
+    for (const t of offerTags) {
+      if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) tags.push(t);
     }
-    if (badge) {
-      const line = `${badge} · ${whenTag}`;
-      if (!tags.some((t) => t.toLowerCase() === line.toLowerCase())) {
-        tags.unshift(line.length > 32 ? `${line.slice(0, 30)}…` : line);
-      }
-    }
-    return tags;
-  }, [offerTags, badge, whenTag]);
+    return tags.slice(0, 4);
+  }, [offerTags, whenTag]);
 
   const shopPick: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
     id: deal.shop_id,
@@ -137,10 +128,15 @@ export default function DealCard({
     e.stopPropagation();
   };
 
+  const goStore = (e?: MouseEvent) => {
+    if (e) stop(e);
+    window.location.href = storeHref;
+  };
+
   const handleAdd = (e: MouseEvent) => {
     stop(e);
     if (!hasPrice) {
-      addToast("This deal needs a price — visit the store or ask the merchant.", "info");
+      addToast("This deal needs a price — open the store or ask the merchant.", "info");
       return;
     }
     addItem(product, shopPick, 1);
@@ -166,17 +162,17 @@ export default function DealCard({
   const handleOrder = (e: MouseEvent) => {
     stop(e);
     if (!canOrderToday) {
-      addToast(`Order opens on deal day (${whenTag}). You can still add to cart or wishlist.`, "info");
+      addToast(`Order opens on ${whenTag}. Cart & wishlist still work.`, "info");
       return;
     }
     if (!hasPrice) {
-      addToast("Set a deal price to order. Opening store…", "info");
-      window.location.href = storeHref;
+      addToast("Deal needs a price — opening store…", "info");
+      goStore();
       return;
     }
     if (!shopPick.whatsapp_number) {
-      addToast("Store WhatsApp missing — opening store page.", "info");
-      window.location.href = storeHref;
+      addToast("Store WhatsApp missing — opening store.", "info");
+      goStore();
       return;
     }
     setCheckoutOpen(true);
@@ -196,15 +192,13 @@ export default function DealCard({
     },
   ];
 
-  const priceClass = compact
-    ? "text-[13px] sm:text-sm"
-    : "text-sm sm:text-[15px]";
   const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
+  const priceClass = compact ? "text-[13px] sm:text-sm" : "text-sm sm:text-[15px]";
 
   return (
     <>
       <article
-        className={`tm-product-card group relative flex h-full w-full flex-col overflow-hidden ${className}`}
+        className={`tm-product-card group relative flex w-full flex-col overflow-hidden ${className}`}
       >
         <div className="tm-product-media relative shrink-0 overflow-hidden">
           {showPhoto && safeSrc ? (
@@ -265,22 +259,24 @@ export default function DealCard({
             </>
           ) : null}
 
-          <OfferTickerMarquee tags={tickerTags} />
+          {tickerTags.length > 0 ? <OfferTickerMarquee tags={tickerTags} /> : null}
         </div>
 
-        <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-0.5">
-          <h3 className={`tm-product-title ${titleClass}`} title={deal.title}>
+        {/* Packed body — no flex-1 stretch (avoids “broken” empty gaps) */}
+        <div className="tm-product-body flex flex-col gap-1">
+          <h3
+            className={`tm-product-title min-h-[2.45em] ${titleClass}`}
+            title={deal.title}
+          >
             {deal.title}
           </h3>
 
-          {deal.shop_name ? (
+          <div className="flex min-w-0 items-center gap-1">
             <button
               type="button"
-              onClick={(e) => {
-                stop(e);
-                window.location.href = storeHref;
-              }}
-              className="flex min-w-0 items-center gap-1 text-left"
+              onClick={goStore}
+              className="flex min-w-0 flex-1 items-center gap-1 text-left"
+              aria-label={`Visit ${deal.shop_name || "store"}`}
             >
               {deal.shop_logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -291,22 +287,17 @@ export default function DealCard({
                 />
               ) : (
                 <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[7px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  {deal.shop_name.charAt(0).toUpperCase()}
+                  {(deal.shop_name || "?").charAt(0).toUpperCase()}
                 </span>
               )}
               <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
-                {deal.shop_name}
+                {deal.shop_name || "Store"}
               </span>
             </button>
-          ) : null}
+          </div>
 
-          <p className="truncate text-[10px] leading-none text-zinc-400 sm:text-[11px]" title={schedule}>
-            {whenTag}
-          </p>
-
-          {/* Same footer pattern as ProductGrid */}
-          <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
-            <div className="min-w-0 flex-1">
+          <div className="tm-product-footer flex items-end justify-between gap-1 pt-0.5">
+            <div className="min-h-[2rem] min-w-0 flex-1">
               {hasPrice ? (
                 <>
                   <p
@@ -328,7 +319,9 @@ export default function DealCard({
                   ) : null}
                 </>
               ) : (
-                <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{whenTag}</p>
+                <p className="text-[11px] font-semibold leading-tight text-zinc-500 dark:text-zinc-400">
+                  {whenTag}
+                </p>
               )}
             </div>
 
@@ -353,30 +346,21 @@ export default function DealCard({
               >
                 Add
               </button>
+              <button
+                type="button"
+                onClick={handleOrder}
+                disabled={!canOrderToday}
+                title={canOrderToday ? "Order via WhatsApp" : `Order on ${whenTag}`}
+                className={`shrink-0 px-0.5 text-[11px] font-bold leading-none transition ${
+                  canOrderToday
+                    ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                    : "cursor-not-allowed text-zinc-300 dark:text-zinc-600"
+                }`}
+                aria-label={canOrderToday ? "Order now" : `Order only on ${whenTag}`}
+              >
+                Order
+              </button>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 pt-0.5">
-            <button
-              type="button"
-              onClick={handleOrder}
-              disabled={!canOrderToday}
-              title={canOrderToday ? "Order today via WhatsApp" : `Order only on ${whenTag}`}
-              className={`text-[11px] font-semibold transition ${
-                canOrderToday
-                  ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                  : "cursor-not-allowed text-zinc-400 dark:text-zinc-500"
-              }`}
-            >
-              {canOrderToday ? "Order" : "Order on day"}
-            </button>
-            <Link
-              href={storeHref}
-              onClick={(e) => e.stopPropagation()}
-              className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
-            >
-              Visit
-            </Link>
           </div>
         </div>
       </article>

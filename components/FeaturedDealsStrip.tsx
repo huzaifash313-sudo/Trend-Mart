@@ -66,7 +66,7 @@ export default function FeaturedDealsStrip({
             {title}
           </h2>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Same as products · Order on deal day
+            Order on deal day
           </p>
         </div>
         <Link
@@ -78,7 +78,7 @@ export default function FeaturedDealsStrip({
       </div>
       <div className="-mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3 pb-1 scrollbar-none sm:mx-0 sm:px-0">
         {visible.map((deal, i) => (
-          <div key={deal.id} className={SLOT}>
+          <div key={deal.id} className={`${SLOT} self-start`}>
             <DealCard
               deal={deal}
               compact

@@ -419,7 +419,7 @@ function ShopDetailInner({ id }: { id: string }) {
               <div>
                 <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Deals</h2>
                 <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                  Wishlist &amp; cart anytime · Order only on the deal day
+                  Order on deal day
                 </p>
               </div>
               <Link
@@ -433,7 +433,7 @@ function ShopDetailInner({ id }: { id: string }) {
               {liveShopDeals.map((deal, i) => (
                 <div
                   key={deal.id}
-                  className="w-[calc(50%-0.25rem)] shrink-0 snap-start sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
+                  className="w-[calc(50%-0.25rem)] shrink-0 snap-start self-start sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
                 >
                   <DealCard
                     deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
