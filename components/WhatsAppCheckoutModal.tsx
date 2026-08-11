@@ -352,17 +352,24 @@ export default function WhatsAppCheckoutModal({
   const minOrderAmount = shop.min_order_amount ?? 0;
   const belowMinimumOrder = minOrderAmount > 0 && subtotal > 0 && subtotal < minOrderAmount;
 
+  const qualifiesForFreeDelivery =
+    shop.free_delivery_threshold != null &&
+    shop.free_delivery_threshold > 0 &&
+    subtotal >= shop.free_delivery_threshold;
+
+  const perKmFee = shop.delivery_fee_per_km ?? 0;
+  const needsDistanceForFee = perKmFee > 0 && !qualifiesForFreeDelivery;
+  const missingDistanceForFee = needsDistanceForFee && distanceKm == null;
+
   const deliveryFee = useMemo(() => {
     const freeThreshold = shop.free_delivery_threshold;
     if (freeThreshold != null && freeThreshold > 0 && subtotal >= freeThreshold) return 0;
     const flat = shop.delivery_fee_flat ?? 0;
     const perKm = shop.delivery_fee_per_km ?? 0;
+    // Without GPS distance, charge flat only and warn the shopper (see missingDistanceForFee).
     const distanceCharge = distanceKm != null && perKm > 0 ? distanceKm * perKm : 0;
     return Math.round((flat + distanceCharge) * 100) / 100;
   }, [shop, subtotal, distanceKm]);
-
-  const qualifiesForFreeDelivery =
-    shop.free_delivery_threshold != null && shop.free_delivery_threshold > 0 && subtotal >= shop.free_delivery_threshold;
 
   const grandTotal = useMemo(
     () => Math.max(0, subtotal - discountAmount + deliveryFee),
@@ -632,6 +639,12 @@ export default function WhatsAppCheckoutModal({
     setOrderError(null);
 
     try {
+      if (belowMinimumOrder) {
+        throw new Error(
+          `Minimum order for this shop is ${formatRupees(minOrderAmount)}. Add more items to continue.`,
+        );
+      }
+
       // Prefer cart WhatsApp; if stale/empty, refresh from shop row so checkout still works.
       let merchantPhone = phone;
       if (!merchantPhone && shop.id) {
@@ -738,6 +751,8 @@ export default function WhatsAppCheckoutModal({
     couponCode,
     couponResult,
     quantities,
+    belowMinimumOrder,
+    minOrderAmount,
   ]);
 
   const finishOrder = useCallback(() => {
@@ -1030,6 +1045,17 @@ export default function WhatsAppCheckoutModal({
                   <InfoIcon />
                   <span className="text-amber-700 dark:text-amber-400">
                     Minimum order for {shop.name} is {formatRupees(minOrderAmount)}. Add {formatRupees(minOrderAmount - subtotal)} more to checkout.
+                  </span>
+                </div>
+              )}
+
+              {/* Distance-based delivery needs GPS */}
+              {missingDistanceForFee && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs dark:bg-amber-900/20">
+                  <InfoIcon />
+                  <span className="text-amber-700 dark:text-amber-400">
+                    This shop charges per-km delivery. Share your location (or set it in Settings)
+                    for an accurate fee — right now only the flat fee ({formatRupees(shop.delivery_fee_flat ?? 0)}) is applied.
                   </span>
                 </div>
               )}

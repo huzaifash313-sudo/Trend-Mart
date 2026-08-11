@@ -371,6 +371,48 @@ export async function placeOrderAtomic(
   const supabase = createClient();
   const MAX_RETRIES = 3;
 
+  // Soft server-side shop rules (min order + live store) before stock work.
+  try {
+    const { data: shopRow, error: shopErr } = await supabase
+      .from("shops")
+      .select("id, name, is_live, min_order_amount, delivery_fee_per_km")
+      .eq("id", params.shopId)
+      .maybeSingle();
+
+    if (shopErr) throw shopErr;
+    if (!shopRow) {
+      return { success: false, error: "Shop not found." };
+    }
+    if (shopRow.is_live === false) {
+      return {
+        success: false,
+        error: "This shop is currently offline and cannot accept orders.",
+      };
+    }
+
+    const lineSubtotal = params.items.reduce(
+      (sum, item) => sum + item.price * Math.max(1, item.quantity ?? 1),
+      0,
+    );
+    const discountedSubtotal = Math.max(
+      0,
+      lineSubtotal - Math.max(0, params.discountAmount ?? 0),
+    );
+    const minOrder = Number(shopRow.min_order_amount ?? 0);
+    if (minOrder > 0 && discountedSubtotal < minOrder) {
+      return {
+        success: false,
+        error: `Minimum order for this shop is Rs. ${minOrder.toLocaleString()}. Current subtotal is Rs. ${Math.round(discountedSubtotal).toLocaleString()}.`,
+      };
+    }
+  } catch (err) {
+    logError(err, {
+      module: "orderService.placeOrderAtomic.shopGate",
+      meta: { shopId: params.shopId },
+    });
+    // Continue — stock checks still protect inventory; do not soft-fail checkout on gate read errors.
+  }
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       // ── Phase 1: Re-verify stock for all items ─────────────────────────

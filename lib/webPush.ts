@@ -1,9 +1,11 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Web Push helpers                                              */
-/*  Out-of-browser VAPID send is optional. Without the `web-push` package we  */
-/*  no-op safely; in-app / Notification API alerts still work via             */
-/*  NotificationListener.                                                     */
+/*  Sends optional OS notifications through VAPID web-push subscriptions.      */
+/*  In-app realtime notifications continue to work even when VAPID is unset.  */
 /* -------------------------------------------------------------------------- */
+
+import webPush from "web-push";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export interface PushPayload {
   title: string;
@@ -12,25 +14,72 @@ export interface PushPayload {
   tag?: string;
 }
 
+type PushSubscriptionRow = {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+};
+
 export function isWebPushConfigured(): boolean {
   return !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 }
 
 /**
- * Best-effort VAPID push.
- * Returns zeros until `web-push` is added as a dependency (intentionally not
- * required for deploy — avoids Turbopack/CI module-not-found failures).
+ * Best-effort VAPID push fan-out for all saved subscriptions owned by a user.
  */
 export async function sendPushToUser(
-  _userId: string,
-  _payload: PushPayload,
+  userId: string,
+  payload: PushPayload,
 ): Promise<{ sent: number; failed: number }> {
   if (!isWebPushConfigured()) return { sent: 0, failed: 0 };
 
-  // Keys may be present, but the optional npm package is not installed.
-  // Keep this a pure no-op so production builds stay green.
-  console.warn(
-    "[webPush] VAPID keys present but `web-push` package is not installed — skipping OS push. In-app notifications still work.",
+  const admin = getSupabaseAdminClient();
+  if (!admin) return { sent: 0, failed: 0 };
+
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
+  const privateKey = process.env.VAPID_PRIVATE_KEY!;
+  const subject = process.env.VAPID_SUBJECT || "mailto:support@trendmart.local";
+
+  webPush.setVapidDetails(subject, publicKey, privateKey);
+
+  const { data, error } = await admin
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .eq("user_id", userId);
+
+  if (error || !data) return { sent: 0, failed: 0 };
+
+  let sent = 0;
+  let failed = 0;
+  const body = JSON.stringify(payload);
+
+  await Promise.all(
+    ((data as PushSubscriptionRow[]) ?? []).map(async (subscription) => {
+      try {
+        await webPush.sendNotification(
+          {
+            endpoint: subscription.endpoint,
+            keys: {
+              p256dh: subscription.p256dh,
+              auth: subscription.auth,
+            },
+          },
+          body,
+        );
+        sent += 1;
+      } catch (err) {
+        failed += 1;
+        const statusCode =
+          typeof err === "object" && err !== null && "statusCode" in err
+            ? Number((err as { statusCode?: number }).statusCode)
+            : 0;
+        if (statusCode === 404 || statusCode === 410) {
+          await admin.from("push_subscriptions").delete().eq("id", subscription.id);
+        }
+      }
+    }),
   );
-  return { sent: 0, failed: 0 };
+
+  return { sent, failed };
 }

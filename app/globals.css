@@ -455,6 +455,16 @@ label {
   padding-bottom: var(--safe-area-inset-bottom);
 }
 
+/* Clears mobile bottom nav + cart bar on phone; normal padding on md+ */
+.pb-safe-nav {
+  padding-bottom: calc(5.5rem + var(--safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .pb-safe-nav {
+    padding-bottom: calc(1.5rem + var(--safe-area-inset-bottom));
+  }
+}
+
 /* ── Marquee Animation (AnnouncementBanner) ─────────────────────────────────── */
 
 @keyframes marquee {

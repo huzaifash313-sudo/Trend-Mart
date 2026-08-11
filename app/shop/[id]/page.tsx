@@ -101,6 +101,7 @@ function ShopDetailInner({ id }: { id: string }) {
   });
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const supabase = useMemo(() => createClient(), []);
+  const resolvedShopId = shop?.id ?? null;
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const theme: StoreTheme = useMemo(() => getStoreTheme(shop?.category), [shop?.category]);
@@ -122,30 +123,35 @@ function ShopDetailInner({ id }: { id: string }) {
       setError(null);
       setIsOwner(false);
 
-      const [shopResult, prefs, couponsResult, auth] = await Promise.all([
-        fetchShopById(id),
-        fetchStorefrontDisplayPrefs(id),
-        fetchCouponsByShopId(id),
-        supabase.auth.getUser(),
-      ]);
+      const shopResult = await fetchShopById(id);
 
       if (cancelled) return;
 
       if (shopResult.success) {
-        setShop(shopResult.data.shop);
+        const resolvedShop = shopResult.data.shop;
+        const resolvedId = resolvedShop.id;
+        const [prefs, couponsResult, auth] = await Promise.all([
+          fetchStorefrontDisplayPrefs(resolvedId),
+          fetchCouponsByShopId(resolvedId),
+          supabase.auth.getUser(),
+        ]);
+
+        if (cancelled) return;
+
+        setShop(resolvedShop);
         setProducts(shopResult.data.products);
-        const ownerId = shopResult.data.shop.owner_id;
+        const ownerId = resolvedShop.owner_id;
         const uid = auth.data.user?.id;
         setIsOwner(Boolean(ownerId && uid && ownerId === uid));
+        setDisplayPrefs(prefs);
+        if (couponsResult.success) setCoupons(couponsResult.data);
+
+        // Fire-and-forget visit log (skips owner + dedupes inside service)
+        void logShopView(resolvedId);
       } else {
         setError(shopResult.error);
       }
-      setDisplayPrefs(prefs);
-      if (couponsResult.success) setCoupons(couponsResult.data);
       setLoading(false);
-
-      // Fire-and-forget visit log (skips owner + dedupes inside service)
-      void logShopView(id);
     }
     fetchData();
     return () => { cancelled = true; };
@@ -155,7 +161,10 @@ function ShopDetailInner({ id }: { id: string }) {
   useEffect(() => {
     const refresh = () => {
       void fetchShopById(id).then((result) => {
-        if (result.success) setProducts(result.data.products);
+        if (result.success) {
+          setShop(result.data.shop);
+          setProducts(result.data.products);
+        }
       });
     };
     window.addEventListener("trendmart:products-updated", refresh);
@@ -196,7 +205,8 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // ── Real-time product updates ─────────────────────────────────────────────
   useEffect(() => {
-    const unsubProducts = subscribeToProducts(id, (payload) => {
+    if (!resolvedShopId) return;
+    const unsubProducts = subscribeToProducts(resolvedShopId, (payload) => {
       const updated = payload.new as Product;
       setProducts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
     }, (payload) => {
@@ -207,7 +217,7 @@ function ShopDetailInner({ id }: { id: string }) {
       setProducts((prev) => prev.filter((p) => p.id !== deleted.id));
     });
     return () => { unsubProducts(); };
-  }, [id]);
+  }, [resolvedShopId]);
 
   useEffect(() => () => { unsubscribeAll(); }, []);
 
@@ -606,7 +616,7 @@ function ShopDetailInner({ id }: { id: string }) {
         {/* Reviews & Ratings — owner can reply; cannot self-review */}
         <section aria-label="Customer Reviews" className="mt-4">
           <h2 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Customer Reviews</h2>
-          <StoreReviews shopId={id} ownerId={shop.owner_id} />
+          <StoreReviews shopId={shop.id} ownerId={shop.owner_id} />
         </section>
       </>)}
 

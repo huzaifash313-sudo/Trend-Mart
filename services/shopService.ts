@@ -8,6 +8,11 @@ import type { Shop, Product, ShopFormData } from "@/types";
 import { logError, toServiceError } from "@/services/errorService";
 import { isValidLatitude, isValidLongitude } from "@/lib/geoCoords";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
+import {
+  generateShopSlug,
+  isUuid,
+  slugifyShopName,
+} from "@/lib/shopSlug";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +54,7 @@ const SHOP_EXTENDED_KEYS = [
   "secondary_phone",
   "business_hours",
   "operating_status",
+  "slug",
 ] as const;
 
 /** Persist offer end time; empty / invalid → null (no countdown). */
@@ -132,21 +138,77 @@ export async function fetchShopById(
   const supabase = createClient();
 
   try {
-    // Fetch shop
-    const { data: shop, error: shopError } = await supabase
-      .from("shops")
-      .select("*")
-      .eq("id", id)
-      .single();
+    let shop: Shop | null = null;
 
-    if (shopError) throw shopError;
+    if (isUuid(id)) {
+      const { data, error: shopError } = await supabase
+        .from("shops")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (shopError) throw shopError;
+      shop = data as Shop | null;
+    } else {
+      const slug = decodeURIComponent(id).trim().toLowerCase();
+
+      // Prefer a real `shops.slug` column when present.
+      let { data, error: slugError } = await supabase
+        .from("shops")
+        .select("*")
+        .eq("slug", slug)
+        .eq("is_live", true)
+        .eq("verification_status", "approved")
+        .maybeSingle();
+
+      if (slugError && isMissingColumnError(slugError)) {
+        ({ data, error: slugError } = await supabase
+          .from("shops")
+          .select("*")
+          .eq("slug", slug)
+          .eq("is_live", true)
+          .maybeSingle());
+      }
+
+      if (slugError && !isMissingColumnError(slugError)) throw slugError;
+      shop = (data as Shop | null) ?? null;
+
+      if (!shop) {
+        // Older schemas have no slug column. Resolve generated slugs from live,
+        // approved shops client-side as a compatibility path.
+        let { data: shops, error: shopsError } = await supabase
+          .from("shops")
+          .select("*")
+          .eq("is_live", true)
+          .eq("verification_status", "approved");
+
+        if (shopsError && isMissingColumnError(shopsError)) {
+          ({ data: shops, error: shopsError } = await supabase
+            .from("shops")
+            .select("*")
+            .eq("is_live", true));
+        }
+
+        if (shopsError) throw shopsError;
+        shop =
+          ((shops as Shop[] | null) ?? []).find((candidate) => {
+            const explicitSlug = candidate.slug?.trim().toLowerCase();
+            return (
+              explicitSlug === slug ||
+              generateShopSlug(candidate.name, candidate.id) === slug ||
+              slugifyShopName(candidate.name) === slug
+            );
+          }) ?? null;
+      }
+    }
+
     if (!shop) throw new Error("Shop not found.");
 
     // Fetch products
     const { data: products, error: productError } = await supabase
       .from("products")
       .select("*")
-      .eq("shop_id", id)
+      .eq("shop_id", shop.id)
       .order("created_at", { ascending: false });
 
     if (productError) throw productError;
@@ -527,7 +589,25 @@ export async function createShop(
     }
 
     if (error) throw error;
-    return { success: true, data: data as Shop };
+
+    let saved = data as Shop;
+    const slug = generateShopSlug(saved.name, saved.id);
+    try {
+      const { data: slugged, error: slugError } = await supabase
+        .from("shops")
+        .update({ slug })
+        .eq("id", saved.id)
+        .select()
+        .single();
+      if (slugError && !isMissingColumnError(slugError)) throw slugError;
+      if (slugged) saved = slugged as Shop;
+    } catch (slugErr) {
+      if (!isMissingColumnError(slugErr)) {
+        logError(slugErr, { module: "shopService.createShop.slug", meta: { shopId: saved.id } });
+      }
+    }
+
+    return { success: true, data: saved };
   } catch (err) {
     logError(err, { module: "shopService.createShop", meta: { form } });
     return { success: false, error: toError(err) };
@@ -545,6 +625,7 @@ export async function updateShop(
 
   try {
     const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
+    sanitized.slug = generateShopSlug(String(sanitized.name ?? form.name), shopId);
     let { data, error } = await supabase
       .from("shops")
       .update(sanitized)

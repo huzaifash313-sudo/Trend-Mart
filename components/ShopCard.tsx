@@ -4,6 +4,7 @@ import Link from "next/link";
 import ShopMediaHeader from "@/components/ShopMediaHeader";
 import ShopOfferTicker from "@/components/ShopOfferTicker";
 import { formatDistance } from "@/services/geoRadiusService";
+import { getShopPath } from "@/lib/shopSlug";
 import {
   buildShopOfferSlides,
   type ShopOfferSlide,
@@ -13,11 +14,13 @@ import CompactRating from "@/components/CompactRating";
 export interface ShopCardData {
   id: string;
   name: string;
+  slug?: string | null;
   category: string;
   location: string;
   logo_url?: string | null;
   banner_url?: string | null;
   is_live?: boolean;
+  verification_status?: "pending" | "approved" | "rejected" | null;
   distance_km?: number | null;
   business_hours?: string | null;
   operating_status?: string | null;
@@ -100,8 +103,9 @@ export default function ShopCard({
   onToggleFavorite,
   priority = false,
 }: ShopCardProps) {
-  const href = `/shop/${shop.id}`;
+  const href = getShopPath(shop);
   const isLive = !!shop.is_live;
+  const isVerified = isLive && (shop.verification_status ?? "approved") === "approved";
   const distance =
     showDistance && shop.distance_km != null
       ? formatDistance(shop.distance_km)
@@ -169,6 +173,12 @@ export default function ShopCard({
           >
             {shop.name}
           </Link>
+
+          {isVerified ? (
+            <span className="-mt-0.5 shrink-0 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800/70">
+              Verified
+            </span>
+          ) : null}
 
           {onToggleFavorite ? (
             <button
