@@ -666,7 +666,7 @@ export function NotificationPanel({
                   onClick={() => {
                     markAsRead(notif.id);
                     if (notif.linkUrl) {
-                      closePanel();
+                      onClose();
                       if (typeof window !== "undefined") {
                         window.location.assign(notif.linkUrl);
                       }
