@@ -21,12 +21,19 @@ export interface ShopDeal {
   badge_text?: string | null;
   /** Highlight on For You / Featured Deals strip. */
   is_featured?: boolean;
+  /** Linked catalog product (optional but recommended for cart/order). */
+  product_id?: string | null;
+  /** Deal selling price (PKR). */
+  price?: number | null;
+  /** Strike-through original price when higher than `price`. */
+  original_price?: number | null;
   created_at: string;
   updated_at?: string;
   /** Joined from shops when listing marketplace deals. */
   shop_name?: string | null;
   shop_logo_url?: string | null;
   shop_slug?: string | null;
+  shop_whatsapp?: string | null;
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -200,6 +207,11 @@ export function isDealActiveOnDate(deal: ShopDeal, dateKey: string): boolean {
   }
 
   return false;
+}
+
+/** Order (WhatsApp checkout) is only allowed on the deal's active calendar day(s). */
+export function isDealOrderableToday(deal: ShopDeal, now = new Date()): boolean {
+  return isDealActiveOnDate(deal, toPkDateKey(now));
 }
 
 export function formatDealSchedule(deal: ShopDeal): string {

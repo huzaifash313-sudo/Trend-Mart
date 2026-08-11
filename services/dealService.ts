@@ -11,10 +11,15 @@ function toError(err: unknown): string {
   return err instanceof Error ? err.message : "An unexpected error occurred.";
 }
 
-const DEAL_LIST_SELECT =
-  "id, shop_id, title, description, schedule_type, weekdays, starts_on, ends_on, day_of_month, is_active, image_url, images, badge_text, is_featured, created_at, updated_at, shops:shop_id ( name, logo_url, slug )";
+const DEAL_CORE =
+  "id, shop_id, title, description, schedule_type, weekdays, starts_on, ends_on, day_of_month, is_active, image_url, images, badge_text, is_featured, product_id, price, original_price, created_at, updated_at";
 
-const DEAL_SELECT_FALLBACK = "*, shops:shop_id ( name, logo_url, slug )";
+const PRODUCT_JOIN =
+  "products:product_id ( id, name, image_url, images, price, original_price )";
+
+const DEAL_LIST_SELECT = `${DEAL_CORE}, shops:shop_id ( name, logo_url, slug, whatsapp_number ), ${PRODUCT_JOIN}`;
+
+const DEAL_SELECT_FALLBACK = `*, shops:shop_id ( name, logo_url, slug, whatsapp_number ), ${PRODUCT_JOIN}`;
 
 export interface CreateShopDealInput {
   title: string;
@@ -28,6 +33,9 @@ export interface CreateShopDealInput {
   images?: string[] | null;
   badge_text?: string | null;
   is_featured?: boolean;
+  product_id?: string | null;
+  price?: number | null;
+  original_price?: number | null;
 }
 
 export interface UpdateShopDealInput {
@@ -38,6 +46,9 @@ export interface UpdateShopDealInput {
   badge_text?: string | null;
   is_featured?: boolean;
   is_active?: boolean;
+  product_id?: string | null;
+  price?: number | null;
+  original_price?: number | null;
 }
 
 function parseImages(raw: unknown): string[] | null {
@@ -46,8 +57,28 @@ function parseImages(raw: unknown): string[] | null {
   return urls.length ? urls : [];
 }
 
+function parseMoney(raw: unknown): number | null {
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 function parseDeal(row: Record<string, unknown>): ShopDeal {
   const shops = row.shops as Record<string, unknown> | null | undefined;
+  const product = row.products as Record<string, unknown> | null | undefined;
+  const dealImages = parseImages(row.images);
+  const productImages = product ? parseImages(product.images) : null;
+  const cover =
+    (row.image_url as string | null)?.trim() ||
+    dealImages?.[0] ||
+    (product?.image_url as string | null)?.trim() ||
+    productImages?.[0] ||
+    null;
+  const gallery =
+    (dealImages && dealImages.length > 0 ? dealImages : null) ??
+    (productImages && productImages.length > 0 ? productImages : null) ??
+    (cover ? [cover] : []);
+
   return {
     id: String(row.id),
     shop_id: String(row.shop_id),
@@ -61,15 +92,20 @@ function parseDeal(row: Record<string, unknown>): ShopDeal {
     ends_on: (row.ends_on as string | null) ?? null,
     day_of_month: row.day_of_month == null ? null : Number(row.day_of_month),
     is_active: row.is_active !== false,
-    image_url: (row.image_url as string | null) ?? null,
-    images: parseImages(row.images),
+    image_url: cover,
+    images: gallery,
     badge_text: (row.badge_text as string | null) ?? null,
     is_featured: row.is_featured === true,
+    product_id: row.product_id ? String(row.product_id) : null,
+    price: parseMoney(row.price) ?? (product ? parseMoney(product.price) : null),
+    original_price:
+      parseMoney(row.original_price) ?? (product ? parseMoney(product.original_price) : null),
     created_at: String(row.created_at ?? ""),
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
     shop_name: shops ? String(shops.name ?? "") || null : null,
     shop_logo_url: shops ? ((shops.logo_url as string | null) ?? null) : null,
     shop_slug: shops ? ((shops.slug as string | null) ?? null) : null,
+    shop_whatsapp: shops ? ((shops.whatsapp_number as string | null) ?? null) : null,
   };
 }
 
@@ -85,6 +121,23 @@ function applyGalleryFields(
   const gallery = normalizeDealGallery(urls);
   payload.image_url = gallery.image_url || null;
   payload.images = gallery.images;
+}
+
+function applyCommerceFields(
+  payload: Record<string, unknown>,
+  input: { product_id?: string | null; price?: number | null; original_price?: number | null },
+) {
+  if (input.product_id !== undefined) {
+    payload.product_id = input.product_id?.trim() || null;
+  }
+  if (input.price !== undefined) {
+    const p = input.price == null ? null : Number(input.price);
+    payload.price = p != null && Number.isFinite(p) && p >= 0 ? p : null;
+  }
+  if (input.original_price !== undefined) {
+    const o = input.original_price == null ? null : Number(input.original_price);
+    payload.original_price = o != null && Number.isFinite(o) && o >= 0 ? o : null;
+  }
 }
 
 function buildSchedulePayload(
@@ -108,6 +161,7 @@ function buildSchedulePayload(
   };
 
   applyGalleryFields(payload, input.image_url, input.images);
+  applyCommerceFields(payload, input);
 
   if (input.schedule_type === "weekly") {
     const days = [...new Set((input.weekdays ?? []).filter((d) => d >= 0 && d <= 6))];
@@ -133,17 +187,16 @@ function buildSchedulePayload(
   return { success: true, data: payload };
 }
 
-function stripVisualColumns(payload: Record<string, unknown>): Record<string, unknown> {
-  const stripped = { ...payload };
-  delete stripped.image_url;
-  delete stripped.images;
-  delete stripped.badge_text;
-  delete stripped.is_featured;
-  return stripped;
+function stripOptionalColumns(payload: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+  const next = { ...payload };
+  for (const k of keys) delete next[k];
+  return next;
 }
 
-function isVisualColumnError(message: string): boolean {
-  return /image_url|badge_text|is_featured|images/i.test(message);
+function isOptionalColumnError(message: string): boolean {
+  return /image_url|badge_text|is_featured|images|product_id|original_price|products|column .* does not exist|PGRST204|Could not find/i.test(
+    message,
+  );
 }
 
 export async function createShopDeal(
@@ -163,26 +216,31 @@ export async function createShopDeal(
       .select(DEAL_LIST_SELECT)
       .single();
 
-    if (error && /images/i.test(error.message)) {
-      const noImages: Record<string, unknown> = { ...payload };
-      delete noImages.images;
-      const retry = await supabase
-        .from("shop_deals")
-        .insert(noImages)
-        .select(DEAL_SELECT_FALLBACK)
-        .single();
-      data = retry.data;
-      error = retry.error;
-    }
-
-    if (error && isVisualColumnError(error.message)) {
-      const retry = await supabase
-        .from("shop_deals")
-        .insert(stripVisualColumns(payload))
-        .select("*")
-        .single();
-      data = retry.data;
-      error = retry.error;
+    // Progressive strip for older DBs missing commerce / visual columns
+    if (error && isOptionalColumnError(error.message)) {
+      const attempts = [
+        stripOptionalColumns(payload, ["product_id", "price", "original_price"]),
+        stripOptionalColumns(payload, ["product_id", "price", "original_price", "images"]),
+        stripOptionalColumns(payload, [
+          "product_id",
+          "price",
+          "original_price",
+          "images",
+          "image_url",
+          "badge_text",
+          "is_featured",
+        ]),
+      ];
+      for (const attempt of attempts) {
+        const retry = await supabase
+          .from("shop_deals")
+          .insert(attempt)
+          .select(DEAL_SELECT_FALLBACK)
+          .single();
+        data = retry.data;
+        error = retry.error;
+        if (!error) break;
+      }
     }
 
     if (error) throw error;
@@ -196,15 +254,14 @@ export async function createShopDeal(
 export async function fetchDealsByShopId(shopId: string): Promise<ServiceResult<ShopDeal[]>> {
   const supabase = createClient();
   try {
+    const withProduct = `${DEAL_CORE}, ${PRODUCT_JOIN}`;
     let { data, error } = await supabase
       .from("shop_deals")
-      .select(
-        "id, shop_id, title, description, schedule_type, weekdays, starts_on, ends_on, day_of_month, is_active, image_url, images, badge_text, is_featured, created_at, updated_at",
-      )
+      .select(withProduct)
       .eq("shop_id", shopId)
       .order("created_at", { ascending: false });
 
-    if (error && /images/i.test(error.message)) {
+    if (error && isOptionalColumnError(error.message)) {
       const retry = await supabase
         .from("shop_deals")
         .select("*")
@@ -237,15 +294,28 @@ export async function fetchActiveDeals(limit = 100): Promise<ServiceResult<ShopD
       .order("created_at", { ascending: false })
       .limit(cap);
 
-    if (error && /images|is_featured|image_url|badge_text|shops/i.test(error.message)) {
-      const fallback = await supabase
+    if (error && isOptionalColumnError(error.message)) {
+      const withShops = await supabase
         .from("shop_deals")
-        .select("*")
+        .select(
+          "*, shops:shop_id ( name, logo_url, slug, whatsapp_number )",
+        )
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(cap);
-      data = fallback.data;
-      error = fallback.error;
+      if (!withShops.error) {
+        data = withShops.data;
+        error = null;
+      } else {
+        const fallback = await supabase
+          .from("shop_deals")
+          .select("*")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(cap);
+        data = fallback.data;
+        error = fallback.error;
+      }
     }
 
     if (error) throw error;
@@ -259,7 +329,6 @@ export async function fetchActiveDeals(limit = 100): Promise<ServiceResult<ShopD
   }
 }
 
-/** Featured active deals for For You / homepage strip (still schedule-filtered by caller). */
 export async function fetchFeaturedDeals(limit = 24): Promise<ServiceResult<ShopDeal[]>> {
   const supabase = createClient();
   try {
@@ -271,7 +340,7 @@ export async function fetchFeaturedDeals(limit = 24): Promise<ServiceResult<Shop
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (error && /is_featured|images|shops/i.test(error.message)) {
+    if (error && /is_featured|images|product_id|shops/i.test(error.message)) {
       const all = await fetchActiveDeals(Math.max(limit * 2, 48));
       if (!all.success) return all;
       return {
@@ -299,13 +368,11 @@ export async function fetchActiveDealsForShops(
   try {
     let { data, error } = await supabase
       .from("shop_deals")
-      .select(
-        "id, shop_id, title, description, schedule_type, weekdays, starts_on, ends_on, day_of_month, is_active, image_url, images, badge_text, is_featured, created_at, updated_at",
-      )
+      .select(DEAL_CORE)
       .in("shop_id", shopIds)
       .eq("is_active", true);
 
-    if (error && /images/i.test(error.message)) {
+    if (error && isOptionalColumnError(error.message)) {
       const retry = await supabase
         .from("shop_deals")
         .select("*")
@@ -353,6 +420,7 @@ export async function updateShopDeal(
     if (patch.image_url !== undefined || patch.images !== undefined) {
       applyGalleryFields(payload, patch.image_url, patch.images);
     }
+    applyCommerceFields(payload, patch);
 
     let { data, error } = await supabase
       .from("shop_deals")
@@ -361,23 +429,19 @@ export async function updateShopDeal(
       .select("*")
       .single();
 
-    if (error && /images/i.test(error.message)) {
-      const noImages = { ...payload };
-      delete noImages.images;
+    if (error && isOptionalColumnError(error.message)) {
+      const stripped = stripOptionalColumns(payload, [
+        "product_id",
+        "price",
+        "original_price",
+        "images",
+        "image_url",
+        "badge_text",
+        "is_featured",
+      ]);
       const retry = await supabase
         .from("shop_deals")
-        .update(noImages)
-        .eq("id", dealId)
-        .select("*")
-        .single();
-      data = retry.data;
-      error = retry.error;
-    }
-
-    if (error && isVisualColumnError(error.message)) {
-      const retry = await supabase
-        .from("shop_deals")
-        .update(stripVisualColumns(payload))
+        .update(stripped)
         .eq("id", dealId)
         .select("*")
         .single();

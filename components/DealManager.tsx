@@ -8,6 +8,7 @@ import {
   updateShopDeal,
   updateShopDealStatus,
 } from "@/services/dealService";
+import { fetchProductsByShopId } from "@/services/productService";
 import {
   WEEKDAY_LABELS,
   formatDealSchedule,
@@ -17,7 +18,8 @@ import {
 import MultiImageUpload from "@/components/MultiImageUpload";
 import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
-import { getDealImages, normalizeDealGallery, MAX_DEAL_IMAGES } from "@/lib/productImages";
+import { getDealImages, getProductImages, normalizeDealGallery, MAX_DEAL_IMAGES } from "@/lib/productImages";
+import type { Product } from "@/types";
 
 interface DealManagerProps {
   shopId: string;
@@ -36,10 +38,14 @@ const EMPTY = {
   gallery: [] as string[],
   badge_text: "",
   is_featured: true,
+  product_id: "",
+  price: "",
+  original_price: "",
 };
 
 export default function DealManager({ shopId, compact = false, onChanged }: DealManagerProps) {
   const [deals, setDeals] = useState<ShopDeal[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,9 +54,15 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
 
   const load = useCallback(async () => {
     setLoading(true);
-    const result = await fetchDealsByShopId(shopId);
-    if (result.success) setDeals(result.data);
-    else setError(result.error);
+    const [dealsRes, productsRes] = await Promise.all([
+      fetchDealsByShopId(shopId),
+      fetchProductsByShopId(shopId),
+    ]);
+    if (dealsRes.success) setDeals(dealsRes.data);
+    else setError(dealsRes.error);
+    if (productsRes.success) {
+      setProducts(productsRes.data.filter((p) => p.is_available !== false));
+    }
     setLoading(false);
   }, [shopId]);
 
@@ -73,11 +85,46 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
     window.dispatchEvent(new Event("trendmart:deals-updated"));
   };
 
+  const applyProduct = (productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) {
+      setForm((f) => ({ ...f, product_id: productId }));
+      return;
+    }
+    const gallery = getProductImages(product);
+    setForm((f) => ({
+      ...f,
+      product_id: product.id,
+      title: f.title.trim() || product.name || product.title || "",
+      gallery: gallery.length ? gallery : f.gallery,
+      price: f.price || String(product.price ?? ""),
+      original_price:
+        f.original_price ||
+        (product.original_price != null && product.original_price > product.price
+          ? String(product.original_price)
+          : product.price
+            ? String(product.price)
+            : ""),
+    }));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     const gallery = normalizeDealGallery(form.gallery);
+    if (!gallery.image_url) {
+      setSaving(false);
+      setError("Add at least one photo (or pick a product that has photos).");
+      return;
+    }
+    const price = form.price.trim() ? Number(form.price) : null;
+    if (price == null || !Number.isFinite(price) || price < 0) {
+      setSaving(false);
+      setError("Enter the deal price (what customer pays).");
+      return;
+    }
+    const original = form.original_price.trim() ? Number(form.original_price) : null;
     const result = await createShopDeal(shopId, {
       title: form.title,
       description: form.description,
@@ -90,6 +137,9 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
       images: gallery.images,
       badge_text: form.badge_text || null,
       is_featured: form.is_featured,
+      product_id: form.product_id || null,
+      price,
+      original_price: original != null && Number.isFinite(original) ? original : null,
     });
     setSaving(false);
     if (!result.success) {
@@ -108,7 +158,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
         <div>
           <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Store deals</h3>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Same look as products — add up to {MAX_DEAL_IMAGES} photos + badge. Tagged Deal on For You & search.
+            Link a product, set deal price + photos + day. Customers can wishlist / cart anytime; Order only on deal day.
           </p>
         </div>
         {!showForm ? (
@@ -127,12 +177,33 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
           onSubmit={handleSubmit}
           className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/60"
         >
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Link product (recommended)
+            </label>
+            <select
+              value={form.product_id}
+              onChange={(e) => applyProduct(e.target.value)}
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              <option value="">Custom deal (no product link)</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — Rs {p.price}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[0.65rem] text-zinc-400">
+              Picking a product fills title, photos, and prices — you can still edit.
+            </p>
+          </div>
+
           <MultiImageUpload
             urls={form.gallery}
             onChange={(urls) => setForm((f) => ({ ...f, gallery: urls }))}
             folder="deals"
             fileIdPrefix={`${shopId}-deal`}
-            label="Deal photos (same as products — up to 6)"
+            label="Deal photos"
             maxImages={MAX_DEAL_IMAGES}
           />
 
@@ -150,6 +221,38 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Deal price (Rs)
+              </label>
+              <input
+                required
+                type="number"
+                min={0}
+                step="1"
+                value={form.price}
+                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                placeholder="940"
+                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Original price
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="1"
+                value={form.original_price}
+                onChange={(e) => setForm((f) => ({ ...f, original_price: e.target.value }))}
+                placeholder="1000"
+                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
               Badge (optional)
@@ -158,14 +261,14 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
               maxLength={24}
               value={form.badge_text}
               onChange={(e) => setForm((f) => ({ ...f, badge_text: e.target.value }))}
-              placeholder="e.g. 20% OFF · BOGO · Free drink"
+              placeholder="e.g. 20% OFF · BOGO"
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Schedule
+              Schedule — Order only works on these days
             </label>
             <div className="grid grid-cols-3 gap-1.5">
               {(
@@ -309,90 +412,97 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
       {loading ? (
         <p className="text-xs text-zinc-400">Loading deals…</p>
       ) : deals.length === 0 ? (
-        <p className="text-xs text-zinc-400">No deals yet. Add photos + schedule — looks like a product card with a Deal tag.</p>
+        <p className="text-xs text-zinc-400">
+          No deals yet. Link a product, add photos + deal price + schedule.
+        </p>
       ) : (
         <ul className="space-y-2">
           {deals.map((deal) => {
             const thumbs = getDealImages(deal);
             const cover = thumbs[0];
             return (
-            <li
-              key={deal.id}
-              className="flex items-start gap-2.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-2.5 dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                {cover ? (
-                  <Image
-                    src={getSafeImageUrl(cover, "product")}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="56px"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[0.55rem] font-bold uppercase text-zinc-400">
-                    Deal
-                  </div>
-                )}
-                {thumbs.length > 1 ? (
-                  <span className="absolute bottom-0.5 right-0.5 rounded bg-zinc-950/70 px-1 text-[8px] font-bold text-white">
-                    {thumbs.length}
-                  </span>
-                ) : null}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  {deal.title}
-                </p>
-                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                  {formatDealSchedule(deal)}
-                  {deal.badge_text ? ` · ${deal.badge_text}` : ""}
-                </p>
-                <div className="mt-0.5 flex flex-wrap gap-1.5">
-                  {!deal.is_active ? (
-                    <span className="text-[0.65rem] font-semibold text-amber-600">Paused</span>
-                  ) : null}
-                  {deal.is_featured ? (
-                    <span className="text-[0.65rem] font-semibold text-emerald-600">Featured</span>
+              <li
+                key={deal.id}
+                className="flex items-start gap-2.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-2.5 dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  {cover ? (
+                    <Image
+                      src={getSafeImageUrl(cover, "product")}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      sizes="56px"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[0.55rem] font-bold uppercase text-zinc-400">
+                      Deal
+                    </div>
+                  )}
+                  {thumbs.length > 1 ? (
+                    <span className="absolute bottom-0.5 right-0.5 rounded bg-zinc-950/70 px-1 text-[8px] font-bold text-white">
+                      {thumbs.length}
+                    </span>
                   ) : null}
                 </div>
-              </div>
-              <div className="flex shrink-0 flex-col gap-1">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await updateShopDeal(deal.id, { is_featured: !deal.is_featured });
-                    await load();
-                    notify();
-                  }}
-                  className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-                >
-                  {deal.is_featured ? "Unfeature" : "Feature"}
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await updateShopDealStatus(deal.id, !deal.is_active);
-                    await load();
-                    notify();
-                  }}
-                  className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  {deal.is_active ? "Pause" : "Resume"}
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await deleteShopDeal(deal.id);
-                    await load();
-                    notify();
-                  }}
-                  className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    {deal.title}
+                  </p>
+                  <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                    {formatDealSchedule(deal)}
+                    {deal.price != null ? ` · Rs ${deal.price}` : ""}
+                    {deal.badge_text ? ` · ${deal.badge_text}` : ""}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap gap-1.5">
+                    {!deal.is_active ? (
+                      <span className="text-[0.65rem] font-semibold text-amber-600">Paused</span>
+                    ) : null}
+                    {deal.is_featured ? (
+                      <span className="text-[0.65rem] font-semibold text-emerald-600">Featured</span>
+                    ) : null}
+                    {deal.product_id ? (
+                      <span className="text-[0.65rem] font-semibold text-zinc-500">Product linked</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await updateShopDeal(deal.id, { is_featured: !deal.is_featured });
+                      await load();
+                      notify();
+                    }}
+                    className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                  >
+                    {deal.is_featured ? "Unfeature" : "Feature"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await updateShopDealStatus(deal.id, !deal.is_active);
+                      await load();
+                      notify();
+                    }}
+                    className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    {deal.is_active ? "Pause" : "Resume"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await deleteShopDeal(deal.id);
+                      await load();
+                      notify();
+                    }}
+                    className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
             );
           })}
         </ul>

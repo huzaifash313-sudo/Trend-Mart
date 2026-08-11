@@ -239,8 +239,19 @@ function ShopDetailInner({ id }: { id: string }) {
         shop_name: d.shop_name || shop.name,
         shop_logo_url: d.shop_logo_url || shop.logo_url,
         shop_slug: d.shop_slug || shop.slug,
+        shop_whatsapp: d.shop_whatsapp || shop.whatsapp_number,
       }));
   }, [shop, deals]);
+
+  // Visit /deals → store: scroll deals strip into view
+  useEffect(() => {
+    if (loading || !shop || liveShopDeals.length === 0) return;
+    if (typeof window === "undefined" || window.location.hash !== "#deals") return;
+    const t = window.setTimeout(() => {
+      document.getElementById("deals")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [loading, shop, liveShopDeals.length]);
 
   // ── Real-time product updates ─────────────────────────────────────────────
   useEffect(() => {
@@ -400,6 +411,39 @@ function ShopDetailInner({ id }: { id: string }) {
             />
           </section>
         )}
+
+        {/* Deals first — Visit from /deals lands here (#deals) */}
+        {liveShopDeals.length > 0 ? (
+          <section id="deals" aria-label="Store deals" className="space-y-2 scroll-mt-20">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Deals</h2>
+                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                  Wishlist &amp; cart anytime · Order only on the deal day
+                </p>
+              </div>
+              <Link
+                href="/deals"
+                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
+              >
+                All deals →
+              </Link>
+            </div>
+            <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 scrollbar-none">
+              {liveShopDeals.map((deal, i) => (
+                <DealCard
+                  key={deal.id}
+                  deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
+                  compact
+                  priority={i < 2}
+                  href={`${getShopPath(shop)}#deals`}
+                  shopWhatsapp={shop.whatsapp_number}
+                  offerTags={shopDealOfferTags}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {/* Hero — banner wide; logo beside shop name */}
         <section className="trend-card overflow-hidden">
@@ -650,32 +694,6 @@ function ShopDetailInner({ id }: { id: string }) {
             </div>
           </section>
         )}
-
-        {liveShopDeals.length > 0 ? (
-          <section aria-label="Store deals" className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Live deals</h2>
-              <Link
-                href="/deals"
-                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
-              >
-                All deals →
-              </Link>
-            </div>
-            <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 scrollbar-none">
-              {liveShopDeals.map((deal, i) => (
-                <DealCard
-                  key={deal.id}
-                  deal={deal}
-                  compact
-                  priority={i < 2}
-                  href={`#products`}
-                  offerTags={shopDealOfferTags}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null}
 
         {showProductCatalog && (
           <section id="products" aria-label="Products">

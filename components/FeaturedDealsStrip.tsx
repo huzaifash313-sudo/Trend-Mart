@@ -62,7 +62,7 @@ export default function FeaturedDealsStrip({
             {title}
           </h2>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Tap a deal to open the shop · schedule shown on each card
+            Cart &amp; wishlist anytime · Order only on deal day · Visit opens store deals
           </p>
         </div>
         <Link
