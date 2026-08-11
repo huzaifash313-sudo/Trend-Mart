@@ -401,17 +401,11 @@ async function resolveUserRole(
       },
     });
 
-    // 1) Explicit role row (maybeSingle — missing row is normal for older accounts)
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
+    // 1) Prefer SECURITY DEFINER RPC (avoids recursive user_roles RLS 500)
     const VALID_ROLES: readonly string[] = ["customer", "merchant", "admin"];
-    if (roleData?.role && VALID_ROLES.includes(roleData.role)) {
-      // Shop owners must keep merchant access even if row still says "customer"
-      if (roleData.role === "customer") {
+    const { data: rpcRole, error: rpcError } = await supabase.rpc("get_my_role");
+    if (!rpcError && typeof rpcRole === "string" && VALID_ROLES.includes(rpcRole)) {
+      if (rpcRole === "customer") {
         const { data: shop } = await supabase
           .from("shops")
           .select("id")
@@ -423,11 +417,11 @@ async function resolveUserRole(
           return "merchant";
         }
       }
-      authDebug("resolveUserRole: SUCCESS", { role: roleData.role });
-      return roleData.role as AppRole;
+      authDebug("resolveUserRole: SUCCESS via get_my_role", { role: rpcRole });
+      return rpcRole as AppRole;
     }
 
-    // 2) JWT metadata (signup role)
+    // 2) JWT metadata (signup role) — skip direct user_roles table (can 500 on recursive RLS)
     const meta =
       (typeof user.user_metadata?.role === "string"
         ? user.user_metadata.role

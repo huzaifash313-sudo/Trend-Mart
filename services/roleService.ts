@@ -41,14 +41,19 @@ export async function getUserRole(): Promise<AppRole | null> {
 
     if (userError || !user) return null;
 
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
+    const { data: rpcRole, error: rpcError } = await supabase.rpc("get_my_role");
+    if (!rpcError && typeof rpcRole === "string") {
+      return rpcRole as AppRole;
+    }
 
-    if (error || !data) return null;
-    return data.role as AppRole;
+    const meta =
+      (typeof user.user_metadata?.role === "string" && user.user_metadata.role) ||
+      (typeof user.app_metadata?.role === "string" && user.app_metadata.role) ||
+      null;
+    if (meta === "customer" || meta === "merchant" || meta === "admin") {
+      return meta;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -84,14 +89,19 @@ export async function getUserRoleAndShopIds(): Promise<{
       return { role: null, shopIds: [], userId: null };
     }
 
-    // Fetch role
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
-
-    const role = (roleData?.role as AppRole) ?? "customer";
+    // Fetch role via RPC first (avoids recursive RLS 500 on user_roles)
+    const { data: rpcRole } = await supabase.rpc("get_my_role");
+    let role: AppRole = "customer";
+    if (typeof rpcRole === "string" && ["customer", "merchant", "admin"].includes(rpcRole)) {
+      role = rpcRole as AppRole;
+    } else {
+      const meta =
+        (typeof user.user_metadata?.role === "string" && user.user_metadata.role) ||
+        (typeof user.app_metadata?.role === "string" && user.app_metadata.role);
+      if (meta === "customer" || meta === "merchant" || meta === "admin") {
+        role = meta;
+      }
+    }
 
     // Fetch owned shop IDs if merchant or admin
     let shopIds: string[] = [];
@@ -132,14 +142,19 @@ export async function getClientUserRole(): Promise<AppRole | null> {
 
     if (userError || !user) return null;
 
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
+    const { data: rpcRole, error: rpcError } = await supabase.rpc("get_my_role");
+    if (!rpcError && typeof rpcRole === "string") {
+      return rpcRole as AppRole;
+    }
 
-    if (error || !data) return null;
-    return data.role as AppRole;
+    const meta =
+      (typeof user.user_metadata?.role === "string" && user.user_metadata.role) ||
+      (typeof user.app_metadata?.role === "string" && user.app_metadata.role) ||
+      null;
+    if (meta === "customer" || meta === "merchant" || meta === "admin") {
+      return meta;
+    }
+    return null;
   } catch {
     return null;
   }

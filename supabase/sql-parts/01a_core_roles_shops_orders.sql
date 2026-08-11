@@ -45,18 +45,9 @@ CREATE POLICY "user_roles_select_own"
   ON public.user_roles FOR SELECT
   USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "user_roles_admin_all" ON public.user_roles;
-CREATE POLICY "user_roles_admin_all"
-  ON public.user_roles FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_id = auth.uid() AND role = 'admin'
-    )
-  );
-
 -- =============================================================================
 -- SECTION 2: ADMIN HELPER FUNCTION (used by multiple RLS policies)
+-- Must exist BEFORE any policy that checks admin status on user_roles itself.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.is_admin(p_user_id uuid DEFAULT auth.uid())
@@ -71,6 +62,12 @@ AS $$
     WHERE user_id = p_user_id AND role = 'admin'
   );
 $$;
+
+DROP POLICY IF EXISTS "user_roles_admin_all" ON public.user_roles;
+CREATE POLICY "user_roles_admin_all"
+  ON public.user_roles FOR ALL
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 -- =============================================================================
 -- SECTION 3: SHOPS TABLE (Core marketplace entity — retail & service)
