@@ -129,15 +129,7 @@ export default function BecomeMerchantPage() {
 
     setSubmitting(true);
     try {
-      // 1) Promote role only after form validation
-      const roleResult = await claimSignupRole("merchant");
-      if (!roleResult.success) {
-        addToast(roleResult.error ?? "Could not switch to merchant.", "error");
-        setSubmitting(false);
-        return;
-      }
-
-      // 2) Create the store with submitted details
+      // Create store first — DB trigger promotes to merchant. Avoid orphan merchant role on failure.
       const shopResult = await createShop({
         ...form,
         name: form.name.trim(),
@@ -149,11 +141,18 @@ export default function BecomeMerchantPage() {
       if (!shopResult.success) {
         addToast(
           shopResult.error ||
-            "Merchant role updated, but store setup failed. Finish it in the dashboard.",
+            "Store setup failed. Please try again — your account was not switched to merchant yet.",
           "error",
         );
-        window.location.href = "/dashboard";
+        setSubmitting(false);
         return;
+      }
+
+      // Safety net: ensure user_roles reflects merchant after successful shop create.
+      const roleResult = await claimSignupRole("merchant");
+      if (!roleResult.success) {
+        // Shop exists; trigger may already have promoted. Continue to dashboard.
+        console.warn("[become-merchant] claimSignupRole:", roleResult.error);
       }
 
       addToast("Store created — welcome to your merchant dashboard!", "success");

@@ -293,6 +293,28 @@ export type SignInFormValues = z.infer<typeof signInSchema>;
 
 export const signUpSchema = z
   .object({
+    full_name: z
+      .string()
+      .min(2, "Full name is required (at least 2 characters).")
+      .max(100, "Name is too long.")
+      .trim()
+      .refine((val) => !/<[^>]*>/.test(val), "Name cannot contain HTML tags."),
+    phone: z
+      .string()
+      .min(1, "Phone number is required.")
+      .trim()
+      .refine(
+        (val) => {
+          const digits = val.replace(/\D/g, "");
+          // Accept 03XXXXXXXXX (11) or 923XXXXXXXXX (12) shapes
+          return (
+            /^03\d{9}$/.test(digits) ||
+            /^92\d{10}$/.test(digits) ||
+            (digits.length === 10 && digits.startsWith("3"))
+          );
+        },
+        "Enter a valid Pakistani mobile (e.g. 0300-1234567).",
+      ),
     email: z
       .string()
       .min(1, "Email is required.")

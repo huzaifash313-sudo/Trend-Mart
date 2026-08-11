@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
-import { signUpWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole } from "@/services/authService";
+import { signUpWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { useToast } from "@/components/Toast";
 import type { SignInFormValues, SignUpFormValues } from "@/lib/validations";
@@ -34,7 +34,7 @@ function FloatingParticles() {
       {PARTICLE_CONFIGS.map((cfg, i) => (
         <motion.div
           key={i}
-          className="absolute rounded-full bg-indigo-300/20 dark:bg-indigo-400/15"
+          className="absolute rounded-full bg-emerald-300/20 dark:bg-emerald-400/15"
           style={{
             width: `${cfg.width}px`,
             height: `${cfg.height}px`,
@@ -67,7 +67,7 @@ function GradientOrbs() {
   return (
     <>
       <motion.div
-        className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-gradient-to-bl from-violet-400 to-indigo-400 opacity-25 blur-3xl dark:from-violet-500 dark:to-indigo-500 dark:opacity-15"
+        className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-gradient-to-bl from-emerald-400 to-teal-400 opacity-25 blur-3xl dark:from-emerald-500 dark:to-teal-500 dark:opacity-15"
         animate={{
           x: [0, -25, 10, 0],
           y: [0, 20, -15, 0],
@@ -76,7 +76,7 @@ function GradientOrbs() {
         transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
-        className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-gradient-to-tr from-fuchsia-300 to-pink-400 opacity-25 blur-3xl dark:from-fuchsia-500 dark:to-pink-500 dark:opacity-15"
+        className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-gradient-to-tr from-teal-300 to-emerald-400 opacity-25 blur-3xl dark:from-teal-500 dark:to-emerald-500 dark:opacity-15"
         animate={{
           x: [0, 15, -20, 0],
           y: [0, -25, 10, 0],
@@ -110,6 +110,10 @@ export default function SignupPage() {
         signupValues.email,
         signupValues.password,
         signupValues.role,
+        {
+          fullName: signupValues.full_name,
+          phone: signupValues.phone,
+        },
       );
 
       if (result.success && !result.needsOtpVerification && result.role) {
@@ -150,6 +154,7 @@ export default function SignupPage() {
     if (user?.id) {
       recordLegalAcceptance(user.id, ["terms", "privacy"]);
       await claimSignupRole(pendingRole);
+      await syncContactProfileFromMetadata(user);
     }
     addToast(
       pendingRole === "merchant"
@@ -163,7 +168,7 @@ export default function SignupPage() {
   return (
     <div className="relative flex min-h-screen overflow-hidden">
       {/* ─── Left Panel: Branding & Animations ────────────────────────── */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-700 to-fuchsia-700 p-12 lg:flex">
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-12 lg:flex">
         <GradientOrbs />
         <FloatingParticles />
 
@@ -180,7 +185,7 @@ export default function SignupPage() {
             </h1>
           </Link>
           <motion.p
-            className="mt-3 text-lg text-indigo-100/80"
+            className="mt-3 text-lg text-emerald-100/80"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5, duration: 0.6 }}
@@ -199,7 +204,7 @@ export default function SignupPage() {
               <h2 className="mb-4 text-4xl font-bold leading-tight text-white">
                 Join TrendMart today.
               </h2>
-              <p className="max-w-md text-indigo-100/80 leading-relaxed">
+              <p className="max-w-md text-emerald-100/80 leading-relaxed">
                 Shop local as a customer — or open your store as a merchant.
                 One platform for browsing, ordering, and selling in your neighborhood.
               </p>
@@ -230,7 +235,7 @@ export default function SignupPage() {
 
         {/* Footer */}
         <motion.p
-          className="relative z-10 text-sm text-indigo-100/60"
+          className="relative z-10 text-sm text-emerald-100/60"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
@@ -250,7 +255,7 @@ export default function SignupPage() {
           {/* Mobile logo */}
           <div className="mb-8 text-center lg:hidden">
             <Link href="/">
-              <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+              <h1 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 TrendMart
               </h1>
             </Link>
