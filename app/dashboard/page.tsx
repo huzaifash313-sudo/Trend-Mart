@@ -46,14 +46,11 @@ import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 import BulkProductCreator from "@/components/BulkProductCreator";
-import DealManager from "@/components/DealManager";
 import { createStory } from "@/services/storyService";
 import { fetchOrdersByShopId } from "@/services/orderService";
 import { transitionOrderStatus, getValidTransitions, getStatusLabel } from "@/services/notificationService";
-import { fetchCouponsByShopId, createCoupon, updateCouponStatus, deleteCoupon } from "@/services/couponService";
 import { downloadProductsCSV, downloadOrdersCSV } from "@/services/exportService";
 import type { Order, OrderStatus } from "@/types";
-import type { Coupon } from "@/services/couponService";
 import {
   OFFER_DURATION_PRESETS,
   expiresAtFromHours,
@@ -1162,10 +1159,13 @@ export default function DashboardPage() {
                 <div className="lg:col-span-8">
                   <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Coupons &amp; scheduled deals</p>
                   <p className="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-                    Free-text “promotional offer” stamps on every product are removed. Use{" "}
-                    <strong className="font-semibold text-emerald-700 dark:text-emerald-400">Coupon</strong> and{" "}
-                    <strong className="font-semibold text-emerald-700 dark:text-emerald-400">Deal</strong> from Store tools
-                    (Add product menu) — deals support weekly days, date ranges, and monthly dates.
+                    Free-text product stamps are removed. Use bottom{" "}
+                    <strong className="font-semibold text-emerald-700 dark:text-emerald-400">+</strong>{" "}
+                    (Quick add) or{" "}
+                    <Link href="/dashboard/settings#coupons" className="font-semibold text-emerald-700 underline dark:text-emerald-400">
+                      Store settings → Coupons &amp; Deals
+                    </Link>
+                    .
                   </p>
                 </div>
                 <div className="lg:col-span-4">
@@ -1778,14 +1778,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Coupon Code Management */}
-        {activeShopId && <CouponManager shopId={activeShopId} addToast={addToast} />}
-
-        {activeShopId ? (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <DealManager shopId={activeShopId} />
-          </section>
-        ) : null}
+        {/* Coupon / Deal managed in Store settings + bottom (+) Quick add — avoid doubling */}
 
         {/* CSV Data Export */}
         {activeShopId && shop && (
@@ -1816,149 +1809,5 @@ export default function DashboardPage() {
         )}
       </main>
     </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Coupon Manager Sub-Component                                               */
-/* -------------------------------------------------------------------------- */
-
-function CouponManager({ shopId, addToast }: { shopId: string; addToast: (msg: string, variant?: "success" | "error" | "info") => void }) {
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [couponsLoading, setCouponsLoading] = useState(false);
-  const [showCouponForm, setShowCouponForm] = useState(false);
-  const [newCode, setNewCode] = useState("");
-  const [discountType, setDiscountType] = useState<"percent" | "amount">("percent");
-  const [discountValue, setDiscountValue] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [couponSaving, setCouponSaving] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setCouponsLoading(true);
-      const r = await fetchCouponsByShopId(shopId);
-      if (!cancelled && r.success) setCoupons(r.data);
-      setCouponsLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [shopId]);
-
-  const handleCreateCoupon = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!newCode.trim() || !discountValue) return;
-    setCouponSaving(true);
-    const pct = discountType === "percent" ? parseFloat(discountValue) : undefined;
-    const amt = discountType === "amount" ? parseFloat(discountValue) : undefined;
-    const result = await createCoupon(shopId, newCode, pct, amt, expiryDate || undefined);
-    if (result.success) {
-      addToast(`Coupon "${newCode.toUpperCase()}" created!`, "success");
-      setNewCode(""); setDiscountValue(""); setExpiryDate("");
-      setShowCouponForm(false);
-      // Refresh coupons list
-      const refreshed = await fetchCouponsByShopId(shopId);
-      if (refreshed.success) setCoupons(refreshed.data);
-    } else { addToast(result.error, "error"); }
-    setCouponSaving(false);
-  };
-
-  const handleToggleActive = async (couponId: string, currentActive: boolean) => {
-    const result = await updateCouponStatus(couponId, !currentActive);
-    if (result.success) {
-      setCoupons((prev) => prev.map((c) => c.id === couponId ? result.data : c));
-      addToast(`Coupon ${result.data.is_active ? "activated" : "deactivated"}.`, "success");
-    } else { addToast(result.error, "error"); }
-  };
-
-  const handleDeleteCoupon = async (couponId: string) => {
-    if (!confirm("Delete this coupon permanently?")) return;
-    const result = await deleteCoupon(couponId);
-    if (result.success) {
-      setCoupons((prev) => prev.filter((c) => c.id !== couponId));
-      addToast("Coupon deleted.", "info");
-    } else { addToast(result.error, "error"); }
-  };
-
-  return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Discount Coupons ({coupons.length})</h2>
-        <button
-          type="button"
-          onClick={() => setShowCouponForm(!showCouponForm)}
-          className="text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
-        >
-          {showCouponForm ? "Cancel" : "+ Add Coupon"}
-        </button>
-      </div>
-
-      {/* Create form */}
-      {showCouponForm && (
-        <form onSubmit={handleCreateCoupon} className="mb-4 space-y-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Create a discount code for your customers.</p>
-          <div className="flex gap-2">
-            <input
-              type="text" required value={newCode}
-              onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-              placeholder="CODE (e.g. SAVE10)"
-              maxLength={20}
-              className="flex-1 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-zinc-900 placeholder:font-normal placeholder:tracking-normal placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <select
-              value={discountType}
-              onChange={(e) => setDiscountType(e.target.value as "percent" | "amount")}
-              className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            >
-              <option value="percent">Percentage (%)</option>
-              <option value="amount">Fixed Amount (Rs.)</option>
-            </select>
-            <input
-              type="number" required min={1} max={discountType === "percent" ? 100 : 99999} step={1}
-              value={discountValue}
-              onChange={(e) => setDiscountValue(e.target.value)}
-              placeholder={discountType === "percent" ? "10" : "200"}
-              className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
-            <input
-              type="date"
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-              className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-              title="Expiry date (optional)"
-            />
-          </div>
-          <button type="submit" disabled={couponSaving} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900">
-            {couponSaving ? "Creating…" : "Create Coupon"}
-          </button>
-        </form>
-      )}
-
-      {/* Coupon list */}
-            {couponsLoading && <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => (<div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"><div className="h-10 rounded bg-zinc-200 dark:bg-zinc-800" /></div>))}</div>}
-      {!couponsLoading && coupons.length === 0 && <p className="text-sm text-zinc-400 dark:text-zinc-500">No coupons created yet.</p>}
-      {!couponsLoading && coupons.map((c) => (
-        <div key={c.id} className="mb-2 flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 transition-shadow hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">{c.code}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${c.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"}`}>
-                {c.is_active ? "Active" : "Disabled"}
-              </span>
-            </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {c.discount_percent ? `${c.discount_percent}% off` : `Rs. ${c.discount_amount} off`}
-              {c.expiry_date && ` · Expires ${new Date(c.expiry_date).toLocaleDateString()}`}
-            </p>
-          </div>
-          <div className="flex gap-1">
-            <button type="button" onClick={() => handleToggleActive(c.id, c.is_active)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">{c.is_active ? "Disable" : "Enable"}</button>
-            <button type="button" onClick={() => handleDeleteCoupon(c.id)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"><TrashIcon /></button>
-          </div>
-        </div>
-      ))}
-    </section>
   );
 }

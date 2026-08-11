@@ -21,7 +21,15 @@ import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { haversineDistance } from "@/services/geoRadiusService";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 import { fetchActiveDeals } from "@/services/dealService";
-import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
+import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
+import {
+  isDealActiveOnDate,
+  shopIdsWithDealOnDate,
+  toPkDateKey,
+  type ShopDeal,
+} from "@/lib/dealSchedule";
+import { isOfferActive } from "@/lib/shopOfferTicker";
+import type { ProductOfferContext } from "@/components/ProductGrid";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -88,6 +96,7 @@ function ProductsPageInner() {
 
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [activeDeals, setActiveDeals] = useState<ShopDeal[]>([]);
+  const [shopCoupons, setShopCoupons] = useState<Record<string, Coupon[]>>({});
   const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,6 +156,10 @@ function ProductsPageInner() {
       if (result.success) {
         setProducts(result.data);
         setVisibleCount(24);
+        const shopIds = [...new Set(result.data.map((p) => p.shop_id).filter(Boolean))];
+        void fetchActiveCouponsForShops(shopIds).then((cRes) => {
+          if (!cancelled && cRes.success) setShopCoupons(cRes.data);
+        });
         if (productParam) {
           const match = result.data.find((p) => p.id === productParam);
           if (match) setQuickView(match);
@@ -234,6 +247,38 @@ function ProductsPageInner() {
 
     return list;
   }, [products, geoFilter, globalCoords, sort, offerDateKey, activeDeals]);
+
+  const getOfferContext = useCallback(
+    (product: { shop_id?: string; shop_free_delivery_threshold?: number | null; shop_delivery_fee_flat?: number | null; shop_delivery_fee_per_km?: number | null }): ProductOfferContext => {
+      const shopId = product.shop_id || "";
+      const today = toPkDateKey();
+      const dealLabels = activeDeals
+        .filter((d) => d.shop_id === shopId && isDealActiveOnDate(d, today))
+        .map((d) => d.title);
+      const couponLabels = (shopCoupons[shopId] ?? [])
+        .filter((c) => c.is_active !== false && isOfferActive(c.expiry_date))
+        .map((c) => {
+          const code = (c.code || "").trim().toUpperCase();
+          if (!code) return "";
+          if (c.discount_percent != null && c.discount_percent > 0) {
+            return `Code ${code} · ${c.discount_percent}% OFF`;
+          }
+          if (c.discount_amount != null && c.discount_amount > 0) {
+            return `Code ${code} · Rs. ${Math.round(c.discount_amount).toLocaleString()} OFF`;
+          }
+          return `Code ${code}`;
+        })
+        .filter(Boolean);
+      return {
+        freeDeliveryThreshold: product.shop_free_delivery_threshold,
+        deliveryFeeFlat: product.shop_delivery_fee_flat,
+        deliveryFeePerKm: product.shop_delivery_fee_per_km,
+        dealLabels,
+        couponLabels,
+      };
+    },
+    [activeDeals, shopCoupons],
+  );
 
   const visibleProducts = useMemo(
     () => displayProducts.slice(0, visibleCount),
@@ -505,6 +550,7 @@ function ProductsPageInner() {
         compact
         showShopMeta
         favorites={favorites}
+        getOfferContext={getOfferContext}
         onProductClick={(p) => handleProductClick(p as MarketplaceProduct)}
         onAddToCart={(p) => handleAddToCart(p as MarketplaceProduct)}
         onFavoriteToggle={(p, next) => handleFavorite(p, next)}

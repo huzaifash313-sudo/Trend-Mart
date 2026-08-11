@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Shop, Product } from "@/types";
 import { fetchShopById } from "@/services/shopService";
@@ -197,12 +198,14 @@ function ShopDetailInner({ id }: { id: string }) {
       coupons,
       deals,
     });
-    const couponSlide = slides.find((s) => s.kind === "coupon");
+    const couponLabels = slides.filter((s) => s.kind === "coupon").map((s) => s.label);
+    const dealLabels = slides.filter((s) => s.kind === "deal").map((s) => s.label);
     return {
       freeDeliveryThreshold: shop.free_delivery_threshold,
-      announcement: null,
-      announcementExpiresAt: null,
-      couponLabel: couponSlide?.label ?? null,
+      deliveryFeeFlat: shop.delivery_fee_flat,
+      deliveryFeePerKm: shop.delivery_fee_per_km,
+      couponLabels,
+      dealLabels,
     };
   }, [shop, coupons, deals]);
 
@@ -453,44 +456,25 @@ function ShopDetailInner({ id }: { id: string }) {
 
             {isOwner ? (
               <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-                <p className="mb-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">Your store tools</p>
+                <p className="mb-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">Manage this store</p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "product" })}
                     className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                   >
-                    Add product
+                    Quick add (+)
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "bulk" })}
+                  <Link
+                    href="/dashboard/settings"
                     className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
                   >
-                    Bulk add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "story" })}
-                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
-                  >
-                    Add story
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "coupon" })}
-                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
-                  >
-                    Coupon
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "deal" })}
-                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
-                  >
-                    Deal
-                  </button>
+                    Store settings
+                  </Link>
                 </div>
+                <p className="mt-2 text-[0.65rem] text-emerald-800/80 dark:text-emerald-300/80">
+                  Products, coupons &amp; deals: bottom + button or Store settings. No duplicate menus.
+                </p>
               </div>
             ) : null}
             {(shop.instagram_handle || shop.facebook_url || shop.secondary_phone) && (

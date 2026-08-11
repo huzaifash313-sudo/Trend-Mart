@@ -28,13 +28,39 @@ function HeartIcon({ filled }: { filled: boolean }) {
   );
 }
 
-/** Optional shop-level promo context (store page products inherit from parent shop). */
+/** Shop-level ticker lines (coupon / deal / delivery) — not product % OFF. */
 export interface ProductOfferContext {
   freeDeliveryThreshold?: number | null;
+  deliveryFeeFlat?: number | null;
+  deliveryFeePerKm?: number | null;
+  /** Prebuilt coupon lines e.g. "Code SAVE10 · 10% OFF" */
+  couponLabels?: string[];
+  /** Active deal titles for today */
+  dealLabels?: string[];
+  /** @deprecated unused — kept for call-site compatibility */
   announcement?: string | null;
   announcementExpiresAt?: string | null;
-  /** Short coupon line e.g. "Code SAVE10 · 10% OFF" */
   couponLabel?: string | null;
+}
+
+export function buildDeliveryTickerLabel(input: {
+  freeDeliveryThreshold?: number | null;
+  deliveryFeeFlat?: number | null;
+  deliveryFeePerKm?: number | null;
+}): string | null {
+  const free = input.freeDeliveryThreshold;
+  if (free != null && free > 0) {
+    return `Free delivery over Rs. ${Math.round(free).toLocaleString()}`;
+  }
+  const flat = input.deliveryFeeFlat;
+  if (flat != null && flat > 0) {
+    return `Delivery Rs. ${Math.round(flat).toLocaleString()}`;
+  }
+  const perKm = input.deliveryFeePerKm;
+  if (perKm != null && perKm > 0) {
+    return `Delivery Rs. ${Math.round(perKm).toLocaleString()}/km`;
+  }
+  return null;
 }
 
 function buildProductOfferTags(
@@ -42,38 +68,49 @@ function buildProductOfferTags(
   offerContext?: ProductOfferContext | null,
 ): string[] {
   const tags: string[] = [];
-  const { hasDiscount, discountPercent } = getProductDiscount(product);
-  if (hasDiscount && discountPercent > 0) {
-    tags.push(`${discountPercent}% OFF`);
+
+  const dealLabels = offerContext?.dealLabels?.filter(Boolean) ?? [];
+  for (const label of dealLabels) {
+    const short = label.length > 32 ? `${label.slice(0, 30)}…` : label;
+    if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) tags.push(short);
   }
 
-  const freeThreshold =
-    offerContext?.freeDeliveryThreshold ?? product.shop_free_delivery_threshold;
-  if (freeThreshold != null && freeThreshold > 0) {
-    tags.push("Free delivery");
+  const couponLabels = [
+    ...(offerContext?.couponLabels ?? []),
+    ...(offerContext?.couponLabel ? [offerContext.couponLabel] : []),
+  ];
+  for (const label of couponLabels) {
+    const trimmed = label.trim();
+    if (!trimmed) continue;
+    const short = trimmed.length > 32 ? `${trimmed.slice(0, 30)}…` : trimmed;
+    if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) tags.push(short);
   }
 
-  const coupon = offerContext?.couponLabel?.trim();
-  if (coupon) {
-    tags.push(coupon.length > 28 ? `${coupon.slice(0, 26)}…` : coupon);
-  }
+  const delivery = buildDeliveryTickerLabel({
+    freeDeliveryThreshold:
+      offerContext?.freeDeliveryThreshold ?? product.shop_free_delivery_threshold,
+    deliveryFeeFlat: offerContext?.deliveryFeeFlat ?? product.shop_delivery_fee_flat,
+    deliveryFeePerKm: offerContext?.deliveryFeePerKm ?? product.shop_delivery_fee_per_km,
+  });
+  if (delivery) tags.push(delivery);
 
   return tags;
 }
 
-/** Dark continuous ticker over product image (homepage-style moving strip). */
+/** Dark continuous ticker over product image. */
 function ProductOfferMarquee({ tags }: { tags: string[] }) {
   if (tags.length === 0) return null;
 
-  // Duplicate for seamless loop; single tag also scrolls as a “patti”.
-  const sequence = tags.length === 1 ? [tags[0], tags[0], tags[0]] : tags;
+  // Keep each unique line once, then loop the full sequence continuously.
+  const unique = tags.filter((t, i) => tags.indexOf(t) === i);
+  const sequence = unique.length === 1 ? [unique[0], unique[0], unique[0]] : unique;
   const track = [...sequence, ...sequence];
-  const durationSec = Math.max(10, Math.min(28, track.length * 3.2));
+  const durationSec = Math.max(12, Math.min(36, track.length * 3.5));
 
   return (
     <div
       className="tm-product-offer-strip"
-      aria-label={tags.join(", ")}
+      aria-label={unique.join(", ")}
       onClick={(e) => e.stopPropagation()}
     >
       <div
@@ -106,6 +143,8 @@ interface ProductGridProps {
   showShopMeta?: boolean;
   /** Shop-level offers (store page) — shown as dark tags on product images. */
   offerContext?: ProductOfferContext | null;
+  /** Per-product shop context (marketplace feed). */
+  getOfferContext?: (product: Product) => ProductOfferContext | null;
 }
 
 function ProductCard({
@@ -346,6 +385,7 @@ export default function ProductGrid({
   categoryLabel,
   showShopMeta = false,
   offerContext = null,
+  getOfferContext,
 }: ProductGridProps) {
   const gridCols =
     columns === "2"
@@ -353,7 +393,7 @@ export default function ProductGrid({
       : columns === "3"
         ? "grid-cols-2 md:grid-cols-3"
         : columns === "4"
-          ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+          ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
           : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 
   const gap = "gap-2 sm:gap-2.5";
@@ -387,7 +427,7 @@ export default function ProductGrid({
           isFavorite={favorites.has(product.id)}
           categoryLabel={categoryLabel}
           showShopMeta={showShopMeta}
-          offerContext={offerContext}
+          offerContext={getOfferContext?.(product) ?? offerContext}
           priority={index < 8}
           onProductClick={onProductClick}
           onAddToCart={onAddToCart}

@@ -17,11 +17,14 @@ import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 import ShopQrCode from "@/components/ShopQrCode";
+import QuickCouponPanel from "@/components/QuickCouponPanel";
+import DealManager from "@/components/DealManager";
 import {
   getPushPermissionState,
   isPushClientSupported,
   subscribeToPushNotifications,
 } from "@/lib/pushClient";
+import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { PK_PHONE_PLACEHOLDER, formatPkPhoneInput } from "@/lib/phoneFormat";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { getShopPath } from "@/lib/shopSlug";
@@ -103,6 +106,26 @@ function BellIcon() {
   );
 }
 
+function TagIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function CalendarDealIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
 function QrCodeIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -139,6 +162,8 @@ type SectionId =
   | "contact"
   | "delivery-area"
   | "fees"
+  | "coupons"
+  | "deals"
   | "alerts"
   | "share"
   | "more";
@@ -154,6 +179,8 @@ const SECTION_LINKS: Array<{ id: SectionId; label: string }> = [
   { id: "contact", label: "Contact" },
   { id: "delivery-area", label: "Delivery area" },
   { id: "fees", label: "Fees" },
+  { id: "coupons", label: "Coupons" },
+  { id: "deals", label: "Deals" },
   { id: "alerts", label: "Alerts" },
   { id: "share", label: "Share" },
   { id: "more", label: "More" },
@@ -426,6 +453,7 @@ export default function DashboardSettingsPage() {
   const [pushBusy, setPushBusy] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   const { addToast } = useToast();
+  const { openQuickAdd } = useMerchantQuickAdd();
 
   useEffect(() => {
     let cancelled = false;
@@ -1003,6 +1031,54 @@ export default function DashboardSettingsPage() {
               placeholder="e.g. 10"
             />
           </div>
+        </SectionShell>
+
+        <SectionShell
+          id="coupons"
+          icon={<TagIcon />}
+          title="Coupons"
+          helper="Discount codes for checkout. Also available from the bottom + Quick add."
+        >
+          {shop ? (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() =>
+                  openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "coupon" })
+                }
+                className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
+                Open Quick add → Coupon
+              </button>
+              <QuickCouponPanel shopId={shop.id} />
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500">Load your shop first.</p>
+          )}
+        </SectionShell>
+
+        <SectionShell
+          id="deals"
+          icon={<CalendarDealIcon />}
+          title="Deals"
+          helper="Weekly days, date ranges, or monthly dates — banners + Offer days filters."
+        >
+          {shop ? (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() =>
+                  openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "deal" })
+                }
+                className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
+                Open Quick add → Deal
+              </button>
+              <DealManager shopId={shop.id} />
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500">Load your shop first.</p>
+          )}
         </SectionShell>
 
         <SectionShell
