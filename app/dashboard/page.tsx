@@ -46,6 +46,7 @@ import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 import BulkProductCreator from "@/components/BulkProductCreator";
+import DealManager from "@/components/DealManager";
 import { createStory } from "@/services/storyService";
 import { fetchOrdersByShopId } from "@/services/orderService";
 import { transitionOrderStatus, getValidTransitions, getStatusLabel } from "@/services/notificationService";
@@ -1155,76 +1156,17 @@ export default function DashboardPage() {
                 <input type="text" value={shopForm.operating_status} onChange={(e) => setShopForm((f) => ({ ...f, operating_status: e.target.value }))} placeholder="Open Today: 9 AM - 10 PM" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
               </div>
             </div>
-            {/* Promo + free delivery — full-width dense row on laptop */}
+            {/* Coupons / deals + free delivery */}
             <div className="rounded-xl border border-dashed border-teal-200/80 bg-teal-50/40 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
-                <div className="lg:col-span-5">
-                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                    Promotional offer
-                  </label>
-                  <input
-                    type="text"
-                    value={shopForm.announcement}
-                    onChange={(e) => {
-                      const announcement = e.target.value;
-                      setShopForm((f) => ({
-                        ...f,
-                        announcement,
-                        announcement_expires_at: announcement.trim() ? f.announcement_expires_at : "",
-                      }));
-                      if (!announcement.trim()) setOfferDurationKey("none");
-                    }}
-                    placeholder="e.g. 20% OFF this weekend!"
-                    maxLength={200}
-                    className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                </div>
-                <div className="lg:col-span-3">
-                  <label className="mb-1 block text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                    Offer end date
-                  </label>
-                  <select
-                    value={offerDurationKey}
-                    onChange={(e) => {
-                      const key = e.target.value;
-                      setOfferDurationKey(key);
-                      if (key === "custom") return;
-                      const preset = OFFER_DURATION_PRESETS.find((p) => p.key === key);
-                      setShopForm((f) => ({
-                        ...f,
-                        announcement_expires_at: expiresAtFromHours(preset?.hours ?? null) ?? "",
-                      }));
-                    }}
-                    disabled={!shopForm.announcement.trim()}
-                    className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  >
-                    {OFFER_DURATION_PRESETS.map((p) => (
-                      <option key={p.key} value={p.key}>
-                        {p.label}
-                      </option>
-                    ))}
-                    <option value="custom">Pick end date &amp; time</option>
-                  </select>
-                  {offerDurationKey === "custom" && (
-                    <input
-                      type="datetime-local"
-                      value={
-                        shopForm.announcement_expires_at
-                          ? toDatetimeLocalValue(shopForm.announcement_expires_at)
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setOfferDurationKey(v ? "custom" : "none");
-                        setShopForm((f) => ({
-                          ...f,
-                          announcement_expires_at: v ? new Date(v).toISOString() : "",
-                        }));
-                      }}
-                      disabled={!shopForm.announcement.trim()}
-                      className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                    />
-                  )}
+                <div className="lg:col-span-8">
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Coupons &amp; scheduled deals</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    Free-text “promotional offer” stamps on every product are removed. Use{" "}
+                    <strong className="font-semibold text-emerald-700 dark:text-emerald-400">Coupon</strong> and{" "}
+                    <strong className="font-semibold text-emerald-700 dark:text-emerald-400">Deal</strong> from Store tools
+                    (Add product menu) — deals support weekly days, date ranges, and monthly dates.
+                  </p>
                 </div>
                 <div className="lg:col-span-4">
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
@@ -1244,7 +1186,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <p className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                Offer + free delivery shop page ke upar banner mein dikhenge.
+                Coupons, deals, and free delivery show on the shop banner — not on every product image.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -1838,6 +1780,12 @@ export default function DashboardPage() {
 
         {/* Coupon Code Management */}
         {activeShopId && <CouponManager shopId={activeShopId} addToast={addToast} />}
+
+        {activeShopId ? (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <DealManager shopId={activeShopId} />
+          </section>
+        ) : null}
 
         {/* CSV Data Export */}
         {activeShopId && shop && (

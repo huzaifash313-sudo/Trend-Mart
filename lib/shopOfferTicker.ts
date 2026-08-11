@@ -1,8 +1,13 @@
-/* -------------------------------------------------------------------------- */
-/*  Shop card offer ticker — slides + remaining-time labels                     */
-/* -------------------------------------------------------------------------- */
+/* Shop card offer ticker — coupons, free delivery, scheduled deals. */
 
-export type ShopOfferSlideKind = "offer" | "free_delivery" | "coupon";
+import {
+  formatDealSchedule,
+  isDealActiveOnDate,
+  toPkDateKey,
+  type ShopDeal,
+} from "@/lib/dealSchedule";
+
+export type ShopOfferSlideKind = "deal" | "free_delivery" | "coupon";
 
 export interface ShopOfferSlide {
   id: string;
@@ -14,7 +19,6 @@ export interface ShopOfferSlide {
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
-/** Format remaining time for offer / coupon timers on shop cards. */
 export function formatOfferRemaining(expiresAt: string | null | undefined, now = Date.now()): string | null {
   if (!expiresAt) return null;
   const end = new Date(expiresAt).getTime();
@@ -48,6 +52,7 @@ export function isOfferActive(expiresAt: string | null | undefined, now = Date.n
 
 export interface BuildShopOfferSlidesInput {
   shopId: string;
+  /** @deprecated Free-text shop announcement is no longer shown on product stamps. */
   announcement?: string | null;
   announcementExpiresAt?: string | null;
   freeDeliveryThreshold?: number | null;
@@ -59,18 +64,25 @@ export interface BuildShopOfferSlidesInput {
     expiry_date?: string | null;
     is_active?: boolean;
   }>;
+  deals?: ShopDeal[];
+  /** Calendar day (YYYY-MM-DD) used to pick which deals are “on” today */
+  forDateKey?: string;
 }
 
-/** Build compact promo slides for a shop card (offer / free delivery / coupons). */
 export function buildShopOfferSlides(input: BuildShopOfferSlidesInput, now = Date.now()): ShopOfferSlide[] {
   const slides: ShopOfferSlide[] = [];
-  const offer = input.announcement?.trim();
-  if (offer && isOfferActive(input.announcementExpiresAt, now)) {
+  const dateKey = input.forDateKey ?? toPkDateKey(new Date(now));
+
+  const deals = input.deals ?? [];
+  for (const deal of deals) {
+    if (!deal.is_active) continue;
+    if (!isDealActiveOnDate(deal, dateKey)) continue;
+    const schedule = formatDealSchedule(deal);
     slides.push({
-      id: `${input.shopId}-offer`,
-      kind: "offer",
-      label: offer,
-      expiresAt: input.announcementExpiresAt ?? null,
+      id: `${input.shopId}-deal-${deal.id}`,
+      kind: "deal",
+      label: `${deal.title} · ${schedule}`,
+      expiresAt: deal.schedule_type === "date_range" ? deal.ends_on : null,
     });
   }
 
@@ -107,7 +119,6 @@ export function buildShopOfferSlides(input: BuildShopOfferSlidesInput, now = Dat
   return slides;
 }
 
-/** Preset durations merchants can pick for timed offers (hours). */
 export const OFFER_DURATION_PRESETS = [
   { key: "none", label: "No expiry", hours: null as number | null },
   { key: "6h", label: "6 hours", hours: 6 },

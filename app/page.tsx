@@ -25,9 +25,12 @@ import { useLocation } from "@/context/LocationContext";
 import PromoAdsCarousel from "@/components/PromoAdsCarousel";
 import ShopCard from "@/components/ShopCard";
 import SubCategoryPills from "@/components/SubCategoryPills";
+import OfferDaysStrip from "@/components/OfferDaysStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { fetchShopIdsBySubCategory } from "@/services/productService";
 import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
+import { fetchActiveDeals } from "@/services/dealService";
+import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
 
 /* -------------------------------------------------------------------------- */
 /*  HomeInner Component                                                        */
@@ -40,6 +43,8 @@ function HomeInner() {
 
   const [shops, setShops] = useState<Shop[]>([]);
   const [shopCoupons, setShopCoupons] = useState<Record<string, Coupon[]>>({});
+  const [activeDeals, setActiveDeals] = useState<ShopDeal[]>([]);
+  const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +109,9 @@ function HomeInner() {
             fetchActiveCouponsForShops(ids).then((cRes) => {
               if (!cancelled && cRes.success) setShopCoupons(cRes.data);
             });
+            fetchActiveDeals().then((dRes) => {
+              if (!cancelled && dRes.success) setActiveDeals(dRes.data);
+            });
           } else setError(shopsResult.error);
           if (storiesResult.success) {
             setStories(sortStoriesUnseenFirst(storiesResult.data));
@@ -164,6 +172,7 @@ function HomeInner() {
 
   /* Client-side filtering */
   const filteredShops = useMemo(() => {
+    const dealShopIds = offerDateKey ? shopIdsWithDealOnDate(activeDeals, offerDateKey) : null;
     return shops.filter((shop) => {
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch = !query || shop.name.toLowerCase().includes(query) || shop.category.toLowerCase().includes(query);
@@ -172,9 +181,10 @@ function HomeInner() {
         !activeSubCategoryId ||
         !subCategoryShopIds ||
         subCategoryShopIds.has(shop.id);
-      return matchesSearch && matchesCategory && matchesSub;
+      const matchesOffer = !dealShopIds || dealShopIds.has(shop.id);
+      return matchesSearch && matchesCategory && matchesSub && matchesOffer;
     });
-  }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds]);
+  }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds, offerDateKey, activeDeals]);
 
   /* Geo filter — Near me (range) / This city / All Pakistan */
   useEffect(() => {
@@ -304,6 +314,12 @@ function HomeInner() {
           label="Filter by sub-category"
         />
       )}
+
+      <OfferDaysStrip
+        deals={activeDeals}
+        selectedDateKey={offerDateKey}
+        onSelect={setOfferDateKey}
+      />
 
       {/* ── Stories Section ───────────────────────────────────────── */}
       <section aria-label="Merchant stories">
@@ -550,6 +566,7 @@ function HomeInner() {
                     avg_rating: shop.avg_rating,
                     review_count: shop.review_count,
                     coupons: shopCoupons[shop.id],
+                    deals: activeDeals.filter((d) => d.shop_id === shop.id),
                   }}
                   favorited={favorites.has(shop.id)}
                   showDistance={showProximityBadges}

@@ -21,6 +21,8 @@ import CompactRating from "@/components/CompactRating";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { buildShopOfferSlides, formatOfferRemaining } from "@/lib/shopOfferTicker";
 import { fetchCouponsByShopId, type Coupon } from "@/services/couponService";
+import { fetchDealsByShopId } from "@/services/dealService";
+import type { ShopDeal } from "@/lib/dealSchedule";
 import {
   fetchStorefrontDisplayPrefs,
   type StorefrontDisplayPrefs,
@@ -100,6 +102,7 @@ function ShopDetailInner({ id }: { id: string }) {
     showWhatsappFloatingButton: true,
   });
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [deals, setDeals] = useState<ShopDeal[]>([]);
   const supabase = useMemo(() => createClient(), []);
   const resolvedShopId = shop?.id ?? null;
 
@@ -130,9 +133,10 @@ function ShopDetailInner({ id }: { id: string }) {
       if (shopResult.success) {
         const resolvedShop = shopResult.data.shop;
         const resolvedId = resolvedShop.id;
-        const [prefs, couponsResult, auth] = await Promise.all([
+        const [prefs, couponsResult, dealsResult, auth] = await Promise.all([
           fetchStorefrontDisplayPrefs(resolvedId),
           fetchCouponsByShopId(resolvedId),
+          fetchDealsByShopId(resolvedId),
           supabase.auth.getUser(),
         ]);
 
@@ -145,6 +149,7 @@ function ShopDetailInner({ id }: { id: string }) {
         setIsOwner(Boolean(ownerId && uid && ownerId === uid));
         setDisplayPrefs(prefs);
         if (couponsResult.success) setCoupons(couponsResult.data);
+        if (dealsResult.success) setDeals(dealsResult.data.filter((d) => d.is_active));
 
         // Fire-and-forget visit log (skips owner + dedupes inside service)
         void logShopView(resolvedId);
@@ -175,33 +180,31 @@ function ShopDetailInner({ id }: { id: string }) {
     if (!shop) return [];
     return buildShopOfferSlides({
       shopId: shop.id,
-      announcement: shop.announcement,
-      announcementExpiresAt: shop.announcement_expires_at,
       freeDeliveryThreshold: shop.free_delivery_threshold,
       coupons,
+      deals,
     }).map((s) => {
       const timer = formatOfferRemaining(s.expiresAt);
       return timer ? `${s.label}  ·  ${timer}` : s.label;
     });
-  }, [shop, coupons]);
+  }, [shop, coupons, deals]);
 
   const productOfferContext = useMemo(() => {
     if (!shop) return null;
     const slides = buildShopOfferSlides({
       shopId: shop.id,
-      announcement: shop.announcement,
-      announcementExpiresAt: shop.announcement_expires_at,
       freeDeliveryThreshold: shop.free_delivery_threshold,
       coupons,
+      deals,
     });
     const couponSlide = slides.find((s) => s.kind === "coupon");
     return {
       freeDeliveryThreshold: shop.free_delivery_threshold,
-      announcement: shop.announcement,
-      announcementExpiresAt: shop.announcement_expires_at,
+      announcement: null,
+      announcementExpiresAt: null,
       couponLabel: couponSlide?.label ?? null,
     };
-  }, [shop, coupons]);
+  }, [shop, coupons, deals]);
 
   // ── Real-time product updates ─────────────────────────────────────────────
   useEffect(() => {
@@ -472,6 +475,20 @@ function ShopDetailInner({ id }: { id: string }) {
                     className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
                   >
                     Add story
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "coupon" })}
+                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
+                  >
+                    Coupon
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "deal" })}
+                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
+                  >
+                    Deal
                   </button>
                 </div>
               </div>

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type QuickAddTab = "product" | "bulk" | "story";
+export type QuickAddTab = "product" | "bulk" | "story" | "coupon" | "deal";
 
 interface MerchantQuickAddValue {
   open: boolean;

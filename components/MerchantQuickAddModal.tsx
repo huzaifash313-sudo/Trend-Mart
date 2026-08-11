@@ -10,6 +10,8 @@ import {
 } from "@/services/subCategoryService";
 import BulkProductCreator from "@/components/BulkProductCreator";
 import ImageUpload from "@/components/ImageUpload";
+import QuickCouponPanel from "@/components/QuickCouponPanel";
+import DealManager from "@/components/DealManager";
 import { useToast } from "@/components/Toast";
 
 function CloseIcon() {
@@ -142,12 +144,16 @@ export default function MerchantQuickAddModal() {
           </button>
         </div>
 
-        <div className="flex gap-1 px-4 pt-3">
-          {([
-            ["product", "Add product"],
-            ["bulk", "Bulk add"],
-            ["story", "Story"],
-          ] as const).map(([key, label]) => (
+        <div className="flex flex-wrap gap-1 px-4 pt-3">
+          {(
+            [
+              ["product", "Add product"],
+              ["bulk", "Bulk"],
+              ["story", "Story"],
+              ["coupon", "Coupon"],
+              ["deal", "Deal"],
+            ] as const
+          ).map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -282,6 +288,10 @@ export default function MerchantQuickAddModal() {
               </button>
             </form>
           ) : null}
+
+          {tab === "coupon" ? <QuickCouponPanel shopId={shopId} /> : null}
+
+          {tab === "deal" ? <DealManager shopId={shopId} compact /> : null}
         </div>
       </div>
     </div>
