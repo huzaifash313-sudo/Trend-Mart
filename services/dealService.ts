@@ -7,19 +7,56 @@ type ServiceResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
+type PostgrestLikeError = {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+} | null;
+
 function toError(err: unknown): string {
   return err instanceof Error ? err.message : "An unexpected error occurred.";
 }
 
-const DEAL_CORE =
-  "id, shop_id, title, description, schedule_type, weekdays, starts_on, ends_on, day_of_month, is_active, image_url, images, badge_text, is_featured, product_id, price, original_price, created_at, updated_at";
+function errText(error: PostgrestLikeError): string {
+  if (!error) return "";
+  return [error.message, error.details, error.hint, error.code].filter(Boolean).join(" ");
+}
+
+/** Base schedule columns that every shop_deals table should have. */
+const DEAL_BASE =
+  "id, shop_id, title, description, schedule_type, weekdays, starts_on, ends_on, day_of_month, is_active, created_at, updated_at";
+
+const DEAL_VISUAL = "image_url, images, badge_text, is_featured";
+const DEAL_COMMERCE = "product_id, price, original_price";
 
 const PRODUCT_JOIN =
   "products:product_id ( id, name, image_url, images, price, original_price )";
 
-const DEAL_LIST_SELECT = `${DEAL_CORE}, shops:shop_id ( name, logo_url, slug, whatsapp_number ), ${PRODUCT_JOIN}`;
+const SHOP_JOIN = "shops:shop_id ( name, logo_url, slug, whatsapp_number )";
 
-const DEAL_SELECT_FALLBACK = `*, shops:shop_id ( name, logo_url, slug, whatsapp_number ), ${PRODUCT_JOIN}`;
+/** Progressive selects — first match that works is cached for this tab session. */
+const LIST_SELECT_ATTEMPTS = [
+  `${DEAL_BASE}, ${DEAL_VISUAL}, ${DEAL_COMMERCE}, ${SHOP_JOIN}, ${PRODUCT_JOIN}`,
+  `${DEAL_BASE}, ${DEAL_VISUAL}, ${DEAL_COMMERCE}, ${SHOP_JOIN}`,
+  `${DEAL_BASE}, ${DEAL_VISUAL}, ${SHOP_JOIN}`,
+  `${DEAL_BASE}, image_url, badge_text, is_featured, ${SHOP_JOIN}`,
+  `${DEAL_BASE}, ${SHOP_JOIN}`,
+  `*, ${SHOP_JOIN}`,
+  "*",
+] as const;
+
+const SHOP_SELECT_ATTEMPTS = [
+  `${DEAL_BASE}, ${DEAL_VISUAL}, ${DEAL_COMMERCE}, ${PRODUCT_JOIN}`,
+  `${DEAL_BASE}, ${DEAL_VISUAL}, ${DEAL_COMMERCE}`,
+  `${DEAL_BASE}, ${DEAL_VISUAL}`,
+  `${DEAL_BASE}, image_url, badge_text, is_featured`,
+  DEAL_BASE,
+  "*",
+] as const;
+
+let cachedListSelect: string | null = null;
+let cachedShopSelect: string | null = null;
 
 export interface CreateShopDealInput {
   title: string;
@@ -193,10 +230,36 @@ function stripOptionalColumns(payload: Record<string, unknown>, keys: string[]):
   return next;
 }
 
-function isOptionalColumnError(message: string): boolean {
-  return /image_url|badge_text|is_featured|images|product_id|original_price|products|column .* does not exist|PGRST204|Could not find/i.test(
-    message,
+function isSchemaMismatch(error: PostgrestLikeError): boolean {
+  const t = errText(error);
+  if (!t) return false;
+  return /image_url|badge_text|is_featured|images|product_id|original_price|\bprice\b|products|column .* does not exist|PGRST204|PGRST200|PGRST201|Could not find|schema cache|42703/i.test(
+    t,
   );
+}
+
+async function selectWithFallback(
+  attempts: readonly string[],
+  cache: { get: () => string | null; set: (s: string | null) => void },
+  run: (select: string) => Promise<{ data: unknown; error: PostgrestLikeError }>,
+): Promise<{ data: unknown; error: PostgrestLikeError }> {
+  const preferred = cache.get();
+  const ordered = preferred
+    ? [preferred, ...attempts.filter((s) => s !== preferred)]
+    : [...attempts];
+
+  let lastError: PostgrestLikeError = null;
+  for (const select of ordered) {
+    const result = await run(select);
+    if (!result.error) {
+      cache.set(select);
+      return result;
+    }
+    lastError = result.error;
+    // Cached shape went stale (schema changed) — drop it and keep trying
+    if (preferred && select === preferred) cache.set(null);
+  }
+  return { data: null, error: lastError };
 }
 
 export async function createShopDeal(
@@ -210,40 +273,34 @@ export async function createShopDeal(
 
     const payload: Record<string, unknown> = { ...built.data, shop_id: shopId };
 
-    let { data, error } = await supabase
-      .from("shop_deals")
-      .insert(payload)
-      .select(DEAL_LIST_SELECT)
-      .single();
+    const attempts = [
+      payload,
+      stripOptionalColumns(payload, ["product_id", "price", "original_price"]),
+      stripOptionalColumns(payload, ["product_id", "price", "original_price", "images"]),
+      stripOptionalColumns(payload, [
+        "product_id",
+        "price",
+        "original_price",
+        "images",
+        "image_url",
+        "badge_text",
+        "is_featured",
+      ]),
+    ];
 
-    // Progressive strip for older DBs missing commerce / visual columns
-    if (error && isOptionalColumnError(error.message)) {
-      const attempts = [
-        stripOptionalColumns(payload, ["product_id", "price", "original_price"]),
-        stripOptionalColumns(payload, ["product_id", "price", "original_price", "images"]),
-        stripOptionalColumns(payload, [
-          "product_id",
-          "price",
-          "original_price",
-          "images",
-          "image_url",
-          "badge_text",
-          "is_featured",
-        ]),
-      ];
-      for (const attempt of attempts) {
-        const retry = await supabase
-          .from("shop_deals")
-          .insert(attempt)
-          .select(DEAL_SELECT_FALLBACK)
-          .single();
-        data = retry.data;
-        error = retry.error;
-        if (!error) break;
-      }
+    let data: unknown = null;
+    let error: PostgrestLikeError = null;
+
+    for (const attempt of attempts) {
+      const insert = await supabase.from("shop_deals").insert(attempt).select("*").maybeSingle();
+      data = insert.data;
+      error = insert.error;
+      if (!error && data) break;
+      if (error && !isSchemaMismatch(error)) break;
     }
 
     if (error) throw error;
+    if (!data) return { success: false, error: "Deal was not created." };
     return { success: true, data: parseDeal(data as Record<string, unknown>) };
   } catch (err) {
     logError(err, { module: "dealService.createShopDeal", meta: { shopId } });
@@ -254,22 +311,23 @@ export async function createShopDeal(
 export async function fetchDealsByShopId(shopId: string): Promise<ServiceResult<ShopDeal[]>> {
   const supabase = createClient();
   try {
-    const withProduct = `${DEAL_CORE}, ${PRODUCT_JOIN}`;
-    let { data, error } = await supabase
-      .from("shop_deals")
-      .select(withProduct)
-      .eq("shop_id", shopId)
-      .order("created_at", { ascending: false });
-
-    if (error && isOptionalColumnError(error.message)) {
-      const retry = await supabase
-        .from("shop_deals")
-        .select("*")
-        .eq("shop_id", shopId)
-        .order("created_at", { ascending: false });
-      data = retry.data;
-      error = retry.error;
-    }
+    const { data, error } = await selectWithFallback(
+      SHOP_SELECT_ATTEMPTS,
+      {
+        get: () => cachedShopSelect,
+        set: (s) => {
+          cachedShopSelect = s;
+        },
+      },
+      async (select) => {
+        const res = await supabase
+          .from("shop_deals")
+          .select(select)
+          .eq("shop_id", shopId)
+          .order("created_at", { ascending: false });
+        return { data: res.data, error: res.error };
+      },
+    );
 
     if (error) throw error;
     return {
@@ -286,37 +344,40 @@ export async function fetchActiveDeals(limit = 100): Promise<ServiceResult<ShopD
   const supabase = createClient();
   const cap = Math.min(Math.max(limit, 12), 160);
   try {
-    let { data, error } = await supabase
-      .from("shop_deals")
-      .select(DEAL_LIST_SELECT)
-      .eq("is_active", true)
-      .order("is_featured", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(cap);
-
-    if (error && isOptionalColumnError(error.message)) {
-      const withShops = await supabase
-        .from("shop_deals")
-        .select(
-          "*, shops:shop_id ( name, logo_url, slug, whatsapp_number )",
-        )
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(cap);
-      if (!withShops.error) {
-        data = withShops.data;
-        error = null;
-      } else {
-        const fallback = await supabase
+    const { data, error } = await selectWithFallback(
+      LIST_SELECT_ATTEMPTS,
+      {
+        get: () => cachedListSelect,
+        set: (s) => {
+          cachedListSelect = s;
+        },
+      },
+      async (select) => {
+        // Prefer featured first when column exists; fall back without that order.
+        const withFeatured = await supabase
           .from("shop_deals")
-          .select("*")
+          .select(select)
           .eq("is_active", true)
+          .order("is_featured", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(cap);
-        data = fallback.data;
-        error = fallback.error;
-      }
-    }
+
+        if (
+          withFeatured.error &&
+          /is_featured/i.test(errText(withFeatured.error))
+        ) {
+          const plain = await supabase
+            .from("shop_deals")
+            .select(select)
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(cap);
+          return { data: plain.data, error: plain.error };
+        }
+
+        return { data: withFeatured.data, error: withFeatured.error };
+      },
+    );
 
     if (error) throw error;
     return {
@@ -330,30 +391,12 @@ export async function fetchActiveDeals(limit = 100): Promise<ServiceResult<ShopD
 }
 
 export async function fetchFeaturedDeals(limit = 24): Promise<ServiceResult<ShopDeal[]>> {
-  const supabase = createClient();
   try {
-    let { data, error } = await supabase
-      .from("shop_deals")
-      .select(DEAL_LIST_SELECT)
-      .eq("is_active", true)
-      .eq("is_featured", true)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (error && /is_featured|images|product_id|shops/i.test(error.message)) {
-      const all = await fetchActiveDeals(Math.max(limit * 2, 48));
-      if (!all.success) return all;
-      return {
-        success: true,
-        data: all.data.filter((d) => d.is_featured).slice(0, limit),
-      };
-    }
-
-    if (error) throw error;
-    return {
-      success: true,
-      data: ((data as Record<string, unknown>[]) ?? []).map(parseDeal),
-    };
+    const all = await fetchActiveDeals(Math.max(limit * 3, 48));
+    if (!all.success) return all;
+    const featured = all.data.filter((d) => d.is_featured);
+    const pool = featured.length ? featured : all.data;
+    return { success: true, data: pool.slice(0, limit) };
   } catch (err) {
     logError(err, { module: "dealService.fetchFeaturedDeals" });
     return { success: false, error: toError(err) };
@@ -366,21 +409,23 @@ export async function fetchActiveDealsForShops(
   if (!shopIds.length) return { success: true, data: {} };
   const supabase = createClient();
   try {
-    let { data, error } = await supabase
-      .from("shop_deals")
-      .select(DEAL_CORE)
-      .in("shop_id", shopIds)
-      .eq("is_active", true);
-
-    if (error && isOptionalColumnError(error.message)) {
-      const retry = await supabase
-        .from("shop_deals")
-        .select("*")
-        .in("shop_id", shopIds)
-        .eq("is_active", true);
-      data = retry.data;
-      error = retry.error;
-    }
+    const { data, error } = await selectWithFallback(
+      SHOP_SELECT_ATTEMPTS,
+      {
+        get: () => cachedShopSelect,
+        set: (s) => {
+          cachedShopSelect = s;
+        },
+      },
+      async (select) => {
+        const res = await supabase
+          .from("shop_deals")
+          .select(select)
+          .in("shop_id", shopIds)
+          .eq("is_active", true);
+        return { data: res.data, error: res.error };
+      },
+    );
 
     if (error) throw error;
     const map: Record<string, ShopDeal[]> = {};
@@ -422,15 +467,20 @@ export async function updateShopDeal(
     }
     applyCommerceFields(payload, patch);
 
-    let { data, error } = await supabase
-      .from("shop_deals")
-      .update(payload)
-      .eq("id", dealId)
-      .select("*")
-      .single();
-
-    if (error && isOptionalColumnError(error.message)) {
-      const stripped = stripOptionalColumns(payload, [
+    const stripLadder = [
+      payload,
+      stripOptionalColumns(payload, ["product_id", "price", "original_price"]),
+      stripOptionalColumns(payload, ["product_id", "price", "original_price", "images"]),
+      stripOptionalColumns(payload, [
+        "product_id",
+        "price",
+        "original_price",
+        "images",
+        "image_url",
+        "badge_text",
+      ]),
+      // Last resort: only is_active / title / description / updated_at
+      stripOptionalColumns(payload, [
         "product_id",
         "price",
         "original_price",
@@ -438,18 +488,54 @@ export async function updateShopDeal(
         "image_url",
         "badge_text",
         "is_featured",
-      ]);
-      const retry = await supabase
+      ]),
+    ];
+
+    let data: unknown = null;
+    let error: PostgrestLikeError = null;
+
+    for (const attempt of stripLadder) {
+      const keys = Object.keys(attempt).filter((k) => k !== "updated_at");
+      if (keys.length === 0) continue;
+
+      const res = await supabase
         .from("shop_deals")
-        .update(stripped)
+        .update(attempt)
         .eq("id", dealId)
         .select("*")
-        .single();
-      data = retry.data;
-      error = retry.error;
+        .maybeSingle();
+
+      data = res.data;
+      error = res.error;
+
+      if (!error && data) break;
+
+      if (!error && !data) {
+        // Update may have applied but RETURNING was empty (RLS) — re-fetch
+        const refetch = await supabase.from("shop_deals").select("*").eq("id", dealId).maybeSingle();
+        if (refetch.data) {
+          data = refetch.data;
+          error = null;
+          break;
+        }
+        // Still empty — likely RLS; stop retrying strips
+        error = {
+          message:
+            "Update blocked by database permissions. Run supabase/FIX_SHOP_DEALS_SCHEMA.sql",
+        };
+        break;
+      }
+
+      if (error && !isSchemaMismatch(error)) break;
     }
 
     if (error) throw error;
+    if (!data) {
+      return {
+        success: false,
+        error: "Could not update deal (check merchant RLS / run FIX_SHOP_DEALS_SCHEMA.sql).",
+      };
+    }
     return { success: true, data: parseDeal(data as Record<string, unknown>) };
   } catch (err) {
     logError(err, { module: "dealService.updateShopDeal", meta: { dealId } });
