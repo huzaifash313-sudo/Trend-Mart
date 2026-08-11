@@ -1003,11 +1003,11 @@ html.dark .tm-product-placeholder {
 }
 
 .tm-product-body {
-  padding: 0.5rem 0.55rem 0.55rem;
+  padding: 0.35rem 0.45rem 0.4rem;
 }
 @media (min-width: 640px) {
   .tm-product-body {
-    padding: 0.55rem 0.6rem 0.6rem;
+    padding: 0.4rem 0.5rem 0.45rem;
   }
 }
 
@@ -1017,9 +1017,9 @@ html.dark .tm-product-placeholder {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  min-height: 2.5em;
+  min-height: 0;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.2;
   letter-spacing: -0.01em;
   color: #18181b;
   word-break: break-word;
@@ -1028,7 +1028,6 @@ html.dark .tm-product-placeholder {
 .tm-product-title--single {
   -webkit-line-clamp: 2;
   line-clamp: 2;
-  min-height: 2.5em;
 }
 html.dark .tm-product-title {
   color: #f4f4f5;

@@ -55,28 +55,35 @@ export default function CompactRating({
 
   const sizes = {
     xs: {
-      wrap: "gap-0.5 rounded px-1 py-0.5",
+      wrap: "gap-0.5",
       star: "h-2.5 w-2.5",
       score: "text-[10px] leading-none",
       count: "text-[9px] leading-none",
+      chrome: false,
     },
     sm: {
       wrap: "gap-1 rounded-md px-1.5 py-0.5",
       star: "h-3 w-3",
       score: "text-[11px] leading-none sm:text-[12px]",
       count: "text-[10px] leading-none sm:text-[11px]",
+      chrome: true,
     },
     md: {
       wrap: "gap-1.5 rounded-lg px-2 py-1",
       star: "h-3.5 w-3.5",
       score: "text-[13px] leading-none sm:text-sm",
       count: "text-[11px] leading-none sm:text-xs",
+      chrome: true,
     },
   }[size];
 
   return (
     <span
-      className={`inline-flex max-w-full min-w-0 items-center border border-amber-200/80 bg-gradient-to-b from-amber-50 to-amber-50/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-amber-500/25 dark:from-amber-950/50 dark:to-amber-950/20 dark:shadow-none ${sizes.wrap} ${className}`}
+      className={`inline-flex max-w-full min-w-0 items-center ${
+        sizes.chrome
+          ? "border border-amber-200/80 bg-gradient-to-b from-amber-50 to-amber-50/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-amber-500/25 dark:from-amber-950/50 dark:to-amber-950/20 dark:shadow-none"
+          : ""
+      } ${sizes.wrap} ${className}`}
       title={`${avg} average from ${Number(count).toLocaleString()} ${reviewWord}`}
       aria-label={`${avg} out of 5 stars, ${Number(count).toLocaleString()} ${reviewWord}`}
     >

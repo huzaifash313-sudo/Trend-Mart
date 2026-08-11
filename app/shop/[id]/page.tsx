@@ -176,6 +176,24 @@ function ShopDetailInner({ id }: { id: string }) {
     });
   }, [shop, coupons]);
 
+  const productOfferContext = useMemo(() => {
+    if (!shop) return null;
+    const slides = buildShopOfferSlides({
+      shopId: shop.id,
+      announcement: shop.announcement,
+      announcementExpiresAt: shop.announcement_expires_at,
+      freeDeliveryThreshold: shop.free_delivery_threshold,
+      coupons,
+    });
+    const couponSlide = slides.find((s) => s.kind === "coupon");
+    return {
+      freeDeliveryThreshold: shop.free_delivery_threshold,
+      announcement: shop.announcement,
+      announcementExpiresAt: shop.announcement_expires_at,
+      couponLabel: couponSlide?.label ?? null,
+    };
+  }, [shop, coupons]);
+
   // ── Real-time product updates ─────────────────────────────────────────────
   useEffect(() => {
     const unsubProducts = subscribeToProducts(id, (payload) => {
@@ -575,6 +593,7 @@ function ShopDetailInner({ id }: { id: string }) {
                 columns="auto"
                 compact={true}
                 categoryLabel={shop.category}
+                offerContext={productOfferContext}
                 onProductClick={handleProductClick}
                 onAddToCart={handleAddToCart}
                 onFavoriteToggle={handleWishlistToggle}

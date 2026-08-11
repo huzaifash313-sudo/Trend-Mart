@@ -268,6 +268,12 @@ export interface Product {
   shop_avg_rating?: number | null;
   /** Parent shop review count (for marketplace cards). */
   shop_review_count?: number | null;
+  /** Parent shop free-delivery threshold (for product image offer tags). */
+  shop_free_delivery_threshold?: number | null;
+  /** Parent shop announcement text. */
+  shop_announcement?: string | null;
+  /** Parent shop announcement expiry. */
+  shop_announcement_expires_at?: string | null;
 }
 
 /** Product row enriched for the cross-store /products marketplace feed. */

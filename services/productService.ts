@@ -263,6 +263,9 @@ type ShopJoin = {
   verification_status?: string | null;
   avg_rating?: number | null;
   review_count?: number | null;
+  free_delivery_threshold?: number | null;
+  announcement?: string | null;
+  announcement_expires_at?: string | null;
 };
 
 function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | null {
@@ -305,6 +308,12 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
       typeof shop.review_count === "number"
         ? shop.review_count
         : Number(shop.review_count) || null,
+    shop_free_delivery_threshold:
+      typeof shop.free_delivery_threshold === "number"
+        ? shop.free_delivery_threshold
+        : Number(shop.free_delivery_threshold) || null,
+    shop_announcement: shop.announcement ?? null,
+    shop_announcement_expires_at: shop.announcement_expires_at ?? null,
   };
 }
 
@@ -323,11 +332,12 @@ const MARKETPLACE_SELECT = `
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude,
-    avg_rating, review_count
+    avg_rating, review_count,
+    free_delivery_threshold, announcement, announcement_expires_at
   )
 `;
 
-/** Pre-migration fallback if avg_rating columns are not applied yet. */
+/** Pre-migration fallback if avg_rating / offer columns are not applied yet. */
 const MARKETPLACE_SELECT_LEGACY = `
   id, shop_id, name, title, description, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
@@ -342,7 +352,7 @@ function isMissingRatingColumnError(err: unknown): boolean {
   const msg = err && typeof err === "object" && "message" in err
     ? String((err as { message?: string }).message || "")
     : String(err || "");
-  return /avg_rating|review_count|column .* does not exist/i.test(msg);
+  return /avg_rating|review_count|free_delivery_threshold|announcement|column .* does not exist/i.test(msg);
 }
 
 /**

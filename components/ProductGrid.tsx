@@ -4,11 +4,12 @@
 
 "use client";
 
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useMemo, type ReactNode } from "react";
 import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
+import { isOfferActive } from "@/lib/shopOfferTicker";
 import CompactRating from "@/components/CompactRating";
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -28,14 +29,45 @@ function HeartIcon({ filled }: { filled: boolean }) {
   );
 }
 
-function DiscountBadge({ originalPrice, currentPrice }: { originalPrice: number; currentPrice: number }) {
-  if (originalPrice <= currentPrice) return null;
-  const pct = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
-  return (
-    <span className="inline-flex items-center rounded px-1 py-px text-[10px] font-bold leading-none text-rose-600 dark:text-rose-400">
-      -{pct}%
-    </span>
-  );
+/** Optional shop-level promo context (store page products inherit from parent shop). */
+export interface ProductOfferContext {
+  freeDeliveryThreshold?: number | null;
+  announcement?: string | null;
+  announcementExpiresAt?: string | null;
+  /** Short coupon line e.g. "Code SAVE10 · 10% OFF" */
+  couponLabel?: string | null;
+}
+
+function buildProductOfferTags(
+  product: Product,
+  offerContext?: ProductOfferContext | null,
+): string[] {
+  const tags: string[] = [];
+  const { hasDiscount, discountPercent } = getProductDiscount(product);
+  if (hasDiscount && discountPercent > 0) {
+    tags.push(`${discountPercent}% OFF`);
+  }
+
+  const freeThreshold =
+    offerContext?.freeDeliveryThreshold ?? product.shop_free_delivery_threshold;
+  if (freeThreshold != null && freeThreshold > 0) {
+    tags.push("Free delivery");
+  }
+
+  const coupon = offerContext?.couponLabel?.trim();
+  if (coupon && tags.length < 2) {
+    tags.push(coupon.length > 26 ? `${coupon.slice(0, 24)}…` : coupon);
+  }
+
+  const announcement =
+    (offerContext?.announcement ?? product.shop_announcement)?.trim() || "";
+  const announcementExpires =
+    offerContext?.announcementExpiresAt ?? product.shop_announcement_expires_at;
+  if (announcement && isOfferActive(announcementExpires) && tags.length < 2) {
+    tags.push(announcement.length > 24 ? `${announcement.slice(0, 22)}…` : announcement);
+  }
+
+  return tags.slice(0, 2);
 }
 
 interface ProductGridProps {
@@ -51,6 +83,8 @@ interface ProductGridProps {
   compact?: boolean;
   categoryLabel?: string;
   showShopMeta?: boolean;
+  /** Shop-level offers (store page) — shown as dark tags on product images. */
+  offerContext?: ProductOfferContext | null;
 }
 
 function ProductCard({
@@ -59,6 +93,7 @@ function ProductCard({
   isFavorite,
   categoryLabel,
   showShopMeta,
+  offerContext,
   priority = false,
   onProductClick,
   onAddToCart,
@@ -70,6 +105,7 @@ function ProductCard({
   isFavorite: boolean;
   categoryLabel?: string;
   showShopMeta?: boolean;
+  offerContext?: ProductOfferContext | null;
   priority?: boolean;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
@@ -102,6 +138,10 @@ function ProductCard({
   );
 
   const { hasDiscount, originalPrice } = getProductDiscount(product);
+  const offerTags = useMemo(
+    () => buildProductOfferTags(product, offerContext),
+    [product, offerContext],
+  );
 
   return (
     <article
@@ -138,9 +178,27 @@ function ProductCard({
         )}
 
         {categoryLabel ? (
-          <span className="absolute left-1.5 top-1.5 z-10 max-w-[72%] truncate rounded bg-zinc-900/70 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+          <span className="absolute left-1.5 top-1.5 z-10 max-w-[55%] truncate rounded bg-zinc-900/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
             {categoryLabel}
           </span>
+        ) : null}
+
+        {offerTags.length > 0 ? (
+          <div
+            className={`absolute z-10 flex max-w-[78%] flex-col items-end gap-0.5 ${
+              categoryLabel ? "right-1.5 top-1.5" : "left-1.5 top-1.5"
+            }`}
+          >
+            {offerTags.map((tag) => (
+              <span
+                key={tag}
+                className="max-w-full truncate rounded bg-zinc-950/85 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-tight text-white shadow-sm backdrop-blur-[2px]"
+                title={tag}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
         ) : null}
 
         {!product.is_available ? (
@@ -152,7 +210,7 @@ function ProductCard({
         ) : null}
       </div>
 
-      <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
+      <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-0.5">
         <h3
           className={`tm-product-title ${
             compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"
@@ -163,14 +221,14 @@ function ProductCard({
         </h3>
 
         {showShopMeta && product.shop_name ? (
-          <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center gap-1">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onShopClick?.(product);
               }}
-              className="flex min-w-0 max-w-full items-center gap-1 text-left"
+              className="flex min-w-0 flex-1 items-center gap-1 text-left"
               aria-label={`View store ${product.shop_name}`}
             >
               {product.shop_logo_url ? (
@@ -178,14 +236,14 @@ function ProductCard({
                 <img
                   src={getSafeImageUrl(product.shop_logo_url, "shop")}
                   alt=""
-                  className="h-3.5 w-3.5 shrink-0 rounded-full object-cover"
+                  className="h-3 w-3 shrink-0 rounded-full object-cover"
                 />
               ) : (
-                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[8px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[7px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                   {product.shop_name.charAt(0).toUpperCase()}
                 </span>
               )}
-              <span className="truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
+              <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
                 {product.shop_name}
               </span>
             </button>
@@ -193,19 +251,19 @@ function ProductCard({
               average={product.shop_avg_rating}
               count={product.shop_review_count}
               size="xs"
-              className="w-fit max-w-full"
+              className="shrink-0"
             />
           </div>
         ) : !compact && product.description ? (
-          <p className="line-clamp-2 text-[11px] leading-snug text-zinc-400 dark:text-zinc-500">
+          <p className="line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
             {product.description}
           </p>
         ) : null}
 
-        <div className="tm-product-footer mt-auto flex flex-col gap-1.5 pt-1.5">
-          <div className="min-w-0 w-full">
+        <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
+          <div className="min-w-0 flex-1">
             <p
-              className={`break-words font-bold tabular-nums leading-tight tracking-tight text-zinc-900 dark:text-zinc-50 ${
+              className={`font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${
                 compact ? "text-[13px] sm:text-sm" : "text-sm sm:text-[15px]"
               }`}
             >
@@ -213,45 +271,40 @@ function ProductCard({
             </p>
             {hasDiscount && originalPrice != null ? (
               <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-                <span className="text-[10px] text-zinc-400 line-through tabular-nums sm:text-[11px]">
+                <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
                   {formatRupees(originalPrice)}
                 </span>
-                <DiscountBadge originalPrice={originalPrice} currentPrice={product.price} />
               </div>
             ) : null}
           </div>
 
-          {(onFavoriteToggle || (product.is_available && onAddToCart)) ? (
-            <div className="flex w-full items-center justify-between gap-2">
-              {onFavoriteToggle ? (
-                <button
-                  type="button"
-                  onClick={handleFavorite}
-                  className={`-ml-1 inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                    isFavorite
-                      ? "text-rose-500"
-                      : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-                  }`}
-                  aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-                >
-                  <HeartIcon filled={isFavorite} />
-                </button>
-              ) : (
-                <span className="h-8 w-8" aria-hidden="true" />
-              )}
+          <div className="flex shrink-0 items-center gap-0.5 pb-px">
+            {onFavoriteToggle ? (
+              <button
+                type="button"
+                onClick={handleFavorite}
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                  isFavorite
+                    ? "text-rose-500"
+                    : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                }`}
+                aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+              >
+                <HeartIcon filled={isFavorite} />
+              </button>
+            ) : null}
 
-              {product.is_available && onAddToCart ? (
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  className="tm-product-add-text inline-flex h-8 items-center shrink-0 px-0.5"
-                  aria-label={`Add ${product.name} to cart`}
-                >
-                  Add
-                </button>
-              ) : null}
-            </div>
-          ) : null}
+            {product.is_available && onAddToCart ? (
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="tm-product-add-text shrink-0 px-0.5"
+                aria-label={`Add ${product.name} to cart`}
+              >
+                Add
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>
@@ -262,15 +315,12 @@ function SkeletonCard() {
   return (
     <div className="tm-product-card flex h-full flex-col overflow-hidden">
       <div className="tm-product-media animate-pulse bg-teal-50 dark:bg-teal-950/30" />
-      <div className="tm-product-body flex flex-col gap-1">
+      <div className="tm-product-body flex flex-col gap-0.5">
         <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-        <div className="mt-auto flex flex-col gap-1.5 pt-1.5">
-          <div className="h-4 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          <div className="flex items-center justify-between">
-            <div className="h-3.5 w-3.5 animate-pulse rounded-full bg-zinc-100 dark:bg-zinc-800" />
-            <div className="h-3 w-8 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          </div>
+        <div className="mt-auto flex items-end justify-between pt-1">
+          <div className="h-4 w-14 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+          <div className="h-3 w-10 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         </div>
       </div>
     </div>
@@ -290,6 +340,7 @@ export default function ProductGrid({
   compact = false,
   categoryLabel,
   showShopMeta = false,
+  offerContext = null,
 }: ProductGridProps) {
   const gridCols =
     columns === "2"
@@ -331,6 +382,7 @@ export default function ProductGrid({
           isFavorite={favorites.has(product.id)}
           categoryLabel={categoryLabel}
           showShopMeta={showShopMeta}
+          offerContext={offerContext}
           priority={index < 8}
           onProductClick={onProductClick}
           onAddToCart={onAddToCart}
