@@ -16,6 +16,7 @@ import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponServic
 import { fetchShopDeliveryMetaForIds, type ShopDeliveryMeta } from "@/services/shopDeliveryMeta";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@/lib/fuzzySearch";
+import DealDayDateFilter from "@/components/DealDayDateFilter";
 
 type FilterMode = "today" | "featured" | "upcoming" | "all";
 
@@ -33,6 +34,7 @@ function DealsInner() {
   const searchParams = useSearchParams();
   const qParam = searchParams.get("q") ?? "";
   const filterParam = (searchParams.get("filter") as FilterMode | null) ?? "today";
+  const dayParam = searchParams.get("day");
 
   const [deals, setDeals] = useState<ShopDeal[]>([]);
   const [shopCoupons, setShopCoupons] = useState<Record<string, Coupon[]>>({});
@@ -43,7 +45,9 @@ function DealsInner() {
   const [filter, setFilter] = useState<FilterMode>(
     ["today", "featured", "upcoming", "all"].includes(filterParam) ? filterParam : "today",
   );
-  const [dayKey, setDayKey] = useState<string | null>(null);
+  const [dayKey, setDayKey] = useState<string | null>(
+    dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null,
+  );
 
   const todayKey = toPkDateKey();
 
@@ -94,19 +98,36 @@ function DealsInner() {
     setFilter(
       ["today", "featured", "upcoming", "all"].includes(filterParam) ? filterParam : "today",
     );
-  }, [qParam, filterParam]);
+    setDayKey(dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null);
+  }, [qParam, filterParam, dayParam]);
 
   const syncUrl = useCallback(
-    (next: { q?: string; filter?: FilterMode }) => {
+    (next: { q?: string; filter?: FilterMode; day?: string | null }) => {
       const params = new URLSearchParams();
       const q = next.q !== undefined ? next.q : query;
       const f = next.filter !== undefined ? next.filter : filter;
+      const day = next.day !== undefined ? next.day : dayKey;
       if (q.trim()) params.set("q", q.trim());
       if (f && f !== "today") params.set("filter", f);
+      if (day) params.set("day", day);
       const qs = params.toString();
       router.replace(qs ? `/deals?${qs}` : "/deals", { scroll: false });
     },
-    [router, query, filter],
+    [router, query, filter, dayKey],
+  );
+
+  const selectDay = useCallback(
+    (key: string | null) => {
+      setDayKey(key);
+      // Day pick overrides quick chips — keep filter as "all" for clarity
+      if (key) {
+        setFilter("all");
+        syncUrl({ day: key, filter: "all" });
+      } else {
+        syncUrl({ day: null });
+      }
+    },
+    [syncUrl],
   );
 
   const offerDays = useMemo(() => listOfferDayKeys(deals, 14, todayKey), [deals, todayKey]);
@@ -170,7 +191,6 @@ function DealsInner() {
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
-    setDayKey(null);
     syncUrl({ q: query });
   };
 
@@ -180,6 +200,16 @@ function DealsInner() {
     { value: "upcoming", label: "Upcoming" },
     { value: "all", label: "All active" },
   ];
+
+  const resultHint = dayKey
+    ? `on ${formatOfferDayLabel(dayKey, todayKey)}`
+    : filter === "today"
+      ? "live today"
+      : filter === "featured"
+        ? "featured today"
+        : filter === "upcoming"
+          ? "upcoming"
+          : "active";
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-28 md:px-4 md:py-5 md:pb-10">
@@ -193,8 +223,7 @@ function DealsInner() {
               Deals for you
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Same browse as products — every card is a store <span className="font-semibold text-amber-700 dark:text-amber-300">Deal</span>
-              , with coupons &amp; delivery from that shop.
+              Filter by weekday or date — see which stores have deals that day.
             </p>
           </div>
           <Link
@@ -228,6 +257,13 @@ function DealsInner() {
         </label>
       </form>
 
+      <DealDayDateFilter
+        deals={deals}
+        selectedDateKey={dayKey}
+        onSelectDate={selectDay}
+        daysAhead={14}
+      />
+
       <div className="sticky top-[var(--tm-navbar-sticky-offset,4.35rem)] z-30 -mx-3 mb-3 border-b border-zinc-100/80 bg-white/95 px-3 py-2 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">
         <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
           {FILTERS.map((opt) => (
@@ -237,7 +273,7 @@ function DealsInner() {
               onClick={() => {
                 setFilter(opt.value);
                 setDayKey(null);
-                syncUrl({ filter: opt.value });
+                syncUrl({ filter: opt.value, day: null });
               }}
               className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
                 filter === opt.value && !dayKey
@@ -251,46 +287,10 @@ function DealsInner() {
         </div>
       </div>
 
-      {offerDays.length > 0 ? (
-        <section aria-label="Offer days" className="tm-cat-bar mb-3 -mx-3 sm:-mx-4">
-          <div className="mb-1 flex items-center justify-between px-2 sm:px-3">
-            <p className="text-[0.65rem] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
-              Jump to day
-            </p>
-            {dayKey ? (
-              <button
-                type="button"
-                onClick={() => setDayKey(null)}
-                className="text-[0.65rem] font-semibold text-zinc-500"
-              >
-                Clear
-              </button>
-            ) : null}
-          </div>
-          <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
-            {offerDays.map((key) => {
-              const active = dayKey === key;
-              const count = deals.filter((d) => isDealActiveOnDate(d, key)).length;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setDayKey(active ? null : key)}
-                  className={`tm-cat-tab${active ? " is-active" : ""}`}
-                  aria-pressed={active}
-                >
-                  <span className="tm-cat-tab-label">{formatOfferDayLabel(key, todayKey)}</span>
-                  <span className="tm-cat-tab-count">{count}</span>
-                  <span className="tm-cat-tab-line" aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
       <p className="mb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
-        {loading ? "Loading deals…" : `${filtered.length} deal${filtered.length === 1 ? "" : "s"}`}
+        {loading
+          ? "Loading deals…"
+          : `${filtered.length} deal${filtered.length === 1 ? "" : "s"} ${resultHint}`}
       </p>
 
       {error ? (
@@ -321,7 +321,9 @@ function DealsInner() {
           </div>
           <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">No matching deals</h3>
           <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Try another filter, clear search, or browse products instead.
+            {dayKey
+              ? `No store deals on ${formatOfferDayLabel(dayKey, todayKey)}. Try another day or date.`
+              : "Try another day, date, filter, or browse products instead."}
           </p>
           {searchSuggestions.length > 0 ? (
             <div className="mt-3 flex flex-wrap justify-center gap-1.5">
@@ -348,7 +350,7 @@ function DealsInner() {
                 setQuery("");
                 setFilter("today");
                 setDayKey(null);
-                syncUrl({ q: "", filter: "today" });
+                syncUrl({ q: "", filter: "today", day: null });
               }}
               className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
             >

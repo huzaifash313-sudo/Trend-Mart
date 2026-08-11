@@ -110,20 +110,37 @@ export function formatOfferDayLabel(dateKey: string, todayKey = toPkDateKey()): 
   return `${WEEKDAY_LABELS[weekday]} ${day}/${month}`;
 }
 
+/** Next N calendar day keys (YYYY-MM-DD), regardless of deal count. */
+export function listCalendarDayKeys(
+  daysAhead = 14,
+  todayKey = toPkDateKey(),
+): string[] {
+  const keys: string[] = [];
+  for (let i = 0; i < daysAhead; i += 1) {
+    keys.push(addDaysToDateKey(todayKey, i));
+  }
+  return keys;
+}
+
 /** Next N calendar days that have at least one active deal. */
 export function listOfferDayKeys(
   deals: ShopDeal[],
   daysAhead = 14,
   todayKey = toPkDateKey(),
 ): string[] {
-  const keys: string[] = [];
-  for (let i = 0; i < daysAhead; i += 1) {
-    const key = addDaysToDateKey(todayKey, i);
-    if (deals.some((d) => isDealActiveOnDate(d, key))) {
-      keys.push(key);
-    }
-  }
-  return keys;
+  return listCalendarDayKeys(daysAhead, todayKey).filter((key) =>
+    deals.some((d) => isDealActiveOnDate(d, key)),
+  );
+}
+
+/** Next calendar date key that falls on the given weekday (0=Sun … 6=Sat). */
+export function nextDateKeyForWeekday(
+  weekday: number,
+  todayKey = toPkDateKey(),
+): string {
+  const todayWd = weekdayFromDateKey(todayKey);
+  const delta = (weekday - todayWd + 7) % 7;
+  return addDaysToDateKey(todayKey, delta);
 }
 
 export function shopIdsWithDealOnDate(deals: ShopDeal[], dateKey: string): Set<string> {
