@@ -471,7 +471,11 @@ export async function fetchMarketplaceProducts(
       builder = builder.eq("sub_category_id", subCategoryId);
     }
 
-    let { data, error } = await builder;
+    const primary = await builder;
+    let rows: Record<string, unknown>[] | null =
+      (primary.data as Record<string, unknown>[] | null) ?? null;
+    let error = primary.error;
+
     if (error && isMissingRatingColumnError(error)) {
       // Migration not applied yet — degrade gracefully without ratings.
       let legacy = supabase
@@ -493,12 +497,12 @@ export async function fetchMarketplaceProducts(
       }
       if (subCategoryId) legacy = legacy.eq("sub_category_id", subCategoryId);
       const legacyRes = await legacy;
-      data = legacyRes.data;
+      rows = (legacyRes.data as Record<string, unknown>[] | null) ?? null;
       error = legacyRes.error;
     }
     if (error) throw error;
 
-    let items = ((data as Record<string, unknown>[]) ?? [])
+    let items = (rows ?? [])
       .map(mapMarketplaceRow)
       .filter((p): p is MarketplaceProduct => !!p);
 

@@ -37,7 +37,6 @@ import {
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
 import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
-import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import ImageUpload from "@/components/ImageUpload";

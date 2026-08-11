@@ -4,6 +4,17 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/webPush";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
 
+type ShopRow = {
+  owner_id: string | null;
+  name: string | null;
+};
+
+type OrderRow = {
+  customer_user_id: string | null;
+  customer_name: string | null;
+  status: string | null;
+};
+
 /**
  * Merchant/customer order status push fan-out.
  * Called best-effort after status changes (never blocks the UI).
@@ -33,19 +44,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, sent: 0 });
     }
 
-    const { data: shop } = await admin
+    const { data: shopRaw } = await admin
       .from("shops")
       .select("owner_id, name")
       .eq("id", body.shopId)
       .maybeSingle();
 
-    const { data: order } = await admin
+    const { data: orderRaw } = await admin
       .from("orders")
       .select("customer_user_id, customer_name, status")
       .eq("id", body.orderId)
       .maybeSingle();
 
-    // Merchant: always notify owner on pending / new activity
+    const shop = shopRaw as ShopRow | null;
+    const order = orderRaw as OrderRow | null;
+
     if (shop?.owner_id) {
       await sendPushToUser(shop.owner_id, {
         title: `Order ${body.status}`,
@@ -55,16 +68,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Customer: notify on status changes after placement
-    if (order?.customer_user_id && order.customer_user_id !== user.id) {
-      await sendPushToUser(order.customer_user_id, {
-        title: `Order update: ${body.status}`,
-        body: `Your order at ${shop?.name || "the shop"} is now ${body.status}.`,
-        url: `/orders/track?id=${body.orderId}`,
-        tag: `order-${body.orderId}`,
-      });
-    } else if (order?.customer_user_id) {
-      // Merchant updating — notify customer
+    if (order?.customer_user_id) {
       await sendPushToUser(order.customer_user_id, {
         title: `Order update: ${body.status}`,
         body: `Your order at ${shop?.name || "the shop"} is now ${body.status}.`,
