@@ -272,6 +272,10 @@ export interface Product {
   shop_review_count?: number | null;
   /** Parent shop free-delivery threshold (for product image offer tags). */
   shop_free_delivery_threshold?: number | null;
+  /** Parent shop flat delivery fee. */
+  shop_delivery_fee_flat?: number | null;
+  /** Parent shop per-km delivery fee. */
+  shop_delivery_fee_per_km?: number | null;
   /** Parent shop announcement text. */
   shop_announcement?: string | null;
   /** Parent shop announcement expiry. */

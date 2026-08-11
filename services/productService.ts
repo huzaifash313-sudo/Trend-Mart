@@ -266,6 +266,8 @@ type ShopJoin = {
   free_delivery_threshold?: number | null;
   announcement?: string | null;
   announcement_expires_at?: string | null;
+  delivery_fee_flat?: number | null;
+  delivery_fee_per_km?: number | null;
 };
 
 function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | null {
@@ -312,6 +314,14 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
       typeof shop.free_delivery_threshold === "number"
         ? shop.free_delivery_threshold
         : Number(shop.free_delivery_threshold) || null,
+    shop_delivery_fee_flat:
+      typeof shop.delivery_fee_flat === "number"
+        ? shop.delivery_fee_flat
+        : Number(shop.delivery_fee_flat) || null,
+    shop_delivery_fee_per_km:
+      typeof shop.delivery_fee_per_km === "number"
+        ? shop.delivery_fee_per_km
+        : Number(shop.delivery_fee_per_km) || null,
     shop_announcement: shop.announcement ?? null,
     shop_announcement_expires_at: shop.announcement_expires_at ?? null,
   };
@@ -333,7 +343,8 @@ const MARKETPLACE_SELECT = `
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude,
     avg_rating, review_count,
-    free_delivery_threshold, announcement, announcement_expires_at
+    free_delivery_threshold, announcement, announcement_expires_at,
+    delivery_fee_flat, delivery_fee_per_km
   )
 `;
 
