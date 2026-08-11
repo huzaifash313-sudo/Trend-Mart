@@ -27,6 +27,9 @@ import {
   isDealActiveOnDate,
   shopIdsWithDealOnDate,
   toPkDateKey,
+  formatDealDisplayLabel,
+  formatDealWhenTag,
+  dealSearchHaystack,
   type ShopDeal,
 } from "@/lib/dealSchedule";
 import { buildShopTickerTags, formatCouponTickerLabels } from "@/lib/shopOfferLabels";
@@ -221,48 +224,6 @@ function ProductsPageInner() {
     };
   }, []);
 
-  const displayProducts = useMemo(() => {
-    const coords = geoFilter.coordinates ?? globalCoords;
-    const radiusActive =
-      geoFilter.scope === "radius" && !!coords && geoFilter.maxDistanceKm > 0;
-
-    let list = products;
-
-    if (radiusActive && coords) {
-      const radius = geoFilter.maxDistanceKm;
-      const nearby: MarketplaceProduct[] = [];
-      const unpinned: MarketplaceProduct[] = [];
-
-      for (const p of products) {
-        if (p.shop_latitude == null || p.shop_longitude == null) {
-          // Keep unpinned shops so Near Me never empties the catalogue
-          unpinned.push(p);
-          continue;
-        }
-        const km = haversineDistance(
-          coords.latitude,
-          coords.longitude,
-          p.shop_latitude,
-          p.shop_longitude,
-        );
-        if (km != null && km <= radius) nearby.push(p);
-      }
-
-      // Nearby first, then unpinned — each block fair-mixed so one shop cannot flood
-      list = [
-        ...diversifyMarketplaceFeed(nearby, sort),
-        ...diversifyMarketplaceFeed(unpinned, sort),
-      ];
-    }
-
-    if (offerDateKey) {
-      const dealShopIds = shopIdsWithDealOnDate(activeDeals, offerDateKey);
-      list = list.filter((p) => dealShopIds.has(p.shop_id));
-    }
-
-    return list;
-  }, [products, geoFilter, globalCoords, sort, offerDateKey, activeDeals]);
-
   const getOfferContext = useCallback(
     (product: {
       shop_id?: string;
@@ -274,10 +235,7 @@ function ProductsPageInner() {
       const today = toPkDateKey();
       const dealLabels = activeDeals
         .filter((d) => d.shop_id === shopId && isDealActiveOnDate(d, today))
-        .map((d) => {
-          const badge = (d.badge_text || "").trim();
-          return badge ? `${badge} · ${d.title}` : d.title;
-        });
+        .map((d) => formatDealDisplayLabel(d));
       const couponLabels = formatCouponTickerLabels(shopCoupons[shopId] ?? []);
       // Coupons + delivery always — even when this product isn't part of a deal.
       return {
@@ -294,15 +252,91 @@ function ProductsPageInner() {
   const getDealStripOfferTags = useCallback(
     (shopId: string) => {
       const sample = products.find((p) => p.shop_id === shopId);
+      const today = toPkDateKey();
+      const dealLabels = activeDeals
+        .filter((d) => d.shop_id === shopId && isDealActiveOnDate(d, today))
+        .map((d) => formatDealDisplayLabel(d));
       return buildShopTickerTags({
         coupons: shopCoupons[shopId] ?? [],
+        dealLabels,
         freeDeliveryThreshold: sample?.shop_free_delivery_threshold,
         deliveryFeeFlat: sample?.shop_delivery_fee_flat,
         deliveryFeePerKm: sample?.shop_delivery_fee_per_km,
       });
     },
-    [products, shopCoupons],
+    [products, shopCoupons, activeDeals],
   );
+
+  /** Deals matching the current search (when-tag / title / shop). */
+  const searchMatchedDeals = useMemo(() => {
+    const q = query.trim();
+    if (!q) return activeDeals;
+    const ranked = fuzzyFilterAndRank(
+      activeDeals.filter((d) => d.is_active),
+      q,
+      (d) => [dealSearchHaystack(d), formatDealWhenTag(d)],
+      { minScore: FUZZY_MIN_SCORE },
+    );
+    return ranked.length ? ranked.map((r) => r.item) : [];
+  }, [activeDeals, query]);
+
+  const displayProducts = useMemo(() => {
+    const coords = geoFilter.coordinates ?? globalCoords;
+    const radiusActive =
+      geoFilter.scope === "radius" && !!coords && geoFilter.maxDistanceKm > 0;
+
+    let list = products;
+
+    if (radiusActive && coords) {
+      const radius = geoFilter.maxDistanceKm;
+      const nearby: MarketplaceProduct[] = [];
+      const unpinned: MarketplaceProduct[] = [];
+
+      for (const p of products) {
+        if (p.shop_latitude == null || p.shop_longitude == null) {
+          unpinned.push(p);
+          continue;
+        }
+        const km = haversineDistance(
+          coords.latitude,
+          coords.longitude,
+          p.shop_latitude,
+          p.shop_longitude,
+        );
+        if (km != null && km <= radius) nearby.push(p);
+      }
+
+      list = [
+        ...diversifyMarketplaceFeed(nearby, sort),
+        ...diversifyMarketplaceFeed(unpinned, sort),
+      ];
+    }
+
+    if (offerDateKey) {
+      const dealShopIds = shopIdsWithDealOnDate(activeDeals, offerDateKey);
+      list = list.filter((p) => dealShopIds.has(p.shop_id));
+    }
+
+    // Search: boost products from shops whose deals match ("Monday deal", "14 August", …)
+    const q = query.trim();
+    if (q && searchMatchedDeals.length > 0) {
+      const boostIds = new Set(searchMatchedDeals.map((d) => d.shop_id));
+      const boosted = list.filter((p) => boostIds.has(p.shop_id));
+      const rest = list.filter((p) => !boostIds.has(p.shop_id));
+      list = [...boosted, ...rest];
+    }
+
+    return list;
+  }, [
+    products,
+    geoFilter,
+    globalCoords,
+    sort,
+    offerDateKey,
+    activeDeals,
+    query,
+    searchMatchedDeals,
+  ]);
 
   const matchingDealCount = useMemo(() => {
     const q = query.trim();
@@ -312,7 +346,7 @@ function ProductsPageInner() {
     return fuzzyFilterAndRank(
       live,
       q,
-      (d) => [d.title, d.description, d.badge_text, d.shop_name],
+      (d) => [dealSearchHaystack(d), formatDealWhenTag(d), d.title],
       { minScore: FUZZY_MIN_SCORE },
     ).length;
   }, [activeDeals, query]);
@@ -545,9 +579,15 @@ function ProductsPageInner() {
       />
 
       <FeaturedDealsStrip
-        deals={activeDeals}
+        deals={query.trim() ? (searchMatchedDeals.length ? searchMatchedDeals : activeDeals) : activeDeals}
         dateKey={offerDateKey}
-        title={sort === "for_you" || sort === "discount" ? "For You · deals" : "Live deals"}
+        title={
+          query.trim() && searchMatchedDeals.length
+            ? "Matching deals"
+            : sort === "for_you" || sort === "discount"
+              ? "For You · deals"
+              : "Live deals"
+        }
         seeAllHref={query.trim() ? `/deals?q=${encodeURIComponent(query.trim())}` : "/deals"}
         className="mb-3"
         getOfferTags={getDealStripOfferTags}

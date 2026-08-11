@@ -163,46 +163,58 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1.0,
     },
     {
+      url: `${BASE_URL}/products`,
+      lastModified: now,
+      changeFrequency: "hourly",
+      priority: 0.95,
+    },
+    {
+      url: `${BASE_URL}/deals`,
+      lastModified: now,
+      changeFrequency: "hourly",
+      priority: 0.95,
+    },
+    {
       url: `${BASE_URL}/search`,
       lastModified: now,
       changeFrequency: "hourly",
-      priority: 0.9,
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/faq`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${BASE_URL}/support`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${BASE_URL}/legal/terms`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${BASE_URL}/legal/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
     },
     {
       url: `${BASE_URL}/wishlist`,
       lastModified: now,
       changeFrequency: "weekly",
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/orders`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/account/addresses`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/login`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.4,
-    },
-    {
-      url: `${BASE_URL}/signup`,
-      lastModified: now,
-      changeFrequency: "monthly",
       priority: 0.4,
     },
   ];
 
   // ── Category Routes ────────────────────────────────────────────────────
   const categoryRoutes: MetadataRoute.Sitemap = categories.map((cat) => ({
-    url: `${BASE_URL}/search?category=${encodeURIComponent(cat.slug)}`,
+    url: `${BASE_URL}/products?category=${encodeURIComponent(cat.name)}`,
     lastModified: now,
     changeFrequency: "daily",
     priority: getCategoryPriority(cat.count, maxCategoryCount),

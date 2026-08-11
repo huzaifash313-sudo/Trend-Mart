@@ -28,6 +28,124 @@ export interface ShopDeal {
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const WEEKDAY_FULL = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+const MONTH_FULL = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+function ordinalDay(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+/** "14 August" from YYYY-MM-DD */
+export function formatLongDayMonth(dateKey: string): string {
+  const day = Number(dateKey.slice(8, 10));
+  const month = Number(dateKey.slice(5, 7));
+  const name = MONTH_FULL[(month || 1) - 1] ?? dateKey.slice(5, 7);
+  return `${day} ${name}`;
+}
+
+/**
+ * Customer-facing when-tag for For You / search / tickers.
+ * Examples: "Monday deal", "Fri & Sat deal", "14 August deal", "14–20 August deal"
+ */
+export function formatDealWhenTag(deal: ShopDeal): string {
+  if (deal.schedule_type === "weekly") {
+    const days = [...new Set(deal.weekdays ?? [])]
+      .filter((d) => d >= 0 && d <= 6)
+      .sort((a, b) => a - b);
+    if (days.length === 1) return `${WEEKDAY_FULL[days[0]]} deal`;
+    if (days.length === 2) {
+      return `${WEEKDAY_LABELS[days[0]]} & ${WEEKDAY_LABELS[days[1]]} deal`;
+    }
+    if (days.length > 2) {
+      const consecutive = days.every((d, i) => i === 0 || d === days[i - 1]! + 1);
+      if (consecutive) {
+        return `${WEEKDAY_LABELS[days[0]!]}–${WEEKDAY_LABELS[days[days.length - 1]!]} deal`;
+      }
+      return `${days.map((d) => WEEKDAY_LABELS[d]).join(", ")} deal`;
+    }
+    return "Weekly deal";
+  }
+
+  if (deal.schedule_type === "date_range") {
+    const start = deal.starts_on?.slice(0, 10);
+    const end = deal.ends_on?.slice(0, 10);
+    if (start && end && start === end) return `${formatLongDayMonth(start)} deal`;
+    if (start && end) {
+      const sameMonth = start.slice(5, 7) === end.slice(5, 7);
+      const startDay = Number(start.slice(8, 10));
+      const endLabel = formatLongDayMonth(end);
+      if (sameMonth) {
+        const month = MONTH_FULL[Number(start.slice(5, 7)) - 1];
+        return `${startDay}–${Number(end.slice(8, 10))} ${month} deal`;
+      }
+      return `${formatLongDayMonth(start)}–${endLabel} deal`;
+    }
+    if (start) return `${formatLongDayMonth(start)} deal`;
+    return "Limited deal";
+  }
+
+  if (deal.schedule_type === "monthly" && deal.day_of_month != null) {
+    return `Monthly ${ordinalDay(deal.day_of_month)} deal`;
+  }
+
+  return "Store deal";
+}
+
+/** Ticker / card line: badge + when-tag (or title fallback). */
+export function formatDealDisplayLabel(deal: ShopDeal): string {
+  const when = formatDealWhenTag(deal);
+  const badge = (deal.badge_text || "").trim();
+  if (badge) return `${badge} · ${when}`;
+  return when;
+}
+
+/** Text blob for fuzzy search (title, badge, when, shop, schedule). */
+export function dealSearchHaystack(deal: ShopDeal): string {
+  return [
+    deal.title,
+    deal.description ?? "",
+    deal.badge_text ?? "",
+    deal.shop_name ?? "",
+    formatDealWhenTag(deal),
+    formatDealSchedule(deal),
+    ...(deal.weekdays ?? []).map((d) => WEEKDAY_FULL[d] ?? ""),
+    ...(deal.weekdays ?? []).map((d) => WEEKDAY_LABELS[d] ?? ""),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 /** YYYY-MM-DD in Asia/Karachi (or local fallback). */
 export function toPkDateKey(date = new Date()): string {

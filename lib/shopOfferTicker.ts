@@ -1,9 +1,9 @@
 /* Shop card offer ticker — coupons, free delivery, scheduled deals. */
 
 import {
-  formatDealSchedule,
   isDealActiveOnDate,
   toPkDateKey,
+  formatDealDisplayLabel,
   type ShopDeal,
 } from "@/lib/dealSchedule";
 
@@ -77,15 +77,10 @@ export function buildShopOfferSlides(input: BuildShopOfferSlidesInput, now = Dat
   for (const deal of deals) {
     if (!deal.is_active) continue;
     if (!isDealActiveOnDate(deal, dateKey)) continue;
-    const badge = (deal.badge_text || "").trim();
-    const schedule = formatDealSchedule(deal);
-    const label = badge
-      ? `${badge} · ${deal.title}`
-      : `${deal.title} · ${schedule}`;
     slides.push({
       id: `${input.shopId}-deal-${deal.id}`,
       kind: "deal",
-      label,
+      label: formatDealDisplayLabel(deal),
       expiresAt: deal.schedule_type === "date_range" ? deal.ends_on : null,
     });
   }

@@ -9,6 +9,8 @@ import {
   isDealActiveOnDate,
   listOfferDayKeys,
   toPkDateKey,
+  dealSearchHaystack,
+  formatDealWhenTag,
   type ShopDeal,
 } from "@/lib/dealSchedule";
 import { fetchActiveDeals } from "@/services/dealService";
@@ -153,8 +155,8 @@ function DealsInner() {
       list = fuzzyFilterAndRank(
         list,
         q,
-        (d) => [d.title, d.badge_text, d.description, d.shop_name],
-        { minScore: FUZZY_MIN_SCORE, weights: [1, 0.9, 0.7, 0.75] },
+        (d) => [dealSearchHaystack(d), formatDealWhenTag(d), d.title, d.badge_text, d.shop_name],
+        { minScore: FUZZY_MIN_SCORE, weights: [1, 1, 0.95, 0.9, 0.75] },
       ).map((r) => r.item);
     } else {
       list = list.slice().sort((a, b) => {

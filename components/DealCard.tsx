@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   formatDealSchedule,
+  formatDealWhenTag,
   type ShopDeal,
 } from "@/lib/dealSchedule";
 import { getSafeImageUrl } from "@/services/storageService";
@@ -43,16 +44,23 @@ export default function DealCard({
   const target = href ?? shopHref;
   const badge = (deal.badge_text || "").trim() || null;
   const hasImage = Boolean(deal.image_url && !imgError);
+  const whenTag = formatDealWhenTag(deal);
   const schedule = formatDealSchedule(deal);
 
   const tickerTags = useMemo(() => {
-    const dealLine = badge ? `${badge} · ${deal.title}` : deal.title;
     const tags = [...offerTags];
-    if (dealLine && !tags.some((t) => t.toLowerCase() === dealLine.toLowerCase())) {
-      tags.push(dealLine.length > 32 ? `${dealLine.slice(0, 30)}…` : dealLine);
+    // Always surface the when-tag (Monday deal / 14 August deal)
+    if (whenTag && !tags.some((t) => t.toLowerCase() === whenTag.toLowerCase())) {
+      tags.unshift(whenTag);
+    }
+    if (badge) {
+      const line = `${badge} · ${whenTag}`;
+      if (!tags.some((t) => t.toLowerCase() === line.toLowerCase())) {
+        tags.unshift(line.length > 32 ? `${line.slice(0, 30)}…` : line);
+      }
     }
     return tags;
-  }, [offerTags, badge, deal.title]);
+  }, [offerTags, badge, whenTag]);
 
   const card = (
     <article
@@ -126,17 +134,11 @@ export default function DealCard({
 
         <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
           <div className="min-w-0 flex-1">
-            {badge ? (
-              <p className="truncate text-[12px] font-bold tabular-nums leading-none text-amber-700 dark:text-amber-300 sm:text-[13px]">
-                {badge}
-              </p>
-            ) : (
-              <p className="truncate text-[11px] font-semibold leading-none text-emerald-700 dark:text-emerald-400">
-                Store deal
-              </p>
-            )}
+            <p className="truncate text-[12px] font-bold leading-none text-amber-700 dark:text-amber-300 sm:text-[13px]">
+              {whenTag}
+            </p>
             <p className="mt-0.5 truncate text-[10px] leading-none text-zinc-400 sm:text-[11px]">
-              {schedule}
+              {badge ? `${badge} · ${schedule}` : schedule}
             </p>
           </div>
           <span className="tm-product-add-text shrink-0 px-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
