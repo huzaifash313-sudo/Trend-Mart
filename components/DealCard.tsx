@@ -28,6 +28,8 @@ interface DealCardProps {
   priority?: boolean;
   className?: string;
   shopWhatsapp?: string | null;
+  /** Open quick-view / photo modal (card body click). */
+  onOpen?: () => void;
 }
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -74,6 +76,7 @@ export default function DealCard({
   priority = false,
   className = "",
   shopWhatsapp,
+  onOpen,
 }: DealCardProps) {
   const { addItem } = useCart();
   const { addToast } = useToast();
@@ -201,9 +204,29 @@ export default function DealCard({
   return (
     <>
       <article
-        className={`tm-product-card group relative flex h-full w-full flex-col overflow-hidden ${className}`}
+        className={`tm-product-card group relative flex h-full w-full flex-col overflow-hidden ${
+          onOpen ? "cursor-pointer" : ""
+        } ${className}`}
+        onClick={() => onOpen?.()}
+        onKeyDown={(e) => {
+          if (!onOpen) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
+        role={onOpen ? "button" : undefined}
+        tabIndex={onOpen ? 0 : undefined}
+        aria-label={onOpen ? `View ${deal.title}` : undefined}
       >
-        <div className="tm-product-media relative shrink-0 overflow-hidden">
+        <div
+          className="tm-product-media relative shrink-0 overflow-hidden"
+          onClick={(e) => {
+            if (!onOpen) return;
+            e.stopPropagation();
+            onOpen();
+          }}
+        >
           {showPhoto && safeSrc ? (
             <Image
               src={safeSrc}
@@ -272,7 +295,10 @@ export default function DealCard({
 
           <button
             type="button"
-            onClick={goStore}
+            onClick={(e) => {
+              stop(e);
+              goStore();
+            }}
             className="flex min-h-[0.875rem] min-w-0 items-center gap-1 text-left"
             aria-label={`Visit ${deal.shop_name || "store"}`}
           >
