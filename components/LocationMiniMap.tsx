@@ -77,9 +77,12 @@ export default function LocationMiniMap({
   const gpsCircleRef = useRef<L.Circle | null>(null);
   const onPickRef = useRef(onPick);
   const suppressMoveEnd = useRef(false);
-  onPickRef.current = onPick;
 
   const isFullscreen = mode === "fullscreen";
+
+  useEffect(() => {
+    onPickRef.current = onPick;
+  }, [onPick]);
 
   // Init map once
   useEffect(() => {
