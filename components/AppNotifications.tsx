@@ -51,8 +51,9 @@ function AutoRegisterMerchantShops() {
 
     void (async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user || cancelled) return;
 
       const { data: shops } = await supabase
@@ -86,8 +87,9 @@ function AutoRegisterCustomerOrders() {
 
     void (async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user || cancelled) return;
       cleanup = registerCustomer(user.id);
     })();
@@ -120,8 +122,9 @@ function AutoSubscribeWebPush() {
     const trySubscribe = async () => {
       if (cancelled) return;
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user || cancelled) return;
 
       const permission = await getPushPermissionState();

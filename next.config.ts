@@ -44,6 +44,8 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SUPABASE_ANON_KEY:
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       "sb_publishable_oqHUrSoDggpaZUBpsGQ9hg_daavN2NK",
+    // Inline so client push subscribe works even if Turbopack misses .env.local
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
   },
 
   // ── Allowed Dev Origins (network access via LAN IP) ─────────────────────────
@@ -83,9 +85,9 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     // Minimum cache TTL for optimized images (1 hour in production)
     minimumCacheTTL: isProd ? 3600 : 60,
-    // Device-based image sizes to reduce kB shipped to mobile
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    // Leaner breakpoints = fewer image variants generated / cached
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [32, 48, 64, 96, 128, 256],
     // Content disposition for SEO-friendly image URLs
     contentDispositionType: "inline",
   },
@@ -312,6 +314,28 @@ const nextConfig: NextConfig = {
             key: "Cache-Control",
             value: isProd
               ? "public, max-age=120, s-maxage=600, stale-while-revalidate=86400"
+              : "no-store, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/products(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: isProd
+              ? "public, max-age=60, s-maxage=300, stale-while-revalidate=86400"
+              : "no-store, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/deals(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: isProd
+              ? "public, max-age=60, s-maxage=300, stale-while-revalidate=86400"
               : "no-store, must-revalidate",
           },
         ],

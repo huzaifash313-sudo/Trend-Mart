@@ -14,6 +14,8 @@ import { ToastProvider } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
+import ScrollToTop from "@/components/ScrollToTop";
+import { ScrollToTopSuspense } from "@/components/PageLoadingShell";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
 import type { ReactNode } from "react";
 
@@ -67,8 +69,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <ErrorBoundary name="Navbar">
                 <Navbar />
               </ErrorBoundary>
+              <ScrollToTopSuspense>
+                <ScrollToTop />
+              </ScrollToTopSuspense>
               <ErrorBoundary name="MainContent">
-                <main className="flex-1">{children}</main>
+                <main className="tm-main flex-1">{children}</main>
               </ErrorBoundary>
               <ErrorBoundary name="Footer">
                 <Footer />

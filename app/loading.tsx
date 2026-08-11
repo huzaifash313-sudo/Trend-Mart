@@ -1,8 +1,9 @@
 import { ShopCardGridSkeleton } from "@/components/Skeletons";
+import PageLoadingShell from "@/components/PageLoadingShell";
 
 export default function HomeLoading() {
   return (
-    <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4">
+    <PageLoadingShell>
       <div className="mb-4 h-10 w-full max-w-md animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
       <div className="mb-6 flex gap-2 overflow-hidden">
         {Array.from({ length: 6 }).map((_, i) => (
@@ -10,6 +11,6 @@ export default function HomeLoading() {
         ))}
       </div>
       <ShopCardGridSkeleton count={8} />
-    </div>
+    </PageLoadingShell>
   );
 }

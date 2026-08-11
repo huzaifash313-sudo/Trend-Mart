@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchMyShop } from "@/services/shopService";
 import { detectUserRole, type AuthRole } from "@/services/authService";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
+import type { User } from "@supabase/supabase-js";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons (compact)                                                */
@@ -75,8 +76,19 @@ export default function BottomNav() {
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
 
-    async function syncAuth(signedIn: boolean, userId?: string) {
-      if (!signedIn || !userId) {
+    type SessionUser = User;
+
+    function roleHint(user: SessionUser | null | undefined): AuthRole | "admin" | null {
+      const raw =
+        (user?.app_metadata?.role as string | undefined) ||
+        (user?.user_metadata?.role as string | undefined);
+      if (raw === "admin" || raw === "merchant" || raw === "customer") return raw;
+      return null;
+    }
+
+    /** Fast path: session + shop only — skip getUser + detectUserRole RPC chain. */
+    async function syncAuth(signedIn: boolean, user?: SessionUser | null) {
+      if (!signedIn || !user?.id) {
         if (!cancelled) {
           setSession(false);
           setRole(null);
@@ -85,18 +97,27 @@ export default function BottomNav() {
         return;
       }
 
-      const supabase = createClient();
-      const { data: userData } = await supabase.auth.getUser();
-      const detected = await detectUserRole(userData.user);
-      const shopResult = await fetchMyShop();
+      const hint = roleHint(user);
+      if (!cancelled) {
+        setSession(true);
+        if (hint) setRole(hint);
+      }
 
+      const shopResult = await fetchMyShop();
       if (cancelled) return;
-      setSession(true);
-      setRole(detected);
+
       if (shopResult.success && shopResult.data) {
         setMerchantShop({ id: shopResult.data.id, category: shopResult.data.category });
+        if (hint !== "admin") setRole("merchant");
       } else {
         setMerchantShop(null);
+        if (!hint) {
+          void detectUserRole(user).then((detected) => {
+            if (!cancelled) setRole(detected);
+          });
+        } else {
+          setRole(hint);
+        }
       }
     }
 
@@ -104,11 +125,13 @@ export default function BottomNav() {
       try {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
-        await syncAuth(!!data.session, data.session?.user?.id);
+        await syncAuth(!!data.session, data.session?.user ?? null);
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (_e, s) => {
           if (cancelled) return;
-          await syncAuth(!!s, s?.user?.id);
+          await syncAuth(!!s, s?.user ?? null);
         });
         unsubscribe = () => subscription.unsubscribe();
       } catch {
@@ -119,10 +142,23 @@ export default function BottomNav() {
         }
       }
     }
-    init();
+
+    // Defer auth work so first paint isn't blocked by Supabase
+    let idleId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (typeof requestIdleCallback !== "undefined") {
+      idleId = requestIdleCallback(() => void init(), { timeout: 1200 });
+    } else {
+      timeoutId = setTimeout(() => void init(), 0);
+    }
+
     return () => {
       cancelled = true;
       unsubscribe?.();
+      if (idleId != null && typeof cancelIdleCallback !== "undefined") {
+        cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
     };
   }, []);
 

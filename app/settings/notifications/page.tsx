@@ -49,11 +49,19 @@ const DEFAULT_TOGGLES: NotificationToggle[] = [
 
 type PushUiStatus = "checking" | "unsupported" | "off" | "on" | "denied";
 
+type PushServerStatus = {
+  ready: boolean;
+  vapidConfigured: boolean;
+  adminConfigured: boolean;
+  subjectSet: boolean;
+};
+
 export default function NotificationsPage() {
   const [toggles, setToggles] = useState<NotificationToggle[]>([]);
   const [loading, setLoading] = useState(true);
   const [pushStatus, setPushStatus] = useState<PushUiStatus>("checking");
   const [pushBusy, setPushBusy] = useState(false);
+  const [serverStatus, setServerStatus] = useState<PushServerStatus | null>(null);
   const { addToast } = useToast();
 
   const refreshPushStatus = useCallback(async () => {
@@ -94,6 +102,10 @@ export default function NotificationsPage() {
     }
     setLoading(false);
     void refreshPushStatus();
+    void fetch("/api/push/status")
+      .then((r) => r.json())
+      .then((data: PushServerStatus) => setServerStatus(data))
+      .catch(() => setServerStatus(null));
   }, [refreshPushStatus]);
 
   const toggleSwitch = useCallback((key: string) => {
@@ -129,7 +141,10 @@ export default function NotificationsPage() {
       addToast("Push is not available (needs HTTPS + VAPID keys).", "error");
       return;
     }
-    addToast("Could not enable push on this device.", "error");
+    addToast(
+      "Could not enable push. Sign in, run the push_subscriptions SQL, then try again.",
+      "error",
+    );
   }, [addToast]);
 
   const handleDisablePush = useCallback(async () => {
@@ -152,6 +167,10 @@ export default function NotificationsPage() {
     );
   }
 
+  const serverReady = serverStatus?.ready === true;
+  const missingAdmin = serverStatus && !serverStatus.adminConfigured;
+  const missingVapid = serverStatus && !serverStatus.vapidConfigured;
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
@@ -168,13 +187,38 @@ export default function NotificationsPage() {
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-3 py-5">
+        {serverStatus && !serverReady && (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+              Server setup incomplete
+            </p>
+            <ul className="mt-2 space-y-1 text-xs text-amber-900/80 dark:text-amber-200/80">
+              {missingVapid && (
+                <li>
+                  Add <code className="font-mono">NEXT_PUBLIC_VAPID_PUBLIC_KEY</code> +{" "}
+                  <code className="font-mono">VAPID_PRIVATE_KEY</code> to{" "}
+                  <code className="font-mono">.env.local</code>, then restart{" "}
+                  <code className="font-mono">npm run dev</code>.
+                </li>
+              )}
+              {missingAdmin && (
+                <li>
+                  Add <code className="font-mono">SUPABASE_SERVICE_ROLE_KEY</code> from Supabase →
+                  Project Settings → API (service_role). Without it, subscribe works but OS push
+                  cannot be sent to other devices.
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
           <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
             Browser push alerts
           </p>
           <p className="mt-1 text-xs leading-relaxed text-emerald-800/80 dark:text-emerald-300/80">
-            Free OS notifications when the app is in the background. Needs VAPID keys in env and
-            HTTPS (or localhost).
+            Free OS notifications when the app is in the background. Works on HTTPS or localhost
+            after you enable below (sign-in required).
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-white px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
@@ -184,6 +228,17 @@ export default function NotificationsPage() {
               {pushStatus === "denied" && "Blocked"}
               {pushStatus === "unsupported" && "Unavailable"}
             </span>
+            {serverStatus && (
+              <span
+                className={`rounded-full px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide ${
+                  serverReady
+                    ? "bg-emerald-600 text-white"
+                    : "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100"
+                }`}
+              >
+                Server {serverReady ? "ready" : "needs setup"}
+              </span>
+            )}
             {pushStatus === "on" ? (
               <button
                 type="button"
@@ -197,7 +252,11 @@ export default function NotificationsPage() {
               <button
                 type="button"
                 disabled={
-                  pushBusy || pushStatus === "unsupported" || pushStatus === "denied" || pushStatus === "checking"
+                  pushBusy ||
+                  pushStatus === "unsupported" ||
+                  pushStatus === "denied" ||
+                  pushStatus === "checking" ||
+                  missingVapid === true
                 }
                 onClick={handleEnablePush}
                 className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"

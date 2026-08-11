@@ -96,10 +96,17 @@ export async function POST(request: Request) {
       });
     }
 
-    if (order.customer_user_id && event !== "new") {
+    // Customer: confirmation on new order + every status change
+    if (order.customer_user_id) {
       await sendPushToUser(order.customer_user_id, {
-        title: `Order update: ${body.status}`,
-        body: `Your order at ${shop?.name || "the shop"} is now ${body.status}.`,
+        title:
+          event === "new"
+            ? "Order placed on TrendMart"
+            : `Order update: ${body.status}`,
+        body:
+          event === "new"
+            ? `Your order at ${shop?.name || "the shop"} was received${amount ? ` (${amount})` : ""}.`
+            : `Your order at ${shop?.name || "the shop"} is now ${body.status}.`,
         url: `/orders/tracking?orderId=${encodeURIComponent(body.orderId)}`,
         tag: `order-${body.orderId}-customer`,
       });

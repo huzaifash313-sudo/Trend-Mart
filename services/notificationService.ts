@@ -57,9 +57,16 @@ const globalTransitionListeners = new Set<StatusTransitionCallback>();
 export const NOTIFICATION_CHANNELS: NotificationChannel[] = [
   {
     id: "realtime",
-    name: "Real-Time Push",
+    name: "Real-Time In-App",
     type: "realtime",
-    description: "Instant browser notifications via Supabase Realtime WebSockets",
+    description: "Instant in-app alerts via Supabase Realtime WebSockets",
+    is_active: true,
+  },
+  {
+    id: "web_push",
+    name: "Browser / OS Push",
+    type: "push",
+    description: "Background OS notifications via Web Push (VAPID)",
     is_active: true,
   },
   {
@@ -73,7 +80,7 @@ export const NOTIFICATION_CHANNELS: NotificationChannel[] = [
     id: "email",
     name: "Email Alerts",
     type: "email",
-    description: "Order status update emails to customers (future: Resend integration)",
+    description: "Order status update emails to customers (optional Resend)",
     is_active: false,
   },
   {

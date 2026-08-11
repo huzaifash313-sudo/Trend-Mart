@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { MarketplaceProduct, Shop, ShopCategory } from "@/types";
@@ -10,10 +11,8 @@ import {
   type MarketplaceSort,
 } from "@/services/productService";
 import ProductGrid from "@/components/ProductGrid";
-import QuickViewModal from "@/components/QuickViewModal";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import OfferDaysStrip from "@/components/OfferDaysStrip";
-import FeaturedDealsStrip from "@/components/FeaturedDealsStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { useLocation } from "@/context/LocationContext";
 import { useCart } from "@/context/CartContext";
@@ -39,6 +38,13 @@ import {
   suggestSearchCorrections,
   FUZZY_MIN_SCORE,
 } from "@/lib/fuzzySearch";
+
+const FeaturedDealsStrip = dynamic(() => import("@/components/FeaturedDealsStrip"), {
+  loading: () => <div className="h-36 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />,
+});
+const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
+  ssr: false,
+});
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -159,7 +165,7 @@ function ProductsPageInner() {
         category: categoryParam === "All" ? undefined : categoryParam,
         subCategoryId: subParam,
         sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
-        limit: 72,
+        limit: 48,
       });
       if (cancelled) return;
       if (result.success) {

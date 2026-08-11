@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -9,7 +10,6 @@ import { SHOP_CATEGORIES } from "@/types";
 import { fetchMyShop, fetchShops } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import type { Story } from "@/types";
-import StoriesViewer from "@/components/StoriesViewer";
 import {
   isStoryViewed,
   sortStoriesUnseenFirst,
@@ -17,16 +17,13 @@ import {
 import { toggleFavorite as toggleFav } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
-import { fetchCategoryCounts, type CategoryWithCount } from "@/services/categoryService";
 import { getSafeImageUrl } from "@/services/storageService";
 import { filterShopsByProximity } from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
-import PromoAdsCarousel from "@/components/PromoAdsCarousel";
 import ShopCard from "@/components/ShopCard";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import OfferDaysStrip from "@/components/OfferDaysStrip";
-import FeaturedDealsStrip from "@/components/FeaturedDealsStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { fetchShopIdsBySubCategory } from "@/services/productService";
 import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
@@ -34,6 +31,16 @@ import { fetchActiveDeals } from "@/services/dealService";
 import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
+
+const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
+  ssr: false,
+});
+const FeaturedDealsStrip = dynamic(() => import("@/components/FeaturedDealsStrip"), {
+  loading: () => <div className="h-40 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />,
+});
+const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
+  loading: () => null,
+});
 
 /* -------------------------------------------------------------------------- */
 /*  HomeInner Component                                                        */
@@ -71,7 +78,7 @@ function HomeInner() {
     return new Set();
   });
 
-  const [categoryCounts, setCategoryCounts] = useState<CategoryWithCount[]>([]);
+  const [categoryCounts, setCategoryCounts] = useState<{ key: ShopCategory; count: number }[]>([]);
   const [brokenImgs, setBrokenImgs] = useState<Set<string>>(new Set());
   const [brokenStoryImgs, setBrokenStoryImgs] = useState<Set<string>>(new Set());
   const [myShop, setMyShop] = useState<{ id: string; category: string; name: string } | null>(null);
@@ -92,42 +99,65 @@ function HomeInner() {
     scope: "radius",
   });
 
-  /* Fetch shops once on mount */
+  /* Fetch shops first for fast paint; stories/deals fill in without blocking */
   useEffect(() => {
     let cancelled = false;
-    const LOADING_TIMEOUT_MS = 15_000;
+    const LOADING_TIMEOUT_MS = 12_000;
 
     async function loadData() {
       try {
-        setLoading(true); setError(null);
-        const result = await Promise.race([
-          Promise.all([
-            fetchShops({ publicOnly: true, limit: 80 }),
-            fetchActiveStories(),
-            fetchActiveDeals(80),
-            fetchCategoryCounts(),
-          ]),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Request timed out.")), LOADING_TIMEOUT_MS)),
+        setLoading(true);
+        setError(null);
+
+        const shopsPromise = Promise.race([
+          fetchShops({ publicOnly: true, limit: 60 }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Request timed out.")), LOADING_TIMEOUT_MS),
+          ),
         ]);
-        const [shopsResult, storiesResult, dealsResult, catResult] = result;
-        if (!cancelled) {
-          if (shopsResult.success) {
-            setShops(shopsResult.data);
-            const ids = shopsResult.data.map((s) => s.id);
-            // Coupons only for visible shops — fire after shops land, don't block paint
-            void fetchActiveCouponsForShops(ids).then((cRes) => {
-              if (!cancelled && cRes.success) setShopCoupons(cRes.data);
-            });
-          } else setError(shopsResult.error);
-          if (storiesResult.success) {
-            setStories(sortStoriesUnseenFirst(storiesResult.data));
+
+        const shopsResult = await shopsPromise;
+        if (cancelled) return;
+
+        if (shopsResult.success) {
+          setShops(shopsResult.data);
+          // Derive category counts from shops already in memory (no extra round-trip)
+          const counts = new Map<string, number>();
+          for (const s of shopsResult.data) {
+            const key = s.category || "Other";
+            counts.set(key, (counts.get(key) ?? 0) + 1);
           }
-          if (dealsResult.success) setActiveDeals(dealsResult.data);
-          if (catResult.success) setCategoryCounts(catResult.data.categories);
+          setCategoryCounts(
+            Array.from(counts.entries()).map(([key, count]) => ({
+              key: key as ShopCategory,
+              count,
+            })),
+          );
+          const ids = shopsResult.data.map((s) => s.id);
+          void fetchActiveCouponsForShops(ids).then((cRes) => {
+            if (!cancelled && cRes.success) setShopCoupons(cRes.data);
+          });
+        } else {
+          setError(shopsResult.error);
         }
+        setLoading(false);
+
+        // Non-blocking enrichment
+        void Promise.all([fetchActiveStories(), fetchActiveDeals(48)]).then(
+          ([storiesResult, dealsResult]) => {
+            if (cancelled) return;
+            if (storiesResult.success) {
+              setStories(sortStoriesUnseenFirst(storiesResult.data));
+            }
+            if (dealsResult.success) setActiveDeals(dealsResult.data);
+          },
+        );
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data.");
-      } finally { if (!cancelled) setLoading(false); }
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load data.");
+          setLoading(false);
+        }
+      }
     }
 
     loadData();
@@ -152,7 +182,7 @@ function HomeInner() {
     };
     window.addEventListener("trendmart:stories-updated", onStoriesUpdated);
     const onDealsUpdated = () => {
-      void fetchActiveDeals(80).then((dRes) => {
+      void fetchActiveDeals(48).then((dRes) => {
         if (!cancelled && dRes.success) setActiveDeals(dRes.data);
       });
     };

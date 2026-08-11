@@ -663,7 +663,15 @@ export function NotificationPanel({
                 <button
                   key={notif.id}
                   type="button"
-                  onClick={() => markAsRead(notif.id)}
+                  onClick={() => {
+                    markAsRead(notif.id);
+                    if (notif.linkUrl) {
+                      closePanel();
+                      if (typeof window !== "undefined") {
+                        window.location.assign(notif.linkUrl);
+                      }
+                    }
+                  }}
                   className={`block w-full px-4 py-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
                     !notif.read ? "bg-emerald-50/50 dark:bg-emerald-900/10" : ""
                   }`}

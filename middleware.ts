@@ -354,6 +354,25 @@ function isVerifyExempt(pathname: string): boolean {
 }
 
 /**
+ * Public catalog / marketing pages — skip session refresh & role RPC for speed.
+ * Auth/dashboard/admin still go through the full gate below.
+ */
+function isPublicBrowsePath(pathname: string): boolean {
+  if (pathname === "/" || pathname === "") return true;
+  if (pathname === "/products" || pathname.startsWith("/products/")) return true;
+  if (pathname === "/deals" || pathname.startsWith("/deals/")) return true;
+  if (pathname === "/search" || pathname.startsWith("/search/")) return true;
+  if (pathname === "/faq" || pathname.startsWith("/faq/")) return true;
+  if (pathname.startsWith("/legal")) return true;
+  if (pathname === "/support" || pathname.startsWith("/support/")) return true;
+  if (pathname === "/offline") return true;
+  if (pathname === "/shop" || /^\/shop\/[^/]+/.test(pathname)) {
+    return !pathname.startsWith("/shop/manage");
+  }
+  return false;
+}
+
+/**
  * Fetch the user's role from the `user_roles` table.
  * FIX: If getUser() fails but session cookies exist, fall back to "customer"
  * instead of returning null. This prevents the login redirect loop when
@@ -612,30 +631,35 @@ export async function middleware(request: NextRequest) {
     return loopResponse;
   }
 
-  // ── 1. Rate limiting check (edge-safe, async) ──────────────────────────
-  const rateLimitAllowed = await checkRateLimit(request);
-  if (!rateLimitAllowed) {
-    const retryAfter = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
-    const response = new NextResponse(
-      JSON.stringify({
-        error: "Too many requests. Please slow down and try again.",
-        retryAfter,
-      }),
-      {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(
-            SENSITIVE_PATH_PATTERNS.some((p) => pathname.startsWith(p))
-              ? SENSITIVE_RATE_LIMIT_MAX
-              : RATE_LIMIT_MAX,
-          ),
+  // ── 1. Rate limiting — skip anonymous GETs on public browse (major speed win)
+  const method = request.method.toUpperCase();
+  const isBrowseGet = method === "GET" || method === "HEAD";
+  const browseFast = isPublicBrowsePath(pathname);
+  if (!(browseFast && isBrowseGet)) {
+    const rateLimitAllowed = await checkRateLimit(request);
+    if (!rateLimitAllowed) {
+      const retryAfter = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
+      const response = new NextResponse(
+        JSON.stringify({
+          error: "Too many requests. Please slow down and try again.",
+          retryAfter,
+        }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": String(retryAfter),
+            "X-RateLimit-Limit": String(
+              SENSITIVE_PATH_PATTERNS.some((p) => pathname.startsWith(p))
+                ? SENSITIVE_RATE_LIMIT_MAX
+                : RATE_LIMIT_MAX,
+            ),
+          },
         },
-      },
-    );
-    stripSensitiveHeaders(response);
-    return response;
+      );
+      stripSensitiveHeaders(response);
+      return response;
+    }
   }
 
   // ── 2. Route classification ────────────────────────────────────────────
@@ -648,15 +672,15 @@ export async function middleware(request: NextRequest) {
     hasSessionCookies: authenticated,
     isAuthRoute: isAuthRoute(pathname),
     isVerifyExempt: isVerifyExempt(pathname),
+    isPublicBrowse: browseFast,
   });
 
-  // ── 3. PUBLIC routes: fast-path, skip all auth ─────────────────────────
+  // ── 3. PUBLIC browse: fast-path (no session refresh / role RPC) ────────
   if (
-    requiredRole === "public" &&
-    !isAuthRoute(pathname) &&
-    !isVerifyExempt(pathname)
+    browseFast ||
+    (requiredRole === "public" && !isAuthRoute(pathname) && !isVerifyExempt(pathname))
   ) {
-    authDebug("PUBLIC route — fast return");
+    authDebug("PUBLIC browse — fast return");
     const response = NextResponse.next({
       request: { headers: request.headers },
     });
