@@ -160,7 +160,7 @@ export default function ShopCard({
       </Link>
 
       <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2 sm:px-2.5 sm:pb-2.5">
-        {/* Name from the start + wishlist */}
+        {/* Name + wishlist */}
         <div className="flex min-w-0 items-start gap-1.5">
           <Link
             href={href}
@@ -190,11 +190,12 @@ export default function ShopCard({
           ) : null}
         </div>
 
-        <CompactRating
-          average={shop.avg_rating}
-          count={shop.review_count}
-          className="mt-1"
-        />
+        <div className="mt-1.5">
+          <CompactRating
+            average={shop.avg_rating}
+            count={shop.review_count}
+          />
+        </div>
 
         {offerSlides.length > 0 ? (
           <div className="mt-1.5">

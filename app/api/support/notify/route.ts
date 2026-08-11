@@ -1,19 +1,31 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Support Ticket Email Notification Endpoint                    */
+/*  TrendMart — Support Ticket Submit + Email Notify                          */
 /*  POST /api/support/notify                                                  */
 /*                                                                             */
-/*  Fired (fire-and-forget) by services/supportService.ts right after a       */
-/*  support ticket is inserted client-side. Sends a confirmation email to     */
-/*  the submitter and an alert email to the TrendMart support team via        */
-/*  Resend. Never blocks or fails the ticket submission itself.               */
+/*  Creates the support_tickets row (server-side) and sends confirmation /    */
+/*  team alert emails. Server insert avoids guest RLS failure on              */
+/*  INSERT … RETURNING that broke the Contact Support form.                   */
 /* -------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailShell } from "@/lib/email";
 import { sanitizeLight, truncate } from "@/lib/sanitization";
+import { formatPkPhoneDisplay } from "@/lib/phoneFormat";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
 
+export const runtime = "nodejs";
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CATEGORIES = new Set([
+  "general",
+  "order",
+  "merchant",
+  "technical",
+  "billing",
+  "other",
+]);
 
 interface NotifyPayload {
   name: string;
@@ -22,32 +34,108 @@ interface NotifyPayload {
   subject: string;
   message: string;
   category: string;
+  /** When true (default), persist to support_tickets before emailing. */
+  persist?: boolean;
+  userId?: string | null;
+}
+
+function publicDbMessage(err: unknown): string {
+  const raw =
+    err instanceof Error
+      ? err.message
+      : err && typeof err === "object" && "message" in err
+        ? String((err as { message: unknown }).message)
+        : "";
+  const msg = raw.toLowerCase();
+  if (
+    msg.includes("does not exist") ||
+    msg.includes("schema cache") ||
+    msg.includes("could not find the table")
+  ) {
+    return "Support inbox is not set up yet. Please try again later.";
+  }
+  if (msg.includes("permission denied") || msg.includes("row-level security")) {
+    return "Could not save your message due to a permissions issue. Please try again.";
+  }
+  return "We could not send your message right now. Please try again.";
+}
+
+async function persistTicket(row: Record<string, unknown>) {
+  const admin = getSupabaseAdminClient();
+  if (admin) {
+    const { error } = await admin.from("support_tickets").insert(row);
+    if (error) throw error;
+    return;
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) {
+    throw new Error("Supabase is not configured on the server.");
+  }
+
+  const client = createSupabaseClient(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  // No .select() — guests cannot read rows under own_read RLS.
+  const { error } = await client.from("support_tickets").insert(row);
+  if (error) throw error;
 }
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Partial<NotifyPayload>;
+    let body: Partial<NotifyPayload>;
+    try {
+      body = (await request.json()) as Partial<NotifyPayload>;
+    } catch {
+      return NextResponse.json(buildSafeErrorResponse(400, "Invalid ticket payload."), {
+        status: 400,
+      });
+    }
 
     const name = truncate(sanitizeLight(body.name ?? ""), 120);
     const email = (body.email ?? "").trim().toLowerCase();
-    const phone = truncate(sanitizeLight(body.phone ?? ""), 30);
+    const phone = body.phone?.trim()
+      ? truncate(sanitizeLight(formatPkPhoneDisplay(body.phone)), 30)
+      : truncate(sanitizeLight(body.phone ?? ""), 30);
     const subject = truncate(sanitizeLight(body.subject ?? ""), 200);
     const message = truncate(sanitizeLight(body.message ?? ""), 4000);
-    const category = truncate(sanitizeLight(body.category ?? "general"), 40);
+    const categoryRaw = truncate(sanitizeLight(body.category ?? "general"), 40);
+    const category = CATEGORIES.has(categoryRaw) ? categoryRaw : "general";
+    const shouldPersist = body.persist !== false;
 
     if (!name || !EMAIL_PATTERN.test(email) || !subject || !message) {
-      return NextResponse.json(buildSafeErrorResponse(400, "Invalid ticket payload."), { status: 400 });
+      return NextResponse.json(buildSafeErrorResponse(400, "Invalid ticket payload."), {
+        status: 400,
+      });
     }
-
-    const supportTeamEmail = (process.env.SUPPORT_TEAM_EMAIL || "").trim();
-    if (!supportTeamEmail || !EMAIL_PATTERN.test(supportTeamEmail)) {
-      // Still confirm to submitter; admin inbox remains the source of truth in DB.
-      console.warn(
-        "[support/notify] SUPPORT_TEAM_EMAIL is missing — skipping team alert email.",
+    if (message.length < 10) {
+      return NextResponse.json(
+        buildSafeErrorResponse(400, "Please describe your issue in at least 10 characters."),
+        { status: 400 },
       );
     }
 
-    // Confirmation to the submitter — best-effort, doesn't fail the request.
+    if (shouldPersist) {
+      try {
+        await persistTicket({
+          user_id: body.userId ?? null,
+          name,
+          email,
+          phone,
+          category,
+          subject,
+          message,
+          status: "open",
+        });
+      } catch (dbErr) {
+        console.error("[support/notify] persist failed:", dbErr);
+        return NextResponse.json(buildSafeErrorResponse(500, publicDbMessage(dbErr)), {
+          status: 500,
+        });
+      }
+    }
+
     const confirmationResult = await sendEmail({
       to: email,
       subject: "We received your message — TrendMart Support",
@@ -62,9 +150,13 @@ export async function POST(request: Request) {
       ),
     });
 
-    // Alert to the internal support team (email never exposed in the public UI).
     let alertSent = false;
-    if (supportTeamEmail && EMAIL_PATTERN.test(supportTeamEmail)) {
+    const supportTeamEmail = (process.env.SUPPORT_TEAM_EMAIL || "").trim();
+    if (!supportTeamEmail || !EMAIL_PATTERN.test(supportTeamEmail)) {
+      console.warn(
+        "[support/notify] SUPPORT_TEAM_EMAIL is missing — skipping team alert email.",
+      );
+    } else {
       const alertResult = await sendEmail({
         to: supportTeamEmail,
         subject: `[${category}] New support ticket: ${subject}`,
@@ -84,11 +176,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      persisted: shouldPersist,
       confirmationSent: confirmationResult.success,
       alertSent,
     });
-  } catch {
-    // Email notification is a non-critical side effect — never surface a hard error.
-    return NextResponse.json({ success: false }, { status: 200 });
+  } catch (err) {
+    console.error("[support/notify]", err);
+    return NextResponse.json(buildSafeErrorResponse(500, publicDbMessage(err)), {
+      status: 500,
+    });
   }
 }

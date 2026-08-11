@@ -351,6 +351,7 @@ function ShopDetailInner({ id }: { id: string }) {
                 <CompactRating
                   average={shop.avg_rating}
                   count={shop.review_count}
+                  size="md"
                   className="mt-0.5"
                 />
                 <div className="flex min-w-0 items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">

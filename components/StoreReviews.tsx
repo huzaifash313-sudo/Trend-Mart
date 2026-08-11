@@ -26,33 +26,56 @@ interface StarRatingProps {
   onChange?: (rating: number) => void;
 }
 
+function StarPath() {
+  return (
+    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+  );
+}
+
 function StarRating({ rating, size = "md", interactive = false, onChange }: StarRatingProps) {
   const [hoverRating, setHoverRating] = useState(0);
   const starClass = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-7 w-7" : "h-5 w-5";
+  const display = hoverRating || rating;
 
   return (
-    <div className="inline-flex items-center gap-0.5">
+    <div className="inline-flex items-center gap-0.5" role={interactive ? "radiogroup" : "img"} aria-label={`${Number(rating).toFixed(1)} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((star) => {
-        const filled = (hoverRating || rating) >= star;
-        return (
-          <button
-            key={star}
-            type="button"
-            disabled={!interactive}
-            onClick={() => interactive && onChange?.(star)}
-            onMouseEnter={() => interactive && setHoverRating(star)}
-            onMouseLeave={() => interactive && setHoverRating(0)}
-            className={`${interactive ? "cursor-pointer transition-transform hover:scale-110" : "cursor-default"} focus:outline-none`}
-            aria-label={`${star} star${star !== 1 ? "s" : ""}`}
-          >
-            <svg
-              className={`${starClass} ${filled ? "text-amber-400" : "text-zinc-300 dark:text-zinc-600"}`}
-              viewBox="0 0 20 20"
-              fill="currentColor"
+        if (interactive) {
+          const filled = display >= star;
+          return (
+            <button
+              key={star}
+              type="button"
+              onClick={() => onChange?.(star)}
+              onMouseEnter={() => setHoverRating(star)}
+              onMouseLeave={() => setHoverRating(0)}
+              className="cursor-pointer transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 rounded-sm"
+              aria-label={`${star} star${star !== 1 ? "s" : ""}`}
             >
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              <svg className={`${starClass} ${filled ? "text-amber-400" : "text-zinc-300 dark:text-zinc-600"}`} viewBox="0 0 20 20" fill="currentColor">
+                <StarPath />
+              </svg>
+            </button>
+          );
+        }
+
+        // Partial fill for averages (e.g. 4.3)
+        const fill = Math.max(0, Math.min(1, display - (star - 1)));
+        const pct = Math.round(fill * 100);
+
+        return (
+          <span key={star} className={`relative inline-block ${starClass}`} aria-hidden="true">
+            <svg className={`${starClass} text-zinc-300 dark:text-zinc-600`} viewBox="0 0 20 20" fill="currentColor">
+              <StarPath />
             </svg>
-          </button>
+            {pct > 0 ? (
+              <span className="absolute inset-0 overflow-hidden" style={{ width: `${pct}%` }}>
+                <svg className={`${starClass} text-amber-400`} viewBox="0 0 20 20" fill="currentColor">
+                  <StarPath />
+                </svg>
+              </span>
+            ) : null}
+          </span>
         );
       })}
     </div>
@@ -73,11 +96,19 @@ function RatingDistributionBar({
         const pct = total > 0 ? Math.round((count / total) * 100) : 0;
         return (
           <div key={star} className="flex items-center gap-2 text-xs">
-            <span className="w-8 text-right font-medium text-zinc-600 dark:text-zinc-400">{star}★</span>
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
-              <div className="h-full rounded-full bg-amber-400 transition-all duration-300" style={{ width: `${pct}%` }} />
+            <span className="flex w-7 shrink-0 items-center justify-end gap-0.5 tabular-nums font-semibold text-zinc-600 dark:text-zinc-400">
+              {star}
+              <svg className="h-3 w-3 text-amber-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <StarPath />
+              </svg>
+            </span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
             </div>
-            <span className="w-8 text-right tabular-nums text-zinc-500 dark:text-zinc-400">{count}</span>
+            <span className="w-8 shrink-0 text-right tabular-nums text-zinc-500 dark:text-zinc-400">{count}</span>
           </div>
         );
       })}
@@ -301,24 +332,32 @@ export function StoreReviewsSummary({ shopId, compact = false }: { shopId: strin
   }
   if (compact) {
     return (
-      <div className="inline-flex items-center gap-1.5">
+      <div className="inline-flex items-center gap-1.5 rounded-md border border-amber-200/80 bg-amber-50/80 px-1.5 py-0.5 dark:border-amber-500/25 dark:bg-amber-950/40">
         <StarRating rating={stats.average} size="sm" />
-        <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{stats.average}</span>
-        <span className="text-xs text-zinc-500">({stats.total})</span>
+        <span className="text-sm font-bold tabular-nums text-zinc-900 dark:text-zinc-100">
+          {Number(stats.average).toFixed(1)}
+        </span>
+        <span className="text-[11px] font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
+          ({stats.total})
+        </span>
       </div>
     );
   }
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center gap-4">
-        <div className="text-center">
-          <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{stats.average}</p>
-          <StarRating rating={stats.average} size="sm" />
-          <p className="mt-1 text-xs text-zinc-500">
-            {stats.total} review{stats.total !== 1 ? "s" : ""}
+    <div className="rounded-2xl border border-amber-100/80 bg-gradient-to-br from-amber-50/90 via-white to-white p-5 shadow-sm dark:border-amber-900/30 dark:from-amber-950/30 dark:via-zinc-900 dark:to-zinc-900">
+      <div className="flex items-center gap-5">
+        <div className="min-w-[5.5rem] text-center">
+          <p className="text-4xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-50">
+            {Number(stats.average).toFixed(1)}
+          </p>
+          <div className="mt-1.5 flex justify-center">
+            <StarRating rating={stats.average} size="sm" />
+          </div>
+          <p className="mt-1.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+            {stats.total.toLocaleString()} review{stats.total !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <RatingDistributionBar distribution={stats.distribution} total={stats.total} />
         </div>
       </div>
@@ -403,16 +442,20 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
   return (
     <div className="space-y-4">
       {stats.total > 0 ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{stats.average}</p>
-              <StarRating rating={stats.average} size="sm" />
-              <p className="mt-1 text-xs text-zinc-500">
-                {stats.total} review{stats.total !== 1 ? "s" : ""}
+        <div className="rounded-2xl border border-amber-100/80 bg-gradient-to-br from-amber-50/90 via-white to-white p-4 shadow-sm dark:border-amber-900/30 dark:from-amber-950/30 dark:via-zinc-900 dark:to-zinc-900 sm:p-5">
+          <div className="flex items-center gap-4 sm:gap-5">
+            <div className="min-w-[5rem] text-center sm:min-w-[5.5rem]">
+              <p className="text-3xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
+                {Number(stats.average).toFixed(1)}
+              </p>
+              <div className="mt-1.5 flex justify-center">
+                <StarRating rating={stats.average} size="sm" />
+              </div>
+              <p className="mt-1.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                {stats.total.toLocaleString()} review{stats.total !== 1 ? "s" : ""}
               </p>
             </div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <RatingDistributionBar distribution={stats.distribution} total={stats.total} />
             </div>
           </div>

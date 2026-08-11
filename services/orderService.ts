@@ -94,8 +94,36 @@ function parseOrder(row: Record<string, unknown>): Order {
   };
 }
 
+/** True when merchant set an explicit numeric stock (null/undefined = untracked). */
+function isTrackedStock(stock: unknown): stock is number {
+  return typeof stock === "number" && Number.isFinite(stock) && stock >= 0;
+}
+
+/**
+ * Cart UI stores labels like "Size: M · Color: Red". Split into selections.
+ */
+function parseVariantSelections(
+  variantLabel: string,
+): Array<{ group?: string; label: string }> {
+  return variantLabel
+    .split(/\s*·\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const idx = part.indexOf(":");
+      if (idx > 0) {
+        return {
+          group: part.slice(0, idx).trim(),
+          label: part.slice(idx + 1).trim(),
+        };
+      }
+      return { label: part };
+    });
+}
+
 /**
  * Locate a variant within the product's variant groups by label and/or group.
+ * Accepts plain labels ("M") and "Group: Label" forms from the cart.
  */
 function findVariant(
   variants: VariantGroup[] | null | undefined,
@@ -105,14 +133,35 @@ function findVariant(
   if (!variants || !variantLabel) return null;
 
   for (const group of variants) {
-    // If variantGroup is specified, only look in that group
     if (variantGroup && group.name !== variantGroup) continue;
 
     for (const opt of group.options) {
       if (opt.label === variantLabel) return opt;
+      if (`${group.name}: ${opt.label}` === variantLabel) return opt;
     }
   }
   return null;
+}
+
+/** Resolve every option referenced by a cart variant string. */
+function resolveVariantsForItem(
+  variants: VariantGroup[] | null | undefined,
+  variantLabel?: string,
+  variantGroup?: string,
+): ProductVariant[] {
+  if (!variants?.length || !variantLabel) return [];
+
+  const found: ProductVariant[] = [];
+  for (const sel of parseVariantSelections(variantLabel)) {
+    const match = findVariant(variants, sel.label, sel.group ?? variantGroup);
+    if (match) found.push(match);
+  }
+
+  if (found.length === 0) {
+    const whole = findVariant(variants, variantLabel, variantGroup);
+    if (whole) found.push(whole);
+  }
+  return found;
 }
 
 /**
@@ -149,6 +198,23 @@ export async function verifyVariantStock(
 
   try {
     for (const productId of productIds) {
+      const relatedItems = items.filter((i) => i.productId === productId);
+
+      // Legacy / incomplete cart lines without a product id — don't block WhatsApp orders.
+      if (!productId) {
+        for (const item of relatedItems) {
+          checks.push({
+            productId: "",
+            productName: "Item",
+            variantLabel: item.variant ?? "default",
+            requested: item.quantity,
+            available: 9999,
+            inStock: true,
+          });
+        }
+        continue;
+      }
+
       const { data: product, error } = await supabase
         .from("products")
         .select("id, name, variants, is_available")
@@ -156,8 +222,6 @@ export async function verifyVariantStock(
         .single();
 
       if (error || !product) {
-        // Product not found
-        const relatedItems = items.filter((i) => i.productId === productId);
         for (const item of relatedItems) {
           checks.push({
             productId,
@@ -172,7 +236,6 @@ export async function verifyVariantStock(
       }
 
       if (!product.is_available) {
-        const relatedItems = items.filter((i) => i.productId === productId);
         for (const item of relatedItems) {
           checks.push({
             productId,
@@ -189,54 +252,81 @@ export async function verifyVariantStock(
       const variants: VariantGroup[] | null =
         (product.variants as VariantGroup[]) ?? null;
 
-      for (const item of items.filter((i) => i.productId === productId)) {
-        if (item.variant && variants) {
-          // Variant-level stock check
-          const variant = findVariant(variants, item.variant, item.variantGroup);
-          const stock = variant?.stock ?? 0;
+      for (const item of relatedItems) {
+        if (item.variant && variants?.length) {
+          const matched = resolveVariantsForItem(
+            variants,
+            item.variant,
+            item.variantGroup,
+          );
+
+          // Display-only label that didn't map — allow checkout (WhatsApp flow).
+          if (matched.length === 0) {
+            checks.push({
+              productId,
+              productName: product.name,
+              variantLabel: item.variant,
+              requested: item.quantity,
+              available: 9999,
+              inStock: true,
+            });
+            continue;
+          }
+
+          const tracked = matched.filter((v) => isTrackedStock(v.stock));
+          if (tracked.length === 0) {
+            checks.push({
+              productId,
+              productName: product.name,
+              variantLabel: item.variant,
+              requested: item.quantity,
+              available: 9999,
+              inStock: true,
+            });
+            continue;
+          }
+
+          const unavailable = tracked.some((v) => v.is_available === false);
+          const available = Math.min(...tracked.map((v) => v.stock as number));
           checks.push({
             productId,
             productName: product.name,
             variantLabel: item.variant,
             requested: item.quantity,
-            available: stock,
-            inStock: stock >= item.quantity,
+            available: unavailable ? 0 : available,
+            inStock: !unavailable && available >= item.quantity,
+          });
+        } else if (variants && variants.length > 0) {
+          // No variant on cart line — only enforce when some options track stock.
+          let trackedTotal = 0;
+          let hasTracked = false;
+          let hasEnoughTracked = false;
+          for (const group of variants) {
+            for (const opt of group.options) {
+              if (opt.is_available === false) continue;
+              if (!isTrackedStock(opt.stock)) continue;
+              hasTracked = true;
+              trackedTotal += opt.stock;
+              if (opt.stock >= item.quantity) hasEnoughTracked = true;
+            }
+          }
+          checks.push({
+            productId,
+            productName: product.name,
+            variantLabel: "default",
+            requested: item.quantity,
+            available: hasTracked ? trackedTotal : 9999,
+            inStock: !hasTracked || hasEnoughTracked || trackedTotal >= item.quantity,
           });
         } else {
-          // No variant specified — assume product-level. If the product
-          // has variants, we need at least one variant with enough stock.
-          if (variants && variants.length > 0) {
-            // Check if any variant has sufficient stock for the quantity
-            let totalAvailable = 0;
-            for (const group of variants) {
-              for (const opt of group.options) {
-                totalAvailable += opt.stock ?? 0;
-                if (opt.is_available === false) continue;
-                if ((opt.stock ?? 0) >= item.quantity) {
-                  // Found at least one variant with enough stock
-                  break;
-                }
-              }
-            }
-            checks.push({
-              productId,
-              productName: product.name,
-              variantLabel: "default",
-              requested: item.quantity,
-              available: totalAvailable,
-              inStock: totalAvailable >= item.quantity,
-            });
-          } else {
-            // No variants at all — treat as unlimited/in-stock
-            checks.push({
-              productId,
-              productName: product.name,
-              variantLabel: "default",
-              requested: item.quantity,
-              available: 9999, // Sentinal for "untracked"
-              inStock: true,
-            });
-          }
+          checks.push({
+            productId,
+            productName: product.name,
+            variantLabel: "default",
+            requested: item.quantity,
+            available: 9999,
+            inStock: true,
+          });
         }
       }
     }
@@ -344,6 +434,8 @@ export async function placeOrderAtomic(
 
       // Fetch current product data to get latest variants and updated_at
       for (const [productId, deductions] of productGroups.entries()) {
+        if (!productId) continue;
+
         const { data: product, error } = await supabase
           .from("products")
           .select("id, variants, updated_at")
@@ -363,47 +455,54 @@ export async function placeOrderAtomic(
         const updatedVariants = cloneVariants(currentVariants);
 
         let deductionFailed = false;
+        let didChangeStock = false;
 
         for (const ded of deductions) {
           if (ded.variant && currentVariants.length > 0) {
-            // Deduct from specific variant
-            const variant = findVariant(
+            const matched = resolveVariantsForItem(
               updatedVariants,
               ded.variant,
               ded.variantGroup,
             );
-            if (!variant) {
-              deductionFailed = true;
-              break;
+            // Unmapped / untracked options — nothing to deduct.
+            const tracked = matched.filter((v) => isTrackedStock(v.stock));
+            if (tracked.length === 0) continue;
+
+            for (const variant of tracked) {
+              if ((variant.stock as number) < ded.quantity) {
+                deductionFailed = true;
+                break;
+              }
+              variant.stock = (variant.stock as number) - ded.quantity;
+              didChangeStock = true;
+              const threshold = variant.low_stock_threshold ?? 5;
+              if (variant.stock <= threshold) {
+                stockDeductions.push({
+                  productId,
+                  productName: "",
+                  variantLabel: ded.variant,
+                  requested: ded.quantity,
+                  available: variant.stock,
+                  inStock: true,
+                });
+              }
             }
-            const currentStock = variant.stock ?? 0;
-            if (currentStock < ded.quantity) {
-              deductionFailed = true;
-              break;
-            }
-            variant.stock = currentStock - ded.quantity;
-            // Flag low stock
-            const threshold = variant.low_stock_threshold ?? 5;
-            if (variant.stock <= threshold) {
-              stockDeductions.push({
-                productId,
-                productName: "",
-                variantLabel: ded.variant,
-                requested: ded.quantity,
-                available: variant.stock,
-                inStock: true,
-              });
-            }
+            if (deductionFailed) break;
           } else if (currentVariants.length > 0) {
-            // No variant specified but product has variants —
-            // deduct from the first available variant with enough stock
+            // Deduct only when some option tracks stock; otherwise unlimited.
+            const anyTracked = updatedVariants.some((g) =>
+              g.options.some((o) => isTrackedStock(o.stock)),
+            );
+            if (!anyTracked) continue;
+
             let deducted = false;
             for (const group of updatedVariants) {
               for (const opt of group.options) {
                 if (opt.is_available === false) continue;
-                const stock = opt.stock ?? 0;
-                if (stock >= ded.quantity) {
-                  opt.stock = stock - ded.quantity;
+                if (!isTrackedStock(opt.stock)) continue;
+                if (opt.stock >= ded.quantity) {
+                  opt.stock = opt.stock - ded.quantity;
+                  didChangeStock = true;
                   const threshold = opt.low_stock_threshold ?? 5;
                   if (opt.stock <= threshold) {
                     stockDeductions.push({
@@ -426,7 +525,6 @@ export async function placeOrderAtomic(
               break;
             }
           }
-          // If no variants exist, no stock deduction needed (unlimited)
         }
 
         if (deductionFailed) {
@@ -437,51 +535,57 @@ export async function placeOrderAtomic(
           };
         }
 
-        productUpdates.push({
-          id: productId,
-          variants: updatedVariants,
-          previousVariants,
-          currentVersion: (product as Record<string, unknown>)
-            .updated_at as string | undefined,
-        });
+        if (didChangeStock) {
+          productUpdates.push({
+            id: productId,
+            variants: updatedVariants,
+            previousVariants,
+            currentVersion: (product as Record<string, unknown>)
+              .updated_at as string | undefined,
+          });
+        }
       }
 
-      // ── Phase 3: Write stock decrements to database ────────────────────
+      // ── Phase 3: Best-effort stock write
+      // Customers are blocked by products_owner_update RLS — never fail the order for that.
       for (const update of productUpdates) {
         const updatePayload: Record<string, unknown> = {
           variants: update.variants,
         };
 
-        // Optimistic concurrency: only update if not modified since our read
         let query = supabase.from("products").update(updatePayload).eq(
           "id",
           update.id,
         );
-
         if (update.currentVersion) {
           query = query.eq("updated_at", update.currentVersion);
         }
 
-        // Must select rows — without this, Supabase leaves `count` null and
-        // version-mismatch retries never fire (oversell race).
-        const { data: updatedRows, error: updateError } = await query.select("id");
+        let { data: updatedRows, error: updateError } = await query.select("id");
 
         if (updateError) {
-          throw new Error(
-            `Failed to update stock for product ${update.id}: ${updateError.message}`,
+          console.warn(
+            "[placeOrderAtomic] Stock update skipped:",
+            update.id,
+            updateError.message,
           );
+          continue;
         }
 
+        // Version drift: one loose retry, then give up on stock (order still proceeds).
         if ((!updatedRows || updatedRows.length === 0) && update.currentVersion) {
-          if (attempt < MAX_RETRIES) {
-            await new Promise((r) => setTimeout(r, attempt * 100));
-            throw new Error("RETRY_VERSION_MISMATCH");
+          ({ data: updatedRows, error: updateError } = await supabase
+            .from("products")
+            .update(updatePayload)
+            .eq("id", update.id)
+            .select("id"));
+
+          if (updateError || !updatedRows?.length) {
+            console.warn(
+              "[placeOrderAtomic] Stock write skipped (RLS or race); placing order anyway:",
+              update.id,
+            );
           }
-          return {
-            success: false,
-            error:
-              "Stock is changing rapidly. Please try again in a moment.",
-          };
         }
       }
 
@@ -534,9 +638,17 @@ export async function placeOrderAtomic(
         .select()
         .single();
 
-      // Older DBs may not have customer_user_id yet — retry without it.
+      // Older DBs may lack optional columns — strip and retry.
       if (orderError && /customer_user_id/i.test(orderError.message || "")) {
         delete orderPayload.customer_user_id;
+        ({ data: orderData, error: orderError } = await supabase
+          .from("orders")
+          .insert(orderPayload)
+          .select()
+          .single());
+      }
+      if (orderError && /\bnotes\b/i.test(orderError.message || "")) {
+        delete orderPayload.notes;
         ({ data: orderData, error: orderError } = await supabase
           .from("orders")
           .insert(orderPayload)

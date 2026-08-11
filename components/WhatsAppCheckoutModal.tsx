@@ -621,11 +621,6 @@ export default function WhatsAppCheckoutModal({
 
   // ── Order Submission ────────────────────────────────────────────────────
   const handlePlaceOrder = useCallback(async () => {
-    if (!phone) {
-      setOrderError("This shop does not have a valid WhatsApp number configured.");
-      return;
-    }
-
     const gate = await requireVerifiedEmailSession();
     if (!gate.ok) {
       setAuthGate(gate.reason === "unverified" ? "verify" : "login");
@@ -637,6 +632,30 @@ export default function WhatsAppCheckoutModal({
     setOrderError(null);
 
     try {
+      // Prefer cart WhatsApp; if stale/empty, refresh from shop row so checkout still works.
+      let merchantPhone = phone;
+      if (!merchantPhone && shop.id) {
+        try {
+          const { createClient } = await import("@/lib/supabase/client");
+          const supabase = createClient();
+          const { data: shopRow } = await supabase
+            .from("shops")
+            .select("whatsapp_number")
+            .eq("id", shop.id)
+            .maybeSingle();
+          merchantPhone = toWhatsAppDigits(
+            (shopRow?.whatsapp_number as string | undefined) ?? "",
+          );
+        } catch {
+          /* ignore — fall through to validation */
+        }
+      }
+      if (!merchantPhone) {
+        throw new Error(
+          "This shop does not have a valid WhatsApp number configured. Ask the merchant to update it in Store Settings.",
+        );
+      }
+
       // 1. Persist order to Supabase (unit price + qty — stock deducts correctly)
       const orderItems: OrderItemType[] = items.map(item => ({
         product_id: item.productId,
@@ -695,7 +714,7 @@ export default function WhatsAppCheckoutModal({
       );
 
       setPendingWhatsAppUrl(
-        `https://wa.me/${phone}?text=${encodeURIComponent(whatsappText)}`,
+        `https://wa.me/${merchantPhone}?text=${encodeURIComponent(whatsappText)}`,
       );
       setStep("success");
       setIsSubmitting(false);
