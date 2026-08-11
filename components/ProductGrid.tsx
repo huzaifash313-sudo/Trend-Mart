@@ -9,7 +9,6 @@ import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
-import { isOfferActive } from "@/lib/shopOfferTicker";
 import CompactRating from "@/components/CompactRating";
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -57,19 +56,6 @@ function buildProductOfferTags(
   const coupon = offerContext?.couponLabel?.trim();
   if (coupon) {
     tags.push(coupon.length > 28 ? `${coupon.slice(0, 26)}…` : coupon);
-  }
-
-  const announcement =
-    (offerContext?.announcement ?? product.shop_announcement)?.trim() || "";
-  const announcementExpires =
-    offerContext?.announcementExpiresAt ?? product.shop_announcement_expires_at;
-  if (announcement && isOfferActive(announcementExpires)) {
-    // Skip if same text already covered by coupon/discount wording
-    const short =
-      announcement.length > 28 ? `${announcement.slice(0, 26)}…` : announcement;
-    if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) {
-      tags.push(short);
-    }
   }
 
   return tags;

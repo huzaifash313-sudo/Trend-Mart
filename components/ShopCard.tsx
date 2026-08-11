@@ -29,8 +29,9 @@ export interface ShopCardData {
   free_delivery_threshold?: number | null;
   avg_rating?: number | null;
   review_count?: number | null;
-  /** Pre-built slides; if omitted, built from announcement / free delivery / coupons */
+  /** Pre-built slides; if omitted, built from deals / free delivery / coupons */
   offerSlides?: ShopOfferSlide[];
+  deals?: import("@/lib/dealSchedule").ShopDeal[];
   coupons?: Array<{
     id: string;
     code: string;
@@ -115,10 +116,9 @@ export default function ShopCard({
     shop.offerSlides ??
     buildShopOfferSlides({
       shopId: shop.id,
-      announcement: shop.announcement,
-      announcementExpiresAt: shop.announcement_expires_at,
       freeDeliveryThreshold: shop.free_delivery_threshold,
       coupons: shop.coupons,
+      deals: shop.deals,
     });
 
   return (

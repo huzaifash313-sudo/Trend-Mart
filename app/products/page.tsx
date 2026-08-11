@@ -12,6 +12,7 @@ import {
 import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
 import SubCategoryPills from "@/components/SubCategoryPills";
+import OfferDaysStrip from "@/components/OfferDaysStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { useLocation } from "@/context/LocationContext";
 import { useCart } from "@/context/CartContext";
@@ -19,6 +20,8 @@ import { useToast } from "@/components/Toast";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { haversineDistance } from "@/services/geoRadiusService";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
+import { fetchActiveDeals } from "@/services/dealService";
+import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -84,6 +87,8 @@ function ProductsPageInner() {
   const [areaOpen, setAreaOpen] = useState(false);
 
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
+  const [activeDeals, setActiveDeals] = useState<ShopDeal[]>([]);
+  const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -159,6 +164,23 @@ function ProductsPageInner() {
     };
   }, [qParam, categoryParam, subParam, sortParam, productParam]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchActiveDeals().then((result) => {
+      if (!cancelled && result.success) setActiveDeals(result.data);
+    });
+    const onDeals = () => {
+      void fetchActiveDeals().then((result) => {
+        if (!cancelled && result.success) setActiveDeals(result.data);
+      });
+    };
+    window.addEventListener("trendmart:deals-updated", onDeals);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("trendmart:deals-updated", onDeals);
+    };
+  }, []);
+
   // Favorites
   useEffect(() => {
     let cancelled = false;
@@ -205,8 +227,13 @@ function ProductsPageInner() {
       ];
     }
 
+    if (offerDateKey) {
+      const dealShopIds = shopIdsWithDealOnDate(activeDeals, offerDateKey);
+      list = list.filter((p) => dealShopIds.has(p.shop_id));
+    }
+
     return list;
-  }, [products, geoFilter, globalCoords, sort]);
+  }, [products, geoFilter, globalCoords, sort, offerDateKey, activeDeals]);
 
   const visibleProducts = useMemo(
     () => displayProducts.slice(0, visibleCount),
@@ -401,6 +428,12 @@ function ProductsPageInner() {
           label="Filter by sub-category"
         />
       )}
+
+      <OfferDaysStrip
+        deals={activeDeals}
+        selectedDateKey={offerDateKey}
+        onSelect={setOfferDateKey}
+      />
 
       {/* Sticky mobile filter strip */}
       <div className="sticky top-[var(--tm-navbar-sticky-offset,4.35rem)] z-30 -mx-3 mb-3 border-b border-zinc-100/80 bg-white/95 px-3 py-2 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">
