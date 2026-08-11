@@ -58,9 +58,13 @@ function dealToProduct(deal: ShopDeal): Product {
   } as Product;
 }
 
+function formatDealPrice(n: number): string {
+  return `Rs ${Math.round(n).toLocaleString("en-PK")}`;
+}
+
 /**
- * ProductGrid twin: title → shop → price | ♡ Add Order.
- * No extra rows (Visit = shop tap). Order only on deal day.
+ * Product-style deal card. Price is always full-width (never clipped by buttons).
+ * Actions sit on their own row. Equal height via stretch + fixed slots.
  */
 export default function DealCard({
   deal,
@@ -96,14 +100,13 @@ export default function DealCard({
   const { hasDiscount, originalPrice, discountPercent } = getProductDiscount(product);
   const hasPrice = deal.price != null && Number.isFinite(Number(deal.price));
 
-  // Ticker: delivery/coupons + when-tag once (no badge spam)
   const tickerTags = useMemo(() => {
     const tags: string[] = [];
     if (whenTag) tags.push(whenTag);
     for (const t of offerTags) {
       if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) tags.push(t);
     }
-    return tags.slice(0, 4);
+    return tags.slice(0, 3);
   }, [offerTags, whenTag]);
 
   const shopPick: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
@@ -193,6 +196,7 @@ export default function DealCard({
   ];
 
   const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
+  const priceLabel = hasPrice ? formatDealPrice(Number(deal.price)) : null;
 
   return (
     <>
@@ -261,93 +265,87 @@ export default function DealCard({
           {tickerTags.length > 0 ? <OfferTickerMarquee tags={tickerTags} /> : null}
         </div>
 
-        {/* Equal-height body: spacer + fixed price slot so no-price cards match */}
         <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
-          <h3
-            className={`tm-product-title min-h-[2.45em] ${titleClass}`}
-            title={deal.title}
-          >
+          <h3 className={`tm-product-title min-h-[2.45em] ${titleClass}`} title={deal.title}>
             {deal.title}
           </h3>
 
-          <div className="flex min-h-[0.875rem] min-w-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={goStore}
-              className="flex min-w-0 flex-1 items-center gap-1 text-left"
-              aria-label={`Visit ${deal.shop_name || "store"}`}
-            >
-              {deal.shop_logo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={getSafeImageUrl(deal.shop_logo_url, "shop")}
-                  alt=""
-                  className="h-3 w-3 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[7px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  {(deal.shop_name || "?").charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
-                {deal.shop_name || "Store"}
+          <button
+            type="button"
+            onClick={goStore}
+            className="flex min-h-[0.875rem] min-w-0 items-center gap-1 text-left"
+            aria-label={`Visit ${deal.shop_name || "store"}`}
+          >
+            {deal.shop_logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={getSafeImageUrl(deal.shop_logo_url, "shop")}
+                alt=""
+                className="h-3 w-3 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[7px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                {(deal.shop_name || "?").charAt(0).toUpperCase()}
               </span>
-            </button>
+            )}
+            <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
+              {deal.shop_name || "Store"}
+            </span>
+          </button>
+
+          {/* Price FULL WIDTH — never shares a row with buttons (no clipping) */}
+          <div className="mt-auto flex min-h-[2.4rem] flex-col justify-end gap-0.5 pt-1">
+            {hasPrice && priceLabel ? (
+              <>
+                <p
+                  className="text-[13px] font-bold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-sm"
+                  title={formatRupees(Number(deal.price))}
+                >
+                  {priceLabel}
+                </p>
+                <div className="flex min-h-[0.95rem] flex-wrap items-center gap-x-1 gap-y-0.5">
+                  {hasDiscount && originalPrice != null ? (
+                    <>
+                      <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums">
+                        {formatDealPrice(originalPrice)}
+                      </span>
+                      {discountPercent > 0 ? (
+                        <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                          {discountPercent}% OFF
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="text-[10px] leading-none text-zinc-400">{whenTag}</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-[12px] font-semibold leading-snug text-zinc-500 dark:text-zinc-400">
+                {whenTag}
+              </p>
+            )}
           </div>
 
-          <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
-            {/* Fixed-height price column — keeps cards aligned with/without price */}
-            <div className="flex h-[2.35rem] min-w-0 flex-1 flex-col justify-end overflow-hidden">
-              {hasPrice ? (
-                <>
-                  <p
-                    className="whitespace-nowrap text-[12px] font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-[13px]"
-                    title={formatRupees(Number(deal.price))}
-                  >
-                    Rs {Number(deal.price).toLocaleString("en-PK")}
-                  </p>
-                  <div className="mt-0.5 flex h-[0.95rem] items-center gap-1 overflow-hidden whitespace-nowrap">
-                    {hasDiscount && originalPrice != null ? (
-                      <>
-                        <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums">
-                          Rs {originalPrice.toLocaleString("en-PK")}
-                        </span>
-                        {discountPercent > 0 ? (
-                          <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-                            {discountPercent}% OFF
-                          </span>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </div>
-                </>
-              ) : (
-                <p
-                  className="whitespace-nowrap text-[11px] font-semibold leading-none text-zinc-500 dark:text-zinc-400"
-                  title={whenTag}
-                >
-                  {whenTag}
-                </p>
-              )}
-            </div>
-
-            <div className="flex shrink-0 items-center gap-0 pb-px">
-              <button
-                type="button"
-                onClick={handleWishlist}
-                className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                  favorited
-                    ? "text-rose-500"
-                    : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-                }`}
-                aria-label="Wishlist"
-              >
-                <HeartIcon filled={favorited} />
-              </button>
+          {/* Actions on their own row — full readable labels */}
+          <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={handleWishlist}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                favorited
+                  ? "text-rose-500"
+                  : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+              }`}
+              aria-label="Wishlist"
+            >
+              <HeartIcon filled={favorited} />
+            </button>
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={handleAdd}
-                className="tm-product-add-text shrink-0 px-0.5"
+                className="tm-product-add-text"
                 aria-label={`Add ${deal.title} to cart`}
               >
                 Add
@@ -357,7 +355,7 @@ export default function DealCard({
                 onClick={handleOrder}
                 disabled={!canOrderToday}
                 title={canOrderToday ? "Order via WhatsApp" : `Order on ${whenTag}`}
-                className={`shrink-0 px-0.5 text-[11px] font-bold leading-none transition ${
+                className={`text-[12px] font-bold leading-none transition ${
                   canOrderToday
                     ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
                     : "cursor-not-allowed text-zinc-300 dark:text-zinc-600"
