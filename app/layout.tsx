@@ -7,7 +7,6 @@ import Footer from "@/components/Footer";
 import PwaRegister from "@/components/PwaRegister";
 import CartBar from "@/components/CartBar";
 import CartProvider from "@/context/CartContext";
-import { LanguageProvider } from "@/context/LanguageContext";
 import { LocationProvider } from "@/context/LocationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { MerchantQuickAddProvider } from "@/context/MerchantQuickAddContext";
@@ -81,7 +80,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="tm-bg flex min-h-full flex-col">
         <ThemeProvider>
-        <LanguageProvider>
         <CartProvider>
           <LocationProvider>
             <ToastProvider>
@@ -109,7 +107,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </ToastProvider>
           </LocationProvider>
         </CartProvider>
-        </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

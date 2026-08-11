@@ -1,9 +1,12 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Multi-Language Localization & RTL Layout Context              */
-/*  Prompt 4: English/Urdu toggle with dynamic dir="rtl/ltr" for Pakistani    */
-/*           retail buyers.                                                   */
+/*  TrendMart — EN/UR translation dictionary (reserved for future i18n)       */
+/*                                                                            */
+/*  The sidebar language toggle was removed because almost all UI still uses  */
+/*  hardcoded English — switching only flipped LTR→RTL without real Urdu.     */
+/*  When wiring proper Urdu: wrap the app in LanguageProvider again and       */
+/*  replace hardcoded copy with t.* keys from this file (expand as needed).   */
 /* -------------------------------------------------------------------------- */
 
 import {

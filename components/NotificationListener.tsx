@@ -50,6 +50,11 @@ interface NotificationContextValue {
   clearNotifications: () => void;
   isMuted: boolean;
   toggleMute: () => void;
+  /** In-app notification history panel (opened from navbar bell). */
+  isPanelOpen: boolean;
+  openPanel: () => void;
+  closePanel: () => void;
+  togglePanel: () => void;
   /** Register a shop to listen for notifications. Returns cleanup function. */
   registerShop: (shopId: string) => () => void;
 }
@@ -123,10 +128,14 @@ export function NotificationListenerProvider({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [muteHydrated, setMuteHydrated] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeShopIds, setActiveShopIds] = useState<Set<string>>(new Set());
   const channelRefs = useRef<Set<string>>(new Set());
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const openPanel = useCallback(() => setIsPanelOpen(true), []);
+  const closePanel = useCallback(() => setIsPanelOpen(false), []);
+  const togglePanel = useCallback(() => setIsPanelOpen((v) => !v), []);
 
   // ── Mute Toggle ────────────────────────────────────────────────────────────
   // Hydrate mute preference from localStorage after hydration to avoid SSR mismatch
@@ -335,6 +344,10 @@ export function NotificationListenerProvider({
         clearNotifications,
         isMuted,
         toggleMute,
+        isPanelOpen,
+        openPanel,
+        closePanel,
+        togglePanel,
         registerShop,
       }}
     >
@@ -412,12 +425,12 @@ export function NotificationBell({
   onClick?: () => void;
   className?: string;
 }) {
-  const { unreadCount, isMuted, toggleMute } = useNotifications();
+  const { unreadCount, isMuted, togglePanel } = useNotifications();
 
   return (
     <button
       type="button"
-      onClick={onClick ?? toggleMute}
+      onClick={onClick ?? togglePanel}
       className={`relative inline-flex items-center rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 ${className}`}
       aria-label={`Notifications${unreadCount > 0 ? ` — ${unreadCount} unread` : ""}`}
     >
