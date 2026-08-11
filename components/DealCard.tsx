@@ -221,7 +221,7 @@ export default function DealCard({
     />
   ) : null;
 
-  /* ── Home: ultra-premium ad spotlight (image ≥ half) ── */
+  /* ── Home: editorial spotlight card (paid-ad grade) ── */
   if (isHomeDensity) {
     return (
       <>
@@ -241,42 +241,39 @@ export default function DealCard({
           tabIndex={onOpen ? 0 : undefined}
           aria-label={onOpen ? `View ${deal.title}` : undefined}
         >
-          <div className="tm-home-deal-media relative w-1/2 min-w-[46%] shrink-0 self-stretch overflow-hidden">
+          <div className="tm-home-deal-media relative w-[52%] min-w-[48%] shrink-0 self-stretch overflow-hidden">
             {showPhoto && safeSrc ? (
               <Image
                 src={safeSrc}
                 alt={deal.title}
                 fill
-                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 28vw, 18vw"
+                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                sizes="(max-width: 640px) 52vw, (max-width: 1024px) 30vw, 20vw"
                 priority={priority}
                 loading={priority ? "eager" : "lazy"}
-                quality={82}
+                quality={85}
                 unoptimized={/\.supabase\.(co|in)\//i.test(safeSrc)}
                 onError={() => setImgError(true)}
               />
             ) : (
-              <div className="tm-product-placeholder flex h-full min-h-[9rem] w-full items-center justify-center sm:min-h-[10rem]">
-                <span className="select-none text-3xl font-bold text-teal-700/35 dark:text-teal-300/30">
+              <div className="tm-home-deal-media-fallback flex h-full min-h-[10rem] w-full items-center justify-center">
+                <span className="select-none text-3xl font-semibold tracking-tight text-white/35">
                   {deal.title.charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
-            <div className="tm-home-deal-media-shine" aria-hidden />
-            <span className="tm-home-deal-badge-deal absolute left-2 top-2">Deal</span>
+            <div className="tm-home-deal-media-veil" aria-hidden />
+            <span className="tm-home-deal-badge-deal absolute left-2.5 top-2.5">Featured</span>
             {hasDiscount && discountPercent > 0 ? (
-              <span className="tm-home-deal-badge-off absolute bottom-2 left-2">
-                {discountPercent}% OFF
+              <span className="tm-home-deal-badge-off absolute bottom-2.5 left-2.5">
+                −{discountPercent}%
               </span>
             ) : null}
           </div>
 
-          <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-2 p-3 sm:gap-2.5 sm:p-3.5 md:p-4">
-            <div className="min-w-0 space-y-1.5">
-              <h3
-                className="line-clamp-2 text-[0.95rem] font-bold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-[1.05rem] md:text-lg"
-                title={deal.title}
-              >
+          <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-2.5 p-3.5 sm:p-4 md:p-5">
+            <div className="min-w-0 space-y-2">
+              <h3 className="tm-home-deal-name line-clamp-2" title={deal.title}>
                 {deal.title}
               </h3>
               <button
@@ -285,7 +282,7 @@ export default function DealCard({
                   stop(e);
                   goStore();
                 }}
-                className="flex min-w-0 max-w-full items-center gap-1.5 text-left"
+                className="tm-home-deal-shop flex min-w-0 max-w-full items-center gap-2 text-left"
                 aria-label={`Visit ${deal.shop_name || "store"}`}
               >
                 {deal.shop_logo_url ? (
@@ -293,50 +290,38 @@ export default function DealCard({
                   <img
                     src={getSafeImageUrl(deal.shop_logo_url, "shop")}
                     alt=""
-                    className="h-5 w-5 shrink-0 rounded-full object-cover ring-2 ring-teal-500/20"
+                    className="h-5 w-5 shrink-0 rounded-full object-cover"
                   />
                 ) : (
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 text-[9px] font-bold text-white">
+                  <span className="tm-home-deal-shop-fallback">
                     {(deal.shop_name || "?").charAt(0).toUpperCase()}
                   </span>
                 )}
-                <span className="truncate text-xs font-semibold text-teal-700 dark:text-teal-300 sm:text-sm">
-                  {deal.shop_name || "Store"}
-                </span>
+                <span className="truncate">{deal.shop_name || "Store"}</span>
               </button>
               {tickerTags[0] ? (
-                <p className="truncate text-[11px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-xs">
-                  {tickerTags[0]}
-                </p>
+                <p className="tm-home-deal-meta truncate">{tickerTags[0]}</p>
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="flex flex-wrap items-end justify-between gap-2.5">
               <div className="min-w-0">
                 {hasPrice && priceLabel ? (
                   <>
-                    <p className="text-lg font-extrabold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-xl md:text-[1.35rem]">
-                      {priceLabel}
-                    </p>
+                    <p className="tm-home-deal-price">{priceLabel}</p>
                     {hasDiscount && originalPrice != null ? (
-                      <span className="mt-1 inline-block text-xs text-zinc-400 line-through tabular-nums sm:text-sm">
-                        {formatDealPrice(originalPrice)}
-                      </span>
+                      <span className="tm-home-deal-was">{formatDealPrice(originalPrice)}</span>
                     ) : null}
                   </>
                 ) : (
-                  <p className="text-sm font-semibold text-zinc-500">{whenTag}</p>
+                  <p className="tm-home-deal-meta">{whenTag}</p>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   onClick={handleWishlist}
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-100 bg-white/80 transition-colors dark:border-zinc-700 dark:bg-zinc-900/60 ${
-                    favorited
-                      ? "text-rose-500"
-                      : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-                  }`}
+                  className={`tm-home-deal-icon ${favorited ? "is-on" : ""}`}
                   aria-label="Wishlist"
                 >
                   <HeartIcon filled={favorited} />

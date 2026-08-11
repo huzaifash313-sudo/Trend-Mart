@@ -294,26 +294,23 @@ function HomeShiftShelf({
 
   return (
     <section aria-label={title} className={`tm-home-deals ${className ?? ""}`}>
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="tm-home-deals-pulse" aria-hidden />
-          <h2 className="truncate text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-[0.95rem]">
-            {title}
-          </h2>
-          <span className="tm-home-deals-sponsored hidden sm:inline">Premium</span>
+      <div className="tm-home-deals-head mb-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="tm-home-deals-kicker">Spotlight</p>
+          <h2 className="tm-home-deals-title truncate">{title}</h2>
         </div>
-        <Link href={seeAllHref} className="tm-home-deals-all">
-          All deals →
+        <Link href={seeAllHref} className="tm-home-deals-all shrink-0">
+          View all
         </Link>
       </div>
 
-      <div className="tm-home-deals-stage relative overflow-hidden rounded-2xl">
+      <div className="tm-home-deals-stage relative">
         {canSlide ? (
-          <div className="tm-home-deals-nav" aria-label="Deal navigation">
+          <>
             <button
               type="button"
               aria-label="Previous deal"
-              className="tm-home-deals-nav-btn"
+              className="tm-home-deals-nav-btn tm-home-deals-nav-btn--prev"
               onClick={() => {
                 go(-1);
                 pauseThenResume();
@@ -324,7 +321,7 @@ function HomeShiftShelf({
             <button
               type="button"
               aria-label="Next deal"
-              className="tm-home-deals-nav-btn"
+              className="tm-home-deals-nav-btn tm-home-deals-nav-btn--next"
               onClick={() => {
                 go(1);
                 pauseThenResume();
@@ -332,12 +329,12 @@ function HomeShiftShelf({
             >
               <Chevron dir="right" />
             </button>
-          </div>
+          </>
         ) : null}
 
         <div
           ref={viewportRef}
-          className={`relative overflow-hidden ${canSlide ? "tm-home-deals-viewport" : ""}`}
+          className={`tm-home-deals-viewport relative overflow-hidden ${canSlide ? "tm-home-deals-viewport--nav" : ""}`}
           style={{ touchAction: "pan-y" }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -387,14 +384,14 @@ function HomeShiftShelf({
         </div>
 
         {canSlide && !reduceMotion && !paused && !openDeal ? (
-          <div key={progressKey} className="tm-home-deals-progress mt-2" aria-hidden>
+          <div key={progressKey} className="tm-home-deals-progress" aria-hidden>
             <span
               className="tm-home-deals-progress-bar"
               style={{ animationDuration: `${HOME_HOLD_MS}ms` }}
             />
           </div>
         ) : (
-          <div className="mt-2 h-0.5" aria-hidden />
+          <div className="tm-home-deals-progress tm-home-deals-progress--idle" aria-hidden />
         )}
       </div>
 
