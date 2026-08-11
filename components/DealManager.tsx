@@ -5,6 +5,7 @@ import {
   createShopDeal,
   deleteShopDeal,
   fetchDealsByShopId,
+  updateShopDeal,
   updateShopDealStatus,
 } from "@/services/dealService";
 import {
@@ -13,6 +14,9 @@ import {
   type DealScheduleType,
   type ShopDeal,
 } from "@/lib/dealSchedule";
+import ImageUpload from "@/components/ImageUpload";
+import Image from "next/image";
+import { getSafeImageUrl } from "@/services/storageService";
 
 interface DealManagerProps {
   shopId: string;
@@ -28,6 +32,9 @@ const EMPTY = {
   starts_on: "",
   ends_on: "",
   day_of_month: "1",
+  image_url: "",
+  badge_text: "",
+  is_featured: true,
 };
 
 export default function DealManager({ shopId, compact = false, onChanged }: DealManagerProps) {
@@ -60,6 +67,11 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
     });
   };
 
+  const notify = () => {
+    onChanged?.();
+    window.dispatchEvent(new Event("trendmart:deals-updated"));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -72,6 +84,9 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
       starts_on: form.starts_on || undefined,
       ends_on: form.ends_on || undefined,
       day_of_month: form.day_of_month ? Number(form.day_of_month) : undefined,
+      image_url: form.image_url || null,
+      badge_text: form.badge_text || null,
+      is_featured: form.is_featured,
     });
     setSaving(false);
     if (!result.success) {
@@ -81,8 +96,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
     setForm(EMPTY);
     setShowForm(false);
     await load();
-    onChanged?.();
-    window.dispatchEvent(new Event("trendmart:deals-updated"));
+    notify();
   };
 
   return (
@@ -91,7 +105,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
         <div>
           <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Store deals</h3>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Weekly days, date range, or monthly date — shown on banners & offer filters.
+            Add an image + badge — shows on For You, All Deals, and product tickers.
           </p>
         </div>
         {!showForm ? (
@@ -106,9 +120,24 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
       </div>
 
       {showForm ? (
-        <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/60"
+        >
+          <ImageUpload
+            currentUrl={form.image_url}
+            onUploaded={(url) => setForm((f) => ({ ...f, image_url: url }))}
+            folder="deals"
+            fileId={`${shopId}-deal-${Date.now()}`}
+            label="Deal image (recommended)"
+            showPreview
+            fallbackType="product"
+          />
+
           <div>
-            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Deal title</label>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Deal title
+            </label>
             <input
               required
               maxLength={80}
@@ -118,8 +147,24 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
+
           <div>
-            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Schedule</label>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Badge (optional)
+            </label>
+            <input
+              maxLength={24}
+              value={form.badge_text}
+              onChange={(e) => setForm((f) => ({ ...f, badge_text: e.target.value }))}
+              placeholder="e.g. 20% OFF · BOGO · Free drink"
+              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Schedule
+            </label>
             <div className="grid grid-cols-3 gap-1.5">
               {(
                 [
@@ -223,6 +268,18 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
             />
           </div>
 
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200/70 bg-emerald-50/60 px-3 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+            <input
+              type="checkbox"
+              checked={form.is_featured}
+              onChange={(e) => setForm((f) => ({ ...f, is_featured: e.target.checked }))}
+              className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+              Feature on For You / homepage deals strip
+            </span>
+          </label>
+
           {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
 
           <div className="flex gap-2">
@@ -250,29 +307,64 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
       {loading ? (
         <p className="text-xs text-zinc-400">Loading deals…</p>
       ) : deals.length === 0 ? (
-        <p className="text-xs text-zinc-400">No deals yet. Add weekly, range, or monthly offers.</p>
+        <p className="text-xs text-zinc-400">No deals yet. Add a visual deal with image + schedule.</p>
       ) : (
         <ul className="space-y-2">
           {deals.map((deal) => (
             <li
               key={deal.id}
-              className="flex items-start justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-900"
+              className="flex items-start gap-2.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-2.5 dark:border-zinc-700 dark:bg-zinc-900"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{deal.title}</p>
-                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">{formatDealSchedule(deal)}</p>
-                {!deal.is_active ? (
-                  <span className="mt-0.5 inline-block text-[0.65rem] font-semibold text-amber-600">Paused</span>
-                ) : null}
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-emerald-900">
+                {deal.image_url ? (
+                  <Image
+                    src={getSafeImageUrl(deal.image_url, "product")}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="56px"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[0.55rem] font-bold uppercase text-emerald-100">
+                    Deal
+                  </div>
+                )}
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  {deal.title}
+                </p>
+                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                  {formatDealSchedule(deal)}
+                  {deal.badge_text ? ` · ${deal.badge_text}` : ""}
+                </p>
+                <div className="mt-0.5 flex flex-wrap gap-1.5">
+                  {!deal.is_active ? (
+                    <span className="text-[0.65rem] font-semibold text-amber-600">Paused</span>
+                  ) : null}
+                  {deal.is_featured ? (
+                    <span className="text-[0.65rem] font-semibold text-emerald-600">Featured</span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await updateShopDeal(deal.id, { is_featured: !deal.is_featured });
+                    await load();
+                    notify();
+                  }}
+                  className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                >
+                  {deal.is_featured ? "Unfeature" : "Feature"}
+                </button>
                 <button
                   type="button"
                   onClick={async () => {
                     await updateShopDealStatus(deal.id, !deal.is_active);
                     await load();
-                    onChanged?.();
-                    window.dispatchEvent(new Event("trendmart:deals-updated"));
+                    notify();
                   }}
                   className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
@@ -283,8 +375,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                   onClick={async () => {
                     await deleteShopDeal(deal.id);
                     await load();
-                    onChanged?.();
-                    window.dispatchEvent(new Event("trendmart:deals-updated"));
+                    notify();
                   }}
                   className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                 >

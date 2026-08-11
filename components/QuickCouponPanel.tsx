@@ -56,6 +56,7 @@ export default function QuickCouponPanel({ shopId, onChanged }: QuickCouponPanel
     setExpiry("");
     await load();
     onChanged?.();
+    window.dispatchEvent(new Event("trendmart:coupons-updated"));
   };
 
   return (

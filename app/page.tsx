@@ -26,6 +26,7 @@ import PromoAdsCarousel from "@/components/PromoAdsCarousel";
 import ShopCard from "@/components/ShopCard";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import OfferDaysStrip from "@/components/OfferDaysStrip";
+import FeaturedDealsStrip from "@/components/FeaturedDealsStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { fetchShopIdsBySubCategory } from "@/services/productService";
 import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
@@ -143,6 +144,12 @@ function HomeInner() {
       });
     };
     window.addEventListener("trendmart:stories-updated", onStoriesUpdated);
+    const onDealsUpdated = () => {
+      void fetchActiveDeals().then((dRes) => {
+        if (!cancelled && dRes.success) setActiveDeals(dRes.data);
+      });
+    };
+    window.addEventListener("trendmart:deals-updated", onDealsUpdated);
     const catTimeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), LOADING_TIMEOUT_MS));
     Promise.race([fetchCategoryCounts(), catTimeout])
       .then((r) => { if (!cancelled && r && typeof r === "object" && "success" in r && r.success) setCategoryCounts(r.data.categories); })
@@ -150,6 +157,7 @@ function HomeInner() {
     return () => {
       cancelled = true;
       window.removeEventListener("trendmart:stories-updated", onStoriesUpdated);
+      window.removeEventListener("trendmart:deals-updated", onDealsUpdated);
     };
   }, []);
 
@@ -321,6 +329,14 @@ function HomeInner() {
         onSelect={setOfferDateKey}
       />
 
+      <FeaturedDealsStrip
+        deals={activeDeals}
+        dateKey={offerDateKey}
+        title="Featured deals"
+        seeAllHref="/deals"
+        className="mb-1"
+      />
+
       {/* ── Stories Section ───────────────────────────────────────── */}
       <section aria-label="Merchant stories">
         <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Stories</h2>
@@ -436,6 +452,12 @@ function HomeInner() {
                 className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
               >
                 Browse products →
+              </Link>
+              <Link
+                href="/deals"
+                className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
+              >
+                All deals →
               </Link>
             </div>
             {!loading && (

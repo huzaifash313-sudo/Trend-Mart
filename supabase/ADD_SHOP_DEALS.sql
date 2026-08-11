@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS public.shop_deals (
   ends_on date DEFAULT NULL,
   day_of_month smallint DEFAULT NULL CHECK (day_of_month IS NULL OR (day_of_month BETWEEN 1 AND 31)),
   is_active boolean NOT NULL DEFAULT true,
+  image_url text,
+  badge_text text,
+  is_featured boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT shop_deals_weekly_check CHECK (
@@ -26,6 +29,15 @@ CREATE TABLE IF NOT EXISTS public.shop_deals (
 
 CREATE INDEX IF NOT EXISTS idx_shop_deals_shop_id ON public.shop_deals (shop_id);
 CREATE INDEX IF NOT EXISTS idx_shop_deals_active ON public.shop_deals (is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_shop_deals_featured
+  ON public.shop_deals (is_featured, is_active)
+  WHERE is_featured = true AND is_active = true;
+
+-- If table already existed without visual columns:
+ALTER TABLE public.shop_deals
+  ADD COLUMN IF NOT EXISTS image_url text,
+  ADD COLUMN IF NOT EXISTS badge_text text,
+  ADD COLUMN IF NOT EXISTS is_featured boolean NOT NULL DEFAULT false;
 
 ALTER TABLE public.shop_deals ENABLE ROW LEVEL SECURITY;
 

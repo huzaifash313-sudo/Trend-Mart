@@ -36,6 +36,15 @@ function HeartIcon() {
   );
 }
 
+function TagDealIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
 function CategoryIcon() {
   return (
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -448,6 +457,17 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               >
                 <SearchIconMenu /> Products
+              </Link>
+            </li>
+
+            {/* Deals hub */}
+            <li>
+              <Link
+                href="/deals"
+                onClick={onClose}
+                className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-amber-50 hover:text-amber-700 dark:text-zinc-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-400"
+              >
+                <TagDealIcon /> Deals
               </Link>
             </li>
 

@@ -13,8 +13,18 @@ export interface ShopDeal {
   ends_on: string | null;
   day_of_month: number | null;
   is_active: boolean;
+  /** Optional deal banner / card image (Cloudinary / storage URL). */
+  image_url?: string | null;
+  /** Short badge e.g. "20% OFF", "Buy 1 Get 1". */
+  badge_text?: string | null;
+  /** Highlight on For You / Featured Deals strip. */
+  is_featured?: boolean;
   created_at: string;
   updated_at?: string;
+  /** Joined from shops when listing marketplace deals. */
+  shop_name?: string | null;
+  shop_logo_url?: string | null;
+  shop_slug?: string | null;
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;

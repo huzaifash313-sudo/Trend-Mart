@@ -14,6 +14,8 @@ import ContactModal from "@/components/ContactModal";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
+import DealCard from "@/components/DealCard";
+import { isDealActiveOnDate, toPkDateKey } from "@/lib/dealSchedule";
 import QuickViewModal from "@/components/QuickViewModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
@@ -208,6 +210,19 @@ function ShopDetailInner({ id }: { id: string }) {
       dealLabels,
     };
   }, [shop, coupons, deals]);
+
+  const liveShopDeals = useMemo(() => {
+    if (!shop) return [];
+    const today = toPkDateKey();
+    return deals
+      .filter((d) => d.is_active && isDealActiveOnDate(d, today))
+      .map((d) => ({
+        ...d,
+        shop_name: d.shop_name || shop.name,
+        shop_logo_url: d.shop_logo_url || shop.logo_url,
+        shop_slug: d.shop_slug || shop.slug,
+      }));
+  }, [shop, deals]);
 
   // ── Real-time product updates ─────────────────────────────────────────────
   useEffect(() => {
@@ -587,8 +602,33 @@ function ShopDetailInner({ id }: { id: string }) {
           </section>
         )}
 
+        {liveShopDeals.length > 0 ? (
+          <section aria-label="Store deals" className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Live deals</h2>
+              <Link
+                href="/deals"
+                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
+              >
+                All deals →
+              </Link>
+            </div>
+            <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 scrollbar-none">
+              {liveShopDeals.map((deal, i) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  compact
+                  priority={i < 2}
+                  href={`#products`}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {showProductCatalog && (
-          <section aria-label="Products">
+          <section id="products" aria-label="Products">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-100"><GridIcon /> Products</h2>
               <span className="text-xs text-zinc-500">{filteredProducts.length} item{filteredProducts.length !== 1 && "s"}</span>

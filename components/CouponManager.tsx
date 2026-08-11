@@ -241,6 +241,9 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
         setForm(EMPTY_FORM);
         setShowForm(false);
         loadCoupons();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("trendmart:coupons-updated"));
+        }
       } else {
         setSubmitStatus({ type: "error", message: result.error });
       }
@@ -265,6 +268,8 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
         setCoupons((prev) =>
           prev.map((c) => (c.id === couponId ? { ...c, is_active: currentActive } : c)),
         );
+      } else if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("trendmart:coupons-updated"));
       }
     } catch {
       // Rollback
@@ -283,6 +288,8 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
       const result = await deleteCoupon(couponId);
       if (!result.success) {
         setCoupons(previous);
+      } else if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("trendmart:coupons-updated"));
       }
     } catch {
       setCoupons(previous);

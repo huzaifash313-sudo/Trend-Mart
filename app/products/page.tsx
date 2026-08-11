@@ -13,6 +13,7 @@ import ProductGrid from "@/components/ProductGrid";
 import QuickViewModal from "@/components/QuickViewModal";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import OfferDaysStrip from "@/components/OfferDaysStrip";
+import FeaturedDealsStrip from "@/components/FeaturedDealsStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { useLocation } from "@/context/LocationContext";
 import { useCart } from "@/context/CartContext";
@@ -254,7 +255,10 @@ function ProductsPageInner() {
       const today = toPkDateKey();
       const dealLabels = activeDeals
         .filter((d) => d.shop_id === shopId && isDealActiveOnDate(d, today))
-        .map((d) => d.title);
+        .map((d) => {
+          const badge = (d.badge_text || "").trim();
+          return badge ? `${badge} · ${d.title}` : d.title;
+        });
       const couponLabels = (shopCoupons[shopId] ?? [])
         .filter((c) => c.is_active !== false && isOfferActive(c.expiry_date))
         .map((c) => {
@@ -279,6 +283,19 @@ function ProductsPageInner() {
     },
     [activeDeals, shopCoupons],
   );
+
+  const matchingDealCount = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return 0;
+    const today = toPkDateKey();
+    return activeDeals.filter((d) => {
+      if (!d.is_active || !isDealActiveOnDate(d, today)) return false;
+      const hay = [d.title, d.description ?? "", d.badge_text ?? "", d.shop_name ?? ""]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    }).length;
+  }, [activeDeals, query]);
 
   const visibleProducts = useMemo(
     () => displayProducts.slice(0, visibleCount),
@@ -416,9 +433,17 @@ function ProductsPageInner() {
         <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
           Products for you
         </h1>
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-          Items from local stores — tap to add to cart or visit the shop
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Items from local stores — tap to add to cart or visit the shop
+          </p>
+          <Link
+            href="/deals"
+            className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            Browse deals →
+          </Link>
+        </div>
       </header>
 
       {/* Search */}
@@ -443,6 +468,20 @@ function ProductsPageInner() {
           </button>
         </label>
       </form>
+
+      {matchingDealCount > 0 ? (
+        <Link
+          href={`/deals?q=${encodeURIComponent(query.trim())}`}
+          className="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-emerald-50 px-3 py-2.5 text-sm dark:border-amber-900/40 dark:from-amber-950/40 dark:to-emerald-950/30"
+        >
+          <span className="font-semibold text-amber-900 dark:text-amber-100">
+            {matchingDealCount} deal{matchingDealCount === 1 ? "" : "s"} match “{query.trim()}”
+          </span>
+          <span className="shrink-0 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+            View deals →
+          </span>
+        </Link>
+      ) : null}
 
       {/* Categories */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
@@ -478,6 +517,14 @@ function ProductsPageInner() {
         deals={activeDeals}
         selectedDateKey={offerDateKey}
         onSelect={setOfferDateKey}
+      />
+
+      <FeaturedDealsStrip
+        deals={activeDeals}
+        dateKey={offerDateKey}
+        title={sort === "for_you" || sort === "discount" ? "For You · deals" : "Live deals"}
+        seeAllHref={query.trim() ? `/deals?q=${encodeURIComponent(query.trim())}` : "/deals"}
+        className="mb-3"
       />
 
       {/* Sticky mobile filter strip */}
