@@ -1403,6 +1403,11 @@ export default function DashboardPage() {
         {activeShopId && (
           <section>
             <h2 className="mb-2.5 text-sm font-bold text-zinc-900 dark:text-emerald-200 sm:text-base">Order Inquiries ({orders.length})</h2>
+            <div className="mb-3">
+              <a href="/dashboard/orders" className="text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400">
+                Open full Order Desk →
+              </a>
+            </div>
             {ordersLoading && <div className="space-y-3">{Array.from({ length: 2 }).map((_, i) => (<div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"><div className="h-10 rounded bg-zinc-200 dark:bg-zinc-800" /></div>))}</div>}
             {!ordersLoading && orders.length === 0 && <p className="text-sm text-zinc-400 dark:text-zinc-500">No order inquiries yet.</p>}
             {!ordersLoading && orders.length > 0 && (

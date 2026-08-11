@@ -367,10 +367,24 @@ export default function ProductsDashboardPage() {
 
   // Low stock alerts
   const lowStockProducts = useMemo(() => {
-    return filteredProducts.filter(p => {
-      // For products with variants, check if any variant is flagged
-      // For simple products, we check the is_available flag as a proxy
-      return p.is_available && filteredProducts.length < 5; // Heuristic
+    return filteredProducts.filter((p) => {
+      if (!p.is_available) return false;
+      const threshold = 5;
+      if (p.variants && p.variants.length > 0) {
+        let tracked = false;
+        let low = false;
+        for (const group of p.variants) {
+          for (const opt of group.options) {
+            if (typeof opt.stock === "number" && opt.stock >= 0) {
+              tracked = true;
+              const t = opt.low_stock_threshold ?? threshold;
+              if (opt.stock <= t) low = true;
+            }
+          }
+        }
+        return tracked && low;
+      }
+      return false;
     });
   }, [filteredProducts]);
 
@@ -484,11 +498,14 @@ export default function ProductsDashboardPage() {
   const displaySkuRecords = form.skuRecords.length > 0 ? form.skuRecords : derivedSkuRecords;
 
   const updateSkuStock = useCallback((skuIndex: number, stock: number) => {
-    setForm(f => ({
-      ...f,
-      skuRecords: f.skuRecords.map((r, i) => i === skuIndex ? { ...r, stock: Math.max(0, stock) } : r),
-    }));
-  }, []);
+    setForm((f) => {
+      const base = f.skuRecords.length > 0 ? f.skuRecords : derivedSkuRecords;
+      const next = base.map((r, i) =>
+        i === skuIndex ? { ...r, stock: Math.max(0, stock) } : r,
+      );
+      return { ...f, skuRecords: next };
+    });
+  }, [derivedSkuRecords]);
 
   const addPriceTier = useCallback(() => {
     setForm(f => ({
@@ -584,6 +601,52 @@ export default function ProductsDashboardPage() {
     const original = form.originalPrice ? parseFloat(form.originalPrice) : null;
     const hasDeal =
       original != null && Number.isFinite(original) && original > form.basePrice;
+    const skuSource = form.skuRecords.length > 0 ? form.skuRecords : derivedSkuRecords;
+    const threshold = Math.max(0, form.lowStockThreshold || 5);
+
+    let variantsPayload = form.variantGroups.length > 0 ? form.variantGroups : null;
+    if (variantsPayload && skuSource.length > 0) {
+      variantsPayload = variantsPayload.map((group) => ({
+        ...group,
+        options: group.options.map((opt) => {
+          const matching = skuSource.filter(
+            (r) =>
+              (group.name === "Color" && r.color === opt.label) ||
+              (group.name === "Size" && r.size === opt.label),
+          );
+          if (matching.length === 0) {
+            return {
+              ...opt,
+              stock: typeof opt.stock === "number" ? opt.stock : 0,
+              low_stock_threshold: threshold,
+            };
+          }
+          const stock = Math.min(...matching.map((r) => r.stock));
+          return {
+            ...opt,
+            stock,
+            low_stock_threshold: threshold,
+            sku: matching[0]?.sku || opt.sku,
+          };
+        }),
+      }));
+    } else if (!variantsPayload && form.stockQuantity > 0) {
+      // Simple products: persist stock in variants JSON (works without stock_quantity column)
+      variantsPayload = [
+        {
+          name: "Inventory",
+          options: [
+            {
+              label: "Default",
+              stock: Math.max(0, form.stockQuantity),
+              low_stock_threshold: threshold,
+              is_available: form.isAvailable,
+            },
+          ],
+        },
+      ];
+    }
+
     const productData: ProductFormData = {
       name: form.name.trim(),
       description: form.description.trim(),
@@ -596,7 +659,8 @@ export default function ProductsDashboardPage() {
       image_url: gallery.image_url,
       images: gallery.images,
       is_available: form.isAvailable,
-      variants: form.variantGroups.length > 0 ? form.variantGroups : null,
+      stock_status: form.isAvailable ? "in_stock" : "out_of_stock",
+      variants: variantsPayload,
       category_id: shopCat || null,
       sub_category_id: subId && isValidUUID(subId) ? subId : null,
     };
@@ -629,7 +693,7 @@ export default function ProductsDashboardPage() {
     }
 
     setFormSaving(false);
-  }, [activeShopId, form, editingProductId, addToast, shops]);
+  }, [activeShopId, form, editingProductId, addToast, shops, derivedSkuRecords]);
 
   const handleEdit = useCallback((product: Product) => {
     setEditingProductId(product.id);
@@ -649,9 +713,19 @@ export default function ProductsDashboardPage() {
       priceTiers: [],
       galleryImages: gallery,
       tags: [],
-      stockQuantity: 0,
+      stockQuantity: (() => {
+        const inv = product.variants?.find((g) => g.name === "Inventory");
+        const stock = inv?.options?.[0]?.stock;
+        return typeof stock === "number" ? stock : 0;
+      })(),
       subCategoryId: product.sub_category_id ?? "",
-      lowStockThreshold: 5,
+      lowStockThreshold: (() => {
+        const fromVariant = product.variants
+          ?.flatMap((g) => g.options)
+          .map((o) => o.low_stock_threshold)
+          .find((t) => typeof t === "number");
+        return typeof fromVariant === "number" ? fromVariant : 5;
+      })(),
     });
 
     // Pre-populate variant selections
@@ -1235,8 +1309,39 @@ export default function ProductsDashboardPage() {
                 )}
               </div>
 
+              {/* Simple product stock (no variants) */}
+              {form.variantGroups.length === 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                      Stock quantity
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.stockQuantity}
+                      onChange={(e) => setForm((f) => ({ ...f, stockQuantity: Math.max(0, Number(e.target.value) || 0) }))}
+                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <p className="mt-1 text-[0.65rem] text-zinc-500">Saved with the product. Leave 0 if you only use In Stock / Out of Stock.</p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                      Low-stock alert at
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.lowStockThreshold}
+                      onChange={(e) => setForm((f) => ({ ...f, lowStockThreshold: Math.max(0, Number(e.target.value) || 0) }))}
+                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* SKU Stock Management (when variants exist) */}
-              {form.skuRecords.length > 0 && (
+              {displaySkuRecords.length > 0 && form.variantGroups.length > 0 && (
                 <div>
                   <label className="mb-2 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                     SKU Inventory Stock Levels
@@ -1283,11 +1388,13 @@ export default function ProductsDashboardPage() {
                   <div className="mb-2 flex items-center justify-between">
                     <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                       Discounted Pricing Tiers
+                      <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[0.6rem] font-semibold text-zinc-500 dark:bg-zinc-800">Coming soon</span>
                     </label>
                     <button
                       type="button"
-                      onClick={addPriceTier}
-                      className="text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                      disabled
+                      title="Bulk price tiers are not persisted yet"
+                      className="cursor-not-allowed text-xs font-medium text-zinc-400"
                     >
                       + Add Tier
                     </button>
