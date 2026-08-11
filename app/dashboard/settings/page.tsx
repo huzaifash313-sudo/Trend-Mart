@@ -580,12 +580,12 @@ export default function DashboardSettingsPage() {
       };
 
       const result = await updateShop(shop.id, shopFormFields);
-      if (result.success && result.data) {
+      if (result.success) {
         setShop(result.data);
         setForm(shopToForm(result.data));
         addToast("Store settings saved successfully.", "success");
       } else {
-        addToast(result.error || "Failed to save settings.", "error");
+        addToast(result.error, "error");
       }
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to save settings.", "error");
