@@ -1006,6 +1006,22 @@ html.dark .tm-product-card:hover {
   transform: translateY(0);
 }
 
+/* Marquee shelf — no hover lift (looks like tilt while moving) */
+.tm-deals-marquee .tm-product-card:hover {
+  transform: none;
+  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.07);
+}
+html.dark .tm-deals-marquee .tm-product-card:hover {
+  box-shadow: 0 2px 12px rgba(13, 148, 136, 0.12);
+}
+.tm-deals-marquee {
+  cursor: grab;
+  user-select: none;
+}
+.tm-deals-marquee:active {
+  cursor: grabbing;
+}
+
 .tm-product-media {
   aspect-ratio: 5 / 4;
   width: 100%;

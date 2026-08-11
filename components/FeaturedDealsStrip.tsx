@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback, type PointerEvent } from "react";
 import Link from "next/link";
 import DealCard from "@/components/DealCard";
 import QuickViewModal from "@/components/QuickViewModal";
@@ -23,11 +23,14 @@ interface FeaturedDealsStripProps {
   getOfferTags?: (shopId: string) => string[];
 }
 
+/** ~2 cards on mobile, ~3 tablet, ~4 desktop */
 const SLOT =
-  "w-[calc(50%-0.25rem)] shrink-0 snap-start sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]";
+  "w-[calc(50%-0.25rem)] shrink-0 sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]";
 
-const AUTO_PX_PER_SEC = 22;
-const RESUME_AFTER_MS = 3500;
+/** Slow continuous marquee (px/sec) — e-commerce shelf feel */
+const AUTO_PX_PER_SEC = 36;
+const RESUME_AFTER_MS = 2800;
+const ARROW_EASE_MS = 420;
 
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
@@ -62,6 +65,21 @@ function dealToQuickProduct(deal: ShopDeal): Product {
   } as Product;
 }
 
+function wrapOffset(x: number, width: number): number {
+  if (width <= 0) return 0;
+  let v = x % width;
+  if (v < 0) v += width;
+  return v;
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+/**
+ * True continuous shelf: GPU translate3d marquee (duplicated track),
+ * drag/swipe, arrow nudges, pause-on-touch, seamless loop.
+ */
 export default function FeaturedDealsStrip({
   deals,
   dateKey,
@@ -73,12 +91,22 @@ export default function FeaturedDealsStrip({
   getOfferTags,
 }: FeaturedDealsStripProps) {
   const day = dateKey ?? toPkDateKey();
-  const scrollerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const setRef = useRef<HTMLDivElement>(null);
+
+  const offsetRef = useRef(0);
+  const setWidthRef = useRef(0);
   const pauseUntilRef = useRef(0);
-  const [canPrev, setCanPrev] = useState(false);
-  const [canNext, setCanNext] = useState(false);
+  const draggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartOffsetRef = useRef(0);
+  const movedRef = useRef(false);
+  const animRef = useRef<number | null>(null);
+
   const [openDeal, setOpenDeal] = useState<ShopDeal | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const visible = useMemo(() => {
     const live = deals.filter((d) => d.is_active && isDealActiveOnDate(d, day));
@@ -97,6 +125,10 @@ export default function FeaturedDealsStrip({
     return [...featured, ...rest].slice(0, limit);
   }, [deals, day, preferFeatured, limit]);
 
+  // Need enough cards for a convincing loop — duplicate in render
+  const loopable = visible.length >= 1;
+  const copies = visible.length === 1 ? 4 : visible.length === 2 ? 3 : 2;
+
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -106,50 +138,51 @@ export default function FeaturedDealsStrip({
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
-  const updateArrows = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    setCanPrev(el.scrollLeft > 4);
-    setCanNext(max > 4 && el.scrollLeft < max - 4);
+  const applyTransform = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const x = -offsetRef.current;
+    track.style.transform = `translate3d(${x}px, 0, 0)`;
   }, []);
+
+  const measure = useCallback(() => {
+    const setEl = setRef.current;
+    if (!setEl) return;
+    // scrollWidth of first set (= one full loop length including gaps)
+    setWidthRef.current = setEl.offsetWidth;
+    setReady(setWidthRef.current > 0);
+    applyTransform();
+  }, [applyTransform]);
+
+  useEffect(() => {
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => measure()) : null;
+    if (setRef.current) ro?.observe(setRef.current);
+    if (viewportRef.current) ro?.observe(viewportRef.current);
+    return () => ro?.disconnect();
+  }, [measure, visible, copies]);
 
   const pauseAuto = useCallback((ms = RESUME_AFTER_MS) => {
     pauseUntilRef.current = Date.now() + ms;
   }, []);
 
-  const scrollByCard = useCallback(
-    (dir: -1 | 1) => {
-      const el = scrollerRef.current;
-      if (!el) return;
-      pauseAuto(6000);
-      const card = el.querySelector<HTMLElement>("[data-deal-slot]");
-      const step = card ? card.offsetWidth + 8 : el.clientWidth * 0.5;
-      const max = el.scrollWidth - el.clientWidth;
-      let next = el.scrollLeft + dir * step;
-      if (next > max + 2) next = 0;
-      if (next < -2) next = max;
-      el.scrollTo({ left: next, behavior: "smooth" });
-    },
-    [pauseAuto],
-  );
-
+  // Continuous GPU marquee
   useEffect(() => {
-    if (reduceMotion || visible.length < 2) return;
-    const el = scrollerRef.current;
-    if (!el) return;
+    if (reduceMotion || !loopable || !ready) return;
 
     let raf = 0;
     let last = performance.now();
 
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = Math.min(0.048, (now - last) / 1000);
       last = now;
-      if (Date.now() >= pauseUntilRef.current) {
-        const max = el.scrollWidth - el.clientWidth;
-        if (max > 8) {
-          el.scrollLeft += AUTO_PX_PER_SEC * dt;
-          if (el.scrollLeft >= max - 1) el.scrollLeft = 0;
+
+      const setW = setWidthRef.current;
+      if (setW > 0 && !draggingRef.current && Date.now() >= pauseUntilRef.current) {
+        // Cancel any arrow tween while auto-running
+        if (animRef.current == null) {
+          offsetRef.current = wrapOffset(offsetRef.current + AUTO_PX_PER_SEC * dt, setW);
+          applyTransform();
         }
       }
       raf = requestAnimationFrame(tick);
@@ -157,23 +190,70 @@ export default function FeaturedDealsStrip({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [visible.length, day, reduceMotion]);
+  }, [reduceMotion, loopable, ready, applyTransform, day, visible.length]);
 
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    updateArrows();
-    const onScroll = () => updateArrows();
-    el.addEventListener("scroll", onScroll, { passive: true });
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateArrows) : null;
-    ro?.observe(el);
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      ro?.disconnect();
-    };
-  }, [updateArrows, visible.length]);
+  const nudge = useCallback(
+    (dir: -1 | 1) => {
+      pauseAuto(5000);
+      const setEl = setRef.current;
+      const card = setEl?.querySelector<HTMLElement>("[data-deal-slot]");
+      const stepPx = card ? card.offsetWidth + 8 : (viewportRef.current?.clientWidth ?? 160) * 0.5;
+      const setW = setWidthRef.current || 1;
+      if (animRef.current != null) {
+        cancelAnimationFrame(animRef.current);
+        animRef.current = null;
+      }
+      const from = offsetRef.current;
+      const to = from + dir * stepPx;
+      const start = performance.now();
+      const stepAnim = (now: number) => {
+        const t = Math.min(1, (now - start) / ARROW_EASE_MS);
+        offsetRef.current = wrapOffset(from + (to - from) * easeOutCubic(t), setW);
+        applyTransform();
+        if (t < 1) animRef.current = requestAnimationFrame(stepAnim);
+        else {
+          animRef.current = null;
+          offsetRef.current = wrapOffset(offsetRef.current, setW);
+          applyTransform();
+        }
+      };
+      animRef.current = requestAnimationFrame(stepAnim);
+    },
+    [applyTransform, pauseAuto],
+  );
 
-  const onUserScrollIntent = useCallback(() => {
+  const onPointerDown = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      draggingRef.current = true;
+      movedRef.current = false;
+      dragStartXRef.current = e.clientX;
+      dragStartOffsetRef.current = offsetRef.current;
+      pauseAuto(10_000);
+      if (animRef.current != null) {
+        cancelAnimationFrame(animRef.current);
+        animRef.current = null;
+      }
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    },
+    [pauseAuto],
+  );
+
+  const onPointerMove = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      if (!draggingRef.current) return;
+      const dx = e.clientX - dragStartXRef.current;
+      if (Math.abs(dx) > 6) movedRef.current = true;
+      const setW = setWidthRef.current;
+      offsetRef.current = wrapOffset(dragStartOffsetRef.current - dx, setW || 1);
+      applyTransform();
+    },
+    [applyTransform],
+  );
+
+  const onPointerUp = useCallback(() => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
     pauseAuto(RESUME_AFTER_MS);
   }, [pauseAuto]);
 
@@ -188,7 +268,30 @@ export default function FeaturedDealsStrip({
       }
     : null;
 
-  const showArrows = visible.length > 1;
+  const showArrows = visible.length >= 1;
+  const renderSet = (keyPrefix: string, isMeasureSet: boolean) => (
+    <div
+      ref={isMeasureSet ? setRef : undefined}
+      className="flex shrink-0 items-stretch gap-2"
+      aria-hidden={!isMeasureSet}
+    >
+      {visible.map((deal, i) => (
+        <div key={`${keyPrefix}-${deal.id}`} data-deal-slot className={`${SLOT} flex`}>
+          <DealCard
+            deal={deal}
+            compact
+            priority={isMeasureSet && i < 2}
+            offerTags={getOfferTags?.(deal.shop_id) ?? []}
+            onOpen={() => {
+              if (movedRef.current) return;
+              pauseAuto(8000);
+              setOpenDeal(deal);
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <section aria-label={title} className={className}>
@@ -202,7 +305,7 @@ export default function FeaturedDealsStrip({
               <button
                 type="button"
                 aria-label="Previous deals"
-                onClick={() => scrollByCard(-1)}
+                onClick={() => nudge(-1)}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 <Chevron dir="left" />
@@ -210,7 +313,7 @@ export default function FeaturedDealsStrip({
               <button
                 type="button"
                 aria-label="Next deals"
-                onClick={() => scrollByCard(1)}
+                onClick={() => nudge(1)}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 <Chevron dir="right" />
@@ -227,53 +330,44 @@ export default function FeaturedDealsStrip({
       </div>
 
       <div className="relative">
-        {showArrows ? (
-          <>
-            <button
-              type="button"
-              aria-label="Scroll deals left"
-              onClick={() => scrollByCard(-1)}
-              className={`absolute left-0.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-zinc-800 shadow-md ring-1 ring-zinc-200/80 backdrop-blur transition dark:bg-zinc-900/95 dark:text-zinc-100 dark:ring-zinc-700 ${
-                canPrev ? "opacity-100" : "opacity-40"
-              }`}
-            >
-              <Chevron dir="left" />
-            </button>
-            <button
-              type="button"
-              aria-label="Scroll deals right"
-              onClick={() => scrollByCard(1)}
-              className={`absolute right-0.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-zinc-800 shadow-md ring-1 ring-zinc-200/80 backdrop-blur transition dark:bg-zinc-900/95 dark:text-zinc-100 dark:ring-zinc-700 ${
-                canNext ? "opacity-100" : "opacity-40"
-              }`}
-            >
-              <Chevron dir="right" />
-            </button>
-          </>
-        ) : null}
+        <button
+          type="button"
+          aria-label="Scroll deals left"
+          onClick={() => nudge(-1)}
+          className="absolute left-0.5 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-zinc-800 shadow-md ring-1 ring-zinc-200/80 backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-100 dark:ring-zinc-700"
+        >
+          <Chevron dir="left" />
+        </button>
+        <button
+          type="button"
+          aria-label="Scroll deals right"
+          onClick={() => nudge(1)}
+          className="absolute right-0.5 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-zinc-800 shadow-md ring-1 ring-zinc-200/80 backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-100 dark:ring-zinc-700"
+        >
+          <Chevron dir="right" />
+        </button>
 
         <div
-          ref={scrollerRef}
-          onPointerDown={onUserScrollIntent}
-          onTouchStart={onUserScrollIntent}
-          onWheel={onUserScrollIntent}
-          className="tm-deals-scroller -mx-3 flex snap-x snap-proximity items-stretch gap-2 overflow-x-auto overscroll-x-contain px-3 pb-1 scrollbar-none sm:mx-0 sm:px-8"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          ref={viewportRef}
+          className="tm-deals-marquee relative -mx-3 overflow-hidden px-3 sm:mx-0 sm:px-9"
+          style={{ touchAction: "pan-y" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
         >
-          {visible.map((deal, i) => (
-            <div key={deal.id} data-deal-slot className={`${SLOT} flex`}>
-              <DealCard
-                deal={deal}
-                compact
-                priority={i < 2}
-                offerTags={getOfferTags?.(deal.shop_id) ?? []}
-                onOpen={() => {
-                  pauseAuto(8000);
-                  setOpenDeal(deal);
-                }}
-              />
-            </div>
-          ))}
+          <div
+            ref={trackRef}
+            className="flex w-max will-change-transform"
+            style={{
+              transform: "translate3d(0,0,0)",
+              backfaceVisibility: "hidden",
+            }}
+          >
+            {Array.from({ length: copies }, (_, copyIdx) =>
+              renderSet(`c${copyIdx}`, copyIdx === 0),
+            )}
+          </div>
         </div>
       </div>
 
