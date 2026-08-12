@@ -185,6 +185,8 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [merchantExpanded, setMerchantExpanded] = useState(false);
 
   // Refs for focus trapping
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -554,48 +556,89 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             {/* Divider */}
             <li className="my-2 border-t border-zinc-100 dark:border-zinc-800" role="separator" />
 
-            {/* Settings hub — Appearance, Notifications, Privacy */}
+            {/* Settings hub — nested preferences (same accordion pattern as Categories) */}
             <li>
-              <Link
-                href="/settings"
-                onClick={onClose}
-                className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              <button
+                type="button"
+                onClick={() => setSettingsExpanded((v) => !v)}
+                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                aria-expanded={settingsExpanded}
+                aria-controls="sidebar-settings-list"
               >
-                <CogIcon /> Settings &amp; Preferences
-              </Link>
-            </li>
-
-            <li>
-              <Link
-                href="/settings/location"
-                onClick={onClose}
-                className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                <span className="flex h-5 w-5 items-center justify-center text-base leading-none" aria-hidden="true">📍</span>
-                Location
-              </Link>
-            </li>
-
-            <li>
-              <Link
-                href="/settings/notifications"
-                onClick={onClose}
-                className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                <span className="flex h-5 w-5 items-center justify-center text-base leading-none" aria-hidden="true">🔔</span>
-                Notifications
-              </Link>
-            </li>
-
-            <li>
-              <Link
-                href="/settings/appearance"
-                onClick={onClose}
-                className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                <span className="flex h-5 w-5 items-center justify-center text-base leading-none" aria-hidden="true">🎨</span>
-                Appearance
-              </Link>
+                <span className="flex items-center gap-3.5">
+                  <CogIcon /> Settings &amp; Preferences
+                </span>
+                <ChevronDownIcon expanded={settingsExpanded} />
+              </button>
+              {settingsExpanded && (
+                <ul
+                  id="sidebar-settings-list"
+                  className="ml-9 mt-1 space-y-0.5 border-l-2 border-zinc-100 pl-4 dark:border-zinc-800"
+                >
+                  <li>
+                    <Link
+                      href="/settings"
+                      onClick={onClose}
+                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                    >
+                      <span aria-hidden="true">⚙️</span>
+                      All settings
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/settings/location"
+                      onClick={onClose}
+                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                    >
+                      <span aria-hidden="true">📍</span>
+                      Location
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/settings/notifications"
+                      onClick={onClose}
+                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                    >
+                      <span aria-hidden="true">🔔</span>
+                      Notifications
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/settings/appearance"
+                      onClick={onClose}
+                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                    >
+                      <span aria-hidden="true">🎨</span>
+                      Appearance
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/settings/privacy"
+                      onClick={onClose}
+                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                    >
+                      <span aria-hidden="true">🔒</span>
+                      Privacy &amp; Security
+                    </Link>
+                  </li>
+                  {session ? (
+                    <li>
+                      <Link
+                        href="/auth/settings"
+                        onClick={onClose}
+                        className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                      >
+                        <span aria-hidden="true">👤</span>
+                        Profile (name, phone, photo)
+                      </Link>
+                    </li>
+                  ) : null}
+                </ul>
+              )}
             </li>
 
             {/* Divider */}
@@ -607,39 +650,63 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                 <>
                   {userRole === "merchant" || userRole === "admin" ? (
                     <>
-                      <Link
-                        href="/dashboard"
-                        onClick={onClose}
-                        className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                      <button
+                        type="button"
+                        onClick={() => setMerchantExpanded((v) => !v)}
+                        className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                        aria-expanded={merchantExpanded}
+                        aria-controls="sidebar-merchant-list"
                       >
-                        <DashboardIcon /> Merchant Dashboard
-                      </Link>
-
-                      {merchantShopId && (
-                        <Link
-                          href={`/shop/${merchantShopId}`}
-                          onClick={onClose}
-                          className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                        <span className="flex items-center gap-3.5">
+                          <DashboardIcon /> Merchant
+                        </span>
+                        <ChevronDownIcon expanded={merchantExpanded} />
+                      </button>
+                      {merchantExpanded && (
+                        <ul
+                          id="sidebar-merchant-list"
+                          className="ml-9 mt-1 space-y-0.5 border-l-2 border-emerald-100 pl-4 dark:border-emerald-900/50"
                         >
-                          <StoreIconMenu /> View My Store
-                        </Link>
+                          <li>
+                            <Link
+                              href="/dashboard"
+                              onClick={onClose}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                            >
+                              <DashboardIcon /> Dashboard
+                            </Link>
+                          </li>
+                          {merchantShopId ? (
+                            <li>
+                              <Link
+                                href={`/shop/${merchantShopId}`}
+                                onClick={onClose}
+                                className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                              >
+                                <StoreIconMenu /> View My Store
+                              </Link>
+                            </li>
+                          ) : null}
+                          <li>
+                            <Link
+                              href="/dashboard/settings"
+                              onClick={onClose}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                            >
+                              <StoreIconMenu /> Store Settings
+                            </Link>
+                          </li>
+                          <li>
+                            <Link
+                              href="/dashboard/analytics"
+                              onClick={onClose}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                            >
+                              <span aria-hidden="true">📊</span> Analytics
+                            </Link>
+                          </li>
+                        </ul>
                       )}
-
-                      <Link
-                        href="/dashboard/settings"
-                        onClick={onClose}
-                        className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        <StoreIconMenu /> Store Settings
-                      </Link>
-
-                      <Link
-                        href="/dashboard/analytics"
-                        onClick={onClose}
-                        className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        <span className="flex h-5 w-5 items-center justify-center text-base leading-none">📊</span> Analytics
-                      </Link>
                     </>
                   ) : (
                     <Link
