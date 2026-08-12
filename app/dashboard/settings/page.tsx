@@ -203,6 +203,7 @@ const INITIAL_FORM: ShopFormData = {
   is_live: false,
   instagram_handle: "",
   facebook_url: "",
+  tiktok_handle: "",
   secondary_phone: "",
   business_hours: "",
   operating_status: "",
@@ -237,6 +238,7 @@ function shopToForm(source: Shop): ShopFormData {
     is_live: source.is_live,
     instagram_handle: source.instagram_handle ?? "",
     facebook_url: source.facebook_url ?? "",
+    tiktok_handle: source.tiktok_handle ?? "",
     secondary_phone: source.secondary_phone ?? "",
     business_hours: source.business_hours ?? "",
     operating_status: source.operating_status ?? "",
@@ -584,6 +586,7 @@ export default function DashboardSettingsPage() {
         is_live: form.is_live,
         instagram_handle: form.instagram_handle,
         facebook_url: form.facebook_url,
+        tiktok_handle: form.tiktok_handle,
         secondary_phone: form.secondary_phone,
         business_hours: form.business_hours,
         operating_status: form.operating_status,
@@ -817,6 +820,9 @@ export default function DashboardSettingsPage() {
               onChange={(e) => setForm((current) => ({ ...current, store_bio: e.target.value }))}
               placeholder="Tell customers what you sell, your specialties, and why they should order from you."
             />
+            <p className="mt-1.5 text-[0.7rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
+              Shown clearly on your public store page under “About this store”.
+            </p>
           </div>
 
           <div>
@@ -963,6 +969,18 @@ export default function DashboardSettingsPage() {
                 onChange={(e) => setForm((current) => ({ ...current, instagram_handle: e.target.value }))}
                 placeholder="@yourstore"
               />
+            </div>
+            <div>
+              <FieldLabel optional>TikTok</FieldLabel>
+              <TextInput
+                type="text"
+                value={form.tiktok_handle}
+                onChange={(e) => setForm((current) => ({ ...current, tiktok_handle: e.target.value }))}
+                placeholder="@yourstore or tiktok.com/@yourstore"
+              />
+              <p className="mt-1 text-[0.7rem] text-zinc-400 dark:text-zinc-500">
+                Customers can open your TikTok profile from the store page.
+              </p>
             </div>
             <div>
               <FieldLabel optional>Facebook</FieldLabel>

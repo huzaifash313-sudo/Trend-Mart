@@ -351,19 +351,6 @@ function ProductsPageInner() {
     searchMatchedDeals,
   ]);
 
-  const matchingDealCount = useMemo(() => {
-    const q = query.trim();
-    if (!q) return 0;
-    const today = toPkDateKey();
-    const live = activeDeals.filter((d) => d.is_active && isDealActiveOnDate(d, today));
-    return fuzzyFilterAndRank(
-      live,
-      q,
-      (d) => [dealSearchHaystack(d), formatDealWhenTag(d), d.title],
-      { minScore: FUZZY_MIN_SCORE },
-    ).length;
-  }, [activeDeals, query]);
-
   const searchSuggestions = useMemo(() => {
     if (!qParam.trim() || displayProducts.length > 0) return [];
     return suggestSearchCorrections(qParam, 4);
@@ -518,7 +505,25 @@ function ProductsPageInner() {
         </div>
       </header>
 
-      {/* Search */}
+      {/* Featured deals — same home snap shelf (Deals page stays separate) */}
+      <section aria-label="Featured deals" className="mb-4 space-y-2 sm:mb-5">
+        <OfferDaysStrip
+          deals={activeDeals}
+          selectedDateKey={offerDateKey}
+          onSelect={setOfferDateKey}
+          variant="pills"
+        />
+        <FeaturedDealsStrip
+          deals={activeDeals}
+          dateKey={offerDateKey}
+          title="Featured deals"
+          seeAllHref="/deals"
+          variant="home"
+          getOfferTags={getDealStripOfferTags}
+        />
+      </section>
+
+      {/* Search — products only; no deal-match chrome */}
       <form onSubmit={handleSearchSubmit} className="mb-3">
         <label className="relative block">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
@@ -540,20 +545,6 @@ function ProductsPageInner() {
           </button>
         </label>
       </form>
-
-      {matchingDealCount > 0 ? (
-        <Link
-          href={`/deals?q=${encodeURIComponent(query.trim())}`}
-          className="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-emerald-50 px-3 py-2.5 text-sm dark:border-amber-900/40 dark:from-amber-950/40 dark:to-emerald-950/30"
-        >
-          <span className="font-semibold text-amber-900 dark:text-amber-100">
-            {matchingDealCount} deal{matchingDealCount === 1 ? "" : "s"} match “{query.trim()}”
-          </span>
-          <span className="shrink-0 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-            View deals →
-          </span>
-        </Link>
-      ) : null}
 
       {/* Categories */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
@@ -584,29 +575,6 @@ function ProductsPageInner() {
           label="Filter by sub-category"
         />
       )}
-
-      <OfferDaysStrip
-        deals={activeDeals}
-        selectedDateKey={offerDateKey}
-        onSelect={setOfferDateKey}
-        variant="pills"
-        className="mb-1.5"
-      />
-
-      <FeaturedDealsStrip
-        deals={query.trim() ? (searchMatchedDeals.length ? searchMatchedDeals : activeDeals) : activeDeals}
-        dateKey={offerDateKey}
-        title={
-          query.trim() && searchMatchedDeals.length
-            ? "Matching deals"
-            : sort === "for_you" || sort === "discount"
-              ? "For You · deals"
-              : "Live deals"
-        }
-        seeAllHref={query.trim() ? `/deals?q=${encodeURIComponent(query.trim())}` : "/deals"}
-        className="mb-3"
-        getOfferTags={getDealStripOfferTags}
-      />
 
       {/* Sticky mobile filter strip */}
       <div className="sticky top-[var(--tm-navbar-sticky-offset,4.35rem)] z-30 -mx-3 mb-3 border-b border-zinc-100/80 bg-white/95 px-3 py-2 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">

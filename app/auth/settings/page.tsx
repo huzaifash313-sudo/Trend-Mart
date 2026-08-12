@@ -1,23 +1,33 @@
 "use client";
 
-import { useState, useEffect, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useCallback, useRef, type FormEvent, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { uploadImage } from "@/services/storageService";
+import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
+import { getSafeImageUrl } from "@/services/storageService";
 
 export default function AccountSettingsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [createdAt, setCreatedAt] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   const [newEmail, setNewEmail] = useState("");
   const [emailSaving, setEmailSaving] = useState(false);
@@ -36,21 +46,29 @@ export default function AccountSettingsPage() {
         router.replace("/login?redirect=/auth/settings");
         return;
       }
+      setUserId(data.user.id);
       setEmail(data.user.email ?? "");
       setCreatedAt(data.user.created_at ?? "");
       const metaName = (data.user.user_metadata?.full_name as string | undefined) ?? "";
+      const metaPhone = (data.user.user_metadata?.phone as string | undefined) ?? "";
       setDisplayName(metaName);
       setFullName(metaName);
+      setPhone(metaPhone ? formatPkPhoneInput(metaPhone) : "");
 
       try {
         const { data: profile } = await supabase
           .from("user_profiles")
-          .select("full_name")
+          .select("full_name, phone, address, avatar_url")
           .eq("user_id", data.user.id)
           .maybeSingle();
-        if (!cancelled && profile?.full_name) {
-          setDisplayName(profile.full_name);
-          setFullName(profile.full_name);
+        if (!cancelled && profile) {
+          if (profile.full_name) {
+            setDisplayName(profile.full_name);
+            setFullName(profile.full_name);
+          }
+          if (profile.phone) setPhone(formatPkPhoneInput(profile.phone));
+          if (profile.address) setAddress(profile.address);
+          if (profile.avatar_url) setAvatarUrl(profile.avatar_url);
         }
       } catch {
         /* profile optional */
@@ -80,8 +98,14 @@ export default function AccountSettingsPage() {
         return;
       }
 
+      const phoneClean = phone.trim();
+      const addressClean = address.trim();
+
       const { error: metaErr } = await supabase.auth.updateUser({
-        data: { full_name: name },
+        data: {
+          full_name: name,
+          phone: phoneClean || null,
+        },
       });
       if (metaErr) {
         addToast(metaErr.message, "error");
@@ -89,18 +113,76 @@ export default function AccountSettingsPage() {
         return;
       }
 
-      await supabase
-        .from("user_profiles")
-        .upsert(
-          { user_id: user.id, full_name: name, updated_at: new Date().toISOString() },
-          { onConflict: "user_id" },
+      const { error: profileErr } = await supabase.from("user_profiles").upsert(
+        {
+          user_id: user.id,
+          full_name: name,
+          phone: phoneClean || null,
+          address: addressClean || null,
+          avatar_url: avatarUrl || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+
+      if (profileErr) {
+        // Column may be missing until SQL is run — still keep name/phone if possible
+        addToast(
+          profileErr.message.includes("avatar_url")
+            ? "Profile saved, but photo needs SQL setup (avatar_url). Run PROFILE_AND_TIKTOK_SETUP.sql."
+            : profileErr.message,
+          profileErr.message.includes("avatar_url") ? "info" : "error",
         );
+        if (!profileErr.message.includes("avatar_url")) {
+          setProfileSaving(false);
+          return;
+        }
+      }
 
       setDisplayName(name);
-      addToast("Profile updated.", "success");
+      addToast("Profile updated. Checkout will use these details.", "success");
       setProfileSaving(false);
     },
-    [fullName, supabase, addToast],
+    [fullName, phone, address, avatarUrl, supabase, addToast],
+  );
+
+  const handleAvatarPick = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file || !userId) return;
+      setAvatarBusy(true);
+      const result = await uploadImage(file, "avatars", userId);
+      if (!result.success) {
+        addToast(result.error, "error");
+        setAvatarBusy(false);
+        return;
+      }
+      setAvatarUrl(result.data);
+      const { error } = await supabase.from("user_profiles").upsert(
+        {
+          user_id: userId,
+          full_name: fullName.trim() || displayName || "Customer",
+          phone: phone.trim() || null,
+          address: address.trim() || null,
+          avatar_url: result.data,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+      if (error) {
+        addToast(
+          error.message.includes("avatar_url")
+            ? "Photo uploaded locally — run PROFILE_AND_TIKTOK_SETUP.sql in Supabase to persist."
+            : error.message,
+          "error",
+        );
+      } else {
+        addToast("Profile photo saved.", "success");
+      }
+      setAvatarBusy(false);
+    },
+    [userId, fullName, displayName, phone, address, supabase, addToast],
   );
 
   const handleUpdateEmail = useCallback(
@@ -148,7 +230,6 @@ export default function AccountSettingsPage() {
       }
 
       setPasswordSaving(true);
-      // Re-authenticate with current password before changing it
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password: currentPassword,
@@ -188,6 +269,9 @@ export default function AccountSettingsPage() {
   const inputClass =
     "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100";
 
+  const safeAvatar = avatarUrl ? getSafeImageUrl(avatarUrl) : null;
+  const initial = (displayName || email || "?").trim().charAt(0).toUpperCase();
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
@@ -204,30 +288,53 @@ export default function AccountSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-xl space-y-6 px-4 py-6 pb-28">
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="mb-3 text-base font-bold text-zinc-900 dark:text-zinc-100">Account info</h2>
-          <div className="space-y-2 text-sm">
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Name:{" "}
-              <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                {displayName || "—"}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={avatarBusy}
+              className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-emerald-100 ring-2 ring-emerald-200 transition hover:ring-emerald-400 disabled:opacity-60 dark:bg-emerald-950 dark:ring-emerald-800"
+              aria-label="Change profile photo"
+            >
+              {safeAvatar ? (
+                <Image src={safeAvatar} alt="" fill className="object-cover" sizes="80px" unoptimized />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                  {initial}
+                </span>
+              )}
+              <span className="absolute inset-x-0 bottom-0 bg-black/50 py-0.5 text-center text-[0.55rem] font-semibold text-white">
+                {avatarBusy ? "…" : "Edit"}
               </span>
-            </p>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Email: <span className="font-medium text-zinc-900 dark:text-zinc-100">{email}</span>
-            </p>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Member since:{" "}
-              <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                {createdAt ? new Date(createdAt).toLocaleDateString() : "—"}
-              </span>
-            </p>
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleAvatarPick}
+            />
+            <div className="min-w-0">
+              <p className="truncate text-base font-bold text-zinc-900 dark:text-zinc-100">
+                {displayName || "Your profile"}
+              </p>
+              <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{email}</p>
+              <p className="mt-1 text-xs text-zinc-400">
+                Member since {createdAt ? new Date(createdAt).toLocaleDateString() : "—"}
+              </p>
+            </div>
           </div>
         </section>
 
         <section>
-          <h2 className="mb-3 text-base font-bold text-zinc-900 dark:text-zinc-100">Profile name</h2>
+          <h2 className="mb-3 text-base font-bold text-zinc-900 dark:text-zinc-100">
+            Delivery profile
+          </h2>
+          <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+            Name, phone and address autofill at checkout. You can still edit them per order.
+          </p>
           <form
             onSubmit={handleUpdateProfile}
             className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
@@ -245,6 +352,37 @@ export default function AccountSettingsPage() {
                 placeholder="Your name"
                 className={inputClass}
               />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Mobile number
+              </label>
+              <input
+                type="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(formatPkPhoneInput(e.target.value))}
+                placeholder={PK_PHONE_PLACEHOLDER}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Default delivery address
+              </label>
+              <textarea
+                rows={3}
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="House / street, area, city"
+                className={inputClass}
+              />
+              <p className="mt-1.5 text-[0.7rem] text-zinc-400">
+                Prefer multiple saved places?{" "}
+                <Link href="/account/addresses" className="font-semibold text-emerald-600 underline">
+                  Manage addresses
+                </Link>
+              </p>
             </div>
             <button
               type="submit"

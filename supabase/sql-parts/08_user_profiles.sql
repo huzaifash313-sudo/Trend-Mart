@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS full_name text;
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS address text;
+ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS avatar_url text;
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS phone_verified_at timestamptz DEFAULT NULL;
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();

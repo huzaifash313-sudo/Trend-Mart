@@ -39,6 +39,13 @@ import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { getStoreTheme, type StoreTheme, isServiceTheme } from "@/lib/storeThemes";
 import { formatRupees } from "@/lib/formatters";
 import {
+  instagramProfileUrl,
+  normalizeInstagramHandle,
+  normalizeTikTokHandle,
+  normalizeFacebookUrl,
+  tikTokProfileUrl,
+} from "@/lib/socialLinks";
+import {
   LocalBusinessSchema,
   BreadcrumbListSchema,
 } from "@/components/SeoSchema";
@@ -502,7 +509,9 @@ function ShopDetailInner({ id }: { id: string }) {
                 />
                 <div className="flex min-w-0 items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                   <PinIcon />
-                  <span className="truncate">{shop.location}</span>
+                  <span className="truncate">
+                    {shop.address_display?.trim() || shop.location || "Location not set"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -547,7 +556,16 @@ function ShopDetailInner({ id }: { id: string }) {
               );
             })()}
 
-            {shop.store_bio && (<p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{shop.store_bio}</p>)}
+            {shop.store_bio?.trim() ? (
+              <div className="rounded-2xl border border-zinc-200/90 bg-gradient-to-br from-zinc-50 to-white px-3.5 py-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-950">
+                <p className="text-[0.65rem] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  About this store
+                </p>
+                <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+                  {shop.store_bio.trim()}
+                </p>
+              </div>
+            ) : null}
             {((shop.min_order_amount ?? 0) > 0 || (shop.free_delivery_threshold ?? 0) > 0) && (
               <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {(shop.min_order_amount ?? 0) > 0 && (
@@ -589,16 +607,39 @@ function ShopDetailInner({ id }: { id: string }) {
                 </p>
               </div>
             ) : null}
-            {(shop.instagram_handle || shop.facebook_url || shop.secondary_phone) && (
+            {(shop.instagram_handle || shop.tiktok_handle || shop.facebook_url || shop.secondary_phone) && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                {shop.instagram_handle && (
-                  <a href={`https://instagram.com/${shop.instagram_handle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 px-3 py-1 text-[0.65rem] font-semibold text-white transition-opacity hover:opacity-90">
+                {shop.instagram_handle && normalizeInstagramHandle(shop.instagram_handle) && (
+                  <a
+                    href={instagramProfileUrl(shop.instagram_handle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 px-3 py-1 text-[0.65rem] font-semibold text-white transition-opacity hover:opacity-90"
+                  >
                     <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 0 1 0 2.5 1.25 1.25 0 0 1 0-2.5M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3z" /></svg>
-                    @{shop.instagram_handle.replace(/^@/, "")}
+                    @{normalizeInstagramHandle(shop.instagram_handle)}
                   </a>
                 )}
-                {shop.facebook_url && (
-                  <a href={shop.facebook_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#1877F2] px-3 py-1 text-[0.65rem] font-semibold text-white transition-opacity hover:opacity-90">
+                {shop.tiktok_handle && normalizeTikTokHandle(shop.tiktok_handle) && (
+                  <a
+                    href={tikTokProfileUrl(shop.tiktok_handle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-3 py-1 text-[0.65rem] font-semibold text-white transition-opacity hover:opacity-90 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .56.04.82.12V9.01a6.27 6.27 0 0 0-.82-.05A6.34 6.34 0 0 0 3.15 15.3a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.95a8.2 8.2 0 0 0 4.76 1.52V6.99a4.85 4.85 0 0 1-1-.3z" />
+                    </svg>
+                    @{normalizeTikTokHandle(shop.tiktok_handle)}
+                  </a>
+                )}
+                {shop.facebook_url && normalizeFacebookUrl(shop.facebook_url) && (
+                  <a
+                    href={normalizeFacebookUrl(shop.facebook_url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-[#1877F2] px-3 py-1 text-[0.65rem] font-semibold text-white transition-opacity hover:opacity-90"
+                  >
                     <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
                     Facebook
                   </a>

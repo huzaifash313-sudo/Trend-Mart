@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS public.shops (
   is_live           boolean DEFAULT false,
   instagram_handle  text,
   facebook_url      text,
+  tiktok_handle     text,
   secondary_phone   text,
   business_hours    text,
   operating_status  text,
@@ -110,6 +111,7 @@ ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS banner_url text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS is_live boolean DEFAULT false;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS instagram_handle text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS facebook_url text;
+ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS tiktok_handle text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS secondary_phone text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS business_hours text;
 ALTER TABLE public.shops ADD COLUMN IF NOT EXISTS operating_status text;

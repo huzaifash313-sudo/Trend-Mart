@@ -66,6 +66,7 @@ const INITIAL_SHOP_FORM: ShopFormData = {
   is_live: false,
   instagram_handle: "",
   facebook_url: "",
+  tiktok_handle: "",
   secondary_phone: "",
   business_hours: "",
   operating_status: "",
@@ -114,6 +115,7 @@ function shopToFormData(s: Shop): ShopFormData {
     is_live: s.is_live,
     instagram_handle: s.instagram_handle ?? "",
     facebook_url: s.facebook_url ?? "",
+    tiktok_handle: s.tiktok_handle ?? "",
     secondary_phone: s.secondary_phone ?? "",
     business_hours: s.business_hours ?? "",
     operating_status: s.operating_status ?? "",
@@ -1136,6 +1138,21 @@ export default function DashboardPage() {
                   type="text"
                   value={shopForm.instagram_handle}
                   onChange={(e) => setShopForm((f) => ({ ...f, instagram_handle: e.target.value }))}
+                  placeholder="@yourstore"
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  <span className="inline-flex items-center gap-1">
+                    TikTok Username
+                    <span className="text-zinc-400 font-normal">(optional)</span>
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={shopForm.tiktok_handle}
+                  onChange={(e) => setShopForm((f) => ({ ...f, tiktok_handle: e.target.value }))}
                   placeholder="@yourstore"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />

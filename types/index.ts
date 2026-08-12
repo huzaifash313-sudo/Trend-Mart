@@ -21,6 +21,8 @@ export interface Shop {
   /** Optional social media & contact links for merchant storefronts. */
   instagram_handle?: string | null;
   facebook_url?: string | null;
+  /** TikTok username (with or without @) — storefront opens tiktok.com/@user. */
+  tiktok_handle?: string | null;
   secondary_phone?: string | null;
   /** Optional business hours and operational status (Prompt 82). */
   business_hours?: string | null;
@@ -93,6 +95,8 @@ export interface ShopFormData {
   is_live: boolean;
   instagram_handle: string;
   facebook_url: string;
+  /** TikTok username or profile URL — saved as bare handle. */
+  tiktok_handle: string;
   secondary_phone: string;
   /** Business hours (e.g., 'Mon-Sat: 9 AM - 10 PM') */
   business_hours: string;

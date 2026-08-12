@@ -51,6 +51,7 @@ const SHOP_EXTENDED_KEYS = [
   "store_bio",
   "instagram_handle",
   "facebook_url",
+  "tiktok_handle",
   "secondary_phone",
   "business_hours",
   "operating_status",
@@ -500,6 +501,19 @@ function sanitizeDbInstagram(input: unknown): string {
 }
 
 /**
+ * Sanitize a TikTok handle (username only). Returns empty string for invalid.
+ */
+function sanitizeDbTikTok(input: unknown): string {
+  if (typeof input !== "string") return "";
+  const raw = input.trim();
+  if (!raw) return "";
+  const fromUrl = raw.match(/tiktok\.com\/@?([^/?#]+)/i);
+  const trimmed = (fromUrl?.[1] ?? raw).replace(/^@/, "");
+  if (/^[a-zA-Z0-9._]{1,30}$/.test(trimmed)) return trimmed;
+  return "";
+}
+
+/**
  * Sanitize a Facebook URL. Returns empty string for invalid.
  */
 function sanitizeDbFacebook(input: unknown): string {
@@ -553,6 +567,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     is_live: sanitizeDbBoolean(form.is_live),
     instagram_handle: sanitizeDbInstagram(form.instagram_handle),
     facebook_url: sanitizeDbFacebook(form.facebook_url),
+    tiktok_handle: sanitizeDbTikTok(form.tiktok_handle),
     secondary_phone: sanitizeDbPhone(form.secondary_phone),
     business_hours: sanitizeDbString(form.business_hours, 150),
     operating_status: sanitizeDbString(form.operating_status, 150),

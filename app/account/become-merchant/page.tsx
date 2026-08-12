@@ -29,6 +29,7 @@ function emptyShopForm(): ShopFormData {
     is_live: true,
     instagram_handle: "",
     facebook_url: "",
+    tiktok_handle: "",
     secondary_phone: "",
     business_hours: "",
     operating_status: "",
