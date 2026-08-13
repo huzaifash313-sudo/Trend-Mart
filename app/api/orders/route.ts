@@ -592,7 +592,7 @@ export async function POST(request: Request) {
   } catch (err) {
     // Best-effort rollback of any stock already deducted.
     for (const a of applied) {
-      await admin.from("products").update({ variants: a.previous }).eq("id", a.id);
+      await admin.from("products").update({ variants: a.previous } as never).eq("id", a.id);
     }
     const msg = err instanceof Error && err.message === "STOCK_WRITE_FAILED"
       ? "Stock changed during checkout. Please try again."
@@ -626,14 +626,14 @@ export async function POST(request: Request) {
 
   const { data: inserted, error: insertErr } = await admin
     .from("orders")
-    .insert(orderPayload)
+    .insert(orderPayload as never)
     .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
     .single();
 
   if (insertErr || !inserted) {
     // Rollback stock — the order did not persist.
     for (const a of applied) {
-      await admin.from("products").update({ variants: a.previous }).eq("id", a.id);
+      await admin.from("products").update({ variants: a.previous } as never).eq("id", a.id);
     }
     return NextResponse.json(
       { success: false, error: "Could not place your order. Please try again." },
