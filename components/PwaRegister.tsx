@@ -14,19 +14,20 @@ declare global {
 }
 
 /**
- * Registers TrendMart SW and forces activation of newer workers so stale
- * chunk caches from older deploys do not break client-side navigation.
+ * Install prompt capture + safe SW update.
+ * Replaces any old fetch-intercepting worker with a no-intercept SW.
  */
 export default function PwaRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
-    if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") return;
+    if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
+      return;
+    }
 
     const onBeforeInstall = (event: Event) => {
       event.preventDefault();
-      const promptEvent = event as BeforeInstallPromptEvent;
-      window.__tmDeferredInstall = promptEvent;
+      window.__tmDeferredInstall = event as BeforeInstallPromptEvent;
       window.dispatchEvent(new Event("tm-pwa-install-available"));
     };
     const onInstalled = () => {
@@ -37,28 +38,30 @@ export default function PwaRegister() {
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
 
-    const register = () => {
-      navigator.serviceWorker
-        .register("/sw.js", { updateViaCache: "none" })
-        .then((reg) => {
-          reg.update().catch(() => undefined);
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: "SKIP_WAITING" });
-          }
-        })
-        .catch(() => undefined);
+    const setup = async () => {
+      try {
+        // Clear stale Cache Storage from older SW versions
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+        const reg = await navigator.serviceWorker.getRegistration();
+        await reg?.update();
+      } catch {
+        /* never block the app */
+      }
     };
 
     if (document.readyState === "complete") {
-      register();
+      void setup();
     } else {
-      window.addEventListener("load", register, { once: true });
+      window.addEventListener("load", () => void setup(), { once: true });
     }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
-      window.removeEventListener("load", register);
     };
   }, []);
 

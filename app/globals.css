@@ -2720,7 +2720,7 @@ html.tm-boot-splash .tm-boot-splash {
   flex-direction: column;
   align-items: center;
   transform: translateY(18vh);
-  transition: transform 0.95s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tm-splash--brand .tm-splash-stage,
@@ -2751,10 +2751,10 @@ html.tm-boot-splash .tm-boot-splash {
     0 12px 36px rgba(0, 0, 0, 0.22),
     0 0 0 1px rgba(255, 255, 255, 0.4);
   padding: 0.55rem;
-  transition: height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.9s ease,
-    padding 0.9s ease;
+  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.45s ease,
+    padding 0.45s ease;
   animation: tm-splash-logo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -2793,9 +2793,9 @@ html.tm-boot-splash .tm-boot-splash {
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
   transform: translateX(-0.5rem);
   transition:
-    max-width 0.85s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.55s ease 0.12s,
-    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.08s;
+    max-width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease 0.05s,
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.04s;
 }
 
 .tm-splash--brand .tm-splash-title,
@@ -2814,7 +2814,7 @@ html.tm-boot-splash .tm-boot-splash {
   opacity: 0;
   transform: translateY(18px);
   pointer-events: none;
-  transition: opacity 0.65s ease, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tm-splash--details .tm-splash-copy,

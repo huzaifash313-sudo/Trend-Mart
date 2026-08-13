@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+
 /**
- * Root error UI — replaces Next.js default "This page couldn't load".
- * Auto-reloads once on chunk/deployment mismatches.
+ * Root error UI. Side effects only in useEffect — never during render.
  */
 export default function GlobalError({
   error,
@@ -11,23 +12,22 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const msg = `${error?.name ?? ""} ${error?.message ?? ""}`;
-  const isChunk =
-    /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed/i.test(
-      msg,
-    );
-
-  if (typeof window !== "undefined" && isChunk) {
+  useEffect(() => {
+    const msg = `${error?.name ?? ""} ${error?.message ?? ""}`;
+    const isChunk =
+      /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module/i.test(
+        msg,
+      );
+    if (!isChunk) return;
     try {
-      const key = "tm_global_chunk_reload_v1";
-      if (sessionStorage.getItem(key) !== "1") {
-        sessionStorage.setItem(key, "1");
-        window.location.reload();
-      }
+      const key = "tm_global_chunk_reload_v2";
+      if (sessionStorage.getItem(key) === "1") return;
+      sessionStorage.setItem(key, "1");
+      window.location.reload();
     } catch {
-      /* fall through to UI */
+      /* show UI */
     }
-  }
+  }, [error]);
 
   return (
     <html lang="en">
@@ -45,20 +45,21 @@ export default function GlobalError({
         }}
       >
         <div>
-          <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>TrendMart needs a refresh</h1>
+          <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>Something went wrong</h1>
           <p style={{ margin: "0 0 20px", color: "#64748b", fontSize: 14 }}>
-            A new update may have shipped. Reload to continue shopping.
+            Tap reload once — then try the page again.
           </p>
           <button
             type="button"
             onClick={() => {
               try {
-                sessionStorage.removeItem("tm_global_chunk_reload_v1");
+                sessionStorage.removeItem("tm_global_chunk_reload_v2");
+                sessionStorage.removeItem("tm_chunk_reload_v2");
               } catch {
                 /* ignore */
               }
               reset();
-              window.location.reload();
+              window.location.href = "/";
             }}
             style={{
               border: 0,

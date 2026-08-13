@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
-export const SPLASH_KEY = "tm_splash_seen_v3";
+export const SPLASH_KEY = "tm_splash_seen_v4";
+
+/** Fast path: logo visible immediately → rise + title → previews → 1s hold → home */
 const STAGE_MS = {
-  logo: 650,
-  brand: 950,
-  details: 1700,
-  hold: 700,
-  exit: 450,
+  brand: 450,
+  details: 500,
+  hold: 1000,
+  exit: 280,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -79,13 +80,12 @@ function PhonePreview({
 }
 
 /**
- * Brand landing: boot logo continues upward (no restart / white flash),
- * then lightweight app previews, then auto home.
+ * Instant cover → same logo rises with TrendMart → previews → 1s → home.
+ * No second logo pop-in, no white flash between boot and splash.
  */
 export default function AppSplash() {
   const pathname = usePathname();
   const [phase, setPhase] = useState<Phase>("off");
-  const [seamless, setSeamless] = useState(false);
 
   useEffect(() => {
     if (!shouldShowSplash(pathname)) {
@@ -95,28 +95,25 @@ export default function AppSplash() {
       return;
     }
 
-    const fromBoot = document.documentElement.classList.contains("tm-boot-splash");
-    setSeamless(fromBoot);
     markSplashSeen();
     document.documentElement.classList.add("tm-splash-lock");
+    // Mount React splash on top of boot immediately (same logo, no restart anim)
     setPhase("logo");
 
-    // Keep boot cover until React splash has painted the same centered logo.
-    let removeId = 0;
-    if (fromBoot) {
-      removeId = window.setTimeout(() => {
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => removeBootSplash());
-        });
-      }, 80);
-    } else {
-      removeBootSplash();
-    }
+    const timers: number[] = [];
 
-    const timers: number[] = [removeId];
-    let t = STAGE_MS.logo;
-    timers.push(window.setTimeout(() => setPhase("brand"), t));
-    t += STAGE_MS.brand;
+    // Drop boot only after React splash is covering (next frames)
+    timers.push(
+      window.setTimeout(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => removeBootSplash());
+        });
+      }, 0),
+    );
+
+    // Start rise almost immediately — logo already showing
+    timers.push(window.setTimeout(() => setPhase("brand"), 120));
+    let t = 120 + STAGE_MS.brand;
     timers.push(window.setTimeout(() => setPhase("details"), t));
     t += STAGE_MS.details;
     timers.push(window.setTimeout(() => setPhase("hold"), t));
@@ -140,7 +137,7 @@ export default function AppSplash() {
 
   return (
     <div
-      className={`tm-splash tm-splash--${phase}${seamless ? " tm-splash--seamless" : ""}`}
+      className={`tm-splash tm-splash--${phase} tm-splash--seamless`}
       data-phase={phase}
       role="dialog"
       aria-label="Welcome to TrendMart"
@@ -170,7 +167,6 @@ export default function AppSplash() {
           <p className="tm-splash-tagline">
             Local shopping, instant WhatsApp orders — your neighborhood, delivered.
           </p>
-
           <div className="tm-splash-previews" aria-hidden="true">
             <PhonePreview label="Home" variant="home" />
             <PhonePreview label="Shop" variant="shop" />
