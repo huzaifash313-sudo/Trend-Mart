@@ -87,14 +87,8 @@ export function generateRootMetadata(): Metadata {
       title: SITE_NAME,
     },
     icons: {
-      icon: [
-        { url: "/favicon.png?v=4", type: "image/png" },
-        { url: "/favicon-32.png?v=4", sizes: "32x32", type: "image/png" },
-        { url: "/favicon-16.png?v=4", sizes: "16x16", type: "image/png" },
-        { url: "/icon-192.png?v=4", sizes: "192x192", type: "image/png" },
-        { url: "/icon-512.png?v=4", sizes: "512x512", type: "image/png" },
-      ],
-      apple: [{ url: "/apple-touch-icon.png?v=4", sizes: "180x180", type: "image/png" }],
+      icon: [{ url: "/trendmart-mark.png?v=5", type: "image/png", sizes: "505x562" }],
+      apple: [{ url: "/trendmart-mark.png?v=5", sizes: "505x562", type: "image/png" }],
     },
   };
 }

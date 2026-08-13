@@ -410,11 +410,11 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/trendmart-mark.png?v=4"
+              src="/trendmart-mark.png?v=5"
               alt=""
               width={32}
-              height={32}
-              className="h-8 w-8 object-contain"
+              height={36}
+              className="tm-brand-mark-img h-8 w-auto"
             />
             <span className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent">
               TrendMart

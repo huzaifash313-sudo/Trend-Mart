@@ -7,6 +7,8 @@ import type { MetadataRoute } from "next";
 /*  Enables "Add to Home Screen" on Android/Chrome and standalone app mode.   */
 /* -------------------------------------------------------------------------- */
 
+const MARK = "/trendmart-mark.png?v=5";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "TrendMart — Local Shopping, Instant WhatsApp Orders",
@@ -22,22 +24,10 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["shopping", "business", "lifestyle"],
     icons: [
       {
-        src: "/icon-192.png?v=4",
-        sizes: "192x192",
+        src: MARK,
+        sizes: "505x562",
         type: "image/png",
         purpose: "any",
-      },
-      {
-        src: "/icon-512.png?v=4",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/icon-512.png?v=4",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "maskable",
       },
     ],
   };

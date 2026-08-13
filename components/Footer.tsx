@@ -57,11 +57,11 @@ export default function Footer() {
             <Link href="/" className="inline-flex items-center gap-2 text-lg font-bold text-emerald-600 dark:text-emerald-400">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/trendmart-mark.png?v=4"
+                src="/trendmart-mark.png?v=5"
                 alt=""
                 width={28}
-                height={28}
-                className="h-7 w-7 object-contain"
+                height={31}
+                className="tm-brand-mark-img h-7 w-auto"
               />
               TrendMart
             </Link>

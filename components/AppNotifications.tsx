@@ -25,7 +25,7 @@ function BrowserNotifyBridge() {
     try {
       const n = new Notification(latest.title, {
         body: latest.body,
-        icon: "/icon-192.png",
+        icon: "/trendmart-mark.png?v=5",
         tag: latest.id,
       });
       n.onclick = () => {
