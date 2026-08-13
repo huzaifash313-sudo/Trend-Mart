@@ -48,8 +48,10 @@ function markSplashSeen() {
 }
 
 function removeBootSplash() {
+  // Only toggle the html class. Never call Node.remove() on #tm-boot-splash —
+  // that node lives in the React layout tree; detaching it causes Safari
+  // NotFoundError: Failed to execute 'removeChild' on 'Node' on navigation.
   document.documentElement.classList.remove("tm-boot-splash");
-  document.getElementById("tm-boot-splash")?.remove();
 }
 
 async function unwrap<T>(
@@ -109,13 +111,15 @@ export default function AppSplash() {
 
   useEffect(() => {
     if (!shouldShowSplash(pathname)) {
-      removeBootSplash();
+      // Returning visit / other routes: InteractionUnlock clears tm-first-paint.
+      // Only drop splash-lock here — don't yank the brief boot cover early.
       document.documentElement.classList.remove("tm-splash-lock");
       setPhase("off");
       return;
     }
 
     markSplashSeen();
+    document.documentElement.classList.remove("tm-first-paint");
     document.documentElement.classList.add("tm-splash-lock");
     setPhase("logo");
 

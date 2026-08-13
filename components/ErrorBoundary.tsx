@@ -2,6 +2,7 @@
 
 import {
   Component,
+  Fragment,
   type ErrorInfo,
   type ReactNode,
 } from "react";
@@ -211,11 +212,10 @@ export class ErrorBoundary extends Component<
       );
     }
 
-    // Key remounts children on retry for a clean slate
+    // Key remounts children on retry. Use Fragment — never `display: contents`
+    // (Safari/iOS then breaks parent/child DOM and throws removeChild NotFoundError).
     return (
-      <div key={this.state.retryKey} className="contents">
-        {this.props.children}
-      </div>
+      <Fragment key={this.state.retryKey}>{this.props.children}</Fragment>
     );
   }
 }

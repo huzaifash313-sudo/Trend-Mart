@@ -1,36 +1,72 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 
 /**
- * Safety net: if splash/boot cover or scroll-lock class is left behind
- * (crash, back-nav, tab restore), clear it so cards stay tappable.
+ * Safety net + first-paint cover:
+ * - Clears brief tm-first-paint boot cover after CSS/fonts settle (no FOUC)
+ * - Never detaches React-owned splash nodes (Safari removeChild crash)
+ * - Failsafe if splash-lock is left behind after crash / tab restore
  */
 export default function InteractionUnlock() {
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const root = document.documentElement;
+    if (!root.classList.contains("tm-first-paint")) return;
+
+    let cleared = false;
+    const clear = () => {
+      if (cleared) return;
+      cleared = true;
+      root.classList.remove("tm-first-paint", "tm-boot-splash");
+    };
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (document.fonts?.ready) {
+          await Promise.race([
+            document.fonts.ready,
+            new Promise((r) => window.setTimeout(r, 280)),
+          ]);
+        }
+      } catch {
+        /* ignore */
+      }
+      if (cancelled) return;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(clear);
+      });
+    };
+
+    void run();
+    // Hard cap — never leave a teal wall up
+    const failsafe = window.setTimeout(clear, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(failsafe);
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const unlock = () => {
       const root = document.documentElement;
-      root.classList.remove("tm-splash-lock", "tm-boot-splash");
-      document.getElementById("tm-boot-splash")?.remove();
-      const stuck = document.querySelector(".tm-splash");
-      if (stuck && !stuck.isConnected) return;
-      // Only remove a splash that is stuck without active phase animation
-      // (AppSplash owns intentional overlays via React).
+      // Class-only unlock. Never Node.remove() React-owned splash nodes.
+      root.classList.remove("tm-splash-lock", "tm-boot-splash", "tm-first-paint");
     };
 
-    // Hard timeout — splash should never block the UI longer than this
     const failsafe = window.setTimeout(unlock, 12_000);
 
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        // Don't kill a live splash in the first seconds of a cold open
-        try {
-          if (sessionStorage.getItem("tm_splash_seen_v5") === "1") unlock();
-        } catch {
-          unlock();
-        }
+      if (document.visibilityState !== "visible") return;
+      try {
+        if (sessionStorage.getItem("tm_splash_seen_v5") === "1") unlock();
+      } catch {
+        unlock();
       }
     };
 

@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useMemo,
   type ReactNode,
@@ -208,20 +209,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const resolved = resolveTheme(prefs.mode);
 
-  // ── Apply side effects on mount and when prefs change ──────────────────────
-  useEffect(() => {
+  // useLayoutEffect: apply before browser paint (useEffect = one-frame FOUC / header jump)
+  useLayoutEffect(() => {
     applyThemeClass(resolved);
   }, [resolved]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyFontScale(prefs.fontScale);
   }, [prefs.fontScale]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyGridLayout(prefs.gridLayout);
   }, [prefs.gridLayout]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyCardStyle(prefs.cardStyle);
   }, [prefs.cardStyle]);
 

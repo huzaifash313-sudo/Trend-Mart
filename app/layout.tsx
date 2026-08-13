@@ -26,11 +26,15 @@ import type { ReactNode } from "react";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = generateRootMetadata();
@@ -42,10 +46,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-const THEME_BOOTSTRAP = `(function(){try{var k="trendmart_theme_prefs_v4";var raw=localStorage.getItem(k);if(!raw){raw=localStorage.getItem("trendmart_theme_prefs_v3");}var mode="light";if(raw){var p=JSON.parse(raw);if(p&&p.mode==="dark")mode="dark";}var r=document.documentElement;if(mode==="dark"){r.classList.add("dark");r.classList.remove("light");}else{r.classList.add("light");r.classList.remove("dark");}}catch(e){document.documentElement.classList.add("light");document.documentElement.classList.remove("dark");}})();`;
+/* Apply theme + fontScale BEFORE first paint so header/UI don't jump big→small on refresh */
+const THEME_BOOTSTRAP = `(function(){try{var k="trendmart_theme_prefs_v4";var raw=localStorage.getItem(k);if(!raw){raw=localStorage.getItem("trendmart_theme_prefs_v3");}var mode="light",fontScale=14,grid="grid",card="default";if(raw){var p=JSON.parse(raw);if(p){if(p.mode==="dark")mode="dark";else if(p.mode==="light")mode="light";if(typeof p.fontScale==="number"&&p.fontScale>=14&&p.fontScale<=20)fontScale=p.fontScale;if(["grid","compact","cards","list","gallery"].indexOf(p.gridLayout)>=0)grid=p.gridLayout;if(["default","minimal","detailed","service"].indexOf(p.cardStyle)>=0)card=p.cardStyle;}}var r=document.documentElement;if(mode==="dark"){r.classList.add("dark");r.classList.remove("light");}else{r.classList.add("light");r.classList.remove("dark");}var textPct=(fontScale/16)*100;var density=0.92+((fontScale-14)/6)*0.14;r.style.fontSize=textPct+"%";r.style.setProperty("--font-scale",String(fontScale));r.style.setProperty("--tm-ui-density",density.toFixed(3));r.setAttribute("data-font-scale",String(fontScale));r.classList.remove("layout-grid","layout-compact","layout-cards","layout-list","layout-gallery");r.classList.add("layout-"+grid);r.classList.remove("card-default","card-minimal","card-detailed","card-service");r.classList.add("card-"+card);}catch(e){var r=document.documentElement;r.classList.add("light");r.classList.remove("dark");r.style.fontSize="87.5%";r.setAttribute("data-font-scale","14");r.classList.add("layout-grid","card-default");}})();`;
 
-/* Show teal+logo cover before React so homepage never flashes first */
-const SPLASH_BOOTSTRAP = `(function(){try{var p=location.pathname||"/";if(p!=="/"&&p!=="")return;if(sessionStorage.getItem("tm_splash_seen_v5")==="1")return;document.documentElement.classList.add("tm-boot-splash","tm-splash-lock");}catch(e){document.documentElement.classList.add("tm-boot-splash","tm-splash-lock");}})();`;
+/* Show teal cover before first paint.
+ * - First homepage visit: keep cover + lock until AppSplash takes over
+ * - Refresh / other routes: brief cover (tm-first-paint) until CSS settles */
+const SPLASH_BOOTSTRAP = `(function(){try{var r=document.documentElement;var p=location.pathname||"/";var home=p==="/"||p==="";var full=home&&sessionStorage.getItem("tm_splash_seen_v5")!=="1";r.classList.add("tm-boot-splash");if(full){r.classList.add("tm-splash-lock");}else{r.classList.add("tm-first-paint");}}catch(e){document.documentElement.classList.add("tm-boot-splash","tm-first-paint");}})();`;
 
 const SITE_JSON_LD = generateSiteJsonLd();
 
