@@ -405,12 +405,12 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
           <Link
             href="/"
             onClick={onClose}
-            className="inline-flex items-center gap-2.5 text-xl font-extrabold tracking-tight"
+            className="inline-flex items-center gap-1.5 text-xl font-extrabold tracking-tight"
             aria-label="TrendMart — Go to homepage"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendmart-mark.png?v=5"
+              src="/trendmart-mark.png?v=6"
               alt=""
               width={32}
               height={32}

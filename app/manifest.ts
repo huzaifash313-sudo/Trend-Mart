@@ -2,12 +2,8 @@ import type { MetadataRoute } from "next";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — PWA Web App Manifest                                          */
-/*  Next.js auto-generates /manifest.webmanifest from this file and injects   */
-/*  the <link rel="manifest"> tag automatically — no layout changes needed.   */
-/*  Enables "Add to Home Screen" on Android/Chrome and standalone app mode.   */
+/*  Icons: same source mark (exact file) — no redesign / recompress.          */
 /* -------------------------------------------------------------------------- */
-
-const MARK = "/trendmart-mark.png?v=5";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -24,10 +20,28 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["shopping", "business", "lifestyle"],
     icons: [
       {
-        src: MARK,
+        src: "/trendmart-mark.png?v=6",
         sizes: "505x562",
         type: "image/png",
         purpose: "any",
+      },
+      {
+        src: "/icon-192.png?v=6",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512.png?v=6",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512.png?v=6",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   };
