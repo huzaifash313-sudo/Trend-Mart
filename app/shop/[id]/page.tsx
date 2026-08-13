@@ -13,7 +13,7 @@ import ContactModal from "@/components/ContactModal";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
-import DealCard from "@/components/DealCard";
+import DealCard, { dealToProduct } from "@/components/DealCard";
 import { isDealActiveOnDate, toPkDateKey } from "@/lib/dealSchedule";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
@@ -110,6 +110,7 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // Quick view modal state — cart-first: no single-item checkout
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
 
   // ── Service-specific state ─────────────────────────────────────────────────
   const [servicePackages, setServicePackages] = useState<ServicePackageItem[]>([]);
@@ -233,13 +234,21 @@ function ShopDetailInner({ id }: { id: string }) {
     if (loading || !shop || typeof window === "undefined") return;
     const hash = window.location.hash.replace(/^#/, "");
     if (!hash) return;
-    const t = window.setTimeout(() => {
-      const el =
-        document.getElementById(hash) ||
-        (hash === "deals" ? document.getElementById("deals") : null);
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-    return () => window.clearTimeout(t);
+
+    const scrollToHash = () => {
+      const el = document.getElementById(hash);
+      if (!el) return;
+      // Don't fight an open modal / user interaction — only intentional deep links.
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    const t = window.setTimeout(scrollToHash, 150);
+    const onHash = () => scrollToHash();
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("hashchange", onHash);
+    };
   }, [loading, shop, liveShopDeals.length, products.length]);
 
   // ── Real-time product updates ─────────────────────────────────────────────
@@ -432,6 +441,7 @@ function ShopDetailInner({ id }: { id: string }) {
                     href={`${getShopPath(shop)}#deal-${deal.id}`}
                     shopWhatsapp={shop.whatsapp_number}
                     offerTags={shopDealOfferTags}
+                    onOpen={() => setQuickViewDeal(deal)}
                   />
                 </div>
               ))}
@@ -770,6 +780,17 @@ function ShopDetailInner({ id }: { id: string }) {
           onClose={() => setQuickViewProduct(null)}
           isWishlisted={wishlistIds.has(quickViewProduct.id)}
           onWishlistToggle={() => handleWishlistToggle(quickViewProduct)}
+        />
+      )}
+      {quickViewDeal && shop && (
+        <QuickViewModal
+          product={dealToProduct({
+            ...quickViewDeal,
+            shop_name: shop.name,
+            shop_whatsapp: shop.whatsapp_number,
+          })}
+          shop={{ id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number }}
+          onClose={() => setQuickViewDeal(null)}
         />
       )}
 

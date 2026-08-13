@@ -54,7 +54,15 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-6 py-10">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           <div className="col-span-2 sm:col-span-1">
-            <Link href="/" className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+            <Link href="/" className="inline-flex items-center gap-2 text-lg font-bold text-emerald-600 dark:text-emerald-400">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/trendmart-mark.svg"
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 rounded-md bg-black p-0.5"
+              />
               TrendMart
             </Link>
             <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">

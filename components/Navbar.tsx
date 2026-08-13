@@ -27,7 +27,7 @@ function SearchIcon() {
   );
 }
 
-/** Brand mark — soft looping gradient + trend-line motion. */
+/** Soft living backdrop behind the Gemini-style sticky brand bar. */
 function TrendBackdrop() {
   const line =
     "M8 72 L48 58 L78 64 L120 42 L152 50 L200 28 L236 36 L286 18 L322 24 L368 10";
@@ -87,8 +87,24 @@ function TrendBackdrop() {
   );
 }
 
+function BrandMark({ size = 34 }: { size?: number }) {
+  return (
+    <span className="tm-navbar-logo" aria-hidden="true">
+      {/* SVG stays crisp at every density; PNG fallback for older browsers */}
+      <img
+        src="/brand/trendmart-mark.svg"
+        alt=""
+        width={size}
+        height={size}
+        className="tm-navbar-logo-img"
+        decoding="async"
+      />
+    </span>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
-/*  Navbar                                                                     */
+/*  Navbar — Gemini-style sticky brand bar                                     */
 /* -------------------------------------------------------------------------- */
 
 export default function Navbar() {
@@ -123,8 +139,9 @@ export default function Navbar() {
             <HamburgerIcon />
           </button>
 
-          <Link href="/" className="tm-navbar-brand">
-            TrendMart
+          <Link href="/" className="tm-navbar-brand" aria-label="TrendMart home">
+            <BrandMark />
+            <span className="tm-navbar-wordmark">TrendMart</span>
           </Link>
 
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">

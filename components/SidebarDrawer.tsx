@@ -405,9 +405,17 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
           <Link
             href="/"
             onClick={onClose}
-            className="text-xl font-extrabold tracking-tight"
+            className="inline-flex items-center gap-2.5 text-xl font-extrabold tracking-tight"
             aria-label="TrendMart — Go to homepage"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/trendmart-mark.svg"
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-lg bg-black p-1 shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700"
+            />
             <span className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent">
               TrendMart
             </span>

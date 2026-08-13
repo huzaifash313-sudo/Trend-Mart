@@ -56,8 +56,9 @@ function useHomePerView() {
     if (typeof window === "undefined") return;
     const update = () => {
       const w = window.innerWidth;
-      if (w >= 1280) setPerView(5);
-      else if (w >= 1024) setPerView(4);
+      // Fewer cards on wide screens so vertical product cards stay readable.
+      if (w >= 1280) setPerView(4);
+      else if (w >= 1024) setPerView(3);
       else if (w >= 768) setPerView(3);
       else if (w >= 640) setPerView(2);
       else setPerView(1);
@@ -156,7 +157,7 @@ function QuickDealModal({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Home: snap-shift carousel — 1 mobile / 2–5 tablet+laptop                  */
+/* Home: snap-shift — 1 editorial card on phone; product-style cards on tablet+ */
 /* -------------------------------------------------------------------------- */
 
 function HomeShiftShelf({
@@ -369,7 +370,7 @@ function HomeShiftShelf({
                 <DealCard
                   deal={deal}
                   compact
-                  density="home"
+                  density={perView <= 1 ? "home" : "default"}
                   priority={i < perView}
                   offerTags={getOfferTags?.(deal.shop_id) ?? []}
                   onOpen={() => {

@@ -106,6 +106,34 @@ export default function QuickViewModal({
     pauseAutoUntil.current = 0;
   }, [product.id]);
 
+  // Keep page scroll where the user was — don't jump to top when modal opens.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const html = document.documentElement;
+    const prev = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      htmlOverflow: html.style.overflow,
+    };
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    html.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = prev.overflow;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      html.style.overflow = prev.htmlOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
   // Auto-advance gallery when user isn't interacting.
   useEffect(() => {
     if (images.length <= 1) return;
