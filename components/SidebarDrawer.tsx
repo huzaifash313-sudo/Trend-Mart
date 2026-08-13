@@ -398,7 +398,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
         aria-modal="true"
         aria-label="Navigation menu"
         onTouchStart={handleDrawerTouchStart}
-        style={{ willChange: "transform", transform: "translateZ(0)" }}
+        style={{ willChange: "transform" }}
       >
         {/* Header — brand + close button */}
         <div className="flex items-center justify-between border-b border-zinc-200/60 px-5 py-4 dark:border-zinc-800/60">
@@ -413,8 +413,8 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               src="/trendmart-mark.png?v=5"
               alt=""
               width={32}
-              height={36}
-              className="tm-brand-mark-img h-8 w-auto"
+              height={32}
+              className="h-8 w-8 shrink-0 object-contain"
             />
             <span className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent">
               TrendMart

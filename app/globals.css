@@ -890,32 +890,28 @@ html.dark .trend-card:hover {
 }
 .tm-navbar-logo {
   display: inline-flex;
-  height: 2.35rem;
-  width: auto;
-  aspect-ratio: 505 / 562;
+  height: 2.25rem;
+  width: 2.25rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  overflow: visible;
+  overflow: hidden;
   padding: 0;
 }
 .tm-navbar-logo-img,
 .tm-brand-mark-img {
-  width: auto;
-  max-width: none;
+  display: block;
+  height: 100%;
+  width: 100%;
+  max-height: 2.25rem;
+  max-width: 2.25rem;
   object-fit: contain;
   object-position: center;
-  display: block;
   background: transparent;
-  /* Keep source pixels as-is — no filters / tint */
   filter: none;
-  image-rendering: auto;
-}
-.tm-navbar-logo-img {
-  height: 100%;
 }
 .tm-navbar-wordmark {
   min-width: 0;
@@ -929,8 +925,12 @@ html.dark .trend-card:hover {
     gap: 0.65rem;
   }
   .tm-navbar-logo {
-    height: 2.65rem;
-    width: auto;
+    height: 2.5rem;
+    width: 2.5rem;
+  }
+  .tm-navbar-logo-img {
+    max-height: 2.5rem;
+    max-width: 2.5rem;
   }
 }
 

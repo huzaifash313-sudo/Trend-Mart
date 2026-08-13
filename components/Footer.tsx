@@ -60,8 +60,8 @@ export default function Footer() {
                 src="/trendmart-mark.png?v=5"
                 alt=""
                 width={28}
-                height={31}
-                className="tm-brand-mark-img h-7 w-auto"
+                height={28}
+                className="h-7 w-7 shrink-0 object-contain"
               />
               TrendMart
             </Link>

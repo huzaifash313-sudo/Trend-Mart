@@ -96,7 +96,7 @@ function BrandMark({ size = 34 }: { size?: number }) {
         alt=""
         width={size}
         height={size}
-        className="tm-navbar-logo-img"
+        className="tm-navbar-logo-img h-full w-full object-contain"
         decoding="async"
       />
     </span>
