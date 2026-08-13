@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import PwaRegister from "@/components/PwaRegister";
 import AppSplash from "@/components/AppSplash";
 import ChunkReloadGuard from "@/components/ChunkReloadGuard";
+import InteractionUnlock from "@/components/InteractionUnlock";
 import CartBar from "@/components/CartBar";
 import CartProvider from "@/context/CartContext";
 import QueryProvider from "@/components/QueryProvider";
@@ -85,6 +86,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <AppSplash />
               </ErrorBoundary>
               <ChunkReloadGuard />
+              <InteractionUnlock />
               <ErrorBoundary name="Navbar">
                 <Navbar />
               </ErrorBoundary>

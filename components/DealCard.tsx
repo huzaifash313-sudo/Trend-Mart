@@ -228,9 +228,14 @@ export default function DealCard({
       <>
         <article
           className={`tm-home-deal-card group relative flex w-full overflow-hidden ${
-            onOpen ? "cursor-pointer" : ""
+            onOpen ? "cursor-pointer" : "cursor-default"
           } ${className}`}
-          onClick={() => onOpen?.()}
+          onClick={(e) => {
+            // Ignore clicks that bubbled from explicit action controls
+            const t = e.target as HTMLElement | null;
+            if (t?.closest("button, a, input, textarea, select, label")) return;
+            onOpen?.();
+          }}
           onKeyDown={(e) => {
             if (!onOpen) return;
             if (e.key === "Enter" || e.key === " ") {
@@ -360,9 +365,13 @@ export default function DealCard({
     <>
       <article
         className={`tm-product-card group relative flex h-full w-full flex-col overflow-hidden ${
-          onOpen ? "cursor-pointer" : ""
+          onOpen ? "cursor-pointer" : "cursor-default"
         } ${className}`}
-        onClick={() => onOpen?.()}
+        onClick={(e) => {
+          const t = e.target as HTMLElement | null;
+          if (t?.closest("button, a, input, textarea, select, label")) return;
+          onOpen?.();
+        }}
         onKeyDown={(e) => {
           if (!onOpen) return;
           if (e.key === "Enter" || e.key === " ") {
@@ -374,14 +383,7 @@ export default function DealCard({
         tabIndex={onOpen ? 0 : undefined}
         aria-label={onOpen ? `View ${deal.title}` : undefined}
       >
-        <div
-          className="tm-product-media relative shrink-0 overflow-hidden"
-          onClick={(e) => {
-            if (!onOpen) return;
-            e.stopPropagation();
-            onOpen();
-          }}
-        >
+        <div className="tm-product-media relative shrink-0 overflow-hidden">
           {showPhoto && safeSrc ? (
             <Image
               src={safeSrc}

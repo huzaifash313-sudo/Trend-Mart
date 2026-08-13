@@ -1181,10 +1181,24 @@ html.dark .tm-home-deals-all:hover {
   transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 .tm-home-deals-nav-btn--prev {
-  left: -0.15rem;
+  left: -0.65rem;
 }
 .tm-home-deals-nav-btn--next {
-  right: -0.15rem;
+  right: -0.65rem;
+}
+@media (max-width: 639px) {
+  .tm-home-deals-nav-btn--prev {
+    left: 0.2rem;
+  }
+  .tm-home-deals-nav-btn--next {
+    right: 0.2rem;
+  }
+  /* Keep arrows from eating the whole card tap target */
+  .tm-home-deals-nav-btn {
+    height: 2rem;
+    width: 2rem;
+    opacity: 0.92;
+  }
 }
 .tm-home-deals-nav-btn:hover {
   background: #fff;

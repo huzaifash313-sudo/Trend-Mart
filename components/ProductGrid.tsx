@@ -171,7 +171,11 @@ function ProductCard({
   return (
     <article
       id={`product-${product.id}`}
-      onClick={handleCardClick}
+      onClick={(e) => {
+        const t = e.target as HTMLElement | null;
+        if (t?.closest("button, a, input, textarea, select, label")) return;
+        handleCardClick();
+      }}
       className="tm-product-card group flex h-full scroll-mt-24 cursor-pointer flex-col overflow-hidden"
       role="button"
       tabIndex={0}
