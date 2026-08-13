@@ -76,6 +76,12 @@ export const RATE_LIMITS = {
     windowMs: 60_000, // 5 review submissions per minute
   } as const,
 
+  /** Support tickets / contact form — block spam. */
+  SUPPORT: {
+    maxRequests: 5,
+    windowMs: 15 * 60_000, // 5 tickets per 15 minutes
+  } as const,
+
   /** WhatsApp cart generation — prevent flooding. */
   WHATSAPP_GENERATE: {
     maxRequests: 10,

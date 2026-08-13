@@ -158,7 +158,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
         <div>
           <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Store deals</h3>
           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            Link a product, set deal price + photos + day. Customers can wishlist / cart anytime; Order only on deal day.
+            Photos, name, and price are enough — no listed product needed. Link a product only if you want. Customers can cart anytime; Order works on the deal day.
           </p>
         </div>
         {!showForm ? (
@@ -179,7 +179,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
         >
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Link product (recommended)
+              Link product (optional)
             </label>
             <select
               value={form.product_id}

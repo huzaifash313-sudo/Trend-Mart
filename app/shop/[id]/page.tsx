@@ -228,15 +228,19 @@ function ShopDetailInner({ id }: { id: string }) {
       }));
   }, [shop, deals]);
 
-  // Visit /deals → store: scroll deals strip into view
+  // Deep links: #deals | #deal-{id} | #product-{id} (from WhatsApp order links)
   useEffect(() => {
-    if (loading || !shop || liveShopDeals.length === 0) return;
-    if (typeof window === "undefined" || window.location.hash !== "#deals") return;
+    if (loading || !shop || typeof window === "undefined") return;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
     const t = window.setTimeout(() => {
-      document.getElementById("deals")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 80);
+      const el =
+        document.getElementById(hash) ||
+        (hash === "deals" ? document.getElementById("deals") : null);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
     return () => window.clearTimeout(t);
-  }, [loading, shop, liveShopDeals.length]);
+  }, [loading, shop, liveShopDeals.length, products.length]);
 
   // ── Real-time product updates ─────────────────────────────────────────────
   useEffect(() => {
@@ -418,13 +422,14 @@ function ShopDetailInner({ id }: { id: string }) {
               {liveShopDeals.map((deal, i) => (
                 <div
                   key={deal.id}
-                  className="flex w-[calc(50%-0.25rem)] shrink-0 snap-start sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
+                  id={`deal-${deal.id}`}
+                  className="flex w-[calc(50%-0.25rem)] shrink-0 snap-start scroll-mt-24 sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
                 >
                   <DealCard
                     deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
                     compact
                     priority={i < 2}
-                    href={`${getShopPath(shop)}#deals`}
+                    href={`${getShopPath(shop)}#deal-${deal.id}`}
                     shopWhatsapp={shop.whatsapp_number}
                     offerTags={shopDealOfferTags}
                   />

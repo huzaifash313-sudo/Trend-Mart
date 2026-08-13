@@ -21,7 +21,7 @@ const CUSTOMER_FAQS: FaqItem[] = [
   },
   {
     q: "How do I place an order?",
-    a: "Create an account and verify your email, add items to your cart, tap Checkout, enter your delivery details (name, phone, address), and submit. Your order is sent to the merchant on WhatsApp, and you can track status from the Orders page.",
+    a: "Create an account and verify your email, add items to your cart, tap Checkout, enter your delivery details, share your live location (required for the rider), and confirm. TrendMart saves the order, then you tap Open WhatsApp to send it to the shop. The shop only sees the WhatsApp message after that tap. Each item includes a TrendMart link so the shop can open the exact product.",
   },
   {
     q: "Why can't I see a shop that I know exists nearby?",
@@ -37,14 +37,14 @@ const CUSTOMER_FAQS: FaqItem[] = [
   },
   {
     q: "How do I track my order?",
-    a: "Visit Orders → Track Order to see live status milestones. You'll also get notified as your order moves from Processing to Dispatched to Delivered.",
+    a: "Visit Orders → Track Order. Status stays Pending until the shop updates it in their dashboard (Processing → Dispatched → Delivered). This is not live GPS tracking, and we do not send automatic status notifications.",
   },
 ];
 
 const MERCHANT_FAQS: FaqItem[] = [
   {
     q: "How do I register my store?",
-    a: "Sign up for an account, then go to your Dashboard and fill in the store registration form — name, category, phone number, logo, and banner. Your store enters a review queue and goes live once a Super-Admin approves it.",
+    a: "Sign up, verify your email, then open Dashboard and fill in your store (name, category, phone, logo, banner). There is no approval queue — once your email is verified and the shop details are complete, the store can go live.",
   },
   {
     q: "How fast can I list a product?",
@@ -52,7 +52,7 @@ const MERCHANT_FAQS: FaqItem[] = [
   },
   {
     q: "How do I pause a product without deleting it?",
-    a: "Every product has an instant In Stock / Out of Stock toggle right on your product list — no need to open the edit form. Toggle it off and the product simply stops appearing as orderable to customers.",
+    a: "Each product has an In Stock / Out of Stock (or Not available) toggle. TrendMart does not track unit counts — merchants sell both in-store and online, so quantity would be wrong. Toggle off to pause selling without deleting the item.",
   },
   {
     q: "How do I control which customers can order from me?",
@@ -68,7 +68,11 @@ const MERCHANT_FAQS: FaqItem[] = [
   },
   {
     q: "How will I receive orders?",
-    a: "Orders appear instantly in your Dashboard and are also compiled into a WhatsApp message sent to your registered business number, so you never have to keep the app open to catch a sale.",
+    a: "Saved orders appear in your Dashboard. The customer still has to tap Open WhatsApp to send you the compiled message — WhatsApp does not send itself. Keep an eye on Dashboard and WhatsApp.",
+  },
+  {
+    q: "How do I mark my shop Closed for today?",
+    a: "Use the Open / Closed switch on Dashboard or Store settings. That switch is what customers see. Business hours text is only a label (for example Mon–Sat 9 AM–10 PM) and does not open or close the shop by itself.",
   },
 ];
 
@@ -114,7 +118,7 @@ function FaqGroup({ title, items }: { title: string; items: FaqItem[] }) {
 
 export default function FaqPage() {
   return (
-    <LegalPageLayout title="FAQ & Merchant Guide" icon="❓" lastUpdated="August 8, 2026">
+    <LegalPageLayout title="FAQ & Merchant Guide" icon="❓" lastUpdated="August 13, 2026">
       <div className="space-y-8">
         <FaqGroup title="For Customers" items={CUSTOMER_FAQS} />
         <FaqGroup title="For Merchants — New Business Owner Guide" items={MERCHANT_FAQS} />

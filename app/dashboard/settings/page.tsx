@@ -186,13 +186,6 @@ const SECTION_LINKS: Array<{ id: SectionId; label: string }> = [
   { id: "more", label: "More" },
 ];
 
-const OPERATING_STATUS_OPTIONS = [
-  "Open",
-  "Closed",
-  "Open Today",
-  "Temporarily Closed",
-] as const;
-
 const INITIAL_FORM: ShopFormData = {
   name: "",
   category: "Others / Universal",
@@ -206,7 +199,7 @@ const INITIAL_FORM: ShopFormData = {
   tiktok_handle: "",
   secondary_phone: "",
   business_hours: "",
-  operating_status: "",
+  operating_status: "Open",
   accent_color: THEME_ACCENT,
   store_bio: "",
   announcement: "",
@@ -241,7 +234,7 @@ function shopToForm(source: Shop): ShopFormData {
     tiktok_handle: source.tiktok_handle ?? "",
     secondary_phone: source.secondary_phone ?? "",
     business_hours: source.business_hours ?? "",
-    operating_status: source.operating_status ?? "",
+    operating_status: source.operating_status?.trim() || "Open",
     accent_color: THEME_ACCENT,
     store_bio: source.store_bio ?? "",
     announcement: source.announcement ?? "",
@@ -294,10 +287,6 @@ function validateSettings(form: ShopFormData): ValidationErrors {
   }
 
   return errors;
-}
-
-function isStandardOperatingStatus(value: string): boolean {
-  return OPERATING_STATUS_OPTIONS.some((option) => option === value);
 }
 
 function sectionScroll(id: SectionId) {
@@ -551,12 +540,6 @@ export default function DashboardSettingsPage() {
     [form.business_hours, form.operating_status],
   );
 
-  const operatingStatusSelectValue = isStandardOperatingStatus(form.operating_status)
-    ? form.operating_status
-    : form.operating_status.trim()
-      ? "custom"
-      : "";
-
   const shareUrl = useMemo(() => {
     if (!shop) return "";
     const shopPath = getShopPath({ id: shop.id, name: shop.name, slug: shop.slug });
@@ -687,8 +670,8 @@ export default function DashboardSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
-      <div className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 shadow-sm backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/95">
+    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-bg)]">
+      <div className="sticky top-[var(--tm-navbar-sticky-offset)] z-40 border-b border-zinc-200 bg-white/95 shadow-sm backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/95">
         <header className="mx-auto flex max-w-4xl items-center gap-3 px-3 py-2.5 sm:px-4">
           <Link
             href="/dashboard"
@@ -881,45 +864,27 @@ export default function DashboardSettingsPage() {
             </div>
 
             <div>
-              <FieldLabel>Operating status</FieldLabel>
-              <select
-                value={operatingStatusSelectValue}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setForm((current) => ({
-                    ...current,
-                    operating_status:
-                      value === "custom"
-                        ? isStandardOperatingStatus(current.operating_status)
-                          ? ""
-                          : current.operating_status
-                        : value,
-                  }));
-                }}
-                className={inputClasses()}
-              >
-                <option value="">Select status</option>
-                {OPERATING_STATUS_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-                <option value="custom">Custom text</option>
-              </select>
+              <FieldLabel>Open / Closed</FieldLabel>
+              <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-elevated)]">
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                  {form.operating_status.toLowerCase().includes("closed") ? "Closed" : "Open"}
+                </p>
+                <ToggleSwitch
+                  checked={!form.operating_status.toLowerCase().includes("closed")}
+                  onChange={(open) =>
+                    setForm((current) => ({
+                      ...current,
+                      operating_status: open ? "Open" : "Closed",
+                    }))
+                  }
+                  label="Shop open or closed"
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                This switch is what customers see. Hours text is display-only.
+              </p>
             </div>
           </div>
-
-          {operatingStatusSelectValue === "custom" ? (
-            <div>
-              <FieldLabel>Custom operating status</FieldLabel>
-              <TextInput
-                type="text"
-                value={form.operating_status}
-                onChange={(e) => setForm((current) => ({ ...current, operating_status: e.target.value }))}
-                placeholder="Open Today: 11 AM - 8 PM"
-              />
-            </div>
-          ) : null}
         </SectionShell>
 
         <SectionShell
@@ -1179,7 +1144,7 @@ export default function DashboardSettingsPage() {
           </Link>
         </SectionShell>
 
-        <div className="pb-8">
+        <div className="mb-24 pb-8 md:mb-0">
           <button
             type="button"
             onClick={handleSave}

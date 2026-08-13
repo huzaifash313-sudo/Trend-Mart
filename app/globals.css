@@ -136,7 +136,7 @@ html.dark textarea {
 }
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: rgb(113 113 122 / 0.45); /* zinc-500 @ 45% — label already names the field */
+  color: rgb(161 161 170 / 0.72);
   opacity: 1;
 }
 
@@ -195,6 +195,12 @@ body {
   min-height: calc(
     100dvh - var(--tm-navbar-sticky-offset, 4.35rem) - 4.5rem
   );
+  padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .tm-main {
+    padding-bottom: 1.5rem;
+  }
 }
 .tm-page-loading {
   min-height: calc(
@@ -476,9 +482,15 @@ label {
   padding-bottom: var(--safe-area-inset-bottom);
 }
 
+/* Dark mode: emerald-800/900 is unreadable on dark surfaces */
+html.dark .text-emerald-800,
+html.dark .text-emerald-900 {
+  color: rgb(167 243 208); /* emerald-200 */
+}
+
 /* Clears mobile bottom nav + cart bar on phone; normal padding on md+ */
 .pb-safe-nav {
-  padding-bottom: calc(5.5rem + var(--safe-area-inset-bottom));
+  padding-bottom: calc(8rem + var(--safe-area-inset-bottom));
 }
 @media (min-width: 768px) {
   .pb-safe-nav {

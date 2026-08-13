@@ -8,8 +8,8 @@
 /*  What this route does, in order:                                             */
 /*    1. Requires a signed-in user with a confirmed email.                     */
 /*    2. Reads the shop and re-validates live/approved/hours/radius/min-order. */
-/*    3. Re-reads every line's authoritative price from `products` or          */
-/*       `service_packages` (client prices are ignored).                       */
+/*    3. Re-reads every line's authoritative price from `products`,            */
+/*       `shop_deals` (standalone deals), or `service_packages`.               */
 /*    4. Re-validates variant stock and atomically-ish deducts it via the      */
 /*       service-role client (which bypasses RLS).                             */
 /*    5. Re-validates the coupon and delivery fee server-side.                 */
@@ -21,7 +21,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizePkPhoneDigits, isValidUUID } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
-import type { Order, OrderItem, VariantGroup, ProductVariant } from "@/types";
+import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
+import type { Order, OrderItem, VariantGroup } from "@/types";
 
 export const runtime = "nodejs";
 
@@ -68,10 +69,14 @@ interface ShopRow {
 
 /** Row shape read from `public.coupons`. */
 interface CouponRow {
+  code: string | null;
   discount_percent: number | null;
   discount_amount: number | null;
   expiry_date: string | null;
   is_active: boolean | null;
+  min_order_amount?: number | null;
+  usage_limit?: number | null;
+  usage_count?: number | null;
 }
 
 /* ─── Small pure helpers ────────────────────────────────────────────────────── */
@@ -98,10 +103,6 @@ function haversineKm(
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1000) / 1000;
 }
 
-function isTrackedStock(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0;
-}
-
 function toNumber(v: unknown, fallback = 0): number {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -118,98 +119,24 @@ function sanitizeText(v: unknown, max: number): string {
   return v.replace(/<[^>]*>/g, "").replace(/[\x00-\x1f\x7f]/g, "").trim().slice(0, max);
 }
 
-/* ─── Variant stock resolution ──────────────────────────────────────────────── */
-
-interface StockResolution {
-  ok: boolean;
-  variants: VariantGroup[];
-  changed: boolean;
-  insufficient: string | null;
-}
-
-function parseVariantSelections(label: string): Array<{ group?: string; label: string }> {
-  return label
-    .split(/\s*·\s*/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const idx = part.indexOf(":");
-      if (idx > 0) {
-        return { group: part.slice(0, idx).trim(), label: part.slice(idx + 1).trim() };
-      }
-      return { label: part };
-    });
-}
-
-function findOption(
-  variants: VariantGroup[],
-  groupName: string | undefined,
-  label: string,
-): ProductVariant | null {
-  for (const group of variants) {
-    if (groupName && group.name !== groupName) continue;
-    for (const opt of group.options) {
-      if (opt.label === label) return opt;
-      if (`${group.name}: ${opt.label}` === label) return opt;
-    }
-  }
-  return null;
-}
-
-function deductStock(
+function variantIsUnavailable(
   variants: VariantGroup[],
   variantLabel: string | undefined,
-  variantGroup: string | undefined,
-  quantity: number,
-): StockResolution {
-  const working = JSON.parse(JSON.stringify(variants)) as VariantGroup[];
-  if (!working.length) {
-    return { ok: true, variants: working, changed: false, insufficient: null };
-  }
-
-  const hasAnyTracked = working.some((g) => g.options.some((o) => isTrackedStock(o.stock)));
-
-  if (variantLabel) {
-    const selections = parseVariantSelections(variantLabel);
-    const matched: ProductVariant[] = [];
-    for (const sel of selections) {
-      const opt = findOption(working, sel.group ?? variantGroup, sel.label);
-      if (opt) matched.push(opt);
-    }
-    if (matched.length === 0) {
-      // Display-only label that doesn't map — no tracked stock to deduct.
-      return { ok: true, variants: working, changed: false, insufficient: null };
-    }
-    const tracked = matched.filter((o) => isTrackedStock(o.stock));
-    if (tracked.length === 0) {
-      return { ok: true, variants: working, changed: false, insufficient: null };
-    }
-    const available = Math.min(...tracked.map((o) => o.stock as number));
-    if (available < quantity) {
-      return { ok: false, variants, changed: false, insufficient: variantLabel };
-    }
-    for (const opt of tracked) {
-      opt.stock = (opt.stock as number) - quantity;
-    }
-    return { ok: true, variants: working, changed: true, insufficient: null };
-  }
-
-  if (!hasAnyTracked) {
-    return { ok: true, variants: working, changed: false, insufficient: null };
-  }
-
-  // No variant on the line — deduct from the first available option with stock.
-  for (const group of working) {
-    for (const opt of group.options) {
-      if (opt.is_available === false) continue;
-      if (!isTrackedStock(opt.stock)) continue;
-      if ((opt.stock as number) >= quantity) {
-        opt.stock = (opt.stock as number) - quantity;
-        return { ok: true, variants: working, changed: true, insufficient: null };
+): boolean {
+  if (!variantLabel || !variants.length) return false;
+  const parts = variantLabel.split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    const idx = part.indexOf(":");
+    const label = idx > 0 ? part.slice(idx + 1).trim() : part;
+    for (const group of variants) {
+      for (const opt of group.options) {
+        if (opt.label === label || `${group.name}: ${opt.label}` === part) {
+          if (opt.is_available === false) return true;
+        }
       }
     }
   }
-  return { ok: false, variants, changed: false, insufficient: "default" };
+  return false;
 }
 
 /* ─── POST handler ──────────────────────────────────────────────────────────── */
@@ -335,14 +262,20 @@ export async function POST(request: Request) {
     });
   }
 
-  // 5. Resolve authoritative prices from products and/or service_packages.
+  // 5. Resolve authoritative prices from products, standalone shop deals, and/or service_packages.
   const ids = [...new Set(items.map((i) => i.productId))];
-  const [productRes, packageRes] = await Promise.all([
+  const [productRes, packageRes, dealRes] = await Promise.all([
     admin
       .from("products")
       .select("id, shop_id, name, price, is_available, variants, updated_at")
       .in("id", ids),
     admin.from("service_packages").select("id, shop_id, name, price").in("id", ids),
+    admin
+      .from("shop_deals")
+      .select(
+        "id, shop_id, title, price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month",
+      )
+      .in("id", ids),
   ]);
 
   const productMap = new Map<
@@ -370,6 +303,41 @@ export async function POST(request: Request) {
     });
   }
 
+  const dealMap = new Map<
+    string,
+    {
+      id: string;
+      shop_id: string;
+      title: string;
+      price: number;
+      deal: ShopDeal;
+    }
+  >();
+  for (const row of (dealRes.data ?? []) as Record<string, unknown>[]) {
+    const scheduleType = String(row.schedule_type ?? "weekly");
+    const deal: ShopDeal = {
+      id: String(row.id),
+      shop_id: String(row.shop_id ?? ""),
+      title: String(row.title ?? "Deal"),
+      description: null,
+      schedule_type:
+        scheduleType === "date_range" || scheduleType === "monthly" ? scheduleType : "weekly",
+      weekdays: Array.isArray(row.weekdays) ? (row.weekdays as number[]) : null,
+      starts_on: row.starts_on ? String(row.starts_on) : null,
+      ends_on: row.ends_on ? String(row.ends_on) : null,
+      day_of_month: row.day_of_month != null ? Number(row.day_of_month) : null,
+      is_active: row.is_active !== false,
+      created_at: "",
+    };
+    dealMap.set(deal.id, {
+      id: deal.id,
+      shop_id: deal.shop_id,
+      title: deal.title,
+      price: toNumber(row.price),
+      deal,
+    });
+  }
+
   const resolvedItems: Array<{
     productId: string;
     name: string;
@@ -394,7 +362,13 @@ export async function POST(request: Request) {
       }
       if (!product.is_available) {
         return NextResponse.json(
-          { success: false, error: `"${product.name}" is currently unavailable.` },
+          { success: false, error: `"${product.name}" is currently out of stock.` },
+          { status: 409 },
+        );
+      }
+      if (variantIsUnavailable(product.variants, item.variant)) {
+        return NextResponse.json(
+          { success: false, error: `"${product.name}"${item.variant ? ` (${item.variant})` : ""} is not available.` },
           { status: 409 },
         );
       }
@@ -409,6 +383,40 @@ export async function POST(request: Request) {
         isProduct: true,
         variants: product.variants,
         updated_at: product.updated_at,
+      });
+      continue;
+    }
+
+    const deal = dealMap.get(item.productId);
+    if (deal) {
+      if (deal.shop_id !== shopId) {
+        return NextResponse.json(
+          { success: false, error: "Cart contains an item from another shop." },
+          { status: 400 },
+        );
+      }
+      if (!deal.deal.is_active || !isDealOrderableToday(deal.deal)) {
+        return NextResponse.json(
+          { success: false, error: `"${deal.title}" is not available to order today.` },
+          { status: 409 },
+        );
+      }
+      if (!(deal.price > 0)) {
+        return NextResponse.json(
+          { success: false, error: `"${deal.title}" needs a price. Ask the shop to set one.` },
+          { status: 409 },
+        );
+      }
+      resolvedItems.push({
+        productId: item.productId,
+        name: deal.title || item.name,
+        price: deal.price,
+        quantity: item.quantity,
+        variant: item.variant,
+        variantGroup: item.variantGroup,
+        notes: item.notes,
+        isProduct: false,
+        variants: [],
       });
       continue;
     }
@@ -480,11 +488,12 @@ export async function POST(request: Request) {
 
   // 8. Coupon validation (server-side).
   let discount = 0;
+  let appliedCoupon: string | null = null;
   const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim().toUpperCase().slice(0, 20) : "";
   if (couponCode) {
     const { data: couponRaw } = await admin
       .from("coupons")
-      .select("code, discount_percent, discount_amount, expiry_date, is_active")
+      .select("code, discount_percent, discount_amount, expiry_date, is_active, min_order_amount, usage_limit, usage_count")
       .eq("shop_id", shopId)
       .eq("code", couponCode)
       .eq("is_active", true)
@@ -493,13 +502,32 @@ export async function POST(request: Request) {
     if (coupon) {
       const expired =
         coupon.expiry_date && new Date(coupon.expiry_date).getTime() <= Date.now();
-      if (!expired) {
+      const minCouponOrder = toNumber(coupon.min_order_amount, 0);
+      const usageLimit = toNumber(coupon.usage_limit, 0);
+      const usageCount = toNumber(coupon.usage_count, 0);
+      if (expired) {
+        discount = 0;
+      } else if (minCouponOrder > 0 && subtotal < minCouponOrder) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `This coupon needs a minimum order of Rs. ${minCouponOrder.toLocaleString()}.`,
+          },
+          { status: 409 },
+        );
+      } else if (usageLimit > 0 && usageCount >= usageLimit) {
+        return NextResponse.json(
+          { success: false, error: "This coupon has reached its usage limit." },
+          { status: 409 },
+        );
+      } else {
         if (toNumber(coupon.discount_percent, 0) > 0) {
           discount = Math.round(subtotal * (toNumber(coupon.discount_percent) / 100));
         } else if (toNumber(coupon.discount_amount, 0) > 0) {
           discount = toNumber(coupon.discount_amount);
         }
         discount = Math.min(discount, subtotal);
+        appliedCoupon = couponCode;
       }
     }
   }
@@ -530,75 +558,8 @@ export async function POST(request: Request) {
 
   const total = Math.max(0, Math.round((subtotal - discount + deliveryFee) * 100) / 100);
 
-  // 11. Stock deduction for product lines (service role → bypasses RLS).
-  const stockDeductions: Array<{
-    productId: string;
-    productName: string;
-    variantLabel: string;
-    requested: number;
-    available: number;
-    inStock: boolean;
-  }> = [];
-  const applied: Array<{ id: string; variants: VariantGroup[]; previous: VariantGroup[] }> = [];
-
-  try {
-    for (const item of resolvedItems) {
-      if (!item.isProduct) continue;
-      const resolution = deductStock(
-        item.variants,
-        item.variant,
-        item.variantGroup,
-        item.quantity,
-      );
-      if (!resolution.ok) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Insufficient stock for "${item.name}"${item.variant ? ` (${item.variant})` : ""}.`,
-          },
-          { status: 409 },
-        );
-      }
-      if (resolution.changed) {
-        const { data: updatedRows, error: updateErr } = await admin
-          .from("products")
-          .update({ variants: resolution.variants } as never)
-          .eq("id", item.productId)
-          .select("id");
-        if (updateErr || !updatedRows || updatedRows.length === 0) {
-          throw new Error("STOCK_WRITE_FAILED");
-        }
-        applied.push({
-          id: item.productId,
-          variants: resolution.variants,
-          previous: item.variants,
-        });
-        for (const group of resolution.variants) {
-          for (const opt of group.options) {
-            if (isTrackedStock(opt.stock) && (opt.stock as number) <= (opt.low_stock_threshold ?? 5)) {
-              stockDeductions.push({
-                productId: item.productId,
-                productName: item.name,
-                variantLabel: opt.label,
-                requested: item.quantity,
-                available: opt.stock as number,
-                inStock: true,
-              });
-            }
-          }
-        }
-      }
-    }
-  } catch (err) {
-    // Best-effort rollback of any stock already deducted.
-    for (const a of applied) {
-      await admin.from("products").update({ variants: a.previous } as never).eq("id", a.id);
-    }
-    const msg = err instanceof Error && err.message === "STOCK_WRITE_FAILED"
-      ? "Stock changed during checkout. Please try again."
-      : "Could not complete checkout. Please try again.";
-    return NextResponse.json({ success: false, error: msg }, { status: 409 });
-  }
+  // 11. Availability is already checked (In Stock / Out of Stock / Not available).
+  // Exact unit counts are not deducted — merchants sell both in-store and online.
 
   // 12. Insert the order.
   const orderItems: OrderItem[] = resolvedItems.map((i) => ({
@@ -620,9 +581,7 @@ export async function POST(request: Request) {
     customer_user_id: user.id,
   };
   if (notes) orderPayload.notes = notes;
-  // Note: the discount/delivery are already reflected in `total` above. The
-  // orders table has no dedicated coupon/delivery columns, so nothing else to
-  // persist here.
+  if (appliedCoupon) orderPayload.coupon_code = appliedCoupon;
 
   const { data: inserted, error: insertErr } = await admin
     .from("orders")
@@ -631,14 +590,25 @@ export async function POST(request: Request) {
     .single();
 
   if (insertErr || !inserted) {
-    // Rollback stock — the order did not persist.
-    for (const a of applied) {
-      await admin.from("products").update({ variants: a.previous } as never).eq("id", a.id);
-    }
     return NextResponse.json(
       { success: false, error: "Could not place your order. Please try again." },
       { status: 500 },
     );
+  }
+
+  if (appliedCoupon) {
+    const { data: usedRaw } = await admin
+      .from("coupons")
+      .select("usage_count")
+      .eq("shop_id", shopId)
+      .eq("code", appliedCoupon)
+      .maybeSingle();
+    const used = toNumber((usedRaw as { usage_count?: number } | null)?.usage_count, 0);
+    await admin
+      .from("coupons")
+      .update({ usage_count: used + 1 } as never)
+      .eq("shop_id", shopId)
+      .eq("code", appliedCoupon);
   }
 
   const order: Order = {
@@ -653,7 +623,5 @@ export async function POST(request: Request) {
     updated_at: (inserted as Record<string, unknown>).updated_at as string | undefined,
   };
 
-  const lowStockAlerts = stockDeductions.filter((d) => d.available <= 5);
-
-  return NextResponse.json({ success: true, order, stockDeductions, lowStockAlerts });
+  return NextResponse.json({ success: true, order });
 }

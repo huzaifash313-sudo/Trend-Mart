@@ -2,17 +2,41 @@
 
 import { useEffect } from "react";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+declare global {
+  interface Window {
+    __tmDeferredInstall?: BeforeInstallPromptEvent | null;
+  }
+}
+
 /**
  * Registers the TrendMart service worker (public/sw.js) on mount, enabling
- * "Add to Home Screen" installability and offline resilience. Renders
- * nothing — purely a side-effect component included once in the root layout.
+ * "Add to Home Screen" installability and offline resilience. Also captures
+ * Android Chrome's beforeinstallprompt so the Install button can fire it.
  */
 export default function PwaRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
-    // Service workers require a secure context (HTTPS or localhost).
     if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") return;
+
+    const onBeforeInstall = (event: Event) => {
+      event.preventDefault();
+      const promptEvent = event as BeforeInstallPromptEvent;
+      window.__tmDeferredInstall = promptEvent;
+      window.dispatchEvent(new Event("tm-pwa-install-available"));
+    };
+    const onInstalled = () => {
+      window.__tmDeferredInstall = null;
+      window.dispatchEvent(new Event("tm-pwa-installed"));
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
 
     const register = () => {
       navigator.serviceWorker.register("/sw.js").catch(() => {
@@ -24,8 +48,13 @@ export default function PwaRegister() {
       register();
     } else {
       window.addEventListener("load", register, { once: true });
-      return () => window.removeEventListener("load", register);
     }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+      window.removeEventListener("load", register);
+    };
   }, []);
 
   return null;

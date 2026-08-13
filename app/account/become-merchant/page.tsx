@@ -32,7 +32,7 @@ function emptyShopForm(): ShopFormData {
     tiktok_handle: "",
     secondary_phone: "",
     business_hours: "",
-    operating_status: "",
+    operating_status: "Open",
     accent_color: "",
     store_bio: "",
     announcement: "",

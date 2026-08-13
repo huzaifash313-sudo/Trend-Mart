@@ -7,13 +7,15 @@
 /*  INSERT … RETURNING that broke the Contact Support form.                   */
 /* -------------------------------------------------------------------------- */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { sendEmail, emailShell } from "@/lib/email";
 import { sanitizeLight, truncate } from "@/lib/sanitization";
 import { formatPkPhoneDisplay } from "@/lib/phoneFormat";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 
 export const runtime = "nodejs";
 
@@ -36,7 +38,6 @@ interface NotifyPayload {
   category: string;
   /** When true (default), persist to support_tickets before emailing. */
   persist?: boolean;
-  userId?: string | null;
 }
 
 type SupportTicketInsert = {
@@ -96,7 +97,13 @@ async function persistTicket(row: SupportTicketInsert) {
   if (error) throw error;
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const limited = checkRateLimit(request, { ...RATE_LIMITS.SUPPORT, name: "support-notify" });
+  if (!limited.allowed) {
+    const res = buildRateLimitResponse(limited);
+    return NextResponse.json(res.body, { status: res.status, headers: res.headers });
+  }
+
   try {
     let body: Partial<NotifyPayload>;
     try {
@@ -116,7 +123,6 @@ export async function POST(request: Request) {
     const message = truncate(sanitizeLight(body.message ?? ""), 4000);
     const categoryRaw = truncate(sanitizeLight(body.category ?? "general"), 40);
     const category = CATEGORIES.has(categoryRaw) ? categoryRaw : "general";
-    const shouldPersist = body.persist !== false;
 
     if (!name || !EMAIL_PATTERN.test(email) || !subject || !message) {
       return NextResponse.json(buildSafeErrorResponse(400, "Invalid ticket payload."), {
@@ -130,24 +136,27 @@ export async function POST(request: Request) {
       );
     }
 
-    if (shouldPersist) {
-      try {
-        await persistTicket({
-          user_id: body.userId ?? null,
-          name,
-          email,
-          phone,
-          category,
-          subject,
-          message,
-          status: "open",
-        });
-      } catch (dbErr) {
-        console.error("[support/notify] persist failed:", dbErr);
-        return NextResponse.json(buildSafeErrorResponse(500, publicDbMessage(dbErr)), {
-          status: 500,
-        });
-      }
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    try {
+      await persistTicket({
+        user_id: user?.id ?? null,
+        name,
+        email,
+        phone,
+        category,
+        subject,
+        message,
+        status: "open",
+      });
+    } catch (dbErr) {
+      console.error("[support/notify] persist failed:", dbErr);
+      return NextResponse.json(buildSafeErrorResponse(500, publicDbMessage(dbErr)), {
+        status: 500,
+      });
     }
 
     const confirmationResult = await sendEmail({
@@ -190,7 +199,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      persisted: shouldPersist,
+      persisted: true,
       confirmationSent: confirmationResult.success,
       alertSent,
     });

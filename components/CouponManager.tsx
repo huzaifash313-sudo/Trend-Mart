@@ -227,6 +227,8 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
     try {
       const discountPercent = form.discountType === "percentage" ? parseFloat(form.discountValue) : undefined;
       const discountAmount = form.discountType === "fixed" ? parseFloat(form.discountValue) : undefined;
+      const minOrder = parseFloat(form.minOrderAmount);
+      const usageLimit = parseInt(form.usageLimit, 10);
 
       const result = await createCoupon(
         shopId,
@@ -234,6 +236,10 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
         discountPercent,
         discountAmount,
         form.expiryDate || undefined,
+        {
+          minOrderAmount: Number.isNaN(minOrder) ? 0 : minOrder,
+          usageLimit: Number.isNaN(usageLimit) ? 0 : usageLimit,
+        },
       );
 
       if (result.success) {

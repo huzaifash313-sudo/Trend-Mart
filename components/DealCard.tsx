@@ -9,7 +9,7 @@ import {
 } from "@/lib/dealSchedule";
 import { getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
-import { getShopPath } from "@/lib/shopSlug";
+import { getShopPath, isUuid } from "@/lib/shopSlug";
 import { OfferTickerMarquee } from "@/components/ProductGrid";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { useCart } from "@/context/CartContext";
@@ -46,7 +46,7 @@ export function dealToProduct(deal: ShopDeal): Product {
   const cover = getDealImages(deal)[0] ?? deal.image_url ?? null;
   const price = deal.price != null && Number.isFinite(deal.price) ? Number(deal.price) : 0;
   return {
-    id: deal.product_id || `deal-${deal.id}`,
+    id: deal.product_id && isUuid(deal.product_id) ? deal.product_id : deal.id,
     shop_id: deal.shop_id,
     name: deal.title,
     title: deal.title,
@@ -199,6 +199,7 @@ export default function DealCard({
       quantity: 1,
       originalPrice: deal.original_price ?? undefined,
       currency: "PKR",
+      viewKind: deal.product_id && isUuid(deal.product_id) ? "product" : "deal",
     },
   ];
 

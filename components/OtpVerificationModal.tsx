@@ -262,7 +262,7 @@ export default function OtpVerificationModal({
             </AnimatePresence>
 
             {/* OTP Input boxes */}
-            <div className="mb-6 flex justify-center gap-2 sm:gap-3">
+            <div className="mb-6 flex w-full flex-wrap justify-center gap-1.5 sm:gap-3">
               {Array.from({ length: OTP_LENGTH }).map((_, index) => (
                 <input
                   key={index}
@@ -278,7 +278,7 @@ export default function OtpVerificationModal({
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={index === 0 ? handlePaste : undefined}
                   disabled={isVerifying}
-                  className={`h-14 w-12 rounded-xl border-2 text-center text-xl font-bold transition-all outline-none sm:h-16 sm:w-14 ${
+                  className={`h-11 min-w-0 flex-1 basis-9 max-w-11 rounded-xl border-2 text-center text-lg font-bold transition-all outline-none sm:h-16 sm:max-w-14 sm:basis-14 sm:text-xl ${
                     isVerifying
                       ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400"
                       : digits[index]

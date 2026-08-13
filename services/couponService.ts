@@ -26,6 +26,12 @@ export interface Coupon {
   expiry_date: string | null;
   is_active: boolean;
   created_at: string;
+  /** Minimum subtotal (PKR) required. Null/0 = no minimum. */
+  min_order_amount?: number | null;
+  /** Max redemptions. Null/0 = unlimited. */
+  usage_limit?: number | null;
+  /** How many times this code has been used. */
+  usage_count?: number | null;
 }
 
 export interface CouponValidation {
@@ -45,24 +51,39 @@ export async function createCoupon(
   discountPercent?: number,
   discountAmount?: number,
   expiryDate?: string,
+  extras?: { minOrderAmount?: number; usageLimit?: number },
 ): Promise<ServiceResult<Coupon>> {
   const supabase = createClient();
+  const minOrder =
+    extras?.minOrderAmount && extras.minOrderAmount > 0 ? extras.minOrderAmount : null;
+  const usageLimit =
+    extras?.usageLimit && extras.usageLimit > 0 ? Math.round(extras.usageLimit) : null;
+
+  const base = {
+    shop_id: shopId,
+    code: code.toUpperCase().trim(),
+    discount_percent: discountPercent ?? null,
+    discount_amount: discountAmount ?? null,
+    expiry_date: expiryDate ?? null,
+    is_active: true,
+    usage_count: 0,
+  };
+
   try {
-    const { data, error } = await supabase
+    const full = { ...base, min_order_amount: minOrder, usage_limit: usageLimit };
+    const first = await supabase.from("coupons").insert(full).select().single();
+    if (!first.error) {
+      return { success: true, data: first.data as Coupon };
+    }
+
+    // Older DBs may lack min_order_amount — retry with usage columns only.
+    const retry = await supabase
       .from("coupons")
-      .insert({
-        shop_id: shopId,
-        code: code.toUpperCase().trim(),
-        discount_percent: discountPercent ?? null,
-        discount_amount: discountAmount ?? null,
-        expiry_date: expiryDate ?? null,
-        is_active: true,
-      })
+      .insert({ ...base, usage_limit: usageLimit })
       .select()
       .single();
-
-    if (error) throw error;
-    return { success: true, data: data as Coupon };
+    if (retry.error) throw retry.error;
+    return { success: true, data: retry.data as Coupon };
   } catch (err) {
     logError(err, { module: "couponService.createCoupon", meta: { shopId, code } });
     return { success: false, error: toError(err) };
@@ -203,6 +224,20 @@ export async function validateCoupon(
     // Check expiry
     if (coupon.expiry_date && new Date(coupon.expiry_date) < new Date()) {
       return { valid: false, message: "This coupon has expired." };
+    }
+
+    const minOrder = Number(coupon.min_order_amount ?? 0);
+    if (minOrder > 0 && subtotal < minOrder) {
+      return {
+        valid: false,
+        message: `This coupon needs a minimum order of Rs. ${minOrder.toLocaleString()}.`,
+      };
+    }
+
+    const limit = Number(coupon.usage_limit ?? 0);
+    const used = Number(coupon.usage_count ?? 0);
+    if (limit > 0 && used >= limit) {
+      return { valid: false, message: "This coupon has reached its usage limit." };
     }
 
     // Calculate discount

@@ -69,7 +69,7 @@ const INITIAL_SHOP_FORM: ShopFormData = {
   tiktok_handle: "",
   secondary_phone: "",
   business_hours: "",
-  operating_status: "",
+  operating_status: "Open",
   accent_color: "",
   store_bio: "",
   announcement: "",
@@ -118,7 +118,7 @@ function shopToFormData(s: Shop): ShopFormData {
     tiktok_handle: s.tiktok_handle ?? "",
     secondary_phone: s.secondary_phone ?? "",
     business_hours: s.business_hours ?? "",
-    operating_status: s.operating_status ?? "",
+    operating_status: s.operating_status?.trim() || "Open",
     accent_color: s.accent_color ?? "",
     store_bio: s.store_bio ?? "",
     announcement: s.announcement ?? "",
@@ -928,10 +928,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
+    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-bg)]">
       {/* ── Email Verification Warning ───────────────────────────────────── */}
       {userEmailVerified === false && (
-        <div className="sticky top-0 z-30 border-b border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/30">
+        <div className="relative z-30 border-b border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/30">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <span className="text-base" role="img" aria-label="Warning">⚠️</span>
@@ -953,7 +953,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h1 className="truncate text-base font-bold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-lg">
@@ -1198,9 +1198,24 @@ export default function DashboardPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                  <span className="inline-flex items-center gap-1">Operating Status <span className="text-zinc-400 font-normal">(optional)</span></span>
+                  Open / Closed
                 </label>
-                <input type="text" value={shopForm.operating_status} onChange={(e) => setShopForm((f) => ({ ...f, operating_status: e.target.value }))} placeholder="Open Today: 9 AM - 10 PM" className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" />
+                <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
+                  <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                    {shopForm.operating_status.toLowerCase().includes("closed") ? "Closed" : "Open"}
+                  </p>
+                  <ToggleSwitch
+                    checked={!shopForm.operating_status.toLowerCase().includes("closed")}
+                    onChange={(open) =>
+                      setShopForm((f) => ({ ...f, operating_status: open ? "Open" : "Closed" }))
+                    }
+                    label="Shop open or closed"
+                    size="sm"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  This switch is what customers see. Hours text is display-only.
+                </p>
               </div>
             </div>
             {/* Coupons / deals + free delivery */}
@@ -1282,7 +1297,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <button type="submit" disabled={shopSaving} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"><SaveIcon />{shopSaving ? "Saving…" : shop ? "Update Shop" : "Create Shop"}</button>
+            <button type="submit" disabled={shopSaving} className="mb-24 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900 md:mb-0"><SaveIcon />{shopSaving ? "Saving…" : shop ? "Update Shop" : "Create Shop"}</button>
           </form>
         </section>
 

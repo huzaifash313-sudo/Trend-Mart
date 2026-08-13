@@ -43,6 +43,8 @@ import {
   toPkWhatsAppDigits,
 } from "@/lib/phoneFormat";
 import Link from "next/link";
+import { getPublicAppUrl } from "@/lib/appUrl";
+import { getShopPath } from "@/lib/shopSlug";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +62,11 @@ export interface WhatsAppCartItem {
   currency?: string;
   /** Original price before discount (for showing savings). */
   originalPrice?: number;
+  /**
+   * Deep-link target on the shop page.
+   * `product` → #product-{id} | `deal` → #deal-{id} (standalone deal, no catalog product).
+   */
+  viewKind?: "product" | "deal";
 }
 
 export interface ShippingDetails {
@@ -164,8 +171,7 @@ function sanitizePayloadUrl(url: string | null | undefined): string {
  * All inputs undergo strict sanitation before being embedded in the payload.
  */
 function buildWhatsAppMessage(
-  shopName: string,
-  shopLocation: string,
+  shop: Pick<Shop, "id" | "name" | "location" | "slug">,
   items: WhatsAppCartItem[],
   quantities: Record<string, number>,
   shipping: ShippingDetails,
@@ -178,8 +184,8 @@ function buildWhatsAppMessage(
   customerCoords?: { latitude: number; longitude: number } | null,
 ): string {
   // ── Sanitize all inputs ──────────────────────────────────────────────
-  const safeShopName = sanitizePayloadString(shopName, 100);
-  const safeLocation = sanitizePayloadString(shopLocation, 100);
+  const safeShopName = sanitizePayloadString(shop.name, 100);
+  const safeLocation = sanitizePayloadString(shop.location, 100);
   const safeOrderRef = sanitizePayloadString(orderRef.slice(0, 8), 20).toUpperCase();
   const safeSubtotal = sanitizePayloadNumber(subtotal);
   const safeDiscount = sanitizePayloadNumber(discount);
@@ -210,6 +216,13 @@ function buildWhatsAppMessage(
       ? `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`
       : null;
 
+  const shopPath = getShopPath({
+    id: shop.id,
+    name: shop.name,
+    slug: shop.slug,
+  });
+  const siteOrigin = getPublicAppUrl().replace(/\/$/, "");
+
   const lines: string[] = [
     `🛒 *New Order via TrendMart*`,
     ``,
@@ -239,10 +252,17 @@ function buildWhatsAppMessage(
 
     lines.push(`• ${safeItemName}${variantLabel}`);
     lines.push(`  ${qty} x ${formatRupees(safePrice)} = ${formatRupees(itemTotal)}${originalPriceStr}`);
-    const safeImageUrl = sanitizePayloadUrl(item.imageUrl);
-    if (safeImageUrl) {
-      lines.push(`  🖼️ Photo: ${safeImageUrl}`);
+
+    const hashKind = item.viewKind === "deal" ? "deal" : "product";
+    const itemId = (item.productId || item.id || "").trim();
+    if (itemId) {
+      const viewUrl = `${siteOrigin}${shopPath}#${hashKind}-${itemId}`;
+      const safeViewUrl = sanitizePayloadUrl(viewUrl);
+      if (safeViewUrl) {
+        lines.push(`  🔗 View on TrendMart: ${safeViewUrl}`);
+      }
     }
+
     if (safeItemNotes) {
       lines.push(`  📝 Note: ${safeItemNotes}`);
     }
@@ -277,6 +297,8 @@ function buildWhatsAppMessage(
   if (mapsPinUrl) {
     lines.push(`   📌 Live pin (open in Maps):`);
     lines.push(`   ${mapsPinUrl}`);
+  } else {
+    lines.push(`   ⚠️ Map pin missing — ask customer to resend location.`);
   }
 
   if (safeNotes) {
@@ -672,6 +694,44 @@ export default function WhatsAppCheckoutModal({
       setErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) return;
 
+      // Live map pin is required so the rider can find the customer.
+      let hasPin =
+        !!location?.coordinates &&
+        Number.isFinite(location.coordinates.latitude) &&
+        Number.isFinite(location.coordinates.longitude);
+      if (!hasPin) {
+        setLocationFillBusy(true);
+        setLocationFillError(null);
+        try {
+          const fresh = await detectLocationDetailed();
+          const c = fresh.location?.coordinates;
+          if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
+            hasPin = true;
+            const line = formatLocationAddress(fresh.location);
+            if (line) {
+              setShipping((s) => ({
+                ...s,
+                shippingAddress: s.shippingAddress.trim() || line,
+              }));
+            }
+          } else {
+            setLocationFillError(
+              locationErrorMessage(fresh.error) ||
+                "Location is required for delivery. Turn on GPS and tap Use my precise location.",
+            );
+            setLocationFillBusy(false);
+            return;
+          }
+        } catch {
+          setLocationFillError(
+            "Location is required for delivery. Turn on GPS and tap Use my precise location.",
+          );
+          setLocationFillBusy(false);
+          return;
+        }
+        setLocationFillBusy(false);
+      }
+
       // Email verification only — no paid SMS / phone OTP.
       const gate = await requireVerifiedEmailSession();
       if (!gate.ok) {
@@ -682,7 +742,7 @@ export default function WhatsAppCheckoutModal({
 
       setStep("confirm");
     },
-    [shipping],
+    [shipping, location, detectLocationDetailed, formatLocationAddress],
   );
 
   // ── Order Submission ────────────────────────────────────────────────────
@@ -748,7 +808,7 @@ export default function WhatsAppCheckoutModal({
         notes: item.notes,
       }));
 
-      // Prefer live GPS from checkout; fall back to header map pin
+      // Prefer live GPS from checkout; fall back to a fresh detect — pin is mandatory.
       let pinLat = location?.coordinates?.latitude ?? null;
       let pinLng = location?.coordinates?.longitude ?? null;
       if (pinLat == null || pinLng == null) {
@@ -760,8 +820,18 @@ export default function WhatsAppCheckoutModal({
             pinLng = c.longitude;
           }
         } catch {
-          /* optional — address text still goes through */
+          /* handled below */
         }
+      }
+      if (
+        pinLat == null ||
+        pinLng == null ||
+        !Number.isFinite(pinLat) ||
+        !Number.isFinite(pinLng)
+      ) {
+        throw new Error(
+          "Your live location is required so the rider can find you. Turn on GPS, tap Use my precise location, then try again.",
+        );
       }
 
       const orderResult = await createOrder({
@@ -798,10 +868,9 @@ export default function WhatsAppCheckoutModal({
         notes: shipping.deliveryNotes,
       });
 
-      // 3. Build WhatsApp message (address + Maps pin when GPS available)
+      // 3. Build WhatsApp message (TrendMart product links + Maps pin)
       const whatsappText = buildWhatsAppMessage(
-        shop.name,
-        shop.location,
+        shop,
         items,
         quantities,
         shipping,
@@ -811,9 +880,7 @@ export default function WhatsAppCheckoutModal({
         grandTotal,
         couponCode,
         ref,
-        pinLat != null && pinLng != null
-          ? { latitude: pinLat, longitude: pinLng }
-          : null,
+        { latitude: pinLat, longitude: pinLng },
       );
 
       setPendingWhatsAppUrl(
@@ -866,15 +933,16 @@ export default function WhatsAppCheckoutModal({
 
   return (
     <div
-      className="fixed inset-0 z-[150] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[150] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={step === "success" ? undefined : onClose}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-zinc-900"
+        className="flex max-h-[min(92dvh,100%)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-zinc-900"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
           <div>
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -896,7 +964,7 @@ export default function WhatsAppCheckoutModal({
               {step === "review" && `Sending order to ${shop.name}`}
               {step === "shipping" && "Enter your delivery information"}
               {step === "confirm" && "Review everything before sending"}
-              {step === "success" && "Tap Open WhatsApp to message the shop"}
+              {step === "success" && "Tap Open WhatsApp to message the shop — this is how they receive your order."}
             </p>
           </div>
           <button
@@ -939,6 +1007,7 @@ export default function WhatsAppCheckoutModal({
         )}
 
         {/* ── Step: Auth / email gate ───────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {step === "auth" && (
           <div className="px-6 py-8 text-center">
             <div className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${accentLight} ${accentText}`}>
@@ -1330,9 +1399,14 @@ export default function WhatsAppCheckoutModal({
                 {locationFillError && (
                   <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{locationFillError}</p>
                 )}
-                {!locationFillError && (
-                  <p className="mt-1 text-[0.65rem] text-zinc-400">
-                    Address autofills from account / map. GPS on hone par WhatsApp message mein Maps pin bhi chala jata hai shop ke liye.
+                {!location?.coordinates && !locationFillError && (
+                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                    Live location is required for delivery. Tap <strong>Use my precise location</strong> so the rider gets a Maps pin.
+                  </p>
+                )}
+                {location?.coordinates && (
+                  <p className="mt-1 text-[0.65rem] text-emerald-600 dark:text-emerald-400">
+                    Location pin ready — it will be sent to the shop on WhatsApp.
                   </p>
                 )}
               </div>
@@ -1354,7 +1428,7 @@ export default function WhatsAppCheckoutModal({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
+            <div className="sticky bottom-0 flex gap-2 border-t border-zinc-100 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
               <button
                 type="button"
                 onClick={handleGoBackToReview}
@@ -1421,6 +1495,15 @@ export default function WhatsAppCheckoutModal({
                   {shipping.customerPhone}
                 </p>
                 {shipping.shippingAddress && <p className="text-sm text-zinc-600 dark:text-zinc-400">📍 {shipping.shippingAddress}</p>}
+                {location?.coordinates ? (
+                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    📌 Live Maps pin will be sent for the rider
+                  </p>
+                ) : (
+                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                    ⚠️ Live location missing — go back and tap Use my precise location
+                  </p>
+                )}
                 {shipping.deliveryNotes && (
                   <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                     📝 {shipping.deliveryNotes}
@@ -1448,7 +1531,7 @@ export default function WhatsAppCheckoutModal({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
+            <div className="sticky bottom-0 flex gap-2 border-t border-zinc-100 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
               <button
                 type="button"
                 onClick={() => setStep("shipping")}
@@ -1480,12 +1563,12 @@ export default function WhatsAppCheckoutModal({
               <ShieldCheckIcon />
             </div>
             <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Order Placed Successfully!</h4>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Tap WhatsApp to send this order to the merchant. This screen stays open until you choose.
-            </p>
-            <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
-              Your order has been logged for {shop.name}{"'s"} records.
-            </p>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                Your order is saved. The shop only sees it when you tap Open WhatsApp and send the message.
+              </p>
+              <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
+                Tracking stays on Pending until the shop updates it in their dashboard.
+              </p>
             {orderRef && (
               <p className="mt-3 inline-block rounded-full bg-zinc-100 px-3 py-1 text-xs font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                 Ref: {orderRef.slice(0, 8).toUpperCase()}
@@ -1504,22 +1587,23 @@ export default function WhatsAppCheckoutModal({
               {orderRef ? (
                 <Link
                   href={`/orders/tracking?orderId=${orderRef}`}
-                  onClick={finishOrder}
+                  onClick={onClose}
                   className="rounded-full border border-zinc-200 px-6 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 >
-                  Track Live →
+                  Track order →
                 </Link>
               ) : null}
               <button
                 type="button"
-                onClick={finishOrder}
+                onClick={onClose}
                 className="rounded-full px-6 py-3 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
               >
-                Close
+                Close without WhatsApp
               </button>
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

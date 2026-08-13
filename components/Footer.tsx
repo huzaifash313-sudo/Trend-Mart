@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Global Footer                                                 */
@@ -43,8 +46,11 @@ const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] 
 ];
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname === "/offline") return null;
+
   return (
-    <footer className="border-t border-zinc-200 bg-white pb-20 dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-bg)] md:pb-0">
+    <footer className="hidden border-t border-zinc-200 bg-white dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-bg)] md:block">
       <div className="mx-auto max-w-7xl px-6 py-10">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           <div className="col-span-2 sm:col-span-1">

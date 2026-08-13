@@ -12,6 +12,7 @@ import { sendEmail, emailShell } from "@/lib/email";
 import { getUserEmailById } from "@/lib/supabase/admin";
 import { sanitizeLight, truncate, isValidUUID } from "@/lib/sanitization";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
+import { requireAdminUser } from "@/lib/requireAdmin";
 
 interface NotifyPayload {
   ownerId: string;
@@ -21,6 +22,11 @@ interface NotifyPayload {
 
 export async function POST(request: Request) {
   try {
+    const gate = await requireAdminUser();
+    if (!gate.ok) {
+      return NextResponse.json(buildSafeErrorResponse(gate.status, gate.error), { status: gate.status });
+    }
+
     const body = (await request.json()) as Partial<NotifyPayload>;
     const ownerId = body.ownerId ?? "";
     const shopName = truncate(sanitizeLight(body.shopName ?? "Your store"), 120);

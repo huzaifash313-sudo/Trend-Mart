@@ -17,7 +17,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
-import { computeOrderSummary, formatCurrency as formatCurrencyTax } from "@/lib/taxService";
+import { formatCurrency as formatCurrencyTax } from "@/lib/taxService";
 import type {
   Order,
   OrderItem,
@@ -97,30 +97,24 @@ export async function prepareInvoiceFromOrder(
 
     // Map order items to invoice line items
     const items: InvoiceLineItem[] = (order.items_json ?? []).map(
-      (item: OrderItem) => ({
-        description: item.name,
-        quantity: 1,
-        unitPrice: item.price,
-        amount: item.price,
-        variant: item.variant ?? undefined,
-      }),
+      (item: OrderItem) => {
+        const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+        const unitPrice = item.price;
+        return {
+          description: item.name,
+          quantity,
+          unitPrice,
+          amount: unitPrice * quantity,
+          variant: item.variant ?? undefined,
+        };
+      },
     );
 
-    // Calculate subtotal (before tax)
     const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-
-    // Calculate tax using platform tax service (PKR context with 17% GST)
-    const taxSummary = computeOrderSummary(
-      subtotal,
-      0, // no discount
-      { gstPercent: 17 }, // standard PKR GST
-      "PKR",
-    );
-
-    const taxRate = 17;
-    const taxAmount = taxSummary.gst;
+    const taxRate = 0;
+    const taxAmount = 0;
     const discount = 0;
-    const total = taxSummary.grandTotal;
+    const total = subtotal;
 
     const invoiceData: InvoiceData = {
       invoiceNumber: generateInvoiceNumber(),

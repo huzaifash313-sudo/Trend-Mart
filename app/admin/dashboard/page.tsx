@@ -696,7 +696,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* ── Tab Navigation ───────────────────────────────────── */}
-          <div className="flex gap-1 mt-4 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl inline-flex">
+          <div className="mt-4 flex gap-1 overflow-x-auto bg-zinc-100 p-1 dark:bg-zinc-800 rounded-xl [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {TAB_OPTIONS.map((tab) => (
               <button
                 key={tab.key}
@@ -706,7 +706,7 @@ export default function AdminDashboardPage() {
                     activeTab: tab.key as AdminDashboardState["activeTab"],
                   }))
                 }
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab.key
                     ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm"
                     : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"

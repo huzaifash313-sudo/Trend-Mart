@@ -397,6 +397,11 @@ function OrderCard({
       {/* Status Timeline */}
       <div className="px-5 py-4">
         <StatusTimeline timeline={order.statusHistory} />
+        {order.status === "Pending" ? (
+          <p className="mt-3 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            Waiting for the shop to update this order. Status does not change by itself.
+          </p>
+        ) : null}
       </div>
 
       {/* Itemized Receipt */}
@@ -853,9 +858,8 @@ function OrderTrackingInner() {
                       {orders.length} Order{orders.length !== 1 ? "s" : ""} Found
                     </h2>
                     {liveConnected && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                        Live
+                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[0.625rem] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                        Waiting for the shop to update
                       </span>
                     )}
                   </div>
@@ -920,9 +924,9 @@ function OrderTrackingInner() {
               Track Your Order
             </h2>
             <p className="mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-              Enter your phone number or order reference ID to check the current
-              status of your orders. Once found, this page updates live —
-              no need to refresh as your merchant moves your order along.
+              Enter your phone number or order reference ID. Status stays Pending
+              until the shop updates it in their dashboard — this page is not a
+              live GPS tracker.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3 text-xs text-zinc-400 dark:text-zinc-500">
               <span className="flex items-center gap-1">

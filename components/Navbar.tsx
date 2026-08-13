@@ -105,6 +105,8 @@ export default function Navbar() {
 
   const navigateToSearch = useCallback(() => router.push("/products"), [router]);
 
+  if (pathname === "/offline") return null;
+
   return (
     <header className="tm-navbar-wrap">
       <div className="tm-navbar">

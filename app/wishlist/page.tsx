@@ -9,6 +9,8 @@ import {
   removeFavorite,
 } from "@/services/wishlistService";
 import { logError } from "@/services/errorService";
+import { fetchShopById } from "@/services/shopService";
+import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline Icons                                                              */
@@ -111,12 +113,39 @@ function WishlistCard({
   item: FavoriteItem;
   onRemove: (id: string) => void;
 }) {
+  const { addToast } = useToast();
+  const [waBusy, setWaBusy] = useState(false);
   const href =
     item.type === "shop"
       ? `/shop/${item.id}`
       : item.shopId
         ? `/shop/${item.shopId}`
         : `/search?q=${encodeURIComponent(item.name)}`;
+
+  const handleWhatsApp = async () => {
+    if (waBusy) return;
+    if (!item.shopId) {
+      addToast("Open the store to message this shop.", "info");
+      window.location.href = `/search?q=${encodeURIComponent(item.name)}`;
+      return;
+    }
+    setWaBusy(true);
+    try {
+      const res = await fetchShopById(item.shopId);
+      const wa = res.success ? res.data.shop?.whatsapp_number : undefined;
+      if (!wa) {
+        addToast("This shop has no WhatsApp number yet — opening the store.", "info");
+        window.location.href = `/shop/${item.shopId}`;
+        return;
+      }
+      openWhatsAppCheckout(item, wa);
+    } catch {
+      addToast("Could not load shop contact — opening the store.", "info");
+      window.location.href = `/shop/${item.shopId}`;
+    } finally {
+      setWaBusy(false);
+    }
+  };
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
@@ -148,8 +177,9 @@ function WishlistCard({
         {item.type === "product" && (
           <button
             type="button"
-            onClick={() => openWhatsAppCheckout(item)}
-            className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+            onClick={() => void handleWhatsApp()}
+            disabled={waBusy}
+            className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-50 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
             aria-label={`Ask about ${item.name} on WhatsApp`}
             title="Ask about this item on WhatsApp"
           >

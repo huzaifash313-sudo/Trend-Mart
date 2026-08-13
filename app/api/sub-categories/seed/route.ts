@@ -12,6 +12,7 @@ import {
   isSeedSubCategoryId,
 } from "@/lib/defaultSubCategories";
 import { isValidUUID } from "@/lib/sanitization";
+import { requireAdminUser } from "@/lib/requireAdmin";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,11 @@ async function seedCategory(category: string) {
 
 export async function POST(request: Request) {
   try {
+    const gate = await requireAdminUser();
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const url = new URL(request.url);
     let category = sanitizeLight(url.searchParams.get("category") ?? "");
     let resolveId: string | null = null;

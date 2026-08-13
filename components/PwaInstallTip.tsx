@@ -2,13 +2,26 @@
 
 import { useEffect, useState } from "react";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+declare global {
+  interface Window {
+    __tmDeferredInstall?: BeforeInstallPromptEvent | null;
+  }
+}
+
 /**
- * Lightweight “Add to Home Screen” tip for mobile Safari / Chrome.
- * Does not rely on beforeinstallprompt (unsupported on iOS) — just clear how-to copy.
+ * “Add to Home Screen” tip. On Android Chrome, uses the captured install prompt.
+ * On iOS (no beforeinstallprompt), shows Share → Add to Home Screen copy.
  */
 export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void }) {
   const [visible, setVisible] = useState(false);
   const [hint, setHint] = useState("Add TrendMart to your home screen for a faster app-like experience.");
+  const [canPrompt, setCanPrompt] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -19,7 +32,6 @@ export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void })
     }
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS Safari
       ("standalone" in window.navigator &&
         (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
     if (standalone) return;
@@ -30,9 +42,23 @@ export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void })
     if (isIOS) {
       setHint("iPhone: Share → Add to Home Screen for the full app feel.");
     } else if (isAndroid) {
-      setHint("Android: Browser menu → Install app / Add to Home screen.");
+      setHint("Tap Install to add TrendMart to your home screen.");
     }
+
+    const syncPrompt = () => {
+      setCanPrompt(Boolean(window.__tmDeferredInstall));
+    };
+    syncPrompt();
+    window.addEventListener("tm-pwa-install-available", syncPrompt);
+    window.addEventListener("tm-pwa-installed", () => {
+      setVisible(false);
+      setCanPrompt(false);
+    });
     setVisible(true);
+
+    return () => {
+      window.removeEventListener("tm-pwa-install-available", syncPrompt);
+    };
   }, []);
 
   if (!visible) return null;
@@ -45,6 +71,21 @@ export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void })
     }
     setVisible(false);
     onDismiss?.();
+  };
+
+  const handleInstall = async () => {
+    const deferred = window.__tmDeferredInstall as BeforeInstallPromptEvent | null | undefined;
+    if (!deferred) return;
+    setInstalling(true);
+    try {
+      await deferred.prompt();
+      await deferred.userChoice;
+      window.__tmDeferredInstall = null;
+      setCanPrompt(false);
+      dismiss();
+    } catch {
+      setInstalling(false);
+    }
   };
 
   return (
@@ -62,13 +103,25 @@ export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void })
           <p className="mt-0.5 text-[11px] leading-snug text-emerald-800/80 dark:text-emerald-300/80">
             {hint}
           </p>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="mt-2 text-[11px] font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-300"
-          >
-            Got it
-          </button>
+          <div className="mt-2 flex items-center gap-3">
+            {canPrompt ? (
+              <button
+                type="button"
+                onClick={() => void handleInstall()}
+                disabled={installing}
+                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-60"
+              >
+                {installing ? "Installing…" : "Install"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={dismiss}
+              className="text-[11px] font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-300"
+            >
+              {canPrompt ? "Not now" : "Got it"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

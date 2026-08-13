@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { formatRupees } from "@/lib/formatters";
 import WhatsAppCheckoutModal from "@/components/WhatsAppCheckoutModal";
@@ -117,6 +118,7 @@ function stubShopFromGroup(group: ShopGroup): Shop {
 /* -------------------------------------------------------------------------- */
 
 export default function CartBar() {
+  const pathname = usePathname();
   const { items, removeItem, updateQuantity, updateItemNotes, totalItems, totalAmount, clearCart } = useCart();
   const [expanded, setExpanded] = useState(false);
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
@@ -162,7 +164,7 @@ export default function CartBar() {
     };
   }, [checkoutShop]);
 
-  if (totalItems === 0) return null;
+  if (pathname === "/offline" || totalItems === 0) return null;
 
   const checkoutItems: WhatsAppCartItem[] = (checkoutShop?.items ?? []).map((i) => ({
     id: i.id,
@@ -185,7 +187,7 @@ export default function CartBar() {
 
   return (
     <>
-      <div className="fixed bottom-16 left-0 right-0 z-50 md:bottom-0">
+      <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 md:bottom-0 md:z-50">
         <div className="mx-auto max-w-lg px-3">
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg transition-all dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
             {expanded && (

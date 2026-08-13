@@ -163,6 +163,7 @@ export default function BottomNav() {
   }, []);
 
   const isMerchant = role === "merchant" || role === "admin" || !!merchantShop;
+  if (pathname === "/offline") return null;
   const accountHref = !session
     ? "/login"
     : role === "admin"
@@ -226,7 +227,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="bottom-nav fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden"
+      className="bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden"
       aria-label="Main navigation"
     >
       <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-end px-1 pb-1">

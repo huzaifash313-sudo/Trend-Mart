@@ -185,7 +185,7 @@ function SignupPageInner() {
   }, [addToast, pendingRole, goAfterAuth]);
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden">
+    <div className="relative flex min-h-screen overflow-y-auto">
       {/* ─── Left Panel: Branding & Animations ────────────────────────── */}
       <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-12 lg:flex">
         <GradientOrbs />
@@ -264,7 +264,7 @@ function SignupPageInner() {
       </div>
 
       {/* ─── Right Panel: Auth Form ───────────────────────────────────── */}
-      <div className="flex w-full items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-[color:var(--tm-surface)] lg:w-1/2">
+      <div className="flex w-full items-start justify-center bg-zinc-50 px-4 py-8 pb-28 dark:bg-[color:var(--tm-surface)] lg:w-1/2 lg:items-center lg:py-12">
         <motion.div
           className="w-full max-w-md"
           initial={{ opacity: 0, x: 20 }}

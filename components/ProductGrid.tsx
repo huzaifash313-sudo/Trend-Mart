@@ -170,8 +170,9 @@ function ProductCard({
 
   return (
     <article
+      id={`product-${product.id}`}
       onClick={handleCardClick}
-      className="tm-product-card group flex h-full cursor-pointer flex-col overflow-hidden"
+      className="tm-product-card group flex h-full scroll-mt-24 cursor-pointer flex-col overflow-hidden"
       role="button"
       tabIndex={0}
       aria-label={`View ${product.name}`}
