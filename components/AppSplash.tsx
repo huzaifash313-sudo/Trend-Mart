@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
-export const SPLASH_KEY = "tm_splash_seen_v2";
+export const SPLASH_KEY = "tm_splash_seen_v3";
 const STAGE_MS = {
-  logo: 700,
-  brand: 1100,
-  details: 1600,
-  hold: 900,
-  exit: 500,
+  logo: 650,
+  brand: 950,
+  details: 1700,
+  hold: 700,
+  exit: 450,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -36,13 +36,56 @@ function removeBootSplash() {
   document.getElementById("tm-boot-splash")?.remove();
 }
 
+function PhonePreview({
+  label,
+  variant,
+}: {
+  label: string;
+  variant: "home" | "shop" | "cart";
+}) {
+  return (
+    <div className={`tm-splash-phone tm-splash-phone--${variant}`}>
+      <div className="tm-splash-phone-notch" aria-hidden="true" />
+      <div className="tm-splash-phone-bar" aria-hidden="true" />
+      {variant === "home" ? (
+        <>
+          <div className="tm-splash-phone-pills" aria-hidden="true">
+            <span /><span /><span />
+          </div>
+          <div className="tm-splash-phone-grid" aria-hidden="true">
+            <span /><span /><span /><span />
+          </div>
+        </>
+      ) : null}
+      {variant === "shop" ? (
+        <>
+          <div className="tm-splash-phone-hero" aria-hidden="true" />
+          <div className="tm-splash-phone-rows" aria-hidden="true">
+            <span /><span /><span />
+          </div>
+        </>
+      ) : null}
+      {variant === "cart" ? (
+        <>
+          <div className="tm-splash-phone-rows tm-splash-phone-rows--cart" aria-hidden="true">
+            <span /><span />
+          </div>
+          <div className="tm-splash-phone-cta" aria-hidden="true" />
+        </>
+      ) : null}
+      <p className="tm-splash-phone-label">{label}</p>
+    </div>
+  );
+}
+
 /**
- * Brand landing: centered logo → rises with TrendMart → details → auto home.
- * Paired with #tm-boot-splash in layout so the homepage never flashes first.
+ * Brand landing: boot logo continues upward (no restart / white flash),
+ * then lightweight app previews, then auto home.
  */
 export default function AppSplash() {
   const pathname = usePathname();
   const [phase, setPhase] = useState<Phase>("off");
+  const [seamless, setSeamless] = useState(false);
 
   useEffect(() => {
     if (!shouldShowSplash(pathname)) {
@@ -52,13 +95,25 @@ export default function AppSplash() {
       return;
     }
 
+    const fromBoot = document.documentElement.classList.contains("tm-boot-splash");
+    setSeamless(fromBoot);
     markSplashSeen();
     document.documentElement.classList.add("tm-splash-lock");
     setPhase("logo");
-    // Hand off from static boot cover to animated React splash
-    window.requestAnimationFrame(() => removeBootSplash());
 
-    const timers: number[] = [];
+    // Keep boot cover until React splash has painted the same centered logo.
+    let removeId = 0;
+    if (fromBoot) {
+      removeId = window.setTimeout(() => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => removeBootSplash());
+        });
+      }, 80);
+    } else {
+      removeBootSplash();
+    }
+
+    const timers: number[] = [removeId];
     let t = STAGE_MS.logo;
     timers.push(window.setTimeout(() => setPhase("brand"), t));
     t += STAGE_MS.brand;
@@ -85,7 +140,7 @@ export default function AppSplash() {
 
   return (
     <div
-      className={`tm-splash tm-splash--${phase}`}
+      className={`tm-splash tm-splash--${phase}${seamless ? " tm-splash--seamless" : ""}`}
       data-phase={phase}
       role="dialog"
       aria-label="Welcome to TrendMart"
@@ -93,18 +148,6 @@ export default function AppSplash() {
     >
       <div className="tm-splash-glow" aria-hidden="true" />
       <div className="tm-splash-glow tm-splash-glow--2" aria-hidden="true" />
-
-      <svg className="tm-splash-trend" viewBox="0 0 400 200" aria-hidden="true">
-        <path
-          className="tm-splash-trend-line"
-          d="M20 160 C80 150 100 90 160 100 S240 40 300 55 S360 20 390 30"
-          fill="none"
-          stroke="rgba(255,255,255,0.28)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-        <path d="M372 18 L392 32 L370 40 Z" fill="rgba(255,255,255,0.35)" />
-      </svg>
 
       <div className="tm-splash-stage">
         <div className="tm-splash-brand">
@@ -128,20 +171,11 @@ export default function AppSplash() {
             Local shopping, instant WhatsApp orders — your neighborhood, delivered.
           </p>
 
-          <ul className="tm-splash-details">
-            <li>
-              <span className="tm-splash-dot" aria-hidden="true" />
-              Discover nearby shops &amp; live deals
-            </li>
-            <li>
-              <span className="tm-splash-dot" aria-hidden="true" />
-              Cart stays on your phone until checkout
-            </li>
-            <li>
-              <span className="tm-splash-dot" aria-hidden="true" />
-              Order straight to the merchant on WhatsApp
-            </li>
-          </ul>
+          <div className="tm-splash-previews" aria-hidden="true">
+            <PhonePreview label="Home" variant="home" />
+            <PhonePreview label="Shop" variant="shop" />
+            <PhonePreview label="Order" variant="cart" />
+          </div>
         </div>
       </div>
     </div>

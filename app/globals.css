@@ -2634,7 +2634,7 @@ html.tm-boot-splash .tm-boot-splash {
 .tm-splash {
   position: fixed;
   inset: 0;
-  z-index: 12000;
+  z-index: 13001;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2758,6 +2758,11 @@ html.tm-boot-splash .tm-boot-splash {
   animation: tm-splash-logo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Boot → React handoff: do not pop the logo again */
+.tm-splash--seamless .tm-splash-logo {
+  animation: none;
+}
+
 .tm-splash--brand .tm-splash-logo,
 .tm-splash--details .tm-splash-logo,
 .tm-splash--hold .tm-splash-logo,
@@ -2804,7 +2809,7 @@ html.tm-boot-splash .tm-boot-splash {
 
 .tm-splash-copy {
   width: 100%;
-  margin-top: 1.15rem;
+  margin-top: 1rem;
   text-align: center;
   opacity: 0;
   transform: translateY(18px);
@@ -2819,59 +2824,131 @@ html.tm-boot-splash .tm-boot-splash {
 }
 
 .tm-splash-tagline {
-  margin: 0 auto 1.2rem;
+  margin: 0 auto 1rem;
   max-width: 18rem;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.92);
   text-wrap: balance;
 }
 
-.tm-splash-details {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.65rem;
-  text-align: left;
-}
-
-.tm-splash-details li {
+/* Lightweight CSS phone previews (not heavy screenshots) */
+.tm-splash-previews {
   display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  padding: 0.7rem 0.85rem;
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(8px);
-  font-size: 0.84rem;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.95);
-  opacity: 0;
-  transform: translateY(10px);
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.15rem 0 0.25rem;
 }
 
-.tm-splash--details .tm-splash-details li,
-.tm-splash--hold .tm-splash-details li {
+.tm-splash-phone {
+  width: 5.6rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f766e;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  padding: 0.45rem 0.4rem 0.35rem;
+  opacity: 0;
+  transform: translateY(14px) scale(0.96);
+}
+
+.tm-splash--details .tm-splash-phone,
+.tm-splash--hold .tm-splash-phone {
   animation: tm-splash-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.tm-splash--details .tm-splash-details li:nth-child(1),
-.tm-splash--hold .tm-splash-details li:nth-child(1) { animation-delay: 0.05s; }
-.tm-splash--details .tm-splash-details li:nth-child(2),
-.tm-splash--hold .tm-splash-details li:nth-child(2) { animation-delay: 0.16s; }
-.tm-splash--details .tm-splash-details li:nth-child(3),
-.tm-splash--hold .tm-splash-details li:nth-child(3) { animation-delay: 0.27s; }
+.tm-splash--details .tm-splash-phone:nth-child(1),
+.tm-splash--hold .tm-splash-phone:nth-child(1) { animation-delay: 0.05s; }
+.tm-splash--details .tm-splash-phone:nth-child(2),
+.tm-splash--hold .tm-splash-phone:nth-child(2) {
+  animation-delay: 0.14s;
+  width: 6.15rem;
+  transform: translateY(6px) scale(1);
+}
+.tm-splash--details .tm-splash-phone:nth-child(3),
+.tm-splash--hold .tm-splash-phone:nth-child(3) { animation-delay: 0.23s; }
 
-.tm-splash-dot {
-  margin-top: 0.35rem;
-  width: 0.45rem;
-  height: 0.45rem;
+.tm-splash-phone-notch {
+  width: 1.6rem;
+  height: 0.22rem;
+  margin: 0 auto 0.35rem;
   border-radius: 999px;
+  background: #d4d4d8;
+}
+
+.tm-splash-phone-bar {
+  height: 0.45rem;
+  border-radius: 0.3rem;
+  background: linear-gradient(90deg, #0f766e, #14b8a6);
+  margin-bottom: 0.35rem;
+}
+
+.tm-splash-phone-pills {
+  display: flex;
+  gap: 0.2rem;
+  margin-bottom: 0.3rem;
+}
+.tm-splash-phone-pills span {
+  flex: 1;
+  height: 0.32rem;
+  border-radius: 999px;
+  background: #e4e4e7;
+}
+.tm-splash-phone-pills span:first-child {
   background: #99f6e4;
-  box-shadow: 0 0 0 4px rgba(153, 246, 228, 0.18);
-  flex-shrink: 0;
+}
+
+.tm-splash-phone-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.22rem;
+  margin-bottom: 0.35rem;
+}
+.tm-splash-phone-grid span {
+  aspect-ratio: 1;
+  border-radius: 0.35rem;
+  background: linear-gradient(145deg, #ecfdf5, #ccfbf1);
+  border: 1px solid #a7f3d0;
+}
+
+.tm-splash-phone-hero {
+  height: 2.4rem;
+  border-radius: 0.4rem;
+  margin-bottom: 0.3rem;
+  background: linear-gradient(135deg, #99f6e4, #5eead4 40%, #0d9488);
+}
+
+.tm-splash-phone-rows {
+  display: grid;
+  gap: 0.22rem;
+  margin-bottom: 0.35rem;
+}
+.tm-splash-phone-rows span {
+  height: 0.55rem;
+  border-radius: 0.28rem;
+  background: #f4f4f5;
+}
+.tm-splash-phone-rows span:nth-child(2) { width: 85%; }
+.tm-splash-phone-rows span:nth-child(3) { width: 70%; }
+.tm-splash-phone-rows--cart span {
+  height: 0.95rem;
+  background: linear-gradient(90deg, #ecfdf5, #f4f4f5);
+}
+
+.tm-splash-phone-cta {
+  height: 0.7rem;
+  border-radius: 999px;
+  background: #0f766e;
+  margin-bottom: 0.3rem;
+}
+
+.tm-splash-phone-label {
+  margin: 0;
+  text-align: center;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #115e59;
 }
 
 @keyframes tm-splash-logo-in {
@@ -2907,7 +2984,7 @@ html.tm-boot-splash .tm-boot-splash {
   .tm-splash-logo,
   .tm-splash-title,
   .tm-splash-copy,
-  .tm-splash-details li,
+  .tm-splash-phone,
   .tm-splash-glow,
   .tm-splash-trend-line,
   .tm-splash--exit {
@@ -2925,7 +3002,7 @@ html.tm-boot-splash .tm-boot-splash {
     transform: none;
   }
   .tm-splash-copy,
-  .tm-splash-details li {
+  .tm-splash-phone {
     opacity: 1;
     transform: none;
   }

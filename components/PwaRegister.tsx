@@ -14,9 +14,8 @@ declare global {
 }
 
 /**
- * Registers the TrendMart service worker (public/sw.js) on mount, enabling
- * "Add to Home Screen" installability and offline resilience. Also captures
- * Android Chrome's beforeinstallprompt so the Install button can fire it.
+ * Registers TrendMart SW and forces activation of newer workers so stale
+ * chunk caches from older deploys do not break client-side navigation.
  */
 export default function PwaRegister() {
   useEffect(() => {
@@ -39,9 +38,15 @@ export default function PwaRegister() {
     window.addEventListener("appinstalled", onInstalled);
 
     const register = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        /* Registration failure should never break the app */
-      });
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .then((reg) => {
+          reg.update().catch(() => undefined);
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: "SKIP_WAITING" });
+          }
+        })
+        .catch(() => undefined);
     };
 
     if (document.readyState === "complete") {
