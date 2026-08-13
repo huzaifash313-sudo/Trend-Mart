@@ -61,7 +61,7 @@ export default function Footer() {
                 alt=""
                 width={28}
                 height={28}
-                className="h-7 w-7 rounded-md bg-black object-contain p-0.5"
+                className="h-7 w-7 object-contain"
               />
               TrendMart
             </Link>

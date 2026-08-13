@@ -414,7 +414,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               alt=""
               width={32}
               height={32}
-              className="h-8 w-8 rounded-lg bg-black object-contain p-0.5 shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700"
+              className="h-8 w-8 object-contain"
             />
             <span className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent">
               TrendMart
