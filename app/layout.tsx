@@ -42,6 +42,9 @@ export const viewport: Viewport = {
 
 const THEME_BOOTSTRAP = `(function(){try{var k="trendmart_theme_prefs_v4";var raw=localStorage.getItem(k);if(!raw){raw=localStorage.getItem("trendmart_theme_prefs_v3");}var mode="light";if(raw){var p=JSON.parse(raw);if(p&&p.mode==="dark")mode="dark";}var r=document.documentElement;if(mode==="dark"){r.classList.add("dark");r.classList.remove("light");}else{r.classList.add("light");r.classList.remove("dark");}}catch(e){document.documentElement.classList.add("light");document.documentElement.classList.remove("dark");}})();`;
 
+/* Show teal+logo cover before React so homepage never flashes first */
+const SPLASH_BOOTSTRAP = `(function(){try{var p=location.pathname||"/";if(p!=="/"&&p!=="")return;if(sessionStorage.getItem("tm_splash_seen_v2")==="1")return;document.documentElement.classList.add("tm-boot-splash","tm-splash-lock");}catch(e){document.documentElement.classList.add("tm-boot-splash","tm-splash-lock");}})();`;
+
 const SITE_JSON_LD = generateSiteJsonLd();
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -53,6 +56,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: SPLASH_BOOTSTRAP }} />
         {SITE_JSON_LD.map((block, i) => (
           <script
             // eslint-disable-next-line react/no-array-index-key
@@ -63,6 +67,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         ))}
       </head>
       <body className="tm-bg flex min-h-full flex-col">
+        <div id="tm-boot-splash" className="tm-boot-splash" aria-hidden="true">
+          <div className="tm-boot-splash-logo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/trendmart-mark.png?v=8" alt="" width={88} height={88} />
+          </div>
+        </div>
         <QueryProvider>
         <ThemeProvider>
         <CartProvider>

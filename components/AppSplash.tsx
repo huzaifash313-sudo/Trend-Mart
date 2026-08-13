@@ -3,80 +3,93 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
-const SPLASH_KEY = "tm_splash_seen_v1";
-const SPLASH_MS = 3200;
+export const SPLASH_KEY = "tm_splash_seen_v2";
+const STAGE_MS = {
+  logo: 700,
+  brand: 1100,
+  details: 1600,
+  hold: 900,
+  exit: 500,
+};
+
+type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
+
+function shouldShowSplash(pathname: string): boolean {
+  if (pathname !== "/") return false;
+  try {
+    return sessionStorage.getItem(SPLASH_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+function markSplashSeen() {
+  try {
+    sessionStorage.setItem(SPLASH_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+function removeBootSplash() {
+  document.documentElement.classList.remove("tm-boot-splash");
+  document.getElementById("tm-boot-splash")?.remove();
+}
 
 /**
- * Full-screen brand landing shown once per session on home (and every cold
- * open in installed PWA). Fades into the storefront — no route change needed.
+ * Brand landing: centered logo → rises with TrendMart → details → auto home.
+ * Paired with #tm-boot-splash in layout so the homepage never flashes first.
  */
 export default function AppSplash() {
   const pathname = usePathname();
-  const [phase, setPhase] = useState<"pending" | "show" | "exit" | "done">("pending");
+  const [phase, setPhase] = useState<Phase>("off");
 
   useEffect(() => {
-    if (pathname !== "/") {
-      setPhase("done");
-      return;
-    }
-    if (typeof window === "undefined") return;
-
-    let show = false;
-    try {
-      const standalone =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        ("standalone" in window.navigator &&
-          (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
-      const seen = sessionStorage.getItem(SPLASH_KEY) === "1";
-      // Installed app: splash every cold start of the session. Browser: once/session.
-      show = standalone ? !seen : !seen;
-    } catch {
-      show = true;
-    }
-
-    if (!show) {
-      setPhase("done");
-      return;
-    }
-
-    try {
-      sessionStorage.setItem(SPLASH_KEY, "1");
-    } catch {
-      /* ignore */
-    }
-
-    setPhase("show");
-    document.documentElement.classList.add("tm-splash-lock");
-
-    const exitTimer = window.setTimeout(() => setPhase("exit"), SPLASH_MS);
-    const doneTimer = window.setTimeout(() => {
+    if (!shouldShowSplash(pathname)) {
+      removeBootSplash();
       document.documentElement.classList.remove("tm-splash-lock");
-      setPhase("done");
-    }, SPLASH_MS + 550);
+      setPhase("off");
+      return;
+    }
+
+    markSplashSeen();
+    document.documentElement.classList.add("tm-splash-lock");
+    setPhase("logo");
+    // Hand off from static boot cover to animated React splash
+    window.requestAnimationFrame(() => removeBootSplash());
+
+    const timers: number[] = [];
+    let t = STAGE_MS.logo;
+    timers.push(window.setTimeout(() => setPhase("brand"), t));
+    t += STAGE_MS.brand;
+    timers.push(window.setTimeout(() => setPhase("details"), t));
+    t += STAGE_MS.details;
+    timers.push(window.setTimeout(() => setPhase("hold"), t));
+    t += STAGE_MS.hold;
+    timers.push(window.setTimeout(() => setPhase("exit"), t));
+    t += STAGE_MS.exit;
+    timers.push(
+      window.setTimeout(() => {
+        document.documentElement.classList.remove("tm-splash-lock");
+        setPhase("off");
+      }, t),
+    );
 
     return () => {
-      window.clearTimeout(exitTimer);
-      window.clearTimeout(doneTimer);
+      timers.forEach((id) => window.clearTimeout(id));
       document.documentElement.classList.remove("tm-splash-lock");
     };
   }, [pathname]);
 
-  const dismiss = () => {
-    setPhase("exit");
-    window.setTimeout(() => {
-      document.documentElement.classList.remove("tm-splash-lock");
-      setPhase("done");
-    }, 480);
-  };
-
-  if (phase === "pending" || phase === "done") return null;
+  if (phase === "off") return null;
 
   return (
     <div
-      className={`tm-splash ${phase === "exit" ? "tm-splash--exit" : ""}`}
+      className={`tm-splash tm-splash--${phase}`}
+      data-phase={phase}
       role="dialog"
       aria-label="Welcome to TrendMart"
-      onClick={dismiss}
+      aria-live="polite"
     >
       <div className="tm-splash-glow" aria-hidden="true" />
       <div className="tm-splash-glow tm-splash-glow--2" aria-hidden="true" />
@@ -90,52 +103,46 @@ export default function AppSplash() {
           strokeWidth="2.5"
           strokeLinecap="round"
         />
-        <path
-          d="M372 18 L392 32 L370 40 Z"
-          fill="rgba(255,255,255,0.35)"
-        />
+        <path d="M372 18 L392 32 L370 40 Z" fill="rgba(255,255,255,0.35)" />
       </svg>
 
-      <div className="tm-splash-inner">
+      <div className="tm-splash-stage">
         <div className="tm-splash-brand">
           <span className="tm-splash-logo" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendmart-mark.png?v=7"
+              src="/trendmart-mark.png?v=8"
               alt=""
-              width={72}
-              height={72}
+              width={88}
+              height={88}
               className="tm-splash-logo-img"
               decoding="async"
+              fetchPriority="high"
             />
           </span>
           <h1 className="tm-splash-title">TrendMart</h1>
         </div>
 
-        <p className="tm-splash-tagline">
-          Local shopping, instant WhatsApp orders — your neighborhood, delivered.
-        </p>
+        <div className="tm-splash-copy">
+          <p className="tm-splash-tagline">
+            Local shopping, instant WhatsApp orders — your neighborhood, delivered.
+          </p>
 
-        <ul className="tm-splash-details">
-          <li>
-            <span className="tm-splash-dot" aria-hidden="true" />
-            Discover nearby shops &amp; live deals
-          </li>
-          <li>
-            <span className="tm-splash-dot" aria-hidden="true" />
-            Cart stays on your phone until checkout
-          </li>
-          <li>
-            <span className="tm-splash-dot" aria-hidden="true" />
-            Order straight to the merchant on WhatsApp
-          </li>
-        </ul>
-
-        <button type="button" className="tm-splash-cta" onClick={dismiss}>
-          Enter storefront
-        </button>
-
-        <p className="tm-splash-hint">Tap anywhere to continue</p>
+          <ul className="tm-splash-details">
+            <li>
+              <span className="tm-splash-dot" aria-hidden="true" />
+              Discover nearby shops &amp; live deals
+            </li>
+            <li>
+              <span className="tm-splash-dot" aria-hidden="true" />
+              Cart stays on your phone until checkout
+            </li>
+            <li>
+              <span className="tm-splash-dot" aria-hidden="true" />
+              Order straight to the merchant on WhatsApp
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   );

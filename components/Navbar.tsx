@@ -92,7 +92,7 @@ function BrandMark({ size = 34 }: { size?: number }) {
     <span className="tm-navbar-logo" aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/trendmart-mark.png?v=7"
+        src="/trendmart-mark.png?v=8"
         alt=""
         width={size}
         height={size}
