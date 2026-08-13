@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   type ReactNode,
 } from "react";
@@ -223,20 +224,33 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     setLocation(null);
   }, []);
 
+  const value = useMemo(
+    () => ({
+      location,
+      coordinates,
+      isDetecting,
+      isInitialized,
+      detectLocation,
+      detectLocationDetailed,
+      setManualPin,
+      setManualCity,
+      clearLocation,
+    }),
+    [
+      location,
+      coordinates,
+      isDetecting,
+      isInitialized,
+      detectLocation,
+      detectLocationDetailed,
+      setManualPin,
+      setManualCity,
+      clearLocation,
+    ],
+  );
+
   return (
-    <LocationContext.Provider
-      value={{
-        location,
-        coordinates,
-        isDetecting,
-        isInitialized,
-        detectLocation,
-        detectLocationDetailed,
-        setManualPin,
-        setManualCity,
-        clearLocation,
-      }}
-    >
+    <LocationContext.Provider value={value}>
       {children}
     </LocationContext.Provider>
   );

@@ -823,6 +823,56 @@ export async function placeOrderAtomic(
  * Accepts an array of line items to support multi-item orders.
  * Pass **unit** price + quantity (do not pre-multiply line totals).
  */
+/**
+ * Place an order through the server-side /api/orders endpoint.
+ *
+ * The server re-reads authoritative prices, validates shop rules and stock,
+ * and deducts stock via the service-role client — the client never inserts
+ * order rows directly and never supplies the trusted total.
+ */
+async function placeOrderOnServer(params: {
+  shopId: string;
+  customerName: string;
+  customerPhone: string;
+  items: Array<{
+    productId: string;
+    name: string;
+    price: number;
+    quantity: number;
+    variant?: string;
+    notes?: string;
+  }>;
+  couponCode?: string;
+  notes?: string;
+  customerLat?: number | null;
+  customerLng?: number | null;
+}): Promise<ServiceResult<Order>> {
+  try {
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      order?: Order;
+    };
+    if (!res.ok || !json.success || !json.order) {
+      return {
+        success: false,
+        error: json.error || "Could not place your order. Please try again.",
+      };
+    }
+    return { success: true, data: json.order };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Could not reach the server.",
+    };
+  }
+}
+
 export async function createOrder(params: {
   shopId: string;
   customerName?: string;
@@ -835,14 +885,12 @@ export async function createOrder(params: {
   customerLat?: number | null;
   customerLng?: number | null;
 }): Promise<ServiceResult<Order>> {
-  const result = await placeOrderAtomic({
+  return placeOrderOnServer({
     shopId: params.shopId,
     customerName: params.customerName ?? "",
     customerPhone: params.customerPhone ?? "",
-    discountAmount: params.discountAmount,
-    deliveryFee: params.deliveryFee,
-    notes: params.notes,
     couponCode: params.couponCode,
+    notes: params.notes,
     customerLat: params.customerLat,
     customerLng: params.customerLng,
     items: params.items.map((item) => ({
@@ -854,9 +902,6 @@ export async function createOrder(params: {
       notes: item.notes,
     })),
   });
-
-  if (!result.success) return result;
-  return { success: true, data: result.data.order };
 }
 
 /**

@@ -1,9 +1,10 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import DealCard from "@/components/DealCard";
+import DealCard, { dealToProduct } from "@/components/DealCard";
 import {
   formatOfferDayLabel,
   isDealActiveOnDate,
@@ -13,14 +14,24 @@ import {
   formatDealWhenTag,
   type ShopDeal,
 } from "@/lib/dealSchedule";
-import { fetchActiveDeals } from "@/services/dealService";
-import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
-import { fetchShopDeliveryMetaForIds, type ShopDeliveryMeta } from "@/services/shopDeliveryMeta";
+import { type Coupon } from "@/services/couponService";
+import { type ShopDeliveryMeta } from "@/services/shopDeliveryMeta";
+import { useDeals, useShopCoupons, useShopDeliveryMeta } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@/lib/fuzzySearch";
 import DealDayDateFilter from "@/components/DealDayDateFilter";
 
+const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
+  ssr: false,
+});
+
 type FilterMode = "today" | "featured" | "upcoming" | "all";
+
+/* Stable empty fallbacks so derived memos don't change identity every render. */
+const EMPTY_DEALS: ShopDeal[] = [];
+const EMPTY_COUPONS: Record<string, Coupon[]> = {};
+const EMPTY_DELIVERY: Record<string, ShopDeliveryMeta> = {};
 
 function SearchIcon() {
   return (
@@ -38,11 +49,6 @@ function DealsInner() {
   const filterParam = (searchParams.get("filter") as FilterMode | null) ?? "today";
   const dayParam = searchParams.get("day");
 
-  const [deals, setDeals] = useState<ShopDeal[]>([]);
-  const [shopCoupons, setShopCoupons] = useState<Record<string, Coupon[]>>({});
-  const [shopDelivery, setShopDelivery] = useState<Record<string, ShopDeliveryMeta>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState(qParam);
   const [filter, setFilter] = useState<FilterMode>(
     ["today", "featured", "upcoming", "all"].includes(filterParam) ? filterParam : "today",
@@ -50,51 +56,25 @@ function DealsInner() {
   const [dayKey, setDayKey] = useState<string | null>(
     dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null,
   );
+  const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
 
-  const todayKey = toPkDateKey();
+  const queryClient = useQueryClient();
 
-  const loadOffersForShops = useCallback(async (shopIds: string[]) => {
-    const unique = [...new Set(shopIds.filter(Boolean))];
-    if (!unique.length) {
-      setShopCoupons({});
-      setShopDelivery({});
-      return;
-    }
-    const [cRes, dRes] = await Promise.all([
-      fetchActiveCouponsForShops(unique),
-      fetchShopDeliveryMetaForIds(unique),
-    ]);
-    if (cRes.success) setShopCoupons(cRes.data);
-    if (dRes.success) setShopDelivery(dRes.data);
-  }, []);
+  const dealsQuery = useDeals(100);
+  const deals = dealsQuery.data ?? EMPTY_DEALS;
+  const loading = dealsQuery.isLoading;
+  const error = dealsQuery.error ? dealsQuery.error.message : null;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const result = await fetchActiveDeals(100);
-    if (result.success) {
-      setDeals(result.data);
-      void loadOffersForShops(result.data.map((d) => d.shop_id));
-    } else {
-      setError(result.error);
-    }
-    setLoading(false);
-  }, [loadOffersForShops]);
+  const dealShopIds = useMemo(
+    () => [...new Set(deals.map((d) => d.shop_id).filter(Boolean))],
+    [deals],
+  );
+  const couponsQuery = useShopCoupons(dealShopIds);
+  const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
+  const deliveryQuery = useShopDeliveryMeta(dealShopIds);
+  const shopDelivery: Record<string, ShopDeliveryMeta> = deliveryQuery.data ?? EMPTY_DELIVERY;
 
-  useEffect(() => {
-    void load();
-    const onDeals = () => void load();
-    window.addEventListener("trendmart:deals-updated", onDeals);
-    return () => window.removeEventListener("trendmart:deals-updated", onDeals);
-  }, [load]);
-
-  useEffect(() => {
-    const shopIds = deals.map((d) => d.shop_id);
-    const onCoupons = () => void loadOffersForShops(shopIds);
-    window.addEventListener("trendmart:coupons-updated", onCoupons);
-    return () => window.removeEventListener("trendmart:coupons-updated", onCoupons);
-  }, [deals, loadOffersForShops]);
-
+  // Re-sync local state when URL changes (back/forward).
   useEffect(() => {
     setQuery(qParam);
     setFilter(
@@ -102,6 +82,20 @@ function DealsInner() {
     );
     setDayKey(dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null);
   }, [qParam, filterParam, dayParam]);
+
+  // Invalidate cached queries when merchants publish/update in other tabs.
+  useEffect(() => {
+    const onDeals = () => queryClient.invalidateQueries({ queryKey: ["deals"] });
+    const onCoupons = () => queryClient.invalidateQueries({ queryKey: ["coupons"] });
+    window.addEventListener("trendmart:deals-updated", onDeals);
+    window.addEventListener("trendmart:coupons-updated", onCoupons);
+    return () => {
+      window.removeEventListener("trendmart:deals-updated", onDeals);
+      window.removeEventListener("trendmart:coupons-updated", onCoupons);
+    };
+  }, [queryClient]);
+
+  const todayKey = toPkDateKey();
 
   const syncUrl = useCallback(
     (next: { q?: string; filter?: FilterMode; day?: string | null }) => {
@@ -129,7 +123,7 @@ function DealsInner() {
         syncUrl({ day: null });
       }
     },
-    [syncUrl],
+    [syncUrl, setDayKey, setFilter],
   );
 
   const offerDays = useMemo(() => listOfferDayKeys(deals, 14, todayKey), [deals, todayKey]);
@@ -298,7 +292,7 @@ function DealsInner() {
       {error ? (
         <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
           {error}
-          <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => dealsQuery.refetch()}>
             Retry
           </button>
         </div>
@@ -374,9 +368,22 @@ function DealsInner() {
               deal={deal}
               priority={i < 2}
               offerTags={getOfferTags(deal.shop_id)}
+              onOpen={() => setQuickViewDeal(deal)}
             />
           ))}
         </div>
+      )}
+
+      {quickViewDeal && (
+        <QuickViewModal
+          product={dealToProduct(quickViewDeal)}
+          shop={{
+            id: quickViewDeal.shop_id,
+            name: quickViewDeal.shop_name || "Store",
+            whatsapp_number: quickViewDeal.shop_whatsapp || "",
+          }}
+          onClose={() => setQuickViewDeal(null)}
+        />
       )}
     </div>
   );

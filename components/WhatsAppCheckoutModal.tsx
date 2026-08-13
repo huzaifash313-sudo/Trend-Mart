@@ -149,6 +149,16 @@ function sanitizePayloadCouponCode(code: string): string {
   return code.replace(/[^A-Z0-9_-]/gi, "").toUpperCase().slice(0, 20);
 }
 
+/** Sanitize an image URL for the payload: http(s) only, no control chars, capped length. */
+function sanitizePayloadUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return "";
+  return trimmed
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .slice(0, 500);
+}
+
 /**
  * Build a meticulously formatted WhatsApp order message for the merchant.
  * All inputs undergo strict sanitation before being embedded in the payload.
@@ -229,6 +239,10 @@ function buildWhatsAppMessage(
 
     lines.push(`• ${safeItemName}${variantLabel}`);
     lines.push(`  ${qty} x ${formatRupees(safePrice)} = ${formatRupees(itemTotal)}${originalPriceStr}`);
+    const safeImageUrl = sanitizePayloadUrl(item.imageUrl);
+    if (safeImageUrl) {
+      lines.push(`  🖼️ Photo: ${safeImageUrl}`);
+    }
     if (safeItemNotes) {
       lines.push(`  📝 Note: ${safeItemNotes}`);
     }

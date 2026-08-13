@@ -240,6 +240,7 @@ export async function fetchProductsByShopId(
 
 export type MarketplaceSort =
   | "for_you"
+  | "popular"
   | "newest"
   | "price_asc"
   | "price_desc"

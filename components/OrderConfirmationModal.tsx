@@ -209,6 +209,7 @@ function formatCurrency(amount: number, currency: string = "PKR"): string {
 function buildWhatsAppMessage(
   shopName: string,
   itemName: string,
+  imageUrl: string | null | undefined,
   quantity: number,
   notes: string,
   subtotal: number,
@@ -217,6 +218,11 @@ function buildWhatsAppMessage(
   couponCode: string,
   currency: string,
 ): string {
+  const safeImageUrl =
+    imageUrl && /^https?:\/\//i.test(imageUrl.trim())
+      ? imageUrl.trim().slice(0, 500)
+      : "";
+
   const lines: string[] = [
     `🛒 *New Order via TrendMart*`,
     ``,
@@ -226,6 +232,10 @@ function buildWhatsAppMessage(
     `💰 *Unit Price:* ${formatCurrency(subtotal / quantity, currency)}`,
     `💵 *Subtotal:* ${formatCurrency(subtotal, currency)}`,
   ];
+
+  if (safeImageUrl) {
+    lines.push(`🖼️ *Photo:* ${safeImageUrl}`);
+  }
 
   if (discountAmount > 0) {
     lines.push(``);
@@ -397,6 +407,7 @@ export default function OrderConfirmationModal({
     const text = buildWhatsAppMessage(
       shopName,
       item.name,
+      item.imageUrl,
       quantity,
       notes,
       subtotal,
@@ -414,7 +425,7 @@ export default function OrderConfirmationModal({
       );
       onClose();
     }, 200);
-  }, [phone, shopName, item.name, quantity, notes, subtotal, discountAmount, grandTotal, couponCode, currency, onClose]);
+  }, [phone, shopName, item.name, item.imageUrl, quantity, notes, subtotal, discountAmount, grandTotal, couponCode, currency, onClose]);
 
   return (
     <div

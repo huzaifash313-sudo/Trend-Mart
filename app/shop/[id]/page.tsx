@@ -3,8 +3,7 @@
 import { useState, useEffect, use, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Shop, Product } from "@/types";
-import { fetchShopById } from "@/services/shopService";
+import type { Product } from "@/types";
 import { logShopView } from "@/services/analyticsService";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorState } from "@/components/ErrorState";
@@ -25,11 +24,11 @@ import StoreReviews from "@/components/StoreReviews";
 import CompactRating from "@/components/CompactRating";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { buildShopOfferSlides, formatOfferRemaining } from "@/lib/shopOfferTicker";
-import { fetchCouponsByShopId, type Coupon } from "@/services/couponService";
-import { fetchDealsByShopId } from "@/services/dealService";
+import { type Coupon } from "@/services/couponService";
 import type { ShopDeal } from "@/lib/dealSchedule";
+import { useShopDetail } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  fetchStorefrontDisplayPrefs,
   type StorefrontDisplayPrefs,
 } from "@/services/themePrefsService";
 import { useCart } from "@/context/CartContext";
@@ -93,7 +92,9 @@ function GridIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill=
 
 function ShopDetailInner({ id }: { id: string }) {
   const router = useRouter();
-  const [shop, setShop] = useState<Shop | null>(null);
+  const queryClient = useQueryClient();
+  const shopQuery = useShopDetail(id);
+  const shop = shopQuery.data?.shop ?? null;
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,63 +137,40 @@ function ShopDetailInner({ id }: { id: string }) {
   const showProductCatalog = !isServiceCategory || products.length > 0;
   const THEME_ACCENT = "#10b981";
 
-  // ── Data Loading (parallel: shop + prefs + coupons) ───────────────────────
+  // ── Data Loading (React Query: cached, no flicker) ────────────────────────
   useEffect(() => {
-    let cancelled = false;
-    async function fetchData() {
+    if (shopQuery.isLoading) {
       setLoading(true);
-      setError(null);
-      setIsOwner(false);
-
-      const shopResult = await fetchShopById(id);
-
-      if (cancelled) return;
-
-      if (shopResult.success) {
-        const resolvedShop = shopResult.data.shop;
-        const resolvedId = resolvedShop.id;
-        const [prefs, couponsResult, dealsResult, auth] = await Promise.all([
-          fetchStorefrontDisplayPrefs(resolvedId),
-          fetchCouponsByShopId(resolvedId),
-          fetchDealsByShopId(resolvedId),
-          supabase.auth.getUser(),
-        ]);
-
-        if (cancelled) return;
-
-        setShop(resolvedShop);
-        setProducts(shopResult.data.products);
-        const ownerId = resolvedShop.owner_id;
-        const uid = auth.data.user?.id;
-        setIsOwner(Boolean(ownerId && uid && ownerId === uid));
-        setDisplayPrefs(prefs);
-        if (couponsResult.success) setCoupons(couponsResult.data);
-        if (dealsResult.success) setDeals(dealsResult.data.filter((d) => d.is_active));
-
-        // Fire-and-forget visit log (skips owner + dedupes inside service)
-        void logShopView(resolvedId);
-      } else {
-        setError(shopResult.error);
-      }
-      setLoading(false);
+      return;
     }
-    fetchData();
-    return () => { cancelled = true; };
-  }, [id, supabase]);
+    setLoading(false);
+
+    if (shopQuery.isError) {
+      setError(shopQuery.error.message);
+      return;
+    }
+
+    if (shopQuery.data) {
+      setError(null);
+      const d = shopQuery.data;
+      setProducts(d.products);
+      setIsOwner(d.isOwner);
+      setDisplayPrefs(d.prefs);
+      setCoupons(d.coupons);
+      setDeals(d.deals);
+      // Fire-and-forget visit log (skips owner + dedupes inside service)
+      void logShopView(d.shop.id);
+    }
+  }, [shopQuery.data, shopQuery.isLoading, shopQuery.isError, shopQuery.error]);
 
   // Refresh catalog when merchant adds from in-store modal
   useEffect(() => {
     const refresh = () => {
-      void fetchShopById(id).then((result) => {
-        if (result.success) {
-          setShop(result.data.shop);
-          setProducts(result.data.products);
-        }
-      });
+      queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
     };
     window.addEventListener("trendmart:products-updated", refresh);
     return () => window.removeEventListener("trendmart:products-updated", refresh);
-  }, [id]);
+  }, [id, queryClient]);
 
   const promoBannerSegments = useMemo(() => {
     if (!shop) return [];

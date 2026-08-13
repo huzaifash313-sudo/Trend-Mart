@@ -6,10 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { MarketplaceProduct, Shop, ShopCategory } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
-import {
-  fetchMarketplaceProducts,
-  type MarketplaceSort,
-} from "@/services/productService";
+import { type MarketplaceSort } from "@/services/productService";
 import ProductGrid from "@/components/ProductGrid";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import OfferDaysStrip from "@/components/OfferDaysStrip";
@@ -20,8 +17,9 @@ import { useToast } from "@/components/Toast";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { haversineDistance } from "@/services/geoRadiusService";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
-import { fetchActiveDeals } from "@/services/dealService";
-import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMarketplaceProducts, useDeals, useShopCoupons } from "@/lib/queries";
+import { type Coupon } from "@/services/couponService";
 import {
   isDealActiveOnDate,
   shopIdsWithDealOnDate,
@@ -69,11 +67,17 @@ function PackageIcon() {
 
 const SORT_OPTIONS: { value: MarketplaceSort; label: string }[] = [
   { value: "for_you", label: "For You" },
+  { value: "popular", label: "Top rated" },
   { value: "newest", label: "Newest" },
   { value: "discount", label: "Best deals" },
   { value: "price_asc", label: "Price ↑" },
   { value: "price_desc", label: "Price ↓" },
 ];
+
+/* Stable empty fallbacks so derived memos don't change identity every render. */
+const EMPTY_PRODUCTS: MarketplaceProduct[] = [];
+const EMPTY_DEALS: ShopDeal[] = [];
+const EMPTY_COUPONS: Record<string, Coupon[]> = {};
 
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                      */
@@ -109,15 +113,59 @@ function ProductsPageInner() {
   });
   const [areaOpen, setAreaOpen] = useState(false);
 
-  const [products, setProducts] = useState<MarketplaceProduct[]>([]);
-  const [activeDeals, setActiveDeals] = useState<ShopDeal[]>([]);
-  const [shopCoupons, setShopCoupons] = useState<Record<string, Coupon[]>>({});
   const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
   const [visibleCount, setVisibleCount] = useState(24);
+
+  const queryClient = useQueryClient();
+
+  const productsQuery = useMarketplaceProducts({
+    query: qParam,
+    category: categoryParam === "All" ? undefined : categoryParam,
+    subCategoryId: subParam,
+    sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
+    limit: 48,
+  });
+  const products = productsQuery.data ?? EMPTY_PRODUCTS;
+  const loading = productsQuery.isLoading;
+  const error = productsQuery.error ? productsQuery.error.message : null;
+
+  const dealsQuery = useDeals(80);
+  const activeDeals = dealsQuery.data ?? EMPTY_DEALS;
+
+  const shopIds = useMemo(
+    () => [...new Set(products.map((p) => p.shop_id).filter(Boolean))],
+    [products],
+  );
+  const couponsQuery = useShopCoupons(shopIds);
+  const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
+
+  // Reset the "load more" window whenever the search/filters change.
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [qParam, categoryParam, subParam, sortParam]);
+
+  // Deep-link: open the quick view for a ?product=<id> in the URL.
+  useEffect(() => {
+    if (productParam && products.length > 0) {
+      const match = products.find((p) => p.id === productParam);
+      if (match) setQuickView(match);
+    }
+  }, [productParam, products]);
+
+  // Invalidate cached queries when merchants publish/update in other tabs.
+  useEffect(() => {
+    const onDeals = () => queryClient.invalidateQueries({ queryKey: ["deals"] });
+    window.addEventListener("trendmart:deals-updated", onDeals);
+    return () => window.removeEventListener("trendmart:deals-updated", onDeals);
+  }, [queryClient]);
+
+  useEffect(() => {
+    const onCoupons = () => queryClient.invalidateQueries({ queryKey: ["coupons"] });
+    window.addEventListener("trendmart:coupons-updated", onCoupons);
+    return () => window.removeEventListener("trendmart:coupons-updated", onCoupons);
+  }, [queryClient]);
 
   const syncUrl = useCallback(
     (next: {
@@ -154,76 +202,15 @@ function ProductsPageInner() {
     setSort(SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you");
   }, [qParam, categoryParam, subParam, sortParam]);
 
-  // Load products
+  // Live search: as the user types, debounce-update the URL so results refresh
+  // automatically — no need to press Enter.
   useEffect(() => {
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      const result = await fetchMarketplaceProducts({
-        query: qParam,
-        category: categoryParam === "All" ? undefined : categoryParam,
-        subCategoryId: subParam,
-        sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
-        limit: 48,
-      });
-      if (cancelled) return;
-      if (result.success) {
-        setProducts(result.data);
-        setVisibleCount(24);
-        const shopIds = [...new Set(result.data.map((p) => p.shop_id).filter(Boolean))];
-        void fetchActiveCouponsForShops(shopIds).then((cRes) => {
-          if (!cancelled && cRes.success) setShopCoupons(cRes.data);
-        });
-        if (productParam) {
-          const match = result.data.find((p) => p.id === productParam);
-          if (match) setQuickView(match);
-        }
-      } else {
-        setError(result.error);
-        setProducts([]);
-      }
-      setLoading(false);
-    }, qParam ? 220 : 0);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [qParam, categoryParam, subParam, sortParam, productParam]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchActiveDeals(80).then((result) => {
-      if (!cancelled && result.success) setActiveDeals(result.data);
-    });
-    const onDeals = () => {
-      void fetchActiveDeals(80).then((result) => {
-        if (!cancelled && result.success) setActiveDeals(result.data);
-      });
-    };
-    window.addEventListener("trendmart:deals-updated", onDeals);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("trendmart:deals-updated", onDeals);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const shopIds = [...new Set(products.map((p) => p.shop_id).filter(Boolean))];
-    const onCoupons = () => {
-      if (!shopIds.length) return;
-      void fetchActiveCouponsForShops(shopIds).then((cRes) => {
-        if (!cancelled && cRes.success) setShopCoupons(cRes.data);
-      });
-    };
-    window.addEventListener("trendmart:coupons-updated", onCoupons);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("trendmart:coupons-updated", onCoupons);
-    };
-  }, [products]);
+    if (query === qParam) return;
+    const t = setTimeout(() => {
+      syncUrl({ q: query });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query, qParam, syncUrl]);
 
   // Favorites
   useEffect(() => {
@@ -533,10 +520,20 @@ function ProductsPageInner() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products (typos OK)…"
-            className="w-full rounded-2xl border border-zinc-200 bg-white py-2.5 pl-10 pr-20 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            placeholder="Search products, shops, categories… (typos OK)"
+            className="w-full rounded-2xl border border-zinc-200 bg-white py-2.5 pl-10 pr-24 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             aria-label="Search products"
           />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-[4.6rem] top-1/2 -translate-y-1/2 rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              aria-label="Clear search"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          ) : null}
           <button
             type="submit"
             className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
@@ -623,7 +620,9 @@ function ProductsPageInner() {
       <p className="mb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
         {loading
           ? "Loading products…"
-          : `Showing ${Math.min(visibleCount, displayProducts.length)} of ${displayProducts.length}`}
+          : productsQuery.isFetching
+            ? "Updating…"
+            : `Showing ${Math.min(visibleCount, displayProducts.length)} of ${displayProducts.length}`}
       </p>
 
       {error && (
@@ -632,7 +631,7 @@ function ProductsPageInner() {
           <button
             type="button"
             className="ml-2 font-semibold underline"
-            onClick={() => router.refresh()}
+            onClick={() => productsQuery.refetch()}
           >
             Retry
           </button>

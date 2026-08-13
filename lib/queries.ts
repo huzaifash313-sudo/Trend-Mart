@@ -1,0 +1,174 @@
+/* -------------------------------------------------------------------------- */
+/*  TrendMart — Storefront React Query Hooks                                   */
+/*                                                                             */
+/*  Thin adapters over the existing service layer (`services/*`). Every        */
+/*  service returns `{ success, data } | { success, error }`; we unwrap that   */
+/*  into a throw-on-error promise so React Query manages loading/error/cache.  */
+/* -------------------------------------------------------------------------- */
+
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { fetchShops, fetchMyShop } from "@/services/shopService";
+import { fetchActiveStories } from "@/services/storyService";
+import { fetchActiveDeals } from "@/services/dealService";
+import { fetchActiveCouponsForShops } from "@/services/couponService";
+import { fetchShopDeliveryMetaForIds } from "@/services/shopDeliveryMeta";
+import {
+  fetchMarketplaceProducts,
+  type MarketplaceProductFilters,
+} from "@/services/productService";
+import { fetchShopById } from "@/services/shopService";
+import { fetchStorefrontDisplayPrefs, type StorefrontDisplayPrefs } from "@/services/themePrefsService";
+import { fetchCouponsByShopId, type Coupon } from "@/services/couponService";
+import { fetchDealsByShopId } from "@/services/dealService";
+import type { ShopDeal } from "@/lib/dealSchedule";
+import { createClient } from "@/lib/supabase/client";
+import type { Product, Shop } from "@/types";
+
+type ServiceResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+/** Adapt a service result into a throw-on-error promise for React Query. */
+async function unwrap<T>(promise: Promise<ServiceResult<T>>): Promise<T> {
+  const result = await promise;
+  if (!result.success) throw new Error(result.error);
+  return result.data;
+}
+
+/* ── Query keys ────────────────────────────────────────────────────────────── */
+
+export const queryKeys = {
+  shops: ["shops", "public"] as const,
+  stories: ["stories"] as const,
+  deals: (limit: number) => ["deals", limit] as const,
+  coupons: (shopIds: string[]) => ["coupons", shopIds.join(",")] as const,
+  myShop: ["my-shop"] as const,
+};
+
+/* ── Shops ─────────────────────────────────────────────────────────────────── */
+
+export function useShops() {
+  return useQuery({
+    queryKey: queryKeys.shops,
+    queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 60 })),
+    staleTime: 2 * 60_000,
+  });
+}
+
+export function useMyShop() {
+  return useQuery({
+    queryKey: queryKeys.myShop,
+    queryFn: async (): Promise<Shop | null> => {
+      const result = await fetchMyShop();
+      // "Not authenticated" / fetch errors are not UI errors here — just no shop.
+      return result.success ? result.data : null;
+    },
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/* ── Enrichment (non-blocking on homepage) ─────────────────────────────────── */
+
+export function useStories() {
+  return useQuery({
+    queryKey: queryKeys.stories,
+    queryFn: () => unwrap(fetchActiveStories()),
+    staleTime: 2 * 60_000,
+  });
+}
+
+export function useDeals(limit = 48) {
+  return useQuery({
+    queryKey: queryKeys.deals(limit),
+    queryFn: () => unwrap(fetchActiveDeals(limit)),
+    staleTime: 2 * 60_000,
+  });
+}
+
+export function useShopCoupons(shopIds: string[]) {
+  return useQuery({
+    queryKey: queryKeys.coupons(shopIds),
+    queryFn: () => unwrap(fetchActiveCouponsForShops(shopIds)),
+    enabled: shopIds.length > 0,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useShopDeliveryMeta(shopIds: string[]) {
+  return useQuery({
+    queryKey: ["delivery-meta", shopIds.join(",")],
+    queryFn: () => unwrap(fetchShopDeliveryMetaForIds(shopIds)),
+    enabled: shopIds.length > 0,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/* ── Shop detail page ──────────────────────────────────────────────────────── */
+
+export interface ShopDetailData {
+  shop: Shop;
+  products: Product[];
+  prefs: StorefrontDisplayPrefs;
+  coupons: Coupon[];
+  deals: ShopDeal[];
+  isOwner: boolean;
+}
+
+export function useShopDetail(id: string) {
+  return useQuery({
+    queryKey: ["shop-detail", id],
+    queryFn: async (): Promise<ShopDetailData> => {
+      const shopResult = await fetchShopById(id);
+      if (!shopResult.success) throw new Error(shopResult.error);
+      const resolvedShop = shopResult.data.shop;
+
+      const supabase = createClient();
+      const [prefs, couponsResult, dealsResult, auth] = await Promise.all([
+        fetchStorefrontDisplayPrefs(resolvedShop.id),
+        fetchCouponsByShopId(resolvedShop.id),
+        fetchDealsByShopId(resolvedShop.id),
+        supabase.auth.getUser(),
+      ]);
+
+      const uid = auth.data.user?.id;
+      return {
+        shop: resolvedShop,
+        products: shopResult.data.products,
+        prefs,
+        coupons: couponsResult.success ? couponsResult.data : [],
+        deals: dealsResult.success ? dealsResult.data.filter((d) => d.is_active) : [],
+        isOwner: Boolean(resolvedShop.owner_id && uid && resolvedShop.owner_id === uid),
+      };
+    },
+    staleTime: 2 * 60_000,
+    retry: 1,
+  });
+}
+
+/* ── Marketplace (products page) ───────────────────────────────────────────── */
+
+export function useMarketplaceProducts(filters: MarketplaceProductFilters) {
+  // Build a stable primitive key (NOT the filters object) so the query caches
+  // correctly and doesn't refetch on every re-render.
+  const queryKey = [
+    "marketplace-products",
+    filters.query ?? "",
+    filters.category ?? "",
+    filters.subCategoryId ?? "",
+    filters.sort ?? "for_you",
+    filters.limit ?? 48,
+    filters.availableOnly ?? true,
+  ] as const;
+
+  return useQuery({
+    queryKey,
+    queryFn: () => unwrap(fetchMarketplaceProducts(filters)),
+    // Keep the previous list on screen while the next one loads — this is the
+    // core fix for the "data disappears then reappears" flicker.
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
+}

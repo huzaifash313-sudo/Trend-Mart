@@ -12,6 +12,7 @@ import { getProductDiscount } from "@/lib/formatters";
 
 export type MarketplaceFeedSort =
   | "for_you"
+  | "popular"
   | "newest"
   | "price_asc"
   | "price_desc"
@@ -23,6 +24,7 @@ export type MarketplaceFeedSort =
  */
 const MAX_PER_SHOP_EARLY: Record<MarketplaceFeedSort, number> = {
   for_you: 3,
+  popular: 6,
   newest: 4,
   discount: 5,
   price_asc: 10,
@@ -109,6 +111,18 @@ export function scoreProductForSort(
       return imgBoost - p.price;
     case "price_desc":
       return imgBoost + p.price;
+    case "popular": {
+      // Popularity proxy: shop rating + review volume, then discount + recency.
+      const rating = Number(p.shop_avg_rating) || 0;
+      const reviews = Number(p.shop_review_count) || 0;
+      return (
+        imgBoost +
+        rating * 100_000 +
+        Math.log10(reviews + 1) * 50_000 +
+        disc * 100 +
+        created / 1_000
+      );
+    }
     case "newest":
       return imgBoost + created / 1_000 + pop;
     case "discount":

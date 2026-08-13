@@ -97,15 +97,6 @@ function OrdersIcon() {
   );
 }
 
-function TrackIcon() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
 function ChevronDownIcon({ expanded }: { expanded: boolean }) {
   return (
     <svg
@@ -185,7 +176,6 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
-  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [merchantExpanded, setMerchantExpanded] = useState(false);
 
   // Refs for focus trapping
@@ -502,17 +492,6 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               </Link>
             </li>
 
-            {/* Order Tracking */}
-            <li>
-              <Link
-                href="/orders/tracking"
-                onClick={onClose}
-                className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                <TrackIcon /> Track Order
-              </Link>
-            </li>
-
             {/* Divider */}
             <li className="my-2 border-t border-zinc-100 dark:border-zinc-800" role="separator" />
 
@@ -556,89 +535,15 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             {/* Divider */}
             <li className="my-2 border-t border-zinc-100 dark:border-zinc-800" role="separator" />
 
-            {/* Settings hub — nested preferences (same accordion pattern as Categories) */}
+            {/* Settings — single link; all preferences live on the Settings page */}
             <li>
-              <button
-                type="button"
-                onClick={() => setSettingsExpanded((v) => !v)}
-                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                aria-expanded={settingsExpanded}
-                aria-controls="sidebar-settings-list"
+              <Link
+                href="/settings"
+                onClick={onClose}
+                className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                <span className="flex items-center gap-3.5">
-                  <CogIcon /> Settings &amp; Preferences
-                </span>
-                <ChevronDownIcon expanded={settingsExpanded} />
-              </button>
-              {settingsExpanded && (
-                <ul
-                  id="sidebar-settings-list"
-                  className="ml-9 mt-1 space-y-0.5 border-l-2 border-zinc-100 pl-4 dark:border-zinc-800"
-                >
-                  <li>
-                    <Link
-                      href="/settings"
-                      onClick={onClose}
-                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                    >
-                      <span aria-hidden="true">⚙️</span>
-                      All settings
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/settings/location"
-                      onClick={onClose}
-                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                    >
-                      <span aria-hidden="true">📍</span>
-                      Location
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/settings/notifications"
-                      onClick={onClose}
-                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                    >
-                      <span aria-hidden="true">🔔</span>
-                      Notifications
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/settings/appearance"
-                      onClick={onClose}
-                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                    >
-                      <span aria-hidden="true">🎨</span>
-                      Appearance
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/settings/privacy"
-                      onClick={onClose}
-                      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                    >
-                      <span aria-hidden="true">🔒</span>
-                      Privacy &amp; Security
-                    </Link>
-                  </li>
-                  {session ? (
-                    <li>
-                      <Link
-                        href="/auth/settings"
-                        onClick={onClose}
-                        className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                      >
-                        <span aria-hidden="true">👤</span>
-                        Profile (name, phone, photo)
-                      </Link>
-                    </li>
-                  ) : null}
-                </ul>
-              )}
+                <CogIcon /> Settings
+              </Link>
             </li>
 
             {/* Divider */}
@@ -674,6 +579,15 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
                             >
                               <DashboardIcon /> Dashboard
+                            </Link>
+                          </li>
+                          <li>
+                            <Link
+                              href="/dashboard/orders"
+                              onClick={onClose}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                            >
+                              <OrdersIcon /> Orders
                             </Link>
                           </li>
                           {merchantShopId ? (

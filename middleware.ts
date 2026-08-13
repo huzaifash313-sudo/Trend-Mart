@@ -320,7 +320,9 @@ async function getAuthenticatedUser(
  */
 async function isEmailConfirmed(request: NextRequest): Promise<boolean> {
   const user = await getAuthenticatedUser(request);
-  if (!user) return true; // No session = nothing to verify
+  // Fail closed: when cookies are present but the user cannot be resolved
+  // (stale cookie or an auth outage), do NOT treat verification as passed.
+  if (!user) return false;
   return !!user.email_confirmed_at;
 }
 
@@ -389,24 +391,21 @@ async function resolveUserRole(
   try {
     const user = await getAuthenticatedUser(request);
 
-    // If getUser fails but cookies exist, do NOT force "customer" for /dashboard —
-    // that caused account↔dashboard loops when the client still saw merchant/shop.
-    // Prefer metadata hints, else allow merchant-tier so the page can load.
+    // Fail closed: when we cannot resolve the user (stale cookie, transient
+    // auth outage, or missing env), do NOT grant merchant/admin privileges.
+    // The route guard below treats a null role as unauthenticated.
     if (!user) {
-      if (authenticated) {
-        authDebug(
-          "resolveUserRole: getUser failed but cookies exist — using metadata / merchant fallback",
-        );
-        return "merchant";
-      }
+      authDebug("resolveUserRole: getUser failed — failing closed (no role)", {
+        authenticated,
+      });
       return null;
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
-      authDebug("resolveUserRole: MISSING ENV VARS");
-      return authenticated ? "merchant" : null;
+      authDebug("resolveUserRole: MISSING ENV VARS — failing closed");
+      return null;
     }
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -483,8 +482,8 @@ async function resolveUserRole(
     authDebug("resolveUserRole: EXCEPTION", {
       error: err instanceof Error ? err.message : String(err),
     });
-    // Fail open to merchant tier when cookies exist so /dashboard isn't bounced to /account
-    return authenticated ? "merchant" : null;
+    // Fail closed: never infer a privileged role from an exception.
+    return null;
   }
 }
 

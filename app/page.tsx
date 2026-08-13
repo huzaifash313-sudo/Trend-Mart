@@ -5,11 +5,8 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import type { Shop, ShopCategory } from "@/types";
+import type { Shop, ShopCategory, Story } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
-import { fetchMyShop, fetchShops } from "@/services/shopService";
-import { fetchActiveStories } from "@/services/storyService";
-import type { Story } from "@/types";
 import {
   isStoryViewed,
   sortStoriesUnseenFirst,
@@ -26,9 +23,10 @@ import SubCategoryPills from "@/components/SubCategoryPills";
 import OfferDaysStrip from "@/components/OfferDaysStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { fetchShopIdsBySubCategory } from "@/services/productService";
-import { fetchActiveCouponsForShops, type Coupon } from "@/services/couponService";
-import { fetchActiveDeals } from "@/services/dealService";
+import { type Coupon } from "@/services/couponService";
 import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
+import { useQueryClient } from "@tanstack/react-query";
+import { useShops, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 
@@ -42,6 +40,12 @@ const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), 
   loading: () => null,
 });
 
+/* Stable empty fallbacks so derived memos don't change identity every render. */
+const EMPTY_SHOPS: Shop[] = [];
+const EMPTY_DEALS: ShopDeal[] = [];
+const EMPTY_STORIES: Story[] = [];
+const EMPTY_COUPONS: Record<string, Coupon[]> = {};
+
 /* -------------------------------------------------------------------------- */
 /*  HomeInner Component                                                        */
 /* -------------------------------------------------------------------------- */
@@ -51,13 +55,44 @@ function HomeInner() {
   const searchParams = useSearchParams();
   const initialCategory = (searchParams.get("category") as ShopCategory) ?? "All";
 
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [shopCoupons, setShopCoupons] = useState<Record<string, Coupon[]>>({});
-  const [activeDeals, setActiveDeals] = useState<ShopDeal[]>([]);
+  const queryClient = useQueryClient();
+
+  const shopsQuery = useShops();
+  const shops = shopsQuery.data ?? EMPTY_SHOPS;
+  const loading = shopsQuery.isLoading;
+  const error = shopsQuery.error ? shopsQuery.error.message : null;
+
+  const dealsQuery = useDeals(48);
+  const activeDeals = dealsQuery.data ?? EMPTY_DEALS;
+
+  const storiesQuery = useStories();
+  const [storiesVersion, setStoriesVersion] = useState(0);
+  const stories = useMemo(() => {
+    void storiesVersion; // re-sort when a story gets marked as seen
+    return sortStoriesUnseenFirst(storiesQuery.data ?? EMPTY_STORIES);
+  }, [storiesQuery.data, storiesVersion]);
+
+  const myShopQuery = useMyShop();
+  const myShop = useMemo(
+    () =>
+      myShopQuery.data
+        ? {
+            id: myShopQuery.data.id,
+            category: myShopQuery.data.category,
+            name: myShopQuery.data.name,
+          }
+        : null,
+    [myShopQuery.data],
+  );
+
+  const shopIds = useMemo(
+    () => shops.map((s) => s.id).filter(Boolean),
+    [shops],
+  );
+  const couponsQuery = useShopCoupons(shopIds);
+  const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
+
   const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
-  const [stories, setStories] = useState<Story[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(
@@ -78,10 +113,20 @@ function HomeInner() {
     return new Set();
   });
 
-  const [categoryCounts, setCategoryCounts] = useState<{ key: ShopCategory; count: number }[]>([]);
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of shops) {
+      const key = s.category || "Other";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return Array.from(counts.entries()).map(([key, count]) => ({
+      key: key as ShopCategory,
+      count,
+    }));
+  }, [shops]);
+
   const [brokenImgs, setBrokenImgs] = useState<Set<string>>(new Set());
   const [brokenStoryImgs, setBrokenStoryImgs] = useState<Set<string>>(new Set());
-  const [myShop, setMyShop] = useState<{ id: string; category: string; name: string } | null>(null);
   const { addToast } = useToast();
   const { openQuickAdd } = useMerchantQuickAdd();
 
@@ -99,100 +144,19 @@ function HomeInner() {
     scope: "radius",
   });
 
-  /* Fetch shops first for fast paint; stories/deals fill in without blocking */
+  /* Invalidate cached queries when merchants publish/update in other tabs. */
   useEffect(() => {
-    let cancelled = false;
-    const LOADING_TIMEOUT_MS = 12_000;
-
-    async function loadData() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const shopsPromise = Promise.race([
-          fetchShops({ publicOnly: true, limit: 60 }),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Request timed out.")), LOADING_TIMEOUT_MS),
-          ),
-        ]);
-
-        const shopsResult = await shopsPromise;
-        if (cancelled) return;
-
-        if (shopsResult.success) {
-          setShops(shopsResult.data);
-          // Derive category counts from shops already in memory (no extra round-trip)
-          const counts = new Map<string, number>();
-          for (const s of shopsResult.data) {
-            const key = s.category || "Other";
-            counts.set(key, (counts.get(key) ?? 0) + 1);
-          }
-          setCategoryCounts(
-            Array.from(counts.entries()).map(([key, count]) => ({
-              key: key as ShopCategory,
-              count,
-            })),
-          );
-          const ids = shopsResult.data.map((s) => s.id);
-          void fetchActiveCouponsForShops(ids).then((cRes) => {
-            if (!cancelled && cRes.success) setShopCoupons(cRes.data);
-          });
-        } else {
-          setError(shopsResult.error);
-        }
-        setLoading(false);
-
-        // Non-blocking enrichment
-        void Promise.all([fetchActiveStories(), fetchActiveDeals(48)]).then(
-          ([storiesResult, dealsResult]) => {
-            if (cancelled) return;
-            if (storiesResult.success) {
-              setStories(sortStoriesUnseenFirst(storiesResult.data));
-            }
-            if (dealsResult.success) setActiveDeals(dealsResult.data);
-          },
-        );
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load data.");
-          setLoading(false);
-        }
-      }
-    }
-
-    loadData();
-    void fetchMyShop().then((result) => {
-      if (cancelled) return;
-      if (result.success && result.data) {
-        setMyShop({
-          id: result.data.id,
-          category: result.data.category,
-          name: result.data.name,
-        });
-      } else {
-        setMyShop(null);
-      }
-    });
-    const onStoriesUpdated = () => {
-      void fetchActiveStories().then((storiesResult) => {
-        if (!cancelled && storiesResult.success) {
-          setStories(sortStoriesUnseenFirst(storiesResult.data));
-        }
-      });
-    };
+    const onStoriesUpdated = () =>
+      queryClient.invalidateQueries({ queryKey: ["stories"] });
+    const onDealsUpdated = () =>
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
     window.addEventListener("trendmart:stories-updated", onStoriesUpdated);
-    const onDealsUpdated = () => {
-      void fetchActiveDeals(48).then((dRes) => {
-        if (!cancelled && dRes.success) setActiveDeals(dRes.data);
-      });
-    };
     window.addEventListener("trendmart:deals-updated", onDealsUpdated);
     return () => {
-      cancelled = true;
       window.removeEventListener("trendmart:stories-updated", onStoriesUpdated);
       window.removeEventListener("trendmart:deals-updated", onDealsUpdated);
     };
-  }, []);
+  }, [queryClient]);
 
   /* Load shop IDs that have products in the selected sub-category */
   useEffect(() => {
@@ -464,7 +428,7 @@ function HomeInner() {
           initialIndex={selectedStoryIndex}
           onClose={() => {
             setStoryViewerOpen(false);
-            setStories((prev) => sortStoriesUnseenFirst(prev));
+            setStoriesVersion((v) => v + 1);
           }}
         />
       )}

@@ -42,7 +42,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
   );
 }
 
-function dealToProduct(deal: ShopDeal): Product {
+export function dealToProduct(deal: ShopDeal): Product {
   const cover = getDealImages(deal)[0] ?? deal.image_url ?? null;
   const price = deal.price != null && Number.isFinite(deal.price) ? Number(deal.price) : 0;
   return {

@@ -100,6 +100,14 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/** Sanitize an image URL for the payload: http(s) only, no control chars, capped length. */
+function sanitizePayloadUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return "";
+  return trimmed.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").slice(0, 500);
+}
+
 /**
  * Build a structured WhatsApp order message for the merchant.
  */
@@ -126,6 +134,10 @@ function buildWhatsAppMessage(
     lines.push(
       `   • ${item.name}${variantLabel} × ${item.quantity} = ${formatCurrency(itemTotal)}`,
     );
+    const safeImageUrl = sanitizePayloadUrl(item.imageUrl);
+    if (safeImageUrl) {
+      lines.push(`      🖼️ Photo: ${safeImageUrl}`);
+    }
   }
 
   lines.push(``);

@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react";
 
@@ -281,22 +282,40 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPrefs((prev) => ({ ...prev, whatsappFloatEnabled: enabled }));
   }, []);
 
-  const value: ThemeContextValue = {
-    mode: prefs.mode,
-    resolved,
-    fontScale: prefs.fontScale,
-    gridLayout: prefs.gridLayout,
-    cardStyle: prefs.cardStyle,
-    marqueeEnabled: prefs.marqueeEnabled,
-    whatsappFloatEnabled: prefs.whatsappFloatEnabled,
-    setMode,
-    toggleTheme,
-    setFontScale,
-    setGridLayout,
-    setCardStyle,
-    setMarqueeEnabled,
-    setWhatsappFloatEnabled,
-  };
+  const value: ThemeContextValue = useMemo(
+    () => ({
+      mode: prefs.mode,
+      resolved,
+      fontScale: prefs.fontScale,
+      gridLayout: prefs.gridLayout,
+      cardStyle: prefs.cardStyle,
+      marqueeEnabled: prefs.marqueeEnabled,
+      whatsappFloatEnabled: prefs.whatsappFloatEnabled,
+      setMode,
+      toggleTheme,
+      setFontScale,
+      setGridLayout,
+      setCardStyle,
+      setMarqueeEnabled,
+      setWhatsappFloatEnabled,
+    }),
+    [
+      prefs.mode,
+      resolved,
+      prefs.fontScale,
+      prefs.gridLayout,
+      prefs.cardStyle,
+      prefs.marqueeEnabled,
+      prefs.whatsappFloatEnabled,
+      setMode,
+      toggleTheme,
+      setFontScale,
+      setGridLayout,
+      setCardStyle,
+      setMarqueeEnabled,
+      setWhatsappFloatEnabled,
+    ],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
