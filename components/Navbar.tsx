@@ -90,9 +90,9 @@ function TrendBackdrop() {
 function BrandMark({ size = 34 }: { size?: number }) {
   return (
     <span className="tm-navbar-logo" aria-hidden="true">
-      {/* SVG stays crisp at every density; PNG fallback for older browsers */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/trendmart-mark.svg"
+        src="/brand/trendmart-mark.png"
         alt=""
         width={size}
         height={size}
