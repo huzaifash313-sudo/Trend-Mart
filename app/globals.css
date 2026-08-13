@@ -892,6 +892,7 @@ html.dark .trend-card:hover {
   display: inline-flex;
   height: 2.15rem;
   width: 2.15rem;
+  aspect-ratio: 1 / 1;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
@@ -913,6 +914,8 @@ html.dark .trend-card:hover {
   object-position: center;
   background: transparent;
   filter: none;
+  /* Never stretch the mark */
+  flex-shrink: 0;
 }
 .tm-navbar-wordmark {
   min-width: 0;
@@ -2580,4 +2583,252 @@ html.layout-gallery,
 .animate-shimmer,
 .animate-pulse-skeleton {
   transition: none;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  App splash / brand landing                                                 */
+/* -------------------------------------------------------------------------- */
+html.tm-splash-lock,
+html.tm-splash-lock body {
+  overflow: hidden;
+}
+
+.tm-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(1.5rem + var(--safe-area-inset-top, 0px)) 1.5rem
+    calc(1.5rem + var(--safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.35), transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, rgba(13, 148, 136, 0.55), transparent 50%),
+    linear-gradient(165deg, #0f766e 0%, #0d9488 42%, #115e59 100%);
+  color: #fff;
+  cursor: pointer;
+  animation: tm-splash-in 0.55s ease-out both;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.tm-splash--exit {
+  opacity: 0;
+  transform: scale(1.03);
+  pointer-events: none;
+}
+
+.tm-splash-glow {
+  position: absolute;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  filter: blur(40px);
+  top: 12%;
+  left: 50%;
+  margin-left: -9rem;
+  animation: tm-splash-glow 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.tm-splash-glow--2 {
+  width: 14rem;
+  height: 14rem;
+  top: auto;
+  bottom: 8%;
+  left: 12%;
+  margin-left: 0;
+  background: rgba(45, 212, 191, 0.18);
+  animation-name: tm-splash-glow-alt;
+  animation-delay: -1.5s;
+}
+
+.tm-splash-trend {
+  position: absolute;
+  inset: auto 0 18% 0;
+  width: 100%;
+  height: 28%;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.tm-splash-trend-line {
+  stroke-dasharray: 480;
+  stroke-dashoffset: 480;
+  animation: tm-splash-draw 2.2s ease-out 0.25s forwards;
+}
+
+.tm-splash-inner {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 22rem);
+  text-align: center;
+  animation: tm-splash-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+.tm-splash-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  margin-bottom: 1.15rem;
+}
+
+.tm-splash-logo {
+  display: inline-flex;
+  height: 4.25rem;
+  width: 4.25rem;
+  aspect-ratio: 1 / 1;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.05rem;
+  background: #fff;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.35);
+  padding: 0.45rem;
+  animation: tm-splash-pop 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.tm-splash-logo-img {
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+}
+
+.tm-splash-title {
+  margin: 0;
+  font-size: clamp(1.85rem, 7vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.tm-splash-tagline {
+  margin: 0 auto 1.35rem;
+  max-width: 18rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+  text-wrap: balance;
+}
+
+.tm-splash-details {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+  text-align: left;
+}
+
+.tm-splash-details li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.95);
+  animation: tm-splash-rise 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tm-splash-details li:nth-child(1) { animation-delay: 0.28s; }
+.tm-splash-details li:nth-child(2) { animation-delay: 0.4s; }
+.tm-splash-details li:nth-child(3) { animation-delay: 0.52s; }
+
+.tm-splash-dot {
+  margin-top: 0.35rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #99f6e4;
+  box-shadow: 0 0 0 4px rgba(153, 246, 228, 0.18);
+  flex-shrink: 0;
+}
+
+.tm-splash-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.7rem 1.35rem;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #0f766e;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  animation: tm-splash-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both;
+}
+
+.tm-splash-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.tm-splash-cta:active {
+  transform: translateY(0);
+}
+
+.tm-splash-hint {
+  margin: 0.85rem 0 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  animation: tm-splash-rise 0.55s ease 0.75s both;
+}
+
+@keyframes tm-splash-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tm-splash-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tm-splash-pop {
+  from { opacity: 0; transform: scale(0.82); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes tm-splash-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+
+@keyframes tm-splash-glow-alt {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(1.1); }
+}
+
+@keyframes tm-splash-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-splash,
+  .tm-splash-inner,
+  .tm-splash-logo,
+  .tm-splash-details li,
+  .tm-splash-cta,
+  .tm-splash-hint,
+  .tm-splash-glow,
+  .tm-splash-trend-line {
+    animation: none !important;
+  }
 }

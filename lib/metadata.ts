@@ -88,15 +88,13 @@ export function generateRootMetadata(): Metadata {
     },
     icons: {
       icon: [
-        { url: "/favicon.png?v=6", type: "image/png" },
-        { url: "/trendmart-mark.png?v=6", type: "image/png", sizes: "505x562" },
-        { url: "/icon-192.png?v=6", sizes: "192x192", type: "image/png" },
-        { url: "/icon-512.png?v=6", sizes: "512x512", type: "image/png" },
+        { url: "/favicon.png?v=7", type: "image/png" },
+        { url: "/favicon-32.png?v=7", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-16.png?v=7", sizes: "16x16", type: "image/png" },
+        { url: "/icon-192.png?v=7", sizes: "192x192", type: "image/png" },
+        { url: "/icon-512.png?v=7", sizes: "512x512", type: "image/png" },
       ],
-      apple: [
-        { url: "/apple-touch-icon.png?v=6", sizes: "180x180", type: "image/png" },
-        { url: "/trendmart-mark.png?v=6", type: "image/png" },
-      ],
+      apple: [{ url: "/apple-touch-icon.png?v=7", sizes: "180x180", type: "image/png" }],
     },
   };
 }

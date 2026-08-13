@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — PWA Web App Manifest                                          */
-/*  Icons: same source mark (exact file) — no redesign / recompress.          */
+/*  Square teal-plate icons (mark contain, no stretch) for home-screen.       */
 /* -------------------------------------------------------------------------- */
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -20,25 +20,19 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["shopping", "business", "lifestyle"],
     icons: [
       {
-        src: "/trendmart-mark.png?v=6",
-        sizes: "505x562",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/icon-192.png?v=6",
+        src: "/icon-192.png?v=7",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png?v=6",
+        src: "/icon-512.png?v=7",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png?v=6",
+        src: "/icon-512.png?v=7",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

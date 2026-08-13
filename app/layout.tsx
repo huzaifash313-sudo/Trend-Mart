@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import Footer from "@/components/Footer";
 import PwaRegister from "@/components/PwaRegister";
+import AppSplash from "@/components/AppSplash";
 import CartBar from "@/components/CartBar";
 import CartProvider from "@/context/CartContext";
 import QueryProvider from "@/components/QueryProvider";
@@ -33,9 +34,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = generateRootMetadata();
 
 export const viewport: Viewport = {
-  themeColor: "#059669",
+  themeColor: "#0f766e",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 const THEME_BOOTSTRAP = `(function(){try{var k="trendmart_theme_prefs_v4";var raw=localStorage.getItem(k);if(!raw){raw=localStorage.getItem("trendmart_theme_prefs_v3");}var mode="light";if(raw){var p=JSON.parse(raw);if(p&&p.mode==="dark")mode="dark";}var r=document.documentElement;if(mode==="dark"){r.classList.add("dark");r.classList.remove("light");}else{r.classList.add("light");r.classList.remove("dark");}}catch(e){document.documentElement.classList.add("light");document.documentElement.classList.remove("dark");}})();`;
@@ -68,6 +70,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <ToastProvider>
               <MerchantQuickAddProvider>
               <AppNotifications>
+              <ErrorBoundary name="AppSplash">
+                <AppSplash />
+              </ErrorBoundary>
               <ErrorBoundary name="Navbar">
                 <Navbar />
               </ErrorBoundary>
