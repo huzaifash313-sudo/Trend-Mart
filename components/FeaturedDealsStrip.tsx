@@ -188,6 +188,7 @@ function HomeShiftShelf({
   const dragStartX = useRef(0);
   const dragging = useRef(false);
   const moved = useRef(false);
+  const suppressClick = useRef(false);
 
   // Enough clones so the last window never looks empty while sliding
   const trackDeals = useMemo(() => {
@@ -224,6 +225,11 @@ function HomeShiftShelf({
     if (viewportRef.current) ro?.observe(viewportRef.current);
     return () => ro?.disconnect();
   }, [measure, trackDeals, perView]);
+
+  const openDealCard = useCallback((deal: ShopDeal) => {
+    setPaused(true);
+    setOpenDeal(deal);
+  }, []);
 
   const go = useCallback(
     (dir: -1 | 1) => {
@@ -262,25 +268,50 @@ function HomeShiftShelf({
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (!canSlide) return;
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    // Don't capture yet — capture steals clicks from DealCard / buttons.
     dragging.current = true;
     moved.current = false;
+    suppressClick.current = false;
     dragStartX.current = e.clientX;
     setPaused(true);
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!dragging.current) return;
-    if (Math.abs(e.clientX - dragStartX.current) > 10) moved.current = true;
+    if (Math.abs(e.clientX - dragStartX.current) <= 12) return;
+    if (!moved.current) {
+      moved.current = true;
+      suppressClick.current = true;
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
   };
 
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
     if (!dragging.current) return;
     dragging.current = false;
     const dx = e.clientX - dragStartX.current;
-    if (Math.abs(dx) > 48) go(dx < 0 ? 1 : -1);
-    setPaused(false);
-    setProgressKey((k) => k + 1);
+    const wasDrag = moved.current;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    if (wasDrag && Math.abs(dx) > 48) {
+      go(dx < 0 ? 1 : -1);
+    }
+    // Keep suppress flag through the synthetic click, then clear.
+    window.setTimeout(() => {
+      moved.current = false;
+      suppressClick.current = false;
+    }, 0);
+    if (!openDeal) {
+      setPaused(false);
+      setProgressKey((k) => k + 1);
+    }
   };
 
   if (count === 0) return null;
@@ -343,7 +374,7 @@ function HomeShiftShelf({
           onPointerCancel={onPointerUp}
           onMouseEnter={() => canSlide && setPaused(true)}
           onMouseLeave={() => {
-            if (!canSlide) return;
+            if (!canSlide || openDeal) return;
             setPaused(false);
             setProgressKey((k) => k + 1);
           }}
@@ -374,9 +405,8 @@ function HomeShiftShelf({
                   priority={i < perView}
                   offerTags={getOfferTags?.(deal.shop_id) ?? []}
                   onOpen={() => {
-                    if (moved.current) return;
-                    setPaused(true);
-                    setOpenDeal(deal);
+                    if (suppressClick.current || moved.current) return;
+                    openDealCard(deal);
                   }}
                 />
               </div>
@@ -544,7 +574,7 @@ function MarqueeShelf({
         cancelAnimationFrame(animRef.current);
         animRef.current = null;
       }
-      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      // Capture only after real drag — otherwise taps never open QuickView.
     },
     [pauseAuto],
   );
@@ -553,18 +583,38 @@ function MarqueeShelf({
     (e: PointerEvent<HTMLDivElement>) => {
       if (!draggingRef.current) return;
       const dx = e.clientX - dragStartXRef.current;
-      if (Math.abs(dx) > 6) movedRef.current = true;
-      offsetRef.current = wrapOffset(dragStartOffsetRef.current - dx, setWidthRef.current || 1);
-      applyTransform();
+      if (Math.abs(dx) > 8) {
+        if (!movedRef.current) {
+          movedRef.current = true;
+          try {
+            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+        }
+        offsetRef.current = wrapOffset(dragStartOffsetRef.current - dx, setWidthRef.current || 1);
+        applyTransform();
+      }
     },
     [applyTransform],
   );
 
-  const onPointerUp = useCallback(() => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    pauseAuto(RESUME_AFTER_MS);
-  }, [pauseAuto]);
+  const onPointerUp = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      pauseAuto(RESUME_AFTER_MS);
+      window.setTimeout(() => {
+        movedRef.current = false;
+      }, 0);
+    },
+    [pauseAuto],
+  );
 
   if (deals.length === 0) return null;
 
