@@ -88,13 +88,13 @@ export function generateRootMetadata(): Metadata {
     },
     icons: {
       icon: [
-        { url: "/favicon.png", type: "image/png" },
-        { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-        { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
-        { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-        { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+        { url: "/favicon.png?v=4", type: "image/png" },
+        { url: "/favicon-32.png?v=4", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-16.png?v=4", sizes: "16x16", type: "image/png" },
+        { url: "/icon-192.png?v=4", sizes: "192x192", type: "image/png" },
+        { url: "/icon-512.png?v=4", sizes: "512x512", type: "image/png" },
       ],
-      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+      apple: [{ url: "/apple-touch-icon.png?v=4", sizes: "180x180", type: "image/png" }],
     },
   };
 }

@@ -17,24 +17,24 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#000000",
+    background_color: "#0f766e",
     theme_color: "#0f766e",
     categories: ["shopping", "business", "lifestyle"],
     icons: [
       {
-        src: "/icon-192.png",
+        src: "/icon-192.png?v=4",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/icon-512.png?v=4",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/icon-512.png?v=4",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
