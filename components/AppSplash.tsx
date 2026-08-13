@@ -2,15 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queries";
+import { fetchShops } from "@/services/shopService";
+import { fetchActiveStories } from "@/services/storyService";
+import { fetchActiveDeals } from "@/services/dealService";
 
-export const SPLASH_KEY = "tm_splash_seen_v4";
+export const SPLASH_KEY = "tm_splash_seen_v5";
 
-/** Fast path: logo visible immediately → rise + title → previews → 1s hold → home */
+/**
+ * Beat:
+ * 1) Logo alone (readable beat)
+ * 2) Logo rises + TrendMart slides in
+ * 3) Tagline + phone previews
+ * 4) Hold so customer can skim (~2s) while home data prefetches
+ * 5) Fade to home (already warm in React Query cache)
+ */
 const STAGE_MS = {
-  brand: 450,
-  details: 500,
-  hold: 1000,
-  exit: 280,
+  logoHold: 550,
+  brand: 700,
+  details: 650,
+  holdMin: 1800,
+  exit: 320,
+  /** Never block home forever if network is slow */
+  maxWaitForData: 2200,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -35,6 +50,14 @@ function markSplashSeen() {
 function removeBootSplash() {
   document.documentElement.classList.remove("tm-boot-splash");
   document.getElementById("tm-boot-splash")?.remove();
+}
+
+async function unwrap<T>(
+  promise: Promise<{ success: true; data: T } | { success: false; error: string }>,
+): Promise<T> {
+  const result = await promise;
+  if (!result.success) throw new Error(result.error);
+  return result.data;
 }
 
 function PhonePreview({
@@ -79,12 +102,9 @@ function PhonePreview({
   );
 }
 
-/**
- * Instant cover → same logo rises with TrendMart → previews → 1s → home.
- * No second logo pop-in, no white flash between boot and splash.
- */
 export default function AppSplash() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("off");
 
   useEffect(() => {
@@ -97,12 +117,30 @@ export default function AppSplash() {
 
     markSplashSeen();
     document.documentElement.classList.add("tm-splash-lock");
-    // Mount React splash on top of boot immediately (same logo, no restart anim)
     setPhase("logo");
 
-    const timers: number[] = [];
+    // Warm homepage cache while the customer watches the splash
+    const prefetch = Promise.allSettled([
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.shops,
+        queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 60 })),
+        staleTime: 2 * 60_000,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.stories,
+        queryFn: () => unwrap(fetchActiveStories()),
+        staleTime: 2 * 60_000,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.deals(48),
+        queryFn: () => unwrap(fetchActiveDeals(48)),
+        staleTime: 2 * 60_000,
+      }),
+    ]);
 
-    // Drop boot only after React splash is covering (next frames)
+    const timers: number[] = [];
+    let cancelled = false;
+
     timers.push(
       window.setTimeout(() => {
         requestAnimationFrame(() => {
@@ -111,27 +149,44 @@ export default function AppSplash() {
       }, 0),
     );
 
-    // Start rise almost immediately — logo already showing
-    timers.push(window.setTimeout(() => setPhase("brand"), 120));
-    let t = 120 + STAGE_MS.brand;
+    // 1) Logo alone, then rise + title
+    timers.push(window.setTimeout(() => setPhase("brand"), STAGE_MS.logoHold));
+    let t = STAGE_MS.logoHold + STAGE_MS.brand;
+    // 2) Previews / details
     timers.push(window.setTimeout(() => setPhase("details"), t));
     t += STAGE_MS.details;
-    timers.push(window.setTimeout(() => setPhase("hold"), t));
-    t += STAGE_MS.hold;
-    timers.push(window.setTimeout(() => setPhase("exit"), t));
-    t += STAGE_MS.exit;
+    // 3) Hold for reading + finish prefetch if needed
     timers.push(
       window.setTimeout(() => {
-        document.documentElement.classList.remove("tm-splash-lock");
-        setPhase("off");
+        setPhase("hold");
+        const holdStarted = Date.now();
+        void (async () => {
+          const remainingMin = STAGE_MS.holdMin;
+          await Promise.race([
+            prefetch,
+            new Promise((r) => window.setTimeout(r, STAGE_MS.maxWaitForData)),
+          ]);
+          if (cancelled) return;
+          const elapsed = Date.now() - holdStarted;
+          const waitMore = Math.max(0, remainingMin - elapsed);
+          await new Promise((r) => window.setTimeout(r, waitMore));
+          if (cancelled) return;
+          setPhase("exit");
+          window.setTimeout(() => {
+            if (cancelled) return;
+            document.documentElement.classList.remove("tm-splash-lock");
+            setPhase("off");
+          }, STAGE_MS.exit);
+        })();
       }, t),
     );
 
     return () => {
+      cancelled = true;
       timers.forEach((id) => window.clearTimeout(id));
       document.documentElement.classList.remove("tm-splash-lock");
     };
-  }, [pathname]);
+  }, [pathname, queryClient]);
 
   if (phase === "off") return null;
 
