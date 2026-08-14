@@ -98,15 +98,6 @@ export async function fetchSubCategories(
     return { success: false, error: "Invalid category specified." };
   }
 
-  // Fire-and-forget: try to upsert missing rows into Supabase when service role is configured
-  if (typeof window !== "undefined") {
-    void fetch(`/api/sub-categories/seed?category=${encodeURIComponent(safeCategory)}`, {
-      method: "POST",
-    }).catch(() => {
-      /* seed is best-effort */
-    });
-  }
-
   const supabase = createClient();
 
   try {

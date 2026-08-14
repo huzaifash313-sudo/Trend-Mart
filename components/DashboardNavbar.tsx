@@ -103,10 +103,10 @@ export default function DashboardNavbar() {
     let cancelled = false;
     async function resolveShop() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user?.id || cancelled) return;
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user?.id || cancelled) return;
         setShopId(null);
-        const { data: shop } = await supabase.from("shops").select("id").eq("owner_id", session.user.id).maybeSingle();
+        const { data: shop } = await supabase.from("shops").select("id").eq("owner_id", user.id).maybeSingle();
         if (!cancelled && shop?.id) setShopId(shop.id);
       } catch (err) { logError(err, { module: "DashboardNavbar.resolveShop" }); }
       finally { if (!cancelled) setLoading(false); }

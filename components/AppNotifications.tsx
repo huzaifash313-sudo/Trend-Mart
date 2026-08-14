@@ -50,18 +50,29 @@ function AutoRegisterMerchantShops() {
     const cleanups: Array<() => void> = [];
 
     void (async () => {
+      // getUser() validates the JWT. getSession() can return a wiped/stale
+      // local session after SQL resets → 401 on shops?owner_id=...
       const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user || cancelled) return;
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+      if (error || !user || cancelled) {
+        if (error) {
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            /* ignore */
+          }
+        }
+        return;
+      }
 
-      const { data: shops } = await supabase
+      const { data: shops, error: shopError } = await supabase
         .from("shops")
         .select("id")
         .eq("owner_id", user.id);
 
-      if (!shops?.length || cancelled) return;
+      if (shopError || !shops?.length || cancelled) return;
 
       for (const shop of shops) {
         if (shop.id) cleanups.push(registerShop(shop.id));

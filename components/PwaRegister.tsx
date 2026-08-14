@@ -26,7 +26,9 @@ export default function PwaRegister() {
     }
 
     const onBeforeInstall = (event: Event) => {
-      event.preventDefault();
+      // Do not preventDefault — Chrome's native install banner is the prompt.
+      // Intercepting without calling .prompt() logs:
+      // "Banner not shown: beforeinstallpromptevent.preventDefault() called"
       window.__tmDeferredInstall = event as BeforeInstallPromptEvent;
       window.dispatchEvent(new Event("tm-pwa-install-available"));
     };

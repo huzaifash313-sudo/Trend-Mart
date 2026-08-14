@@ -199,12 +199,15 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
           const role = await detectUserRole(data.session.user);
           setUserRole(role);
           if (role === "merchant" || role === "admin") {
-            const { data: shop } = await supabase
-              .from("shops")
-              .select("id")
-              .eq("owner_id", data.session.user.id)
-              .maybeSingle();
-            if (!cancelled) setMerchantShopId(shop?.id ?? null);
+            const { data: auth } = await supabase.auth.getUser();
+            if (auth.user && !cancelled) {
+              const { data: shop } = await supabase
+                .from("shops")
+                .select("id")
+                .eq("owner_id", auth.user.id)
+                .maybeSingle();
+              if (!cancelled) setMerchantShopId(shop?.id ?? null);
+            }
           } else if (!cancelled) {
             setMerchantShopId(null);
           }
@@ -220,12 +223,15 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             const role = await detectUserRole(currentSession.user);
             setUserRole(role);
             if (role === "merchant" || role === "admin") {
-              const { data: shop } = await supabase
-                .from("shops")
-                .select("id")
-                .eq("owner_id", currentSession.user.id)
-                .maybeSingle();
-              if (!cancelled) setMerchantShopId(shop?.id ?? null);
+              const { data: auth } = await supabase.auth.getUser();
+              if (auth.user && !cancelled) {
+                const { data: shop } = await supabase
+                  .from("shops")
+                  .select("id")
+                  .eq("owner_id", auth.user.id)
+                  .maybeSingle();
+                if (!cancelled) setMerchantShopId(shop?.id ?? null);
+              }
             } else {
               setMerchantShopId(null);
             }

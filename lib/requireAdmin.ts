@@ -5,11 +5,10 @@ type AdminGate =
   | { ok: true; user: User }
   | { ok: false; status: 401 | 403; error: string };
 
-/**
- * Require a signed-in Super-Admin for server routes that send mail
- * or write with the service-role client.
- */
-export async function requireAdminUser(): Promise<AdminGate> {
+/** Any signed-in user (merchant/customer/admin). */
+export async function requireSignedInUser(): Promise<
+  { ok: true; user: User } | { ok: false; status: 401; error: string }
+> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,6 +16,19 @@ export async function requireAdminUser(): Promise<AdminGate> {
   if (!user) {
     return { ok: false, status: 401, error: "Sign in required." };
   }
+  return { ok: true, user };
+}
+
+/**
+ * Require a signed-in Super-Admin for server routes that send mail
+ * or write with the service-role client.
+ */
+export async function requireAdminUser(): Promise<AdminGate> {
+  const signedIn = await requireSignedInUser();
+  if (!signedIn.ok) return signedIn;
+
+  const user = signedIn.user;
+  const supabase = await createClient();
 
   const VALID = new Set(["admin"]);
   const { data: rpcRole } = await supabase.rpc("get_my_role");
