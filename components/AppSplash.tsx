@@ -37,10 +37,15 @@ type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
 function shouldShowSplash(pathname: string): boolean {
   if (pathname !== "/") return false;
   try {
-    return sessionStorage.getItem(SPLASH_KEY) !== "1";
+    if (sessionStorage.getItem(SPLASH_KEY) === "1") return false;
   } catch {
-    return true;
+    /* ignore */
   }
+  // Only play the intro when the BOOT script armed it (i.e. this is a genuine
+  // fresh homepage load). A client-side navigation (e.g. /products → home) must
+  // NOT trigger the intro, otherwise the homepage flashes under the splash.
+  if (typeof document === "undefined") return false;
+  return document.documentElement.classList.contains("tm-splash-lock");
 }
 
 function markSplashSeen() {

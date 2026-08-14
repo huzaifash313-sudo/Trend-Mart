@@ -2635,8 +2635,11 @@ html.tm-splash-lock body {
   z-index: 13000;
   align-items: center;
   justify-content: center;
+  /* Exact same gradient as the React `.tm-splash` so the boot → React handoff
+     is invisible (no background flicker). */
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.35), transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, rgba(13, 148, 136, 0.55), transparent 50%),
     linear-gradient(165deg, #0f766e 0%, #0d9488 42%, #115e59 100%);
   pointer-events: none;
 }
@@ -2660,6 +2663,10 @@ html.tm-first-paint .tm-boot-splash {
   background: #fff;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
   padding: 0.55rem;
+  /* Match the React splash's initial "logo" phase position (`.tm-splash-stage`
+     is translateY(18vh)) so the boot → React handoff is pixel-perfect with no
+     logo jump / double-logo flash. */
+  transform: translateY(18vh);
 }
 
 .tm-boot-splash-logo img {
