@@ -291,8 +291,9 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
       body.style.top = originalTop;
       body.style.width = originalWidth;
 
-      // Restore scroll position
-      window.scrollTo(0, scrollY);
+      // Restore scroll position — instant (avoid the global smooth-scroll
+      // animating it from the top when the drawer closes).
+      window.scrollTo({ top: scrollY, behavior: "instant" });
 
       // Restore focus to the previously active element
       if (previousActiveElement.current && typeof previousActiveElement.current.focus === "function") {

@@ -94,10 +94,12 @@ export default function ScrollToTop() {
       prevContentSig.current = sig;
       const y = readMap()[`${pathname}${search ? `?${search}` : ""}`] ?? 0;
       if (y > 0) {
-        window.scrollTo(0, y);
+        // Instant restore — never animate (global smooth-scroll would slide
+        // the list back down from the top, which looks like a bug).
+        window.scrollTo({ top: y, behavior: "instant" });
         document.documentElement.scrollTop = y;
       } else {
-        window.scrollTo(0, 0);
+        window.scrollTo({ top: 0, behavior: "instant" });
       }
       return;
     }
@@ -113,9 +115,9 @@ export default function ScrollToTop() {
       return;
     }
 
-    // Genuine content change → jump to top.
+    // Genuine content change → jump to top (instant).
     prevContentSig.current = sig;
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: "instant" });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, [pathname, search]);

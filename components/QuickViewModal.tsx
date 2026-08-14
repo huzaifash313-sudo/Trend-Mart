@@ -130,7 +130,9 @@ export default function QuickViewModal({
       body.style.top = prev.top;
       body.style.width = prev.width;
       html.style.overflow = prev.htmlOverflow;
-      window.scrollTo(0, scrollY);
+      // Instant restore — a global `scroll-behavior: smooth` would otherwise
+      // animate this from the top, making the list visibly "jump back down".
+      window.scrollTo({ top: scrollY, behavior: "instant" });
     };
   }, []);
 
