@@ -463,8 +463,7 @@ function HomeInner() {
 
       {/* Stories — first content under category tabs */}
       <section aria-label="Merchant stories" className="mt-1 mb-3">
-        <h2 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Stories</h2>
-        <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-1 scrollbar-none">
+        <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0.5 scrollbar-none">
           {myShop ? (
             <button
               type="button"
@@ -540,6 +539,9 @@ function HomeInner() {
             })
           )}
         </div>
+        <p className="mt-1 px-0.5 text-[0.55rem] font-medium uppercase tracking-wider text-zinc-400/80 dark:text-zinc-500">
+          Stories
+        </p>
       </section>
 
       {storyViewerOpen && (
