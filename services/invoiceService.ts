@@ -114,7 +114,10 @@ export async function prepareInvoiceFromOrder(
     const taxRate = 0;
     const taxAmount = 0;
     const discount = 0;
-    const total = subtotal;
+    // The order's stored total is authoritative (includes discount + delivery
+    // fee). Never recompute total = subtotal — that would silently drop any
+    // applied coupon/delivery adjustments and mismatch the order record.
+    const total = Number(order.total_amount) || subtotal;
 
     const invoiceData: InvoiceData = {
       invoiceNumber: generateInvoiceNumber(),

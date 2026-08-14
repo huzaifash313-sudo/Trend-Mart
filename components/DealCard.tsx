@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useCallback, type MouseEvent } from "react";
+import { useMemo, useState, useCallback, memo, type MouseEvent } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import {
   formatDealWhenTag,
@@ -15,10 +16,15 @@ import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { useCart } from "@/context/CartContext";
 import { toggleFavorite } from "@/services/wishlistService";
 import type { Product, Shop } from "@/types";
-import WhatsAppCheckoutModal, {
-  type WhatsAppCartItem,
-} from "@/components/WhatsAppCheckoutModal";
+import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import { useToast } from "@/components/Toast";
+
+// Lazy-load the heavy checkout form — it's only needed when a shopper actually
+// taps "Order", so it should never be in the deals-list bundle.
+const WhatsAppCheckoutModal = dynamic(
+  () => import("@/components/WhatsAppCheckoutModal"),
+  { ssr: false },
+);
 
 interface DealCardProps {
   deal: ShopDeal;
@@ -69,8 +75,9 @@ function formatDealPrice(n: number): string {
 /**
  * Product-style deal card. Price is always full-width (never clipped by buttons).
  * Actions sit on their own row. Equal height via stretch + fixed slots.
+ * Memoized so re-rendering a deals strip/grid doesn't re-render every card.
  */
-export default function DealCard({
+function DealCard({
   deal,
   href,
   offerTags = [],
@@ -258,7 +265,6 @@ export default function DealCard({
                 priority={priority}
                 loading={priority ? "eager" : "lazy"}
                 quality={85}
-                unoptimized={/\.supabase\.(co|in)\//i.test(safeSrc)}
                 onError={() => setImgError(true)}
               />
             ) : (
@@ -394,7 +400,6 @@ export default function DealCard({
               priority={priority}
               loading={priority ? "eager" : "lazy"}
               quality={75}
-              unoptimized={/\.supabase\.(co|in)\//i.test(safeSrc)}
               onError={() => setImgError(true)}
             />
           ) : (
@@ -553,3 +558,5 @@ export default function DealCard({
     </>
   );
 }
+
+export default memo(DealCard);

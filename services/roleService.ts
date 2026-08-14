@@ -42,16 +42,20 @@ export async function getUserRole(): Promise<AppRole | null> {
     if (userError || !user) return null;
 
     const { data: rpcRole, error: rpcError } = await supabase.rpc("get_my_role");
-    if (!rpcError && typeof rpcRole === "string") {
+    if (
+      !rpcError &&
+      typeof rpcRole === "string" &&
+      ["customer", "merchant", "admin"].includes(rpcRole)
+    ) {
       return rpcRole as AppRole;
     }
 
-    const meta =
-      (typeof user.user_metadata?.role === "string" && user.user_metadata.role) ||
-      (typeof user.app_metadata?.role === "string" && user.app_metadata.role) ||
-      null;
-    if (meta === "customer" || meta === "merchant" || meta === "admin") {
-      return meta;
+    // SECURITY: app_metadata.role is service-role-only. user_metadata.role is
+    // user-editable and must NEVER confer admin/merchant — deliberately ignored.
+    const appMeta =
+      typeof user.app_metadata?.role === "string" ? user.app_metadata.role : null;
+    if (appMeta === "customer" || appMeta === "merchant" || appMeta === "admin") {
+      return appMeta;
     }
     return null;
   } catch {
@@ -95,29 +99,34 @@ export async function getUserRoleAndShopIds(): Promise<{
     if (typeof rpcRole === "string" && ["customer", "merchant", "admin"].includes(rpcRole)) {
       role = rpcRole as AppRole;
     } else {
-      const meta =
-        (typeof user.user_metadata?.role === "string" && user.user_metadata.role) ||
-        (typeof user.app_metadata?.role === "string" && user.app_metadata.role);
-      if (meta === "customer" || meta === "merchant" || meta === "admin") {
-        role = meta;
+      // SECURITY: only app_metadata (service-role) may confer a role here.
+      const appMeta =
+        typeof user.app_metadata?.role === "string" ? user.app_metadata.role : "";
+      if (appMeta === "customer" || appMeta === "merchant" || appMeta === "admin") {
+        role = appMeta;
+      } else {
+        // Fallback: shop ownership implies merchant.
+        const { data: owned } = await supabase
+          .from("shops")
+          .select("id")
+          .eq("owner_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        role = owned?.id ? "merchant" : "customer";
       }
     }
 
-    // Fetch owned shop IDs if merchant or admin
+    // Fetch owned shop IDs: admin sees all shops, merchant only their own.
     let shopIds: string[] = [];
-    if (role === "merchant" || role === "admin") {
+    if (role === "admin") {
+      const { data: allShops } = await supabase.from("shops").select("id");
+      shopIds = (allShops ?? []).map((s: { id: string }) => s.id);
+    } else if (role === "merchant") {
       const { data: shops } = await supabase
         .from("shops")
         .select("id")
-        .eq(role === "admin" ? "id" : "owner_id", role === "admin" ? undefined! : user.id);
-
-      // For admin, we would fetch all shops - but we use a different query
-      if (role === "admin") {
-        const { data: allShops } = await supabase.from("shops").select("id");
-        shopIds = (allShops ?? []).map((s: { id: string }) => s.id);
-      } else {
-        shopIds = (shops ?? []).map((s: { id: string }) => s.id);
-      }
+        .eq("owner_id", user.id);
+      shopIds = (shops ?? []).map((s: { id: string }) => s.id);
     }
 
     return { role, shopIds, userId: user.id };
@@ -143,16 +152,19 @@ export async function getClientUserRole(): Promise<AppRole | null> {
     if (userError || !user) return null;
 
     const { data: rpcRole, error: rpcError } = await supabase.rpc("get_my_role");
-    if (!rpcError && typeof rpcRole === "string") {
+    if (
+      !rpcError &&
+      typeof rpcRole === "string" &&
+      ["customer", "merchant", "admin"].includes(rpcRole)
+    ) {
       return rpcRole as AppRole;
     }
 
-    const meta =
-      (typeof user.user_metadata?.role === "string" && user.user_metadata.role) ||
-      (typeof user.app_metadata?.role === "string" && user.app_metadata.role) ||
-      null;
-    if (meta === "customer" || meta === "merchant" || meta === "admin") {
-      return meta;
+    // SECURITY: app_metadata.role only — never user-editable user_metadata.
+    const appMeta =
+      typeof user.app_metadata?.role === "string" ? user.app_metadata.role : null;
+    if (appMeta === "customer" || appMeta === "merchant" || appMeta === "admin") {
+      return appMeta;
     }
     return null;
   } catch {

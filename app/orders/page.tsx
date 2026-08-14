@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Order, OrderItem } from "@/types";
 import { fetchOrdersByPhone } from "@/services/orderService";
 import { fetchShops } from "@/services/shopService";
+import { getOrderHistory } from "@/services/orderHistoryService";
 import type { Shop } from "@/types";
 
 /* -------------------------------------------------------------------------- */
@@ -174,12 +175,26 @@ interface LocalOrder {
 
 function getLocalOrders(): LocalOrder[] {
   if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem("trendmart_orders");
-    return raw ? (JSON.parse(raw) as LocalOrder[]) : [];
-  } catch {
-    return [];
-  }
+  // Read from the unified local history service (same key the checkout writes).
+  return getOrderHistory().map((o) => ({
+    id: o.id,
+    shopId: o.shopId,
+    shopName: o.shopName,
+    items:
+      Array.isArray(o.items) && o.items.length > 0
+        ? o.items
+        : [
+            {
+              product_id: "",
+              name: o.productName || "Order",
+              price: o.quantity > 0 ? o.totalAmount / o.quantity : o.totalAmount,
+              quantity: o.quantity,
+            },
+          ],
+    totalAmount: o.totalAmount,
+    status: o.status || "Pending",
+    createdAt: o.timestamp,
+  }));
 }
 
 /* -------------------------------------------------------------------------- */

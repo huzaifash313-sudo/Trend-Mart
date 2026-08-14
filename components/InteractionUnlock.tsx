@@ -64,7 +64,7 @@ export default function InteractionUnlock() {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       try {
-        if (sessionStorage.getItem("tm_splash_seen_v5") === "1") unlock();
+        if (sessionStorage.getItem("tm_splash_seen_v6") === "1") unlock();
       } catch {
         unlock();
       }

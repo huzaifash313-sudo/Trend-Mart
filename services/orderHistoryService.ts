@@ -4,12 +4,14 @@
 /* -------------------------------------------------------------------------- */
 
 import { sanitizeLight, truncate, sanitizeNumeric } from "@/lib/sanitization";
+import type { OrderItem } from "@/types";
 
 export interface LocalOrderRecord {
   /** Unique reference ID (auto-generated or from Supabase). */
   id: string;
   shopId: string;
   shopName: string;
+  /** Comma-joined product names (compact label for the account portal). */
   productName: string;
   quantity: number;
   totalAmount: number;
@@ -17,9 +19,17 @@ export interface LocalOrderRecord {
   couponCode: string;
   notes: string;
   timestamp: string;
+  /** Line items — added so the /orders page can render the full breakdown. */
+  items?: OrderItem[];
+  /** Order status at time of save (defaults to Pending). */
+  status?: string;
 }
 
-const STORAGE_KEY = "trendmart_order_history";
+// The orders page (`app/orders/page.tsx`) reads this key. It previously read
+// `trendmart_orders` while this service wrote `trendmart_order_history` — the
+// two were disconnected. We now write the same key the reader expects.
+const STORAGE_KEY = "trendmart_orders";
+const LEGACY_STORAGE_KEY = "trendmart_order_history";
 
 // ─── Field length constraints ────────────────────────────────────────────────
 
@@ -35,7 +45,18 @@ const MAX_NOTES = 500;
 function getStoredOrders(): LocalOrderRecord[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    let raw = localStorage.getItem(STORAGE_KEY);
+
+    // One-time migration: pull old history key forward so existing users keep
+    // their local orders under the unified key.
+    if (!raw) {
+      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy) {
+        localStorage.setItem(STORAGE_KEY, legacy);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        raw = legacy;
+      }
+    }
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     // Type-validate the stored array before returning
@@ -86,6 +107,20 @@ function sanitizeOrderParams(
       MAX_COUPON_CODE,
     ),
     notes: truncate(sanitizeLight(params.notes), MAX_NOTES),
+    ...(Array.isArray(params.items)
+      ? {
+          items: params.items.slice(0, 200).map((it) => ({
+            product_id: truncate(sanitizeLight(it.product_id ?? ""), 100),
+            name: truncate(sanitizeLight(it.name), 200),
+            price: sanitizeNumeric(it.price, 0, 99_999_999, 0),
+            quantity: sanitizeNumeric(it.quantity, 1, 999, 1),
+            ...(it.variant ? { variant: truncate(sanitizeLight(it.variant), 100) } : {}),
+          })),
+        }
+      : {}),
+    ...(typeof params.status === "string"
+      ? { status: truncate(sanitizeLight(params.status), 30) }
+      : {}),
   };
 }
 

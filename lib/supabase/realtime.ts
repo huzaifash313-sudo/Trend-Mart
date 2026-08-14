@@ -120,6 +120,17 @@ export function getConnectionState(): ConnectionState {
 
 const activeChannels = new Map<string, RealtimeChannel>();
 
+// Monotonic counter so multiple concurrent listeners on the SAME logical
+// channel (e.g. the global bell AND the dashboard live feed both subscribe to
+// the same shop's orders) each get a unique physical channel name. The previous
+// single-slot-per-key design unsubscribed the first listener whenever a second
+// subscribed, silently killing earlier callbacks.
+let channelSeq = 0;
+function uniqueKey(base: string): string {
+  channelSeq += 1;
+  return `${base}#${channelSeq}`;
+}
+
 /**
  * Subscribe to real-time INSERT/UPDATE events on the orders table for a specific shop.
  * The merchant dashboard uses this to see new orders appear instantly.
@@ -130,10 +141,7 @@ export function subscribeToOrders(
   onUpdate?: RealtimeCallback<OrderPayload>,
 ): () => void {
   const supabase = createClient();
-  const channelKey = `orders-${shopId}`;
-
-  // Clean up any existing subscription for this shop
-  unsubscribe(channelKey);
+  const channelKey = uniqueKey(`orders-${shopId}`);
 
   const channel = supabase
     .channel(channelKey)
@@ -188,9 +196,7 @@ export function subscribeToInquiries(
   onUpdate?: RealtimeCallback<InquiryPayload>,
 ): () => void {
   const supabase = createClient();
-  const channelKey = `inquiries-${shopId}`;
-
-  unsubscribe(channelKey);
+  const channelKey = uniqueKey(`inquiries-${shopId}`);
 
   const channel = supabase
     .channel(channelKey)
@@ -237,9 +243,7 @@ export function subscribeToCustomerOrders(
   onUpdate: RealtimeCallback<OrderPayload>,
 ): () => void {
   const supabase = createClient();
-  const channelKey = `customer-orders-${userId}`;
-
-  unsubscribe(channelKey);
+  const channelKey = uniqueKey(`customer-orders-${userId}`);
 
   const channel = supabase
     .channel(channelKey)
@@ -278,9 +282,7 @@ export function subscribeToProducts(
   onDelete?: RealtimeCallback<ProductPayload>,
 ): () => void {
   const supabase = createClient();
-  const channelKey = `products-${shopId}`;
-
-  unsubscribe(channelKey);
+  const channelKey = uniqueKey(`products-${shopId}`);
 
   const channel = supabase
     .channel(channelKey)
@@ -340,9 +342,7 @@ export function subscribeToReviews(
   onInsert: RealtimeCallback<ReviewPayload>,
 ): () => void {
   const supabase = createClient();
-  const channelKey = `reviews-${shopId}`;
-
-  unsubscribe(channelKey);
+  const channelKey = uniqueKey(`reviews-${shopId}`);
 
   const channel = supabase
     .channel(channelKey)
@@ -381,9 +381,7 @@ export function subscribeToInventory(
   onDelete?: RealtimeCallback<InventoryVariantPayload>,
 ): () => void {
   const supabase = createClient();
-  const channelKey = `inventory-${shopId}`;
-
-  unsubscribe(channelKey);
+  const channelKey = uniqueKey(`inventory-${shopId}`);
 
   const channel = supabase
     .channel(channelKey)
@@ -444,9 +442,7 @@ export function subscribeToAnalytics(
   onInsert: RealtimeCallback<AnalyticsPayload>,
 ): () => void {
   const supabase = createClient();
-  const channelKey = `analytics-${shopId}`;
-
-  unsubscribe(channelKey);
+  const channelKey = uniqueKey(`analytics-${shopId}`);
 
   const channel = supabase
     .channel(channelKey)

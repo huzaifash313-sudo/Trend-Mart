@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,10 +15,10 @@ import { useLocation } from "@/context/LocationContext";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
-import { haversineDistance } from "@/services/geoRadiusService";
+import { filterShopsByProximity, haversineDistance } from "@/services/geoRadiusService";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMarketplaceProducts, useDeals, useShopCoupons } from "@/lib/queries";
+import { useMarketplaceProductsInfinite, useDeals, useShopCoupons } from "@/lib/queries";
 import { type Coupon } from "@/services/couponService";
 import {
   isDealActiveOnDate,
@@ -36,6 +36,11 @@ import {
   suggestSearchCorrections,
   FUZZY_MIN_SCORE,
 } from "@/lib/fuzzySearch";
+import {
+  trackProductView,
+  trackSearch,
+  trackCategoryInterest,
+} from "@/lib/behavior";
 
 const FeaturedDealsStrip = dynamic(() => import("@/components/FeaturedDealsStrip"), {
   loading: () => <div className="h-36 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />,
@@ -67,6 +72,7 @@ function PackageIcon() {
 
 const SORT_OPTIONS: { value: MarketplaceSort; label: string }[] = [
   { value: "for_you", label: "For You" },
+  { value: "nearest", label: "Nearest" },
   { value: "popular", label: "Top rated" },
   { value: "newest", label: "Newest" },
   { value: "discount", label: "Best deals" },
@@ -88,7 +94,7 @@ function ProductsPageInner() {
   const searchParams = useSearchParams();
   const { addToast } = useToast();
   const { addItem } = useCart();
-  const { coordinates: globalCoords } = useLocation();
+  const { coordinates: globalCoords, location: globalLocation } = useLocation();
 
   const qParam = searchParams.get("q") ?? "";
   const categoryParam = (searchParams.get("category") as ShopCategory | null) ?? "All";
@@ -116,20 +122,33 @@ function ProductsPageInner() {
   const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
-  const [visibleCount, setVisibleCount] = useState(24);
+  // Infinite-scroll sentinel element (IntersectionObserver) for auto-load.
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const queryClient = useQueryClient();
 
-  const productsQuery = useMarketplaceProducts({
+  const productsQuery = useMarketplaceProductsInfinite({
     query: qParam,
     category: categoryParam === "All" ? undefined : categoryParam,
     subCategoryId: subParam,
     sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
     limit: 48,
   });
-  const products = productsQuery.data ?? EMPTY_PRODUCTS;
+  // Flatten accumulated pages into a single deduped array (stable across renders).
+  const products = useMemo(() => {
+    const flat = productsQuery.data?.pages.flat() ?? EMPTY_PRODUCTS;
+    const seen = new Set<string>();
+    return flat.filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  }, [productsQuery.data]);
   const loading = productsQuery.isLoading;
   const error = productsQuery.error ? productsQuery.error.message : null;
+  const hasNextPage = !!productsQuery.hasNextPage;
+  const isFetchingNextPage = productsQuery.isFetchingNextPage;
+  const fetchNextPage = productsQuery.fetchNextPage;
 
   const dealsQuery = useDeals(80);
   const activeDeals = dealsQuery.data ?? EMPTY_DEALS;
@@ -141,10 +160,22 @@ function ProductsPageInner() {
   const couponsQuery = useShopCoupons(shopIds);
   const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
 
-  // Reset the "load more" window whenever the search/filters change.
+  // Infinite scroll: when the sentinel scrolls into view and more pages exist,
+  // fetch the next page (server-side cursor pagination).
   useEffect(() => {
-    setVisibleCount(24);
-  }, [qParam, categoryParam, subParam, sortParam]);
+    const el = loadMoreRef.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Deep-link: open the quick view for a ?product=<id> in the URL.
   useEffect(() => {
@@ -224,29 +255,34 @@ function ProductsPageInner() {
     };
   }, []);
 
-  const getOfferContext = useCallback(
-    (product: {
-      shop_id?: string;
-      shop_free_delivery_threshold?: number | null;
-      shop_delivery_fee_flat?: number | null;
-      shop_delivery_fee_per_km?: number | null;
-    }): ProductOfferContext => {
-      const shopId = product.shop_id || "";
-      const today = toPkDateKey();
+  // Precompute offer context ONCE per shop (not per product per render) into a
+  // stable Map. This removes the O(products × deals) recompute AND gives every
+  // ProductCard a stable `offerContext` object identity, so the memoized cards
+  // don't re-render on unrelated parent state changes.
+  const offerContextByShop = useMemo(() => {
+    const today = toPkDateKey();
+    const map = new Map<string, ProductOfferContext>();
+    for (const p of products) {
+      const shopId = p.shop_id;
+      if (!shopId || map.has(shopId)) continue;
       const dealLabels = activeDeals
         .filter((d) => d.shop_id === shopId && isDealActiveOnDate(d, today))
         .map((d) => formatDealDisplayLabel(d));
-      const couponLabels = formatCouponTickerLabels(shopCoupons[shopId] ?? []);
-      // Coupons + delivery always — even when this product isn't part of a deal.
-      return {
-        freeDeliveryThreshold: product.shop_free_delivery_threshold,
-        deliveryFeeFlat: product.shop_delivery_fee_flat,
-        deliveryFeePerKm: product.shop_delivery_fee_per_km,
+      map.set(shopId, {
+        freeDeliveryThreshold: p.shop_free_delivery_threshold,
+        deliveryFeeFlat: p.shop_delivery_fee_flat,
+        deliveryFeePerKm: p.shop_delivery_fee_per_km,
         dealLabels,
-        couponLabels,
-      };
-    },
-    [activeDeals, shopCoupons],
+        couponLabels: formatCouponTickerLabels(shopCoupons[shopId] ?? []),
+      });
+    }
+    return map;
+  }, [products, activeDeals, shopCoupons]);
+
+  const getOfferContext = useCallback(
+    (product: { shop_id?: string }): ProductOfferContext | null =>
+      offerContextByShop.get(product.shop_id || "") ?? null,
+    [offerContextByShop],
   );
 
   const getDealStripOfferTags = useCallback(
@@ -280,36 +316,93 @@ function ProductsPageInner() {
     return ranked.length ? ranked.map((r) => r.item) : [];
   }, [activeDeals, query]);
 
-  const displayProducts = useMemo(() => {
-    const coords = geoFilter.coordinates ?? globalCoords;
-    const radiusActive =
-      geoFilter.scope === "radius" && !!coords && geoFilter.maxDistanceKm > 0;
+  // Build a deduplicated list of pseudo-shops from the product join so the
+  // same proximity / merchant-coverage engine used on the homepage applies here.
+  const productShops = useMemo(() => {
+    const map = new Map<string, Shop>();
+    for (const p of products) {
+      if (!p.shop_id || map.has(p.shop_id)) continue;
+      map.set(p.shop_id, {
+        id: p.shop_id,
+        name: p.shop_name ?? "",
+        category: p.shop_category ?? "",
+        location: p.shop_location ?? "",
+        whatsapp_number: p.shop_whatsapp ?? "",
+        is_live: true,
+        latitude: p.shop_latitude ?? null,
+        longitude: p.shop_longitude ?? null,
+        service_radius_km: p.shop_service_radius_km ?? null,
+        delivery_zones: p.shop_delivery_zones ?? null,
+      });
+    }
+    return [...map.values()];
+  }, [products]);
 
-    let list = products;
+  // Location-visible shop IDs (radius / city / pakistan scope + merchant coverage).
+  const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function compute() {
+      const scope = geoFilter.scope;
+      const coords = geoFilter.coordinates ?? globalCoords ?? null;
 
-    if (radiusActive && coords) {
-      const radius = geoFilter.maxDistanceKm;
-      const nearby: MarketplaceProduct[] = [];
-      const unpinned: MarketplaceProduct[] = [];
-
-      for (const p of products) {
-        if (p.shop_latitude == null || p.shop_longitude == null) {
-          unpinned.push(p);
-          continue;
-        }
-        const km = haversineDistance(
-          coords.latitude,
-          coords.longitude,
-          p.shop_latitude,
-          p.shop_longitude,
-        );
-        if (km != null && km <= radius) nearby.push(p);
+      if ((scope === "pakistan" || scope === "city") && !coords) {
+        setGeoVisibleShopIds(null);
+        return;
+      }
+      if (scope === "radius" && !coords) {
+        setGeoVisibleShopIds(null);
+        return;
       }
 
-      list = [
-        ...diversifyMarketplaceFeed(nearby, sort),
-        ...diversifyMarketplaceFeed(unpinned, sort),
-      ];
+      try {
+        const result = await filterShopsByProximity(productShops, {
+          coordinates: coords,
+          maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
+          enforceServiceRadius: true,
+          sortByProximity: false,
+          scope,
+          deliveryZone: globalLocation?.deliveryZone ?? undefined,
+          customerCity: globalLocation?.city ?? undefined,
+        });
+        if (!cancelled) {
+          setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
+        }
+      } catch {
+        if (!cancelled) setGeoVisibleShopIds(null);
+      }
+    }
+    compute();
+    return () => {
+      cancelled = true;
+    };
+  }, [productShops, geoFilter, globalCoords, globalLocation]);
+
+  const displayProducts = useMemo(() => {
+    let list = products;
+
+    if (geoVisibleShopIds) {
+      list = diversifyMarketplaceFeed(
+        list.filter((p) => geoVisibleShopIds.has(p.shop_id)),
+        sort,
+      );
+    }
+
+    // "Nearest" sort: re-sort by straight-line distance to the customer's pin.
+    // Products without a shop pin sink to the bottom (still visible).
+    if (sort === "nearest" && globalCoords) {
+      const { latitude, longitude } = globalCoords;
+      list = [...list].sort((a, b) => {
+        const da =
+          a.shop_latitude != null && a.shop_longitude != null
+            ? haversineDistance(latitude, longitude, a.shop_latitude, a.shop_longitude) ?? Infinity
+            : Infinity;
+        const db =
+          b.shop_latitude != null && b.shop_longitude != null
+            ? haversineDistance(latitude, longitude, b.shop_latitude, b.shop_longitude) ?? Infinity
+            : Infinity;
+        return da - db;
+      });
     }
 
     if (offerDateKey) {
@@ -329,9 +422,9 @@ function ProductsPageInner() {
     return list;
   }, [
     products,
-    geoFilter,
-    globalCoords,
+    geoVisibleShopIds,
     sort,
+    globalCoords,
     offerDateKey,
     activeDeals,
     query,
@@ -343,10 +436,9 @@ function ProductsPageInner() {
     return suggestSearchCorrections(qParam, 4);
   }, [qParam, displayProducts.length]);
 
-  const visibleProducts = useMemo(
-    () => displayProducts.slice(0, visibleCount),
-    [displayProducts, visibleCount],
-  );
+  // All accumulated + filtered products render directly (infinite scroll pages
+  // load lazily via the sentinel below, so we never mount a huge list up front).
+  const visibleProducts = displayProducts;
 
   const handleCategoryChange = useCallback(
     (category: ShopCategory) => {
@@ -377,6 +469,7 @@ function ProductsPageInner() {
     (e: React.FormEvent) => {
       e.preventDefault();
       syncUrl({ q: query });
+      trackSearch(query);
     },
     [query, syncUrl],
   );
@@ -386,6 +479,17 @@ function ProductsPageInner() {
       const full = products.find((p) => p.id === product.id) ?? (product as MarketplaceProduct);
       setQuickView(full);
       syncUrl({ product: full.id });
+      // Behaviour memory: recently viewed + category affinity.
+      trackProductView({
+        id: full.id,
+        name: full.name,
+        price: full.price,
+        imageUrl: full.image_url,
+        shopId: full.shop_id,
+        shopName: full.shop_name,
+        category: full.shop_category ?? full.category_id ?? null,
+      });
+      trackCategoryInterest(full.shop_category ?? full.category_id, "click");
     },
     [products, syncUrl],
   );
@@ -449,9 +553,13 @@ function ProductsPageInner() {
           return n;
         });
         addToast("Could not update wishlist", "error");
+      } else if (next) {
+        // Strong interest signal — wishlist add boosts category affinity.
+        const full = products.find((p) => p.id === product.id);
+        trackCategoryInterest(full?.shop_category ?? full?.category_id, "wishlist");
       }
     },
-    [addToast],
+    [addToast, products],
   );
 
   const handleShopClick = useCallback(
@@ -620,9 +728,9 @@ function ProductsPageInner() {
       <p className="mb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
         {loading
           ? "Loading products…"
-          : productsQuery.isFetching
-            ? "Updating…"
-            : `Showing ${Math.min(visibleCount, displayProducts.length)} of ${displayProducts.length}`}
+          : isFetchingNextPage
+            ? "Loading more…"
+            : `Showing ${displayProducts.length} product${displayProducts.length !== 1 ? "s" : ""}`}
       </p>
 
       {error && (
@@ -706,15 +814,28 @@ function ProductsPageInner() {
         }
       />
 
-      {!loading && visibleCount < displayProducts.length && (
-        <div className="mt-5 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setVisibleCount((n) => n + 24)}
-            className="rounded-full border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 active:scale-95 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
-          >
-            Load more
-          </button>
+      {/* Infinite-scroll sentinel + status — auto-loads the next page when it
+          scrolls into view (or via the manual button as a fallback). */}
+      {!loading && (
+        <div ref={loadMoreRef} className="mt-6 flex min-h-[3rem] items-center justify-center">
+          {isFetchingNextPage ? (
+            <span className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+              Loading more products…
+            </span>
+          ) : hasNextPage ? (
+            <button
+              type="button"
+              onClick={() => void fetchNextPage()}
+              className="rounded-full border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 active:scale-95 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
+            >
+              Load more
+            </button>
+          ) : displayProducts.length > 0 ? (
+            <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+              You&apos;ve reached the end
+            </p>
+          ) : null}
         </div>
       )}
 

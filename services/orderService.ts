@@ -846,6 +846,8 @@ async function placeOrderOnServer(params: {
   notes?: string;
   customerLat?: number | null;
   customerLng?: number | null;
+  customerCity?: string | null;
+  idempotencyKey?: string | null;
 }): Promise<ServiceResult<Order>> {
   try {
     const res = await fetch("/api/orders", {
@@ -884,6 +886,8 @@ export async function createOrder(params: {
   couponCode?: string;
   customerLat?: number | null;
   customerLng?: number | null;
+  customerCity?: string | null;
+  idempotencyKey?: string | null;
 }): Promise<ServiceResult<Order>> {
   return placeOrderOnServer({
     shopId: params.shopId,
@@ -893,6 +897,8 @@ export async function createOrder(params: {
     notes: params.notes,
     customerLat: params.customerLat,
     customerLng: params.customerLng,
+    customerCity: params.customerCity,
+    idempotencyKey: params.idempotencyKey,
     items: params.items.map((item) => ({
       productId: item.product_id ?? "",
       name: item.name,

@@ -472,6 +472,46 @@ export async function requireVerifiedEmailSession(): Promise<
 }
 
 /**
+ * Re-authenticate the current user by password.
+ *
+ * Used to gate sensitive merchant actions (e.g. changing the locked store
+ * location pin). Verifies the entered password against the signed-in account
+ * without losing the session — `signInWithPassword` refreshes the session for
+ * the same account, so the user stays signed in.
+ */
+export async function verifyPassword(
+  password: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!password) {
+    return { success: false, error: "Enter your password to continue." };
+  }
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.email) {
+      return {
+        success: false,
+        error: "Could not verify your account. Please sign in again.",
+      };
+    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password,
+    });
+    if (error) {
+      return { success: false, error: "Incorrect password. Please try again." };
+    }
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Verification failed.",
+    };
+  }
+}
+
+/**
  * Sign out the current user.
  */
 export async function signOut(): Promise<{ success: boolean; error?: string }> {
@@ -578,15 +618,17 @@ export async function detectUserRole(user: User | null): Promise<AuthRole | "adm
     /* fall through — run supabase/FIX_USER_ROLES_500.sql if RPC is missing */
   }
 
-  // 2. user metadata
+  // 2. user metadata — user-editable via supabase.auth.updateUser(), so it can
+  //    never confer a privileged role by itself. It only acts as a hint:
+  //    owning a shop makes you a merchant, otherwise you remain a customer.
   const metadataRole = user.user_metadata?.role as AuthRole | undefined;
   if (metadataRole === "merchant" || metadataRole === "customer") {
-    if (metadataRole === "customer" && (await ownsShop())) return "merchant";
-    return metadataRole;
+    return (await ownsShop()) ? "merchant" : "customer";
   }
 
-  // 3. app_metadata
-  const appRole = user.app_metadata?.role as AuthRole | undefined;
+  // 3. app_metadata — set only by the service role, safe to trust.
+  const appRole = user.app_metadata?.role as (AuthRole | "admin") | undefined;
+  if (appRole === "admin") return "admin";
   if (appRole === "merchant" || appRole === "customer") {
     if (appRole === "customer" && (await ownsShop())) return "merchant";
     return appRole;

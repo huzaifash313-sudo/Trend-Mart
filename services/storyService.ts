@@ -26,8 +26,21 @@ function toError(err: unknown): string {
  * The RLS policy on the `stories` table automatically filters expired stories,
  * but we also apply a client-side cutoff as a safety net.
  */
+interface StoryShopJoin {
+  name?: string | null;
+  logo_url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  service_radius_km?: number | null;
+  delivery_zones?: string[] | null;
+  location?: string | null;
+  is_live?: boolean | null;
+  verification_status?: string | null;
+}
+
 function mapStoryRow(row: Record<string, unknown>): Story {
-  const shop = row.shops as { name?: string; logo_url?: string | null } | null | undefined;
+  const shop = (row.shops as StoryShopJoin | StoryShopJoin[] | null | undefined);
+  const s = Array.isArray(shop) ? shop[0] : shop;
   return {
     id: String(row.id),
     shop_id: String(row.shop_id),
@@ -35,8 +48,18 @@ function mapStoryRow(row: Record<string, unknown>): Story {
     caption: (row.caption as string | null) ?? null,
     created_at: (row.created_at as string | undefined) ?? undefined,
     expires_at: (row.expires_at as string | undefined) ?? undefined,
-    shop_name: shop?.name ?? null,
-    shop_logo_url: shop?.logo_url ?? null,
+    shop_name: s?.name ?? null,
+    shop_logo_url: s?.logo_url ?? null,
+    shop_latitude: typeof s?.latitude === "number" ? s.latitude : null,
+    shop_longitude: typeof s?.longitude === "number" ? s.longitude : null,
+    shop_service_radius_km:
+      typeof s?.service_radius_km === "number" ? s.service_radius_km : null,
+    shop_delivery_zones: Array.isArray(s?.delivery_zones)
+      ? (s.delivery_zones as string[])
+      : null,
+    shop_location: s?.location ?? null,
+    shop_is_live: s?.is_live ?? null,
+    shop_verification_status: s?.verification_status ?? null,
   };
 }
 
@@ -44,12 +67,15 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
   const supabase = createClient();
 
   try {
-    // Prefer join so tray/viewer can show merchant shop name
+    // Prefer join so tray/viewer can show merchant shop name + geo for filtering.
     const withShop = await supabase
       .from("stories")
-      .select("*, shops:shop_id ( name, logo_url )")
+      .select(
+        "*, shops:shop_id ( name, logo_url, latitude, longitude, service_radius_km, delivery_zones, location, is_live, verification_status )",
+      )
       .gt("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (!withShop.error && withShop.data) {
       return {
@@ -63,7 +89,8 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
       .from("stories")
       .select("*")
       .gt("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (error) throw error;
     return { success: true, data: (data as Story[]) ?? [] };

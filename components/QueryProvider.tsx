@@ -1,7 +1,8 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { registerQueryClient, invalidateStorefrontData } from "@/lib/cacheBus";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Global React Query Provider                                    */
@@ -12,27 +13,63 @@ import { useState, type ReactNode } from "react";
 /*  flicker that came from manual `setLoading(true)` + skeleton swaps.         */
 /* -------------------------------------------------------------------------- */
 
-export default function QueryProvider({ children }: { children: ReactNode }) {
-  const [client] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            // Data is considered fresh for 60s — no refetch on re-mount/nav.
-            staleTime: 60_000,
-            // Keep unused query data cached for 5 minutes (dedupe + instant back-nav).
-            gcTime: 5 * 60_000,
-            // Supabase RLS queries are cheap to retry once on transient errors.
-            retry: 1,
-            // Avoid refetch storms when the user switches tabs/apps.
-            refetchOnWindowFocus: false,
-          },
-          mutations: {
-            retry: 0,
-          },
-        },
-      }),
-  );
+/**
+ * Listens for the app's mutation-complete events and invalidates the whole
+ * storefront cache. This centralizes cache freshness — any code that finishes
+ * a write just dispatches the matching `trendmart:*` event, and every page's
+ * React Query data (shops, products, deals, stories, coupons, shop detail)
+ * refetches in the background.
+ */
+const STOREFRONT_EVENTS = [
+  "trendmart:shops-updated",
+  "trendmart:products-updated",
+  "trendmart:stories-updated",
+  "trendmart:deals-updated",
+  "trendmart:coupons-updated",
+] as const;
 
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+function StorefrontCacheListener() {
+  useEffect(() => {
+    const onChange = () => invalidateStorefrontData();
+    for (const event of STOREFRONT_EVENTS) {
+      window.addEventListener(event, onChange);
+    }
+    return () => {
+      for (const event of STOREFRONT_EVENTS) {
+        window.removeEventListener(event, onChange);
+      }
+    };
+  }, []);
+  return null;
+}
+
+export default function QueryProvider({ children }: { children: ReactNode }) {
+  const [client] = useState(() => {
+    const qc = new QueryClient({
+      defaultOptions: {
+        queries: {
+          // Data is considered fresh for 60s — no refetch on re-mount/nav.
+          staleTime: 60_000,
+          // Keep unused query data cached for 5 minutes (dedupe + instant back-nav).
+          gcTime: 5 * 60_000,
+          // Supabase RLS queries are cheap to retry once on transient errors.
+          retry: 1,
+          // Avoid refetch storms when the user switches tabs/apps.
+          refetchOnWindowFocus: false,
+        },
+        mutations: {
+          retry: 0,
+        },
+      },
+    });
+    registerQueryClient(qc);
+    return qc;
+  });
+
+  return (
+    <QueryClientProvider client={client}>
+      <StorefrontCacheListener />
+      {children}
+    </QueryClientProvider>
+  );
 }

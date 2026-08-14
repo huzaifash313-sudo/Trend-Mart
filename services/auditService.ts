@@ -15,6 +15,21 @@ function toError(err: unknown): string {
   return err instanceof Error ? err.message : "An unexpected error occurred.";
 }
 
+/**
+ * Escape PostgREST filter metacharacters so user search text can't broaden an
+ * ILIKE wildcard (%/_) or inject additional `.or()` clauses via commas.
+ */
+function escapeFilterLiteral(input: string): string {
+  return input
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
+    .replace(/,/g, " ")
+    .replace(/\(/g, " ")
+    .replace(/\)/g, " ")
+    .slice(0, 100);
+}
+
 export type AuditSeverity = "info" | "warning" | "critical";
 
 export type AuditTargetType =
@@ -75,12 +90,18 @@ export function logAuditEvent(payload: AuditLogPayload): void {
       performed_by_email: payload.performedByEmail ?? null,
       severity: payload.severity ?? "info",
     })
-    .then(({ error }) => {
-      if (error) {
-        // Silent fail — audit logs should never break UX
-        console.error("[auditService] Failed to log audit event:", error);
-      }
-    });
+    .then(
+      ({ error }) => {
+        if (error) {
+          // Silent fail — audit logs should never break UX
+          console.error("[auditService] Failed to log audit event:", error);
+        }
+      },
+      () => {
+        // Network-level rejection (offline / Supabase unreachable) must not
+        // become an unhandled promise rejection.
+      },
+    );
 }
 
 /**
@@ -139,7 +160,10 @@ export async function fetchAuditLogs(opts?: {
     if (opts?.performedBy) countQuery = countQuery.eq("performed_by", opts.performedBy);
     if (opts?.fromDate) countQuery = countQuery.gte("created_at", opts.fromDate);
     if (opts?.toDate) countQuery = countQuery.lte("created_at", opts.toDate);
-    if (opts?.search) countQuery = countQuery.or(`description.ilike.%${opts.search}%,event_type.ilike.%${opts.search}%`);
+    if (opts?.search) {
+      const s = escapeFilterLiteral(opts.search);
+      countQuery = countQuery.or(`description.ilike.%${s}%,event_type.ilike.%${s}%`);
+    }
 
     const { count, error: countError } = await countQuery;
     if (countError) throw countError;
@@ -157,7 +181,10 @@ export async function fetchAuditLogs(opts?: {
     if (opts?.performedBy) dataQuery = dataQuery.eq("performed_by", opts.performedBy);
     if (opts?.fromDate) dataQuery = dataQuery.gte("created_at", opts.fromDate);
     if (opts?.toDate) dataQuery = dataQuery.lte("created_at", opts.toDate);
-    if (opts?.search) dataQuery = dataQuery.or(`description.ilike.%${opts.search}%,event_type.ilike.%${opts.search}%`);
+    if (opts?.search) {
+      const s = escapeFilterLiteral(opts.search);
+      dataQuery = dataQuery.or(`description.ilike.%${s}%,event_type.ilike.%${s}%`);
+    }
 
     const { data, error } = await dataQuery;
     if (error) throw error;

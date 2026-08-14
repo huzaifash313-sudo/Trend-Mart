@@ -61,7 +61,9 @@ const KNOWN_SAFE_PUBLIC_VARS = [
   "NEXT_PUBLIC_VERCEL_ENV",
   "NEXT_PUBLIC_SITE_URL",
   "NEXT_PUBLIC_SITE_NAME",
-  "NEXT_PUBLIC_GOOGLE_MAPS_KEY",
+  // NOTE: NEXT_PUBLIC_GOOGLE_MAPS_KEY is intentionally NOT listed here — a
+  // Google Maps Places key is billable and must remain server-only
+  // (GOOGLE_MAPS_API_KEY). Exposing it via NEXT_PUBLIC_ would be flagged.
   "NEXT_PUBLIC_MAPBOX_TOKEN",
   "NEXT_PUBLIC_SENTRY_DSN",
   "NEXT_PUBLIC_GA_MEASUREMENT_ID",

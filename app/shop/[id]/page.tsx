@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/types";
 import { logShopView } from "@/services/analyticsService";
+import { trackCategoryInterest } from "@/lib/behavior";
+import { useLocation } from "@/context/LocationContext";
+import { isCustomerWithinCoverage } from "@/services/geoRadiusService";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorState } from "@/components/ErrorState";
 import { EmptyState } from "@/components/EmptyState";
@@ -50,10 +53,7 @@ import {
 } from "@/components/SeoSchema";
 import { absoluteUrl } from "@/lib/metadata";
 import { getShopPath } from "@/lib/shopSlug";
-import {
-  subscribeToProducts,
-  unsubscribeAll,
-} from "@/lib/supabase/realtime";
+import { subscribeToProducts } from "@/lib/supabase/realtime";
 import ServiceBookingModal, { type ServicePackageItem } from "@/components/ServiceBookingModal";
 import AvailabilitySchedule, { type AvailabilityDay } from "@/components/AvailabilitySchedule";
 import type { PortfolioItem } from "@/components/ServicePortfolioManager";
@@ -95,10 +95,18 @@ function ShopDetailInner({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const shopQuery = useShopDetail(id);
   const shop = shopQuery.data?.shop ?? null;
+  const { location } = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  // Debounced search term — avoid re-running fuzzyFilterAndRank on every
+  // keystroke (it's O(products) per render).
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [priceSort, setPriceSort] = useState<"default" | "low" | "high">("default");
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
@@ -128,6 +136,24 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const theme: StoreTheme = useMemo(() => getStoreTheme(shop?.category), [shop?.category]);
+
+  // ── Delivery-area notice (soft) for out-of-coverage visitors ─────────────
+  const outsideCoverage = useMemo(() => {
+    if (!shop || !location?.coordinates) return null;
+    const gate = isCustomerWithinCoverage(
+      shop,
+      location.coordinates.latitude,
+      location.coordinates.longitude,
+      location.city,
+    );
+    if (gate.within) return null;
+    return {
+      mode: gate.coverageMode,
+      distanceKm: gate.distanceKm,
+      radiusKm: shop.service_radius_km ?? 0,
+      city: shop.location || null,
+    };
+  }, [shop, location]);
   /** Service chrome (booking / packages) — category OR explicit shop_type. */
   const isServiceCategory = isServiceTheme(shop?.category) || shop?.shop_type === "service";
   /**
@@ -161,6 +187,8 @@ function ShopDetailInner({ id }: { id: string }) {
       setDeals(d.deals);
       // Fire-and-forget visit log (skips owner + dedupes inside service)
       void logShopView(d.shop.id);
+      // Behaviour memory: viewing a shop signals interest in its category.
+      trackCategoryInterest(d.shop.category, "view");
     }
   }, [shopQuery.data, shopQuery.isLoading, shopQuery.isError, shopQuery.error]);
 
@@ -267,8 +295,6 @@ function ShopDetailInner({ id }: { id: string }) {
     return () => { unsubProducts(); };
   }, [resolvedShopId]);
 
-  useEffect(() => () => { unsubscribeAll(); }, []);
-
   // ── Wishlist product IDs ──────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -319,7 +345,7 @@ function ShopDetailInner({ id }: { id: string }) {
     if (activeSubCategoryId) {
       result = result.filter((p) => p.sub_category_id === activeSubCategoryId);
     }
-    const q = searchQuery.trim();
+    const q = debouncedQuery.trim();
     if (q) {
       result = fuzzyFilterAndRank(
         result,
@@ -331,7 +357,7 @@ function ShopDetailInner({ id }: { id: string }) {
     if (priceSort === "low") result = [...result].sort((a, b) => a.price - b.price);
     else if (priceSort === "high") result = [...result].sort((a, b) => b.price - a.price);
     return result;
-  }, [products, searchQuery, priceSort, activeSubCategoryId]);
+  }, [products, debouncedQuery, priceSort, activeSubCategoryId]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleProductClick = useCallback((product: Product) => {
@@ -652,6 +678,23 @@ function ShopDetailInner({ id }: { id: string }) {
         <div className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs text-zinc-500 dark:text-zinc-400">{theme.categoryDescription}</p>
         </div>
+
+        {/* ── Out-of-area soft notice (checkout still hard-blocks) ─────── */}
+        {outsideCoverage && (
+          <section aria-label="Delivery area notice" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/30">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+              This store may not deliver to your current location
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+              {outsideCoverage.mode === "city"
+                ? `This shop only delivers in ${outsideCoverage.city || "its selected city"}, which doesn't match your location.`
+                : outsideCoverage.distanceKm != null
+                  ? `You're about ${outsideCoverage.distanceKm.toFixed(1)} km away — this shop delivers within ${outsideCoverage.radiusKm} km.`
+                  : "This shop has a limited delivery area."}{" "}
+              You can still browse, but checkout may be blocked.
+            </p>
+          </section>
+        )}
 
         {/* ── SERVICE Section ──────────────────────────────────────── */}
         {isServiceCategory && (

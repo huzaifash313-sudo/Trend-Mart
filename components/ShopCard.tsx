@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import ShopMediaHeader from "@/components/ShopMediaHeader";
 import ShopOfferTicker from "@/components/ShopOfferTicker";
@@ -92,8 +93,10 @@ function PinIcon() {
 
 /**
  * Shop card — logo DP on banner (left); name starts clean from body left.
+ * Memoized so a single favorite toggle / broken-image update doesn't re-render
+ * the entire shop grid.
  */
-export default function ShopCard({
+function ShopCard({
   shop,
   favorited = false,
   showDistance = false,
@@ -141,10 +144,10 @@ export default function ShopCard({
           priority={priority}
         >
           <span
-            className={`absolute left-1.5 top-1.5 z-[1] inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm backdrop-blur-[2px] ${
+            className={`absolute left-1.5 top-1.5 z-[1] inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${
               isLive
-                ? "bg-white/95 text-emerald-700 dark:bg-zinc-900/90 dark:text-emerald-300"
-                : "bg-zinc-900/80 text-zinc-100"
+                ? "bg-white/95 text-emerald-700 dark:bg-zinc-900/95 dark:text-emerald-300"
+                : "bg-zinc-900/85 text-zinc-100"
             }`}
           >
             <span
@@ -156,7 +159,7 @@ export default function ShopCard({
             {isLive ? "Live" : "Unavailable"}
           </span>
           {distance ? (
-            <span className="absolute right-1.5 top-1.5 z-[1] rounded-full bg-zinc-900/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white backdrop-blur-sm">
+            <span className="absolute right-1.5 top-1.5 z-[1] rounded-full bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
               {distance}
             </span>
           ) : null}
@@ -239,3 +242,5 @@ export default function ShopCard({
     </article>
   );
 }
+
+export default memo(ShopCard);

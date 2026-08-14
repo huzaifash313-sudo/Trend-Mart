@@ -79,10 +79,15 @@ export default function BottomNav() {
     type SessionUser = User;
 
     function roleHint(user: SessionUser | null | undefined): AuthRole | "admin" | null {
-      const raw =
-        (user?.app_metadata?.role as string | undefined) ||
-        (user?.user_metadata?.role as string | undefined);
-      if (raw === "admin" || raw === "merchant" || raw === "customer") return raw;
+      // app_metadata is service-role-only — full trust (including admin).
+      const appMeta = user?.app_metadata?.role as string | undefined;
+      if (appMeta === "admin" || appMeta === "merchant" || appMeta === "customer") {
+        return appMeta;
+      }
+      // user_metadata is user-editable — NEVER expose "admin" from it (a user
+      // could self-set role=admin); only the harmless merchant/customer hint.
+      const userMeta = user?.user_metadata?.role as string | undefined;
+      if (userMeta === "merchant" || userMeta === "customer") return userMeta;
       return null;
     }
 

@@ -22,20 +22,10 @@ export async function GET(request: NextRequest) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const metaRole = (user.user_metadata?.role as string | undefined) ?? "";
-          const desiredRole =
-            metaRole === "merchant" || metaRole === "customer" ? metaRole : "customer";
-
-          // Ensure role row exists after email-link confirmation
-          try {
-            await supabase.rpc("set_my_signup_role", { desired_role: desiredRole });
-          } catch {
-            await supabase.from("user_roles").upsert(
-              { user_id: user.id, role: desiredRole },
-              { onConflict: "user_id" },
-            );
-          }
-
+          // SECURITY: never derive a role from user-editable user_metadata.role
+          // — a signup could self-grant "merchant" (or attempt admin). Resolve
+          // exclusively from the authoritative user_roles table, which the
+          // handle_new_user trigger populates with a default "customer".
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
@@ -43,7 +33,7 @@ export async function GET(request: NextRequest) {
             .maybeSingle();
 
           if (roleData?.role === "admin") redirectTo = "/admin/dashboard";
-          else if (roleData?.role === "merchant" || metaRole === "merchant") redirectTo = "/dashboard";
+          else if (roleData?.role === "merchant") redirectTo = "/dashboard";
           else redirectTo = next ?? "/account";
         }
       } catch {

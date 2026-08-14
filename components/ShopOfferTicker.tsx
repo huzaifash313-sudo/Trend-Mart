@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo } from "react";
 import {
   formatOfferRemaining,
   type ShopOfferSlide,
 } from "@/lib/shopOfferTicker";
+import { useOfferClock } from "@/lib/offerClock";
 
 const ROTATE_MS = 3200;
 
@@ -14,38 +15,23 @@ interface ShopOfferTickerProps {
 
 /**
  * Compact floating promo strip between shop name and category.
- * Rotates offer / free-delivery / coupon slides; shows a small timer when timed.
+ * Rotation + countdown are driven by a single shared app-wide clock
+ * (lib/offerClock.ts) — zero per-card intervals.
+ *
+ * Memoized: the only thing that changes is the shared clock tick, so re-render
+ * work is minimal and unrelated parent re-renders never touch this subtree.
  */
-export default function ShopOfferTicker({ slides }: ShopOfferTickerProps) {
-  const [index, setIndex] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
+const ShopOfferTicker = memo(function ShopOfferTicker({ slides }: ShopOfferTickerProps) {
+  const now = useOfferClock();
 
   const active = slides.filter((s) => {
     if (!s.expiresAt) return true;
     return new Date(s.expiresAt).getTime() > now;
   });
 
-  useEffect(() => {
-    if (active.length <= 1) return;
-    const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % active.length);
-    }, ROTATE_MS);
-    return () => window.clearInterval(id);
-  }, [active.length]);
-
-  useEffect(() => {
-    const needsTick = active.some((s) => s.expiresAt);
-    if (!needsTick) return;
-    const id = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, [active]);
-
-  useEffect(() => {
-    if (index >= active.length) setIndex(0);
-  }, [active.length, index]);
-
   if (active.length === 0) return null;
 
+  const index = active.length > 1 ? Math.floor(now / ROTATE_MS) % active.length : 0;
   const slide = active[Math.min(index, active.length - 1)]!;
   const timer = formatOfferRemaining(slide.expiresAt, now);
 
@@ -83,4 +69,6 @@ export default function ShopOfferTicker({ slides }: ShopOfferTickerProps) {
       ) : null}
     </div>
   );
-}
+});
+
+export default ShopOfferTicker;

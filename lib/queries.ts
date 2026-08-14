@@ -6,7 +6,7 @@
 /*  into a throw-on-error promise so React Query manages loading/error/cache.  */
 /* -------------------------------------------------------------------------- */
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { fetchShops, fetchMyShop } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import { fetchActiveDeals } from "@/services/dealService";
@@ -37,11 +37,16 @@ async function unwrap<T>(promise: Promise<ServiceResult<T>>): Promise<T> {
 
 /* ── Query keys ────────────────────────────────────────────────────────────── */
 
+/** Normalize a list of IDs into a stable, order-independent cache key. */
+function idsKey(ids: string[]): string {
+  return [...new Set(ids.filter(Boolean))].sort().join(",");
+}
+
 export const queryKeys = {
   shops: ["shops", "public"] as const,
   stories: ["stories"] as const,
   deals: (limit: number) => ["deals", limit] as const,
-  coupons: (shopIds: string[]) => ["coupons", shopIds.join(",")] as const,
+  coupons: (shopIds: string[]) => ["coupons", idsKey(shopIds)] as const,
   myShop: ["my-shop"] as const,
 };
 
@@ -50,7 +55,7 @@ export const queryKeys = {
 export function useShops() {
   return useQuery({
     queryKey: queryKeys.shops,
-    queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 60 })),
+    queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 300 })),
     staleTime: 2 * 60_000,
   });
 }
@@ -98,7 +103,7 @@ export function useShopCoupons(shopIds: string[]) {
 
 export function useShopDeliveryMeta(shopIds: string[]) {
   return useQuery({
-    queryKey: ["delivery-meta", shopIds.join(",")],
+    queryKey: ["delivery-meta", idsKey(shopIds)],
     queryFn: () => unwrap(fetchShopDeliveryMetaForIds(shopIds)),
     enabled: shopIds.length > 0,
     staleTime: 60_000,
@@ -168,6 +173,38 @@ export function useMarketplaceProducts(filters: MarketplaceProductFilters) {
     queryFn: () => unwrap(fetchMarketplaceProducts(filters)),
     // Keep the previous list on screen while the next one loads — this is the
     // core fix for the "data disappears then reappears" flicker.
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Infinite-scroll marketplace products: fetches pages server-side via a cursor
+ * `offset`, so the app scales to large catalogues ("lakh products") without
+ * loading everything up front. Pages accumulate in `data.pages`.
+ */
+export function useMarketplaceProductsInfinite(filters: MarketplaceProductFilters) {
+  const pageSize = filters.limit ?? 48;
+  const queryKey = [
+    "marketplace-products-infinite",
+    filters.query ?? "",
+    filters.category ?? "",
+    filters.subCategoryId ?? "",
+    filters.sort ?? "for_you",
+    pageSize,
+    filters.availableOnly ?? true,
+  ] as const;
+
+  return useInfiniteQuery({
+    queryKey,
+    queryFn: ({ pageParam }) =>
+      unwrap(fetchMarketplaceProducts({ ...filters, offset: pageParam as number })),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const fetched = allPages.reduce((n, p) => n + p.length, 0);
+      // A full page means there may be more rows to fetch.
+      return lastPage.length >= pageSize ? fetched : undefined;
+    },
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });

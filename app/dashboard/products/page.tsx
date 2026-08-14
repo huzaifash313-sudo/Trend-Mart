@@ -25,7 +25,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { unsubscribeAll } from "@/lib/supabase/realtime";
 import type {
   Product,
   ProductFormData,
@@ -58,6 +57,13 @@ import {
 import { isValidUUID } from "@/lib/sanitization";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+/** Tell the storefront cache a product changed (invalidate marketplace/home). */
+function emitProductsChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("trendmart:products-updated"));
+  }
+}
 
 interface PriceTier {
   label: string;
@@ -309,11 +315,6 @@ export default function ProductsDashboardPage() {
     return () => { cancelled = true; };
   }, [activeShopId]);
 
-  // ── Cleanup realtime subscriptions ──────────────────────────────────────
-  useEffect(() => {
-    return () => { unsubscribeAll(); };
-  }, []);
-
   // ── Derived: filtered & sorted products ─────────────────────────────────
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
@@ -538,6 +539,7 @@ export default function ProductsDashboardPage() {
           editingProductId ? "Product updated successfully!" : "Product created successfully!",
           "success"
         );
+        emitProductsChanged();
 
         // Refresh products list
         const refreshed = await fetchProductsByShopId(activeShopId);
@@ -598,6 +600,7 @@ export default function ProductsDashboardPage() {
     if (result.success) {
       setProducts(prev => prev.filter(p => p.id !== productId));
       addToast("Product deleted.", "info");
+      emitProductsChanged();
     } else {
       addToast(result.error ?? "Failed to delete product.", "error");
     }
@@ -629,6 +632,7 @@ export default function ProductsDashboardPage() {
     const result = await bulkUpdateAvailability([...selectedProductIds], false);
     if (result.success) {
       addToast(`${selectedProductIds.size} product(s) marked out of stock.`, "success");
+      emitProductsChanged();
       const refreshed = await fetchProductsByShopId(activeShopId!);
       if (refreshed.success) setProducts(refreshed.data);
       setSelectedProductIds(new Set());
@@ -645,6 +649,7 @@ export default function ProductsDashboardPage() {
     const result = await bulkUpdateAvailability([...selectedProductIds], true);
     if (result.success) {
       addToast(`${selectedProductIds.size} product(s) marked as available.`, "success");
+      emitProductsChanged();
       const refreshed = await fetchProductsByShopId(activeShopId!);
       if (refreshed.success) setProducts(refreshed.data);
       setSelectedProductIds(new Set());
@@ -691,6 +696,7 @@ export default function ProductsDashboardPage() {
     }
 
     addToast(`${successCount} product(s) updated with ${percent}% discount.`, "success");
+    emitProductsChanged();
     const refreshed = await fetchProductsByShopId(activeShopId!);
     if (refreshed.success) setProducts(refreshed.data);
     setSelectedProductIds(new Set());
@@ -711,6 +717,7 @@ export default function ProductsDashboardPage() {
     setProducts(prev => prev.filter(p => !selectedProductIds.has(p.id)));
     setSelectedProductIds(new Set());
     addToast(`${successCount} product(s) deleted.`, successCount > 0 ? "success" : "error");
+    if (successCount > 0) emitProductsChanged();
     setBulkActionLoading(false);
   }, [selectedProductIds, addToast]);
 
@@ -727,6 +734,7 @@ export default function ProductsDashboardPage() {
     });
     if (result.success) {
       addToast(nextAvailable ? `"${product.name}" is now in stock.` : `"${product.name}" marked out of stock.`, "success");
+      emitProductsChanged();
     } else {
       setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, is_available: product.is_available } : p)));
       addToast(result.error, "error");
@@ -781,6 +789,7 @@ export default function ProductsDashboardPage() {
       }
 
       addToast(`${imported} product(s) imported successfully!`, "success");
+      if (imported > 0) emitProductsChanged();
       const refreshed = await fetchProductsByShopId(activeShopId);
       if (refreshed.success) setProducts(refreshed.data);
     } catch {

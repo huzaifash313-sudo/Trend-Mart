@@ -31,7 +31,12 @@ import type { OrderItem as OrderItemType, Shop } from "@/types";
 import { formatRupees } from "@/lib/formatters";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
-import { getDistanceToShop, locationErrorMessage } from "@/services/geoRadiusService";
+import {
+  getDistanceToShop,
+  locationErrorMessage,
+  parseCoverageFromZones,
+  isCustomerWithinCoverage,
+} from "@/services/geoRadiusService";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { requireVerifiedEmailSession } from "@/services/authService";
 import { toWhatsAppDigits, normalizePkPhoneDigits } from "@/lib/sanitization";
@@ -384,6 +389,16 @@ export default function WhatsAppCheckoutModal({
   const [availableCoupons, setAvailableCoupons] = useState<Array<{ id: string; code: string }>>([]);
   const couponTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Idempotency token: one per checkout session. Reused across retries so a
+  // double-submit can't create duplicate orders; regenerated only on success.
+  const idempotencyKeyRef = useRef<string>("");
+  if (!idempotencyKeyRef.current) {
+    idempotencyKeyRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `ord_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   // Editable quantities (initialized from items via lazy state initializer)
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
@@ -434,13 +449,20 @@ export default function WhatsAppCheckoutModal({
   const shopClosed = shopHours.state === "closed";
 
   const radiusKm = shop.service_radius_km ?? 0;
-  const zones = shop.delivery_zones ?? [];
-  const isNationwide = zones.some((z) => /pakistan|nationwide|all/i.test(String(z)));
-  const outsideServiceRadius =
-    !isNationwide &&
-    radiusKm > 0 &&
-    distanceKm != null &&
-    distanceKm > radiusKm;
+  const coverageMode = useMemo(
+    () => parseCoverageFromZones(shop.delivery_zones).mode,
+    [shop.delivery_zones],
+  );
+  const outsideServiceRadius = useMemo(() => {
+    if (!location?.coordinates) return false;
+    const gate = isCustomerWithinCoverage(
+      shop,
+      location.coordinates.latitude,
+      location.coordinates.longitude,
+      location.city,
+    );
+    return !gate.within;
+  }, [shop, location]);
 
   const deliveryFee = useMemo(() => {
     const freeThreshold = shop.free_delivery_threshold;
@@ -770,7 +792,9 @@ export default function WhatsAppCheckoutModal({
       }
       if (outsideServiceRadius) {
         throw new Error(
-          `You are outside this shop's delivery radius (${radiusKm} km).`,
+          coverageMode === "city"
+            ? "You are outside this shop's delivery area (city)."
+            : `You are outside this shop's delivery radius (${radiusKm} km).`,
         );
       }
 
@@ -847,16 +871,21 @@ export default function WhatsAppCheckoutModal({
         couponCode: couponResult?.valid ? couponCode : undefined,
         customerLat: pinLat,
         customerLng: pinLng,
+        customerCity: location?.city ?? undefined,
+        idempotencyKey: idempotencyKeyRef.current,
       });
 
       if (!orderResult.success) {
         throw new Error(orderResult.error);
       }
 
+      // Success — reset the idempotency token so a future order gets a fresh one.
+      idempotencyKeyRef.current = "";
+
       const ref = orderResult.data.id;
       setOrderRef(ref);
 
-      // 2. Save to local history
+      // 2. Save to local history (items array so the orders page can render it)
       saveOrderRecord({
         shopId: shop.id,
         shopName: shop.name,
@@ -866,6 +895,13 @@ export default function WhatsAppCheckoutModal({
         discountAmount,
         couponCode,
         notes: shipping.deliveryNotes,
+        items: items.map((i) => ({
+          product_id: i.productId,
+          name: i.name,
+          price: i.price,
+          quantity: quantities[i.id] ?? i.quantity,
+        })),
+        status: "Pending",
       });
 
       // 3. Build WhatsApp message (TrendMart product links + Maps pin)
@@ -1257,7 +1293,9 @@ export default function WhatsAppCheckoutModal({
                 <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs dark:bg-red-900/20">
                   <InfoIcon />
                   <span className="text-red-700 dark:text-red-400">
-                    You are about {distanceKm?.toFixed(1)} km away — this shop delivers within {radiusKm} km only.
+                    {coverageMode === "city"
+                      ? "This shop only delivers within its selected city, which doesn't match your current location."
+                      : `You are about ${distanceKm?.toFixed(1)} km away — this shop delivers within ${radiusKm} km only.`}
                   </span>
                 </div>
               )}

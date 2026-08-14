@@ -64,11 +64,17 @@ const SENSITIVE_RATE_LIMIT_MAX = 10;
  */
 async function checkRateLimit(request: NextRequest): Promise<boolean> {
   const limiter = getDistributedRateLimiter();
+  // Sensitive paths (auth/admin/dashboard/api) get a tighter cap than the
+  // general browse default. Previously the 10-cap was computed for the header
+  // but never actually enforced — every path silently used 30.
+  const pathname = request.nextUrl.pathname;
+  const isSensitive = SENSITIVE_PATH_PATTERNS.some((p) => pathname.startsWith(p));
+  const maxRequests = isSensitive ? SENSITIVE_RATE_LIMIT_MAX : RATE_LIMIT_MAX;
   try {
     const result = await limiter.checkRateLimit(request, {
-      maxRequests: RATE_LIMIT_MAX,
+      maxRequests,
       windowMs: RATE_LIMIT_WINDOW_MS,
-      name: "middleware-global",
+      name: isSensitive ? "middleware-sensitive" : "middleware-global",
     });
     return result.allowed;
   } catch {
@@ -439,32 +445,24 @@ async function resolveUserRole(
       return rpcRole as AppRole;
     }
 
-    // 2) JWT metadata (signup role) — skip direct user_roles table (can 500 on recursive RLS)
-    const meta =
-      (typeof user.user_metadata?.role === "string"
-        ? user.user_metadata.role
-        : undefined) ||
-      (typeof user.app_metadata?.role === "string"
-        ? user.app_metadata.role
-        : undefined);
-    if (meta === "admin" || meta === "merchant" || meta === "customer") {
-      if (meta === "customer") {
-        const { data: shop } = await supabase
-          .from("shops")
-          .select("id")
-          .eq("owner_id", user.id)
-          .limit(1)
-          .maybeSingle();
-        if (shop?.id) {
-          authDebug("resolveUserRole: metadata customer but owns shop → merchant");
-          return "merchant";
-        }
-      }
-      authDebug("resolveUserRole: from metadata", { role: meta });
-      return meta;
+    // 2) app_metadata.role — written only by the service role.
+    //    SECURITY: user_metadata.role is user-editable via
+    //    supabase.auth.updateUser({ data: { role: "admin" } }), so it must NEVER
+    //    confer admin or merchant. Only app_metadata may grant a privileged role;
+    //    customers fall through to the shop-ownership check below.
+    const appMeta =
+      typeof user.app_metadata?.role === "string" ? user.app_metadata.role : "";
+    if (appMeta === "admin") {
+      authDebug("resolveUserRole: admin via app_metadata");
+      return "admin";
+    }
+    if (appMeta === "merchant") {
+      authDebug("resolveUserRole: merchant via app_metadata");
+      return "merchant";
     }
 
-    // 3) Shop ownership — older merchants before user_roles existed
+    // 3) Shop ownership — authoritative merchant signal (un-fakeable; legacy
+    //    merchants before user_roles existed, and customers who own a shop).
     const { data: shop } = await supabase
       .from("shops")
       .select("id")
@@ -510,7 +508,11 @@ function applySecurityHeaders(response: NextResponse): void {
 
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co",
+    // 'unsafe-inline' is required for the inline theme/splash bootstrap scripts
+    // in app/layout.tsx. 'unsafe-eval' is intentionally OMITTED — Next.js
+    // production builds never need eval, and removing it closes the largest
+    // XSS execution vector.
+    "script-src 'self' 'unsafe-inline' https://*.supabase.co",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     // Always allow Supabase HTTPS + Realtime WebSockets (prod was missing wss://)

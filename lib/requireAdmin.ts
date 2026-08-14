@@ -30,17 +30,20 @@ export async function requireAdminUser(): Promise<AdminGate> {
   const user = signedIn.user;
   const supabase = await createClient();
 
-  const VALID = new Set(["admin"]);
+  // 1) Authoritative check — SECURITY DEFINER get_my_role() reads the
+  //    user_roles table, whose RLS blocks self-promotion to admin.
   const { data: rpcRole } = await supabase.rpc("get_my_role");
-  if (typeof rpcRole === "string" && VALID.has(rpcRole)) {
+  if (rpcRole === "admin") {
     return { ok: true, user };
   }
 
-  const meta =
-    (typeof user.app_metadata?.role === "string" && user.app_metadata.role) ||
-    (typeof user.user_metadata?.role === "string" && user.user_metadata.role) ||
-    "";
-  if (meta === "admin") {
+  // 2) app_metadata.role — written ONLY by the service role, never by the
+  //    user. SECURITY: user_metadata.role is user-editable via
+  //    supabase.auth.updateUser({ data: { role: "admin" } }), so it must NEVER
+  //    confer admin. It is deliberately ignored here.
+  const appMetaRole =
+    typeof user.app_metadata?.role === "string" ? user.app_metadata.role : "";
+  if (appMetaRole === "admin") {
     return { ok: true, user };
   }
 

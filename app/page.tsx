@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  memo,
+  Suspense,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,6 +38,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useShops, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
+import { getTopAffinityCategories } from "@/lib/behavior";
+import RecentlyViewedStrip from "@/components/RecentlyViewedStrip";
 
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
@@ -45,6 +56,102 @@ const EMPTY_SHOPS: Shop[] = [];
 const EMPTY_DEALS: ShopDeal[] = [];
 const EMPTY_STORIES: Story[] = [];
 const EMPTY_COUPONS: Record<string, Coupon[]> = {};
+
+/* -------------------------------------------------------------------------- */
+/*  Memoized shop-card row                                                     */
+/*  Keeps each card's `shop` object + handlers stable, so a favorite toggle /  */
+/*  broken-image update re-renders only the affected card, not the whole grid. */
+/* -------------------------------------------------------------------------- */
+
+interface ShopCardRowProps {
+  shop: ShopWithDistance;
+  favorited: boolean;
+  showDistance: boolean;
+  bannerBroken: boolean;
+  logoBroken: boolean;
+  priority: boolean;
+  coupons?: Coupon[];
+  activeDeals: ShopDeal[];
+  setBrokenImgs: Dispatch<SetStateAction<Set<string>>>;
+  setFavorites: Dispatch<SetStateAction<Set<string>>>;
+}
+
+const ShopCardRow = memo(function ShopCardRow({
+  shop,
+  favorited,
+  showDistance,
+  bannerBroken,
+  logoBroken,
+  priority,
+  coupons,
+  activeDeals,
+  setBrokenImgs,
+  setFavorites,
+}: ShopCardRowProps) {
+  const { addToast } = useToast();
+  const deals = useMemo(
+    () => activeDeals.filter((d) => d.shop_id === shop.id),
+    [activeDeals, shop.id],
+  );
+
+  const onBannerError = useCallback(() => {
+    setBrokenImgs((prev) => new Set(prev).add(`banner:${shop.id}`));
+  }, [setBrokenImgs, shop.id]);
+
+  const onLogoError = useCallback(() => {
+    setBrokenImgs((prev) => new Set(prev).add(`logo:${shop.id}`));
+  }, [setBrokenImgs, shop.id]);
+
+  const onToggleFavorite = useCallback(async () => {
+    const nowFav = await toggleFav(
+      shop.id,
+      "shop",
+      shop.name,
+      shop.logo_url ?? undefined,
+    );
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (nowFav) next.add(shop.id);
+      else next.delete(shop.id);
+      return next;
+    });
+    addToast(nowFav ? "Added to wishlist" : "Removed from wishlist", "info");
+  }, [setFavorites, addToast, shop.id, shop.name, shop.logo_url]);
+
+  return (
+    <ShopCard
+      shop={{
+        id: shop.id,
+        name: shop.name,
+        slug: shop.slug,
+        category: shop.category,
+        location: shop.location,
+        logo_url: shop.logo_url,
+        banner_url: shop.banner_url,
+        is_live: shop.is_live,
+        verification_status: shop.verification_status,
+        distance_km: shop.distance_km,
+        business_hours: shop.business_hours,
+        operating_status: shop.operating_status,
+        announcement: shop.announcement,
+        announcement_expires_at: shop.announcement_expires_at,
+        free_delivery_threshold: shop.free_delivery_threshold,
+        avg_rating: shop.avg_rating,
+        review_count: shop.review_count,
+        coupons,
+        deals,
+      }}
+      favorited={favorited}
+      showDistance={showDistance}
+      bannerBroken={bannerBroken}
+      logoBroken={logoBroken}
+      onBannerError={onBannerError}
+      onLogoError={onLogoError}
+      onToggleFavorite={onToggleFavorite}
+      priority={priority}
+    />
+  );
+});
 
 /* -------------------------------------------------------------------------- */
 /*  HomeInner Component                                                        */
@@ -67,10 +174,13 @@ function HomeInner() {
 
   const storiesQuery = useStories();
   const [storiesVersion, setStoriesVersion] = useState(0);
+  const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
   const stories = useMemo(() => {
     void storiesVersion; // re-sort when a story gets marked as seen
-    return sortStoriesUnseenFirst(storiesQuery.data ?? EMPTY_STORIES);
-  }, [storiesQuery.data, storiesVersion]);
+    const base = sortStoriesUnseenFirst(storiesQuery.data ?? EMPTY_STORIES);
+    if (!geoVisibleShopIds) return base;
+    return base.filter((s) => geoVisibleShopIds.has(s.shop_id));
+  }, [storiesQuery.data, storiesVersion, geoVisibleShopIds]);
 
   const myShopQuery = useMyShop();
   const myShop = useMemo(
@@ -125,9 +235,27 @@ function HomeInner() {
     }));
   }, [shops]);
 
+  // Personalisation: reorder the category pills so the categories a customer
+  // actually browses / wishes / searches appear first (after "All"). Read from
+  // localStorage AFTER mount (client-only) to avoid a hydration mismatch — the
+  // server always renders the static order.
+  const [orderedCategories, setOrderedCategories] = useState<ShopCategory[]>(SHOP_CATEGORIES.slice());
+  useEffect(() => {
+    const affinity = getTopAffinityCategories(10);
+    if (affinity.length === 0) return;
+    const ordered = SHOP_CATEGORIES.filter((c) => c !== "All").slice();
+    for (const cat of [...affinity].reverse()) {
+      const idx = ordered.findIndex((c) => c === cat);
+      if (idx > 0) {
+        const [moved] = ordered.splice(idx, 1);
+        ordered.unshift(moved);
+      }
+    }
+    setOrderedCategories(["All", ...ordered] as ShopCategory[]);
+  }, []);
+
   const [brokenImgs, setBrokenImgs] = useState<Set<string>>(new Set());
   const [brokenStoryImgs, setBrokenStoryImgs] = useState<Set<string>>(new Set());
-  const { addToast } = useToast();
   const { openQuickAdd } = useMerchantQuickAdd();
 
   // Header LocationPicker + homepage area filter (Near me / City / All Pakistan)
@@ -240,7 +368,7 @@ function HomeInner() {
         const result = await filterShopsByProximity(filteredShops, {
           coordinates: coords,
           maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
-          enforceServiceRadius: scope === "radius",
+          enforceServiceRadius: true,
           sortByProximity: true,
           scope,
           deliveryZone: globalLocation?.deliveryZone ?? undefined,
@@ -263,6 +391,46 @@ function HomeInner() {
       cancelled = true;
     };
   }, [filteredShops, geoFilter, globalCoords, globalLocation]);
+
+  /* Geo filter — compute location-visible shop IDs (location-only) for stories. */
+  useEffect(() => {
+    let cancelled = false;
+    async function computeVisibleShopIds() {
+      const scope = geoFilter.scope;
+      const coords = geoFilter.coordinates ?? globalCoords ?? null;
+
+      // No pin + nationwide/city browse → no location restriction on stories.
+      if ((scope === "pakistan" || scope === "city") && !coords) {
+        setGeoVisibleShopIds(null);
+        return;
+      }
+      if (scope === "radius" && !coords) {
+        setGeoVisibleShopIds(null);
+        return;
+      }
+
+      try {
+        const result = await filterShopsByProximity(shops, {
+          coordinates: coords,
+          maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
+          enforceServiceRadius: true,
+          sortByProximity: false,
+          scope,
+          deliveryZone: globalLocation?.deliveryZone ?? undefined,
+          customerCity: globalLocation?.city ?? undefined,
+        });
+        if (!cancelled) {
+          setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
+        }
+      } catch {
+        if (!cancelled) setGeoVisibleShopIds(null);
+      }
+    }
+    computeVisibleShopIds();
+    return () => {
+      cancelled = true;
+    };
+  }, [shops, geoFilter, globalCoords, globalLocation]);
 
   const displayShops = proximityActive ? geoFilteredShops : filteredShops;
   const showProximityBadges =
@@ -309,7 +477,7 @@ function HomeInner() {
       {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
         <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
-          {SHOP_CATEGORIES.map((category) => {
+          {orderedCategories.map((category) => {
             const isActive = activeCategory === category;
             const catCount = categoryCounts.find((c) => c.key === category)?.count;
             return (
@@ -454,6 +622,9 @@ function HomeInner() {
       {/* ── Sponsored / Promotional Ads Carousel ───────────────────── */}
       <PromoAdsCarousel placement="homepage_top" />
 
+      {/* ── Recently viewed (personal: pick up where you left off) ───── */}
+      <RecentlyViewedStrip />
+
       {geoFiltering && (
         <p className="animate-pulse text-xs text-teal-600/80 dark:text-teal-400/80">
           Updating shops for your area…
@@ -583,62 +754,20 @@ function HomeInner() {
         {!loading && !error && displayShops.length > 0 && (
           <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {displayShops.map((shop, index) => {
-              const bannerBroken = brokenImgs.has(`banner:${shop.id}`);
-              const logoBroken = brokenImgs.has(`logo:${shop.id}`);
               const withDistance = shop as ShopWithDistance;
               return (
-                <ShopCard
+                <ShopCardRow
                   key={shop.id}
+                  shop={withDistance}
                   priority={index < 2}
-                  shop={{
-                    id: shop.id,
-                    name: shop.name,
-                    slug: shop.slug,
-                    category: shop.category,
-                    location: shop.location,
-                    logo_url: shop.logo_url,
-                    banner_url: shop.banner_url,
-                    is_live: shop.is_live,
-                    verification_status: shop.verification_status,
-                    distance_km: withDistance.distance_km,
-                    business_hours: shop.business_hours,
-                    operating_status: shop.operating_status,
-                    announcement: shop.announcement,
-                    announcement_expires_at: shop.announcement_expires_at,
-                    free_delivery_threshold: shop.free_delivery_threshold,
-                    avg_rating: shop.avg_rating,
-                    review_count: shop.review_count,
-                    coupons: shopCoupons[shop.id],
-                    deals: activeDeals.filter((d) => d.shop_id === shop.id),
-                  }}
                   favorited={favorites.has(shop.id)}
                   showDistance={showProximityBadges}
-                  bannerBroken={bannerBroken}
-                  logoBroken={logoBroken}
-                  onBannerError={() =>
-                    setBrokenImgs((prev) => new Set(prev).add(`banner:${shop.id}`))
-                  }
-                  onLogoError={() =>
-                    setBrokenImgs((prev) => new Set(prev).add(`logo:${shop.id}`))
-                  }
-                  onToggleFavorite={async () => {
-                    const nowFav = await toggleFav(
-                      shop.id,
-                      "shop",
-                      shop.name,
-                      shop.logo_url ?? undefined,
-                    );
-                    setFavorites((prev) => {
-                      const next = new Set(prev);
-                      if (nowFav) next.add(shop.id);
-                      else next.delete(shop.id);
-                      return next;
-                    });
-                    addToast(
-                      nowFav ? "Added to wishlist" : "Removed from wishlist",
-                      "info",
-                    );
-                  }}
+                  bannerBroken={brokenImgs.has(`banner:${shop.id}`)}
+                  logoBroken={brokenImgs.has(`logo:${shop.id}`)}
+                  coupons={shopCoupons[shop.id]}
+                  activeDeals={activeDeals}
+                  setBrokenImgs={setBrokenImgs}
+                  setFavorites={setFavorites}
                 />
               );
             })}

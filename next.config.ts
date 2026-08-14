@@ -34,17 +34,12 @@ const isCI = process.env.CI === "true";
 
 const nextConfig: NextConfig = {
   // ── Environment Variables (explicitly inline NEXT_PUBLIC_* for client) ────
-  // Turbopack may not always inline .env.local variables into client bundles,
-  // so we hardcode the publishable values here to guarantee availability.
-  // These are publishable keys — safe to include in source, not secrets.
+  // SECURITY: no hardcoded fallbacks here. A hardcoded Supabase URL/anon key
+  // would silently target a fixed project whenever env vars are missing —
+  // masking misconfiguration. The client/server now fail fast instead.
   env: {
-    NEXT_PUBLIC_SUPABASE_URL:
-      process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      "https://olbxprailtqjbxmkrbhe.supabase.co",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY:
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      "sb_publishable_oqHUrSoDggpaZUBpsGQ9hg_daavN2NK",
-    // Inline so client push subscribe works even if Turbopack misses .env.local
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
   },
 
@@ -211,7 +206,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",

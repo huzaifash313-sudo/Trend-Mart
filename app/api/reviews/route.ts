@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
       visitor_ip_hash: ipHash,
       verified_purchase: true,
     })
-    .select("id, shop_id, customer_name, rating, comment, created_at, merchant_reply, merchant_reply_at, verified_purchase, user_id")
+    .select("id, shop_id, customer_name, rating, comment, created_at, merchant_reply, merchant_reply_at, verified_purchase")
     .single();
 
   if (error) {
@@ -273,7 +273,7 @@ export async function PATCH(request: NextRequest) {
       merchant_reply_at: new Date().toISOString(),
     })
     .eq("id", reviewId)
-    .select("id, shop_id, customer_name, rating, comment, created_at, merchant_reply, merchant_reply_at, verified_purchase, user_id")
+    .select("id, shop_id, customer_name, rating, comment, created_at, merchant_reply, merchant_reply_at, verified_purchase")
     .single();
 
   if (error) {

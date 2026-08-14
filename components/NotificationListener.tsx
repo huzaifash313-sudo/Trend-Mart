@@ -22,7 +22,6 @@ import {
   useContext,
   type ReactNode,
 } from "react";
-import { createClient } from "@/lib/supabase/client";
 import {
   subscribeToOrders,
   subscribeToInquiries,
@@ -171,11 +170,18 @@ export function NotificationListenerProvider({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [historyReady, setHistoryReady] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [muteHydrated, setMuteHydrated] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [activeShopIds, setActiveShopIds] = useState<Set<string>>(new Set());
   const channelRefs = useRef<Set<string>>(new Set());
   const customerChannelRef = useRef<string | null>(null);
+  // Mute is read via a ref inside addNotification so toggling mute does NOT
+  // change addNotification's identity → registerShop/registerCustomer stay
+  // stable → no full unsubscribe/resubscribe churn on mute toggle.
+  const isMutedRef = useRef(isMuted);
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+  // All live unsubscribe closures, so provider unmount actually tears them down.
+  const cleanupFns = useRef<Set<() => void>>(new Set());
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const openPanel = useCallback(() => setIsPanelOpen(true), []);
@@ -203,7 +209,6 @@ export function NotificationListenerProvider({
         // Ignore
       }
     }
-    setMuteHydrated(true);
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -238,7 +243,7 @@ export function NotificationListenerProvider({
         return next;
       });
 
-      if (!isMuted) {
+      if (!isMutedRef.current) {
         playChimeSound();
       }
 
@@ -254,7 +259,7 @@ export function NotificationListenerProvider({
         );
       }
     },
-    [isMuted],
+    [],
   );
 
   const markAsRead = useCallback((id: string) => {
@@ -279,8 +284,6 @@ export function NotificationListenerProvider({
         // Already subscribed — no-op
         return () => {};
       }
-
-      setActiveShopIds((prev) => new Set(prev).add(shopId));
 
       // Subscribe to new orders
       const unsubOrders = subscribeToOrders(
@@ -341,16 +344,14 @@ export function NotificationListenerProvider({
       channelRefs.current.add(shopId);
 
       // Return cleanup
-      return () => {
+      const cleanup = () => {
         unsubOrders();
         unsubInquiries();
         channelRefs.current.delete(shopId);
-        setActiveShopIds((prev) => {
-          const next = new Set(prev);
-          next.delete(shopId);
-          return next;
-        });
+        cleanupFns.current.delete(cleanup);
       };
+      cleanupFns.current.add(cleanup);
+      return cleanup;
     },
     [addNotification],
   );
@@ -376,12 +377,15 @@ export function NotificationListenerProvider({
         });
       });
 
-      return () => {
+      const cleanup = () => {
         unsub();
+        cleanupFns.current.delete(cleanup);
         if (customerChannelRef.current === userId) {
           customerChannelRef.current = null;
         }
       };
+      cleanupFns.current.add(cleanup);
+      return cleanup;
     },
     [addNotification],
   );
@@ -389,41 +393,25 @@ export function NotificationListenerProvider({
   // ── Cleanup all subscriptions on unmount ───────────────────────────────────
   useEffect(() => {
     return () => {
-      // Individual cleanup happens via registerShop return functions
+      // Actually tear down every live channel — not just clear the ref Set.
+      for (const fn of cleanupFns.current) {
+        try {
+          fn();
+        } catch {
+          /* ignore */
+        }
+      }
+      cleanupFns.current.clear();
       channelRefs.current.clear();
     };
   }, []);
 
-  // ── Persist active shop subscriptions across sessions ──────────────────────
-  useEffect(() => {
-    // If dashboard has previously registered shops, try to re-register them
-    const savedIds =
-      typeof window !== "undefined"
-        ? localStorage.getItem("trendmart_notification_shops")
-        : null;
-    if (savedIds) {
-      try {
-        const ids: string[] = JSON.parse(savedIds);
-        for (const id of ids) {
-          registerShop(id);
-        }
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-    // We intentionally don't call registerShop in cleanup deps because
-    // registerShop is stable due to useCallback with addNotification
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Save active shop IDs for re-subscription on next visit ─────────────────
-  useEffect(() => {
-    if (typeof window !== "undefined" && activeShopIds.size > 0) {
-      localStorage.setItem(
-        "trendmart_notification_shops",
-        JSON.stringify(Array.from(activeShopIds)),
-      );
-    }
-  }, [activeShopIds]);
+  // NOTE: the previous localStorage-driven re-registration of shop channels was
+  // removed. It re-subscribed to saved shop IDs with NO auth/ownership check,
+  // so a logged-out visitor (or a different user on the same browser) could
+  // inherit the previous merchant's order/inquiry streams. Correct registration
+  // now happens exclusively via AutoRegisterMerchantShops (auth + ownership
+  // verified) in components/AppNotifications.tsx.
 
   return (
     <NotificationContext.Provider

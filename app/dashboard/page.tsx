@@ -13,7 +13,6 @@ import { createClient } from "@/lib/supabase/client";
 import {
   subscribeToOrders,
   subscribeToInquiries,
-  unsubscribeAll,
 } from "@/lib/supabase/realtime";
 import type { Shop, Product, ShopFormData, ProductFormData, AnalyticsSummary } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
@@ -605,19 +604,14 @@ export default function DashboardPage() {
       },
     );
 
-    // Cleanup all subscriptions when shop changes or component unmounts
+    // Cleanup only THIS page's subscriptions when shop changes or unmounts.
+    // (Do NOT call unsubscribeAll() — that would kill the global notification
+    // bell's order/inquiry channels too.)
     return () => {
       unsubOrders();
       unsubInquiries();
     };
   }, [activeShopId, addToast]);
-
-  // ── Cleanup all real-time subscriptions on unmount ──────────────────────
-  useEffect(() => {
-    return () => {
-      unsubscribeAll();
-    };
-  }, []);
 
   const handleSaveShop = useCallback(async (e: FormEvent) => {
     e.preventDefault();

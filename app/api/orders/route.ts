@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizePkPhoneDigits, isValidUUID } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
+import { sendPushToUser } from "@/lib/webPush";
 import type { Order, OrderItem, VariantGroup } from "@/types";
 
 export const runtime = "nodejs";
@@ -47,11 +48,15 @@ interface OrderRequestBody {
   notes?: string | null;
   customerLat?: number | null;
   customerLng?: number | null;
+  customerCity?: string | null;
+  /** Client-generated idempotency token to prevent duplicate orders. */
+  idempotencyKey?: string | null;
 }
 
 /** Row shape read from `public.shops` (the untyped admin client resolves to `never`). */
 interface ShopRow {
   id: string;
+  owner_id: string | null;
   name: string | null;
   is_live: boolean | null;
   verification_status: string | null;
@@ -63,6 +68,7 @@ interface ShopRow {
   longitude: number | null;
   service_radius_km: number | null;
   delivery_zones: string[] | null;
+  location: string | null;
   business_hours: string | null;
   operating_status: string | null;
 }
@@ -139,6 +145,32 @@ function variantIsUnavailable(
   return false;
 }
 
+type CoverageMode = "radius" | "city" | "nationwide";
+
+function parseCoverage(zones: string[] | null | undefined): {
+  mode: CoverageMode;
+  city: string | null;
+} {
+  const list = zones ?? [];
+  for (const z of list) {
+    const s = String(z);
+    if (s === "__pk_nationwide__" || s.toLowerCase() === "pakistan") {
+      return { mode: "nationwide", city: null };
+    }
+    if (s.startsWith("__pk_city__:")) {
+      return { mode: "city", city: s.slice("__pk_city__:".length).trim() || null };
+    }
+  }
+  return { mode: "radius", city: null };
+}
+
+function cityMatch(a: string, b: string): boolean {
+  const l = a.toLowerCase().trim();
+  const r = b.toLowerCase().trim();
+  if (!l || !r) return false;
+  return l === r || l.includes(r) || r.includes(l);
+}
+
 /* ─── POST handler ──────────────────────────────────────────────────────────── */
 
 export async function POST(request: Request) {
@@ -174,6 +206,9 @@ export async function POST(request: Request) {
   const customerPhone =
     normalizePkPhoneDigits(customerPhoneRaw) || customerPhoneRaw.replace(/\D/g, "");
   const notes = sanitizeText(body.notes, 500);
+  // Idempotency token: client-generated UUID, unique per checkout attempt.
+  const idempotencyKey =
+    typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim().slice(0, 100) : "";
 
   if (!isValidUUID(shopId)) {
     return NextResponse.json({ success: false, error: "Invalid shop." }, { status: 400 });
@@ -199,11 +234,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // The service-role client has no generated Database types, so `.rpc()` is
+  // typed with `args?: undefined`. Cast it to the loose signature we actually
+  // call (atomic coupon increment + product variant stock deduction).
+  const adminRpc = admin.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: unknown }>;
+
   // 3. Read the shop.
   const { data: shopRaw, error: shopErr } = await admin
     .from("shops")
     .select(
-      "id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, business_hours, operating_status",
+      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, location, business_hours, operating_status",
     )
     .eq("id", shopId)
     .maybeSingle();
@@ -452,38 +495,39 @@ export async function POST(request: Request) {
   // 6. Subtotal from authoritative prices.
   const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-  // 7. Radius enforcement (only when GPS + a numeric service radius exist).
+  // 7. Delivery-coverage enforcement (radius / city / nationwide).
   const radiusKm = toNumber(shopRow.service_radius_km, 0);
-  const zones = Array.isArray(shopRow.delivery_zones) ? (shopRow.delivery_zones as string[]) : [];
-  const isNationwide = zones.some((z) => /pakistan|nationwide|all/i.test(String(z)));
+  const coverage = parseCoverage(shopRow.delivery_zones);
+  const customerCity = typeof body.customerCity === "string" ? body.customerCity.trim() : "";
   const custLat = typeof body.customerLat === "number" ? body.customerLat : null;
   const custLng = typeof body.customerLng === "number" ? body.customerLng : null;
-  let distanceKm: number | null = null;
-  if (
-    !isNationwide &&
-    radiusKm > 0 &&
+  const hasCustomerCoords =
     custLat != null &&
     custLng != null &&
     Number.isFinite(custLat) &&
-    Number.isFinite(custLng) &&
-    Number.isFinite(toNumber(shopRow.latitude)) &&
-    Number.isFinite(toNumber(shopRow.longitude))
-  ) {
-    distanceKm = haversineKm(
-      custLat,
-      custLng,
-      toNumber(shopRow.latitude),
-      toNumber(shopRow.longitude),
-    );
-    if (distanceKm != null && distanceKm > radiusKm) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `You are about ${distanceKm.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`,
-        },
-        { status: 409 },
-      );
+    Number.isFinite(custLng);
+  const shopLat = toNumber(shopRow.latitude);
+  const shopLng = toNumber(shopRow.longitude);
+  let distanceKm: number | null = null;
+  if (hasCustomerCoords && Number.isFinite(shopLat) && Number.isFinite(shopLng)) {
+    distanceKm = haversineKm(custLat, custLng, shopLat, shopLng);
+  }
+
+  let coverageError: string | null = null;
+  if (coverage.mode === "city") {
+    const target = coverage.city || (shopRow.location ?? "");
+    if (customerCity && target && !cityMatch(target, customerCity)) {
+      coverageError = `This shop only delivers in ${target}.`;
+    } else if (!customerCity && distanceKm != null && distanceKm > 35) {
+      coverageError = "You appear to be outside this shop's delivery city.";
     }
+  } else if (coverage.mode === "radius") {
+    if (radiusKm > 0 && distanceKm != null && distanceKm > radiusKm) {
+      coverageError = `You are about ${distanceKm.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`;
+    }
+  }
+  if (coverageError) {
+    return NextResponse.json({ success: false, error: coverageError }, { status: 409 });
   }
 
   // 8. Coupon validation (server-side).
@@ -532,15 +576,15 @@ export async function POST(request: Request) {
     }
   }
 
-  const discountedSubtotal = Math.max(0, subtotal - discount);
-
-  // 9. Minimum order check.
+  // 9. Minimum order check — uses PRE-discount subtotal so it matches the
+  //     client-side gate (`belowMinimumOrder` in WhatsAppCheckoutModal) and the
+  //     merchant's intent ("spend at least Rs. X", not "after coupon").
   const minOrder = toNumber(shopRow.min_order_amount, 0);
-  if (minOrder > 0 && discountedSubtotal < minOrder) {
+  if (minOrder > 0 && subtotal < minOrder) {
     return NextResponse.json(
       {
         success: false,
-        error: `Minimum order for this shop is Rs. ${minOrder.toLocaleString()}. Current subtotal is Rs. ${Math.round(discountedSubtotal).toLocaleString()}.`,
+        error: `Minimum order for this shop is Rs. ${minOrder.toLocaleString()}. Current subtotal is Rs. ${Math.round(subtotal).toLocaleString()}.`,
       },
       { status: 409 },
     );
@@ -558,10 +602,113 @@ export async function POST(request: Request) {
 
   const total = Math.max(0, Math.round((subtotal - discount + deliveryFee) * 100) / 100);
 
-  // 11. Availability is already checked (In Stock / Out of Stock / Not available).
-  // Exact unit counts are not deducted — merchants sell both in-store and online.
+  // 11. Atomic coupon redemption — BEFORE insert, so the usage limit can never
+  //     be exceeded even under concurrent checkouts (closes the TOCTOU race).
+  if (appliedCoupon) {
+    let rpcOk: boolean | null = null;
+    try {
+      const { data: rpcData, error: rpcErr } = await adminRpc(
+        "increment_coupon_usage",
+        { p_shop_id: shopId, p_code: appliedCoupon },
+      );
+      if (!rpcErr) rpcOk = rpcData === true;
+    } catch {
+      rpcOk = null; // RPC missing on legacy DB
+    }
 
-  // 12. Insert the order.
+    if (rpcOk === false) {
+      return NextResponse.json(
+        { success: false, error: "This coupon has reached its usage limit." },
+        { status: 409 },
+      );
+    }
+
+    if (rpcOk === null) {
+      // Legacy fallback: guarded read-modify-write (non-atomic, best-effort).
+      const { data: cur } = await admin
+        .from("coupons")
+        .select("usage_count, usage_limit")
+        .eq("shop_id", shopId)
+        .eq("code", appliedCoupon)
+        .maybeSingle();
+      const row = cur as { usage_count?: number | null; usage_limit?: number | null } | null;
+      const current = toNumber(row?.usage_count, 0);
+      const limit = toNumber(row?.usage_limit, 0);
+      if (limit > 0 && current >= limit) {
+        return NextResponse.json(
+          { success: false, error: "This coupon has reached its usage limit." },
+          { status: 409 },
+        );
+      }
+      let updater = admin
+        .from("coupons")
+        .update({ usage_count: current + 1 } as never)
+        .eq("shop_id", shopId)
+        .eq("code", appliedCoupon);
+      if (limit > 0) updater = updater.lt("usage_count", limit);
+      await updater;
+    }
+  }
+
+  // 12. SOFT stock deduction — advisory, never blocks checkout.
+  //     TrendMart is a WhatsApp-first marketplace: the merchant is the human
+  //     gatekeeper who confirms/declines each order in WhatsApp. Digital stock
+  //     is only a rough guide (merchants also sell walk-in), so we NEVER reject
+  //     an order over a stock number. Instead:
+  //       - tracked stock is decremented when available (keeps online count honest)
+  //       - if a tracked variant can't cover the order, the product is auto-flagged
+  //         "Out of Stock" (so new customers see "Sold Out") but THIS order still
+  //         proceeds — the merchant confirms via WhatsApp.
+  for (const item of resolvedItems) {
+    if (!item.isProduct) continue;
+    try {
+      const { data: deductOk, error: deductErr } = await adminRpc(
+        "deduct_product_variant_stock",
+        {
+          p_product_id: item.productId,
+          p_variant_label: item.variant ?? "",
+          p_qty: item.quantity,
+        },
+      );
+      if (!deductErr && deductOk === false) {
+        // Insufficient tracked stock: don't block — just hide the product from
+        // further orders until the merchant taps it back "In Stock".
+        await admin
+          .from("products")
+          .update({ is_available: false } as never)
+          .eq("id", item.productId);
+      }
+    } catch {
+      // RPC missing (old DB) — skip deduction; availability was already checked.
+    }
+  }
+
+  // 13. Idempotency — if this checkout token already produced an order, return
+  //     it instead of creating a duplicate (guards double-click / retry).
+  if (idempotencyKey) {
+    const { data: existing } = await admin
+      .from("orders")
+      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
+      .eq("client_token", idempotencyKey)
+      .maybeSingle();
+    if (existing) {
+      const prior = existing as Record<string, unknown>;
+      const order: Order = {
+        id: String(prior.id),
+        shop_id: String(prior.shop_id),
+        customer_name: String(prior.customer_name ?? ""),
+        customer_phone: String(prior.customer_phone ?? ""),
+        items_json: (prior.items_json as OrderItem[]) ?? [],
+        total_amount: toNumber(prior.total_amount, 0),
+        status: (prior.status as Order["status"]) ?? "Pending",
+        created_at: String(prior.created_at ?? new Date().toISOString()),
+        updated_at: prior.updated_at as string | undefined,
+      };
+      return NextResponse.json({ success: true, order });
+    }
+  }
+
+  // 14. Insert the order with the full money breakdown.
   const orderItems: OrderItem[] = resolvedItems.map((i) => ({
     product_id: i.productId,
     name: i.name,
@@ -577,38 +724,48 @@ export async function POST(request: Request) {
     customer_phone: customerPhone,
     items_json: orderItems,
     total_amount: total,
+    subtotal_amount: subtotal,
+    discount_amount: discount,
+    delivery_fee: deliveryFee,
     status: "Pending",
     customer_user_id: user.id,
   };
   if (notes) orderPayload.notes = notes;
   if (appliedCoupon) orderPayload.coupon_code = appliedCoupon;
+  if (idempotencyKey) orderPayload.client_token = idempotencyKey;
 
-  const { data: inserted, error: insertErr } = await admin
+  let { data: inserted, error: insertErr } = await admin
     .from("orders")
     .insert(orderPayload as never)
     .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
     .single();
+
+  // Older DBs may lack the money-breakdown / coupon_code columns — retry with
+  // core fields so checkout still works and coupon orders don't 500.
+  if (insertErr && /column .* does not exist|PGRST204|schema cache|Could not find/i.test(insertErr.message || "")) {
+    const corePayload: Record<string, unknown> = {
+      shop_id: shopId,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      items_json: orderItems,
+      total_amount: total,
+      status: "Pending",
+      customer_user_id: user.id,
+    };
+    if (notes) corePayload.notes = notes;
+    if (idempotencyKey) corePayload.client_token = idempotencyKey;
+    ({ data: inserted, error: insertErr } = await admin
+      .from("orders")
+      .insert(corePayload as never)
+      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
+      .single());
+  }
 
   if (insertErr || !inserted) {
     return NextResponse.json(
       { success: false, error: "Could not place your order. Please try again." },
       { status: 500 },
     );
-  }
-
-  if (appliedCoupon) {
-    const { data: usedRaw } = await admin
-      .from("coupons")
-      .select("usage_count")
-      .eq("shop_id", shopId)
-      .eq("code", appliedCoupon)
-      .maybeSingle();
-    const used = toNumber((usedRaw as { usage_count?: number } | null)?.usage_count, 0);
-    await admin
-      .from("coupons")
-      .update({ usage_count: used + 1 } as never)
-      .eq("shop_id", shopId)
-      .eq("code", appliedCoupon);
   }
 
   const order: Order = {
@@ -622,6 +779,27 @@ export async function POST(request: Request) {
     created_at: String((inserted as Record<string, unknown>).created_at ?? new Date().toISOString()),
     updated_at: (inserted as Record<string, unknown>).updated_at as string | undefined,
   };
+
+  // Notify merchant + customer via OS web push (best-effort, never blocks the
+  // order response). This covers the trusted checkout path end-to-end.
+  const amountLabel = `Rs. ${Math.round(total).toLocaleString()}`;
+  const shopName = (shopRow.name ?? "your shop").trim() || "your shop";
+  void (async () => {
+    if (shopRow.owner_id) {
+      await sendPushToUser(shopRow.owner_id, {
+        title: "New TrendMart order",
+        body: `${customerName} placed an order — ${amountLabel} at ${shopName}.`,
+        url: "/dashboard/orders",
+        tag: `order-${order.id}`,
+      });
+    }
+    await sendPushToUser(user.id, {
+      title: "Order placed on TrendMart",
+      body: `Your order at ${shopName} was received (${amountLabel}).`,
+      url: `/orders/tracking?orderId=${encodeURIComponent(order.id)}`,
+      tag: `order-${order.id}-customer`,
+    });
+  })().catch(() => undefined);
 
   return NextResponse.json({ success: true, order });
 }

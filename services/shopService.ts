@@ -115,6 +115,8 @@ export async function fetchShops(opts?: {
     "latitude",
     "longitude",
     "service_radius_km",
+    "delivery_zones",
+    "address_display",
     "free_delivery_threshold",
     "delivery_fee_flat",
     "delivery_fee_per_km",
@@ -148,7 +150,7 @@ export async function fetchShops(opts?: {
     query = query.order("name", { ascending: true });
 
     if (opts?.limit && opts.limit > 0) {
-      query = query.limit(Math.min(opts.limit, 200));
+      query = query.limit(Math.min(opts.limit, 500));
     }
 
     const { data, error } = await query;
@@ -163,7 +165,7 @@ export async function fetchShops(opts?: {
         fallback = fallback.eq("category", opts.category);
       }
       if (opts?.limit && opts.limit > 0) {
-        fallback = fallback.limit(Math.min(opts.limit, 200));
+        fallback = fallback.limit(Math.min(opts.limit, 500));
       }
       fallback = fallback.order("name", { ascending: true });
       const retry = await fallback;

@@ -29,9 +29,6 @@ import {
 /*  Constants                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** Default city used as fallback when GPS is denied and user hasn't picked one. */
-const DEFAULT_CITY: SupportedCity = "Gujranwala";
-
 /** Only attempt auto-detect once per page session (not repeatedly). */
 const AUTO_DETECT_KEY = "trendmart_location_autodetect_attempted_v2";
 
@@ -119,13 +116,9 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     try {
       if (sessionStorage.getItem(AUTO_DETECT_KEY) === "1") {
         autoDetectAttempted.current = true;
-        // No saved location found but auto-detect was tried — apply default city
-        if (!location) {
-          const defaultLoc = buildLocationFromCity(DEFAULT_CITY);
-          defaultLoc.source = "cached";
-          saveLocation(defaultLoc);
-          setLocation(defaultLoc);
-        }
+        // No saved location and auto-detect already tried this session — leave
+        // location empty so the user picks a city or enables GPS. Never fabricate
+        // a fallback pin (that would show wrong shops to distant users).
         return;
       }
     } catch { /* ignore */ }
@@ -141,20 +134,12 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       .then((detected) => {
         if (detected) {
           setLocation(detected);
-        } else {
-          // GPS failed or was denied — apply default city fallback gracefully
-          const defaultLoc = buildLocationFromCity(DEFAULT_CITY);
-          defaultLoc.source = "cached";
-          saveLocation(defaultLoc);
-          setLocation(defaultLoc);
         }
+        // GPS failed or was denied — leave location empty; the area filter will
+        // show a "Detect My Location" / city picker prompt instead of a wrong pin.
       })
       .catch(() => {
-        // Network error or any other failure — fallback to default city
-        const defaultLoc = buildLocationFromCity(DEFAULT_CITY);
-        defaultLoc.source = "cached";
-        saveLocation(defaultLoc);
-        setLocation(defaultLoc);
+        // Network error — leave location empty (no fabricated fallback pin).
       })
       .finally(() => {
         setIsDetecting(false);

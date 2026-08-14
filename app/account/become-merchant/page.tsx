@@ -156,6 +156,11 @@ export default function BecomeMerchantPage() {
         console.warn("[become-merchant] claimSignupRole:", roleResult.error);
       }
 
+      // Invalidate storefront cache so the new shop shows up on the homepage.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("trendmart:shops-updated"));
+      }
+
       addToast("Store created — welcome to your merchant dashboard!", "success");
       window.location.href = "/dashboard";
     } catch {

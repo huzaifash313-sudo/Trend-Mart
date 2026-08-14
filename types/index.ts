@@ -270,6 +270,12 @@ export interface Product {
   shop_category?: string | null;
   shop_latitude?: number | null;
   shop_longitude?: number | null;
+  /** Parent shop city/area text (for coverage matching). */
+  shop_location?: string | null;
+  /** Parent shop delivery radius in km (for coverage matching). */
+  shop_service_radius_km?: number | null;
+  /** Parent shop delivery coverage markers (for coverage matching). */
+  shop_delivery_zones?: string[] | null;
   /** Parent shop average rating (for marketplace cards). */
   shop_avg_rating?: number | null;
   /** Parent shop review count (for marketplace cards). */
@@ -359,6 +365,14 @@ export interface Story {
   /** Joined from shops — shown on tray + viewer header */
   shop_name?: string | null;
   shop_logo_url?: string | null;
+  /** Joined shop geo fields — used to filter stories by customer location. */
+  shop_latitude?: number | null;
+  shop_longitude?: number | null;
+  shop_service_radius_km?: number | null;
+  shop_delivery_zones?: string[] | null;
+  shop_location?: string | null;
+  shop_is_live?: boolean | null;
+  shop_verification_status?: string | null;
 }
 
 // ─── User Profile (derived from Supabase auth.users) ───────────────────────
@@ -585,6 +599,14 @@ export const SUPPORTED_CITIES: readonly string[] = [
   "Jehlum",
   "Narowal",
   "Sheikhupura",
+  "Peshawar",
+  "Quetta",
+  "Hyderabad",
+  "Bahawalpur",
+  "Sargodha",
+  "Sukkur",
+  "Abbottabad",
+  "Mardan",
 ] as const;
 
 export type SupportedCity = (typeof SUPPORTED_CITIES)[number];

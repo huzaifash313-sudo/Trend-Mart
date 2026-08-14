@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   NotificationListenerProvider,
   NotificationPanel,
@@ -15,6 +15,10 @@ import {
 
 function BrowserNotifyBridge() {
   const { notifications, isMuted } = useNotifications();
+  // Each notification should only ever fire ONE system notification. Without
+  // this, marking the top item read (or any array change) re-fired the next
+  // unread item, re-announcing old notifications.
+  const notifiedIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -22,6 +26,8 @@ function BrowserNotifyBridge() {
     if (isMuted) return;
     const latest = notifications[0];
     if (!latest || latest.read) return;
+    if (notifiedIds.current.has(latest.id)) return;
+    notifiedIds.current.add(latest.id);
     try {
       const n = new Notification(latest.title, {
         body: latest.body,
@@ -95,6 +101,17 @@ function AutoRegisterCustomerOrders() {
     const supabase = createClient();
     let cleanup: (() => void) | undefined;
     let cancelled = false;
+    // Guard against the INITIAL_SESSION auth event racing the explicit
+    // getSession() IIFE — both would otherwise register and churn the channel.
+    let lastRegisteredUserId: string | null = null;
+
+    const registerForUser = (userId: string) => {
+      if (cancelled) return;
+      if (lastRegisteredUserId === userId) return; // already subscribed
+      cleanup?.();
+      lastRegisteredUserId = userId;
+      cleanup = registerCustomer(userId);
+    };
 
     void (async () => {
       const {
@@ -102,14 +119,16 @@ function AutoRegisterCustomerOrders() {
       } = await supabase.auth.getSession();
       const user = session?.user;
       if (!user || cancelled) return;
-      cleanup = registerCustomer(user.id);
+      registerForUser(user.id);
     })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      cleanup?.();
-      cleanup = undefined;
       if (session?.user) {
-        cleanup = registerCustomer(session.user.id);
+        registerForUser(session.user.id);
+      } else {
+        cleanup?.();
+        cleanup = undefined;
+        lastRegisteredUserId = null;
       }
     });
 
@@ -141,11 +160,11 @@ function AutoSubscribeWebPush() {
       const permission = await getPushPermissionState();
       if (permission === "denied" || permission === "unsupported") return;
 
-      const already =
-        typeof window !== "undefined" &&
-        localStorage.getItem("trendmart_push_subscribed") === "true";
-
-      if (permission === "granted" || already) {
+      // SECURITY/UX: only auto-subscribe when permission is ALREADY granted.
+      // Never call requestPermission() outside a user gesture — the browser
+      // silently suppresses it and the "trendmart_push_subscribed" flag alone
+      // must not trigger a prompt.
+      if (permission === "granted") {
         await subscribeToPushNotifications();
       }
     };

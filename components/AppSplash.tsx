@@ -8,24 +8,28 @@ import { fetchShops } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import { fetchActiveDeals } from "@/services/dealService";
 
-export const SPLASH_KEY = "tm_splash_seen_v5";
+export const SPLASH_KEY = "tm_splash_seen_v6";
 
 /**
- * Beat:
- * 1) Logo alone (readable beat)
- * 2) Logo rises + TrendMart slides in
- * 3) Tagline + phone previews
- * 4) Hold so customer can skim (~2s) while home data prefetches
- * 5) Fade to home (already warm in React Query cache)
+ * First-impression intro. Shows only on a FRESH open of the homepage (new
+ * browser session), never on an in-session refresh — that's the whole point of
+ * the session-scoped `SPLASH_KEY`.
+ *
+ * Beat (deliberately slow + smooth so it never feels rushed):
+ *   1) Logo alone
+ *   2) Logo rises + "TrendMart" wordmark slides in
+ *   3) A short value introduction (what TrendMart is), not page mockups
+ *   4) Hold so it's readable while home data prefetches in the background
+ *   5) Slow fade into the (already-warm) homepage
  */
 const STAGE_MS = {
-  logoHold: 550,
-  brand: 700,
-  details: 650,
-  holdMin: 1800,
-  exit: 320,
-  /** Never block home forever if network is slow */
-  maxWaitForData: 2200,
+  logoHold: 800,
+  brand: 800,
+  details: 900,
+  holdMin: 2400,
+  exit: 650,
+  /** Never block home forever if network is slow. */
+  maxWaitForData: 2400,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -48,9 +52,8 @@ function markSplashSeen() {
 }
 
 function removeBootSplash() {
-  // Only toggle the html class. Never call Node.remove() on #tm-boot-splash —
-  // that node lives in the React layout tree; detaching it causes Safari
-  // NotFoundError: Failed to execute 'removeChild' on 'Node' on navigation.
+  // Class-only toggle. Never call Node.remove() on #tm-boot-splash — that node
+  // lives in the React layout tree and detaching it crashes Safari.
   document.documentElement.classList.remove("tm-boot-splash");
 }
 
@@ -62,47 +65,12 @@ async function unwrap<T>(
   return result.data;
 }
 
-function PhonePreview({
-  label,
-  variant,
-}: {
-  label: string;
-  variant: "home" | "shop" | "cart";
-}) {
-  return (
-    <div className={`tm-splash-phone tm-splash-phone--${variant}`}>
-      <div className="tm-splash-phone-notch" aria-hidden="true" />
-      <div className="tm-splash-phone-bar" aria-hidden="true" />
-      {variant === "home" ? (
-        <>
-          <div className="tm-splash-phone-pills" aria-hidden="true">
-            <span /><span /><span />
-          </div>
-          <div className="tm-splash-phone-grid" aria-hidden="true">
-            <span /><span /><span /><span />
-          </div>
-        </>
-      ) : null}
-      {variant === "shop" ? (
-        <>
-          <div className="tm-splash-phone-hero" aria-hidden="true" />
-          <div className="tm-splash-phone-rows" aria-hidden="true">
-            <span /><span /><span />
-          </div>
-        </>
-      ) : null}
-      {variant === "cart" ? (
-        <>
-          <div className="tm-splash-phone-rows tm-splash-phone-rows--cart" aria-hidden="true">
-            <span /><span />
-          </div>
-          <div className="tm-splash-phone-cta" aria-hidden="true" />
-        </>
-      ) : null}
-      <p className="tm-splash-phone-label">{label}</p>
-    </div>
-  );
-}
+/* Short, human value intro — no page mockups, just "what TrendMart is". */
+const FEATURES = [
+  { icon: "🛍️", title: "Local shops nearby", subtitle: "Discover trusted stores in your area" },
+  { icon: "💬", title: "Order on WhatsApp", subtitle: "Direct chat with the shop — no confusion" },
+  { icon: "🚚", title: "Fast delivery", subtitle: "Your neighbourhood, delivered to your door" },
+] as const;
 
 export default function AppSplash() {
   const pathname = usePathname();
@@ -111,8 +79,7 @@ export default function AppSplash() {
 
   useEffect(() => {
     if (!shouldShowSplash(pathname)) {
-      // Returning visit / other routes: InteractionUnlock clears tm-first-paint.
-      // Only drop splash-lock here — don't yank the brief boot cover early.
+      // Returning visit / refresh / other route: no intro, no cover flash.
       document.documentElement.classList.remove("tm-splash-lock");
       setPhase("off");
       return;
@@ -123,11 +90,11 @@ export default function AppSplash() {
     document.documentElement.classList.add("tm-splash-lock");
     setPhase("logo");
 
-    // Warm homepage cache while the customer watches the splash
+    // Warm the homepage cache while the customer watches the intro.
     const prefetch = Promise.allSettled([
       queryClient.prefetchQuery({
         queryKey: queryKeys.shops,
-        queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 60 })),
+        queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 300 })),
         staleTime: 2 * 60_000,
       }),
       queryClient.prefetchQuery({
@@ -153,26 +120,25 @@ export default function AppSplash() {
       }, 0),
     );
 
-    // 1) Logo alone, then rise + title
+    // 1) Logo alone, then rise + wordmark
     timers.push(window.setTimeout(() => setPhase("brand"), STAGE_MS.logoHold));
     let t = STAGE_MS.logoHold + STAGE_MS.brand;
-    // 2) Previews / details
+    // 2) Introduction slides in
     timers.push(window.setTimeout(() => setPhase("details"), t));
     t += STAGE_MS.details;
-    // 3) Hold for reading + finish prefetch if needed
+    // 3) Hold for reading + finish prefetch if needed, then slow fade out
     timers.push(
       window.setTimeout(() => {
         setPhase("hold");
         const holdStarted = Date.now();
         void (async () => {
-          const remainingMin = STAGE_MS.holdMin;
           await Promise.race([
             prefetch,
             new Promise((r) => window.setTimeout(r, STAGE_MS.maxWaitForData)),
           ]);
           if (cancelled) return;
           const elapsed = Date.now() - holdStarted;
-          const waitMore = Math.max(0, remainingMin - elapsed);
+          const waitMore = Math.max(0, STAGE_MS.holdMin - elapsed);
           await new Promise((r) => window.setTimeout(r, waitMore));
           if (cancelled) return;
           setPhase("exit");
@@ -224,13 +190,22 @@ export default function AppSplash() {
 
         <div className="tm-splash-copy">
           <p className="tm-splash-tagline">
-            Local shopping, instant WhatsApp orders — your neighborhood, delivered.
+            Your neighbourhood marketplace — discover local shops and order
+            straight on WhatsApp, delivered fast.
           </p>
-          <div className="tm-splash-previews" aria-hidden="true">
-            <PhonePreview label="Home" variant="home" />
-            <PhonePreview label="Shop" variant="shop" />
-            <PhonePreview label="Order" variant="cart" />
-          </div>
+          <ul className="tm-splash-features">
+            {FEATURES.map((f) => (
+              <li key={f.title} className="tm-splash-feature">
+                <span className="tm-splash-feature-icon" aria-hidden="true">
+                  {f.icon}
+                </span>
+                <span className="tm-splash-feature-text">
+                  <strong>{f.title}</strong>
+                  <span>{f.subtitle}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>

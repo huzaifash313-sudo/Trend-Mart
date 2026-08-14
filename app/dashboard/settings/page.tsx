@@ -25,6 +25,7 @@ import {
   subscribeToPushNotifications,
 } from "@/lib/pushClient";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
+import { verifyPassword } from "@/services/authService";
 import { PK_PHONE_PLACEHOLDER, formatPkPhoneInput } from "@/lib/phoneFormat";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { getShopPath } from "@/lib/shopSlug";
@@ -122,6 +123,15 @@ function CalendarDealIcon() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }
@@ -443,6 +453,10 @@ export default function DashboardSettingsPage() {
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
   const [pushBusy, setPushBusy] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
+  const [locationUnlocked, setLocationUnlocked] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
   const { addToast } = useToast();
   const { openQuickAdd } = useMerchantQuickAdd();
 
@@ -547,6 +561,27 @@ export default function DashboardSettingsPage() {
     return `${window.location.origin}${shopPath}`;
   }, [shop]);
 
+  const hasLocationPin = form.latitude != null && form.longitude != null;
+  const locationLocked = hasLocationPin && !locationUnlocked;
+
+  const handleUnlockLocation = useCallback(async () => {
+    if (!unlockPassword.trim()) {
+      setUnlockError("Enter your account password to unlock the location.");
+      return;
+    }
+    setUnlocking(true);
+    setUnlockError(null);
+    const result = await verifyPassword(unlockPassword);
+    if (result.success) {
+      setLocationUnlocked(true);
+      setUnlockPassword("");
+      addToast("Location unlocked — you can now update the store pin.", "success");
+    } else {
+      setUnlockError(result.error || "Incorrect password. Please try again.");
+    }
+    setUnlocking(false);
+  }, [unlockPassword, addToast]);
+
   const handleSave = useCallback(async () => {
     if (!shop) return;
 
@@ -597,7 +632,13 @@ export default function DashboardSettingsPage() {
       if (result.success) {
         setShop(result.data);
         setForm(shopToForm(result.data));
+        setLocationUnlocked(false);
+        setUnlockPassword("");
         addToast("Store settings saved successfully.", "success");
+        // Invalidate the storefront cache so homepage/cards reflect changes.
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("trendmart:shops-updated"));
+        }
       } else {
         addToast(result.error, "error");
       }
@@ -968,17 +1009,84 @@ export default function DashboardSettingsPage() {
           <div className="mb-3 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2.5 text-[0.75rem] leading-relaxed text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
             Set once carefully. Orders leave from this pin. Avoid changing it daily — update only if you relocate the store.
           </div>
-          <ShopLocationRadiusPicker
-            value={{
-              latitude: form.latitude,
-              longitude: form.longitude,
-              service_radius_km: form.service_radius_km,
-              address_display: form.address_display,
-              location: form.location,
-              delivery_zones: form.delivery_zones,
-            }}
-            onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
-          />
+          {locationLocked ? (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2.5 rounded-xl border border-zinc-200 bg-zinc-50 p-3.5 dark:border-zinc-700 dark:bg-zinc-900/60">
+                <span className="mt-0.5 text-zinc-500 dark:text-zinc-400">
+                  <LockIcon />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                    Store location is locked
+                  </p>
+                  <p className="mt-0.5 text-[0.7rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    {form.address_display?.trim() || form.location?.trim() || "No address set"}
+                  </p>
+                  {hasLocationPin && (
+                    <p className="mt-1 text-[0.6rem] text-zinc-400 dark:text-zinc-500">
+                      Lat {form.latitude?.toFixed(5)} · Lng {form.longitude?.toFixed(5)}
+                    </p>
+                  )}
+                  <p className="mt-2 text-[0.7rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                    Your pin stays fixed so every customer sees one consistent store location.
+                    Enter your password below to change it.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <label
+                  htmlFor="location-unlock-password"
+                  className="mb-1.5 block text-xs font-semibold text-zinc-700 dark:text-zinc-300"
+                >
+                  Enter your password to unlock location
+                </label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="location-unlock-password"
+                    type="password"
+                    value={unlockPassword}
+                    onChange={(e) => {
+                      setUnlockPassword(e.target.value);
+                      setUnlockError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleUnlockLocation();
+                      }
+                    }}
+                    placeholder="Your account password"
+                    autoComplete="current-password"
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleUnlockLocation}
+                    disabled={unlocking}
+                    className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {unlocking ? "Verifying…" : "Unlock location"}
+                  </button>
+                </div>
+                {unlockError ? (
+                  <p className="mt-1.5 text-xs font-medium text-red-500">{unlockError}</p>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <ShopLocationRadiusPicker
+              value={{
+                latitude: form.latitude,
+                longitude: form.longitude,
+                service_radius_km: form.service_radius_km,
+                address_display: form.address_display,
+                location: form.location,
+                delivery_zones: form.delivery_zones,
+              }}
+              onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+            />
+          )}
         </SectionShell>
 
         <SectionShell

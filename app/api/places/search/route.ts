@@ -18,10 +18,10 @@ export interface PlaceHit {
 }
 
 function googleKey(): string | null {
-  const key =
-    process.env.GOOGLE_MAPS_API_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ||
-    "";
+  // SECURITY: this is a SERVER-side, billable Google Places API key. It must
+  // come from the server-only GOOGLE_MAPS_API_KEY. Never fall back to a
+  // NEXT_PUBLIC_* key — that would leak a billable key into the client bundle.
+  const key = process.env.GOOGLE_MAPS_API_KEY?.trim() || "";
   return key.length > 8 ? key : null;
 }
 

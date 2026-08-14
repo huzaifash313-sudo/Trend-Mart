@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useCallback, useMemo, memo, type ReactNode } from "react";
 import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
@@ -112,7 +112,7 @@ interface ProductGridProps {
   getOfferContext?: (product: Product) => ProductOfferContext | null;
 }
 
-function ProductCard({
+const ProductCard = memo(function ProductCard({
   product,
   compact,
   isFavorite,
@@ -209,7 +209,7 @@ function ProductCard({
         )}
 
         {categoryLabel ? (
-          <span className="absolute left-1.5 top-1.5 z-10 max-w-[70%] truncate rounded-md bg-zinc-950/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/95 shadow-sm backdrop-blur-[2px]">
+          <span className="absolute left-1.5 top-1.5 z-10 max-w-[70%] truncate rounded-md bg-zinc-950/85 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/95 shadow-sm">
             {categoryLabel}
           </span>
         ) : null}
@@ -339,7 +339,7 @@ function ProductCard({
       </div>
     </article>
   );
-}
+});
 
 function SkeletonCard() {
   return (

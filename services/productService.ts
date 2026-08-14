@@ -244,7 +244,8 @@ export type MarketplaceSort =
   | "newest"
   | "price_asc"
   | "price_desc"
-  | "discount";
+  | "discount"
+  | "nearest";
 
 export interface MarketplaceProductFilters {
   query?: string;
@@ -252,8 +253,10 @@ export interface MarketplaceProductFilters {
   category?: string;
   subCategoryId?: string | null;
   sort?: MarketplaceSort;
-  /** Cap rows pulled from Supabase before client sort (default 160) */
+  /** Page size (rows per page, clamped 20..200). */
   limit?: number;
+  /** Zero-based row offset for cursor pagination (default 0). */
+  offset?: number;
   availableOnly?: boolean;
 }
 
@@ -274,6 +277,9 @@ type ShopJoin = {
   announcement_expires_at?: string | null;
   delivery_fee_flat?: number | null;
   delivery_fee_per_km?: number | null;
+  location?: string | null;
+  service_radius_km?: number | null;
+  delivery_zones?: string[] | null;
 };
 
 function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | null {
@@ -310,6 +316,12 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     shop_category: shop.category ?? null,
     shop_latitude: typeof shop.latitude === "number" ? shop.latitude : null,
     shop_longitude: typeof shop.longitude === "number" ? shop.longitude : null,
+    shop_location: shop.location ?? null,
+    shop_service_radius_km:
+      typeof shop.service_radius_km === "number" ? shop.service_radius_km : null,
+    shop_delivery_zones: Array.isArray(shop.delivery_zones)
+      ? (shop.delivery_zones as string[])
+      : null,
     shop_avg_rating:
       typeof shop.avg_rating === "number" ? shop.avg_rating : Number(shop.avg_rating) || null,
     shop_review_count:
@@ -347,7 +359,8 @@ const MARKETPLACE_SELECT = `
   category_id, sub_category_id, created_at,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
-    is_live, verification_status, latitude, longitude,
+    is_live, verification_status, latitude, longitude, location,
+    service_radius_km, delivery_zones,
     avg_rating, review_count,
     free_delivery_threshold, announcement, announcement_expires_at,
     delivery_fee_flat, delivery_fee_per_km
@@ -361,7 +374,7 @@ const MARKETPLACE_SELECT_LEGACY = `
   category_id, sub_category_id, created_at,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
-    is_live, verification_status, latitude, longitude
+    is_live, verification_status, latitude, longitude, location
   )
 `;
 
@@ -474,8 +487,12 @@ export async function fetchMarketplaceProducts(
     subCategoryId,
     sort = "for_you",
     limit = 72,
+    offset = 0,
     availableOnly = true,
   } = filters;
+  // Page size clamped to [20, 200]; offset is a safe non-negative integer.
+  const pageSize = Math.min(Math.max(Math.round(limit) || 20, 20), 200);
+  const start = Math.max(0, Math.round(offset) || 0);
 
   try {
     let builder = supabase
@@ -484,7 +501,7 @@ export async function fetchMarketplaceProducts(
       .eq("shops.is_live", true)
       .eq("shops.verification_status", "approved")
       .order("created_at", { ascending: false })
-      .limit(Math.min(Math.max(limit, 20), 120));
+      .range(start, start + pageSize - 1);
 
     if (availableOnly) {
       builder = builder.eq("is_available", true);
@@ -523,7 +540,7 @@ export async function fetchMarketplaceProducts(
         .eq("shops.is_live", true)
         .eq("shops.verification_status", "approved")
         .order("created_at", { ascending: false })
-        .limit(Math.min(Math.max(limit, 20), 120));
+        .range(start, start + pageSize - 1);
       if (availableOnly) legacy = legacy.eq("is_available", true);
       if (q) {
         const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 6);

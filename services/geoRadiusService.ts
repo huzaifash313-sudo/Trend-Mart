@@ -119,7 +119,7 @@ export function parseCoverageFromZones(
   return { mode: "radius", city: null };
 }
 
-function cityNamesMatch(a: string, b: string): boolean {
+export function cityNamesMatch(a: string, b: string): boolean {
   const left = a.toLowerCase().trim();
   const right = b.toLowerCase().trim();
   if (!left || !right) return false;
@@ -152,6 +152,14 @@ export const CITY_CENTROIDS: Record<string, { lat: number; lng: number }> = {
   "Jehlum": { lat: 32.9418, lng: 73.7253 },
   "Narowal": { lat: 32.1007, lng: 74.8809 },
   "Sheikhupura": { lat: 31.7167, lng: 73.9850 },
+  "Peshawar": { lat: 34.0151, lng: 71.5249 },
+  "Quetta": { lat: 30.1798, lng: 66.975 },
+  "Hyderabad": { lat: 25.396, lng: 68.3578 },
+  "Bahawalpur": { lat: 29.3956, lng: 71.6836 },
+  "Sargodha": { lat: 32.0836, lng: 72.6711 },
+  "Sukkur": { lat: 27.7052, lng: 68.8574 },
+  "Abbottabad": { lat: 34.1688, lng: 73.2215 },
+  "Mardan": { lat: 34.1989, lng: 72.0231 },
 };
 
 // ─── Haversine Distance Calculation ─────────────────────────────────────────
@@ -425,17 +433,10 @@ export async function filterShopsByProximity(
     maxDistanceKm <= 0;
 
   if (!userCoords) {
-    // Without GPS, still honor nationwide + city-only coverage when city is known.
-    if (browseScope === "pakistan") {
-      return {
-        shops: allShops.map((s) => ({ ...s, within_radius: true })),
-        locationAvailable: false,
-        userCoordinates: null,
-        totalBeforeFilter,
-        totalAfterFilter: allShops.length,
-      };
-    }
-    if ((enforceServiceRadius || browseScope === "city") && resolvedCustomerCity) {
+    // No GPS pin. If the customer's city is known, still honor merchant coverage
+    // (nationwide + matching city). Radius-only shops can't be distance-checked
+    // without coordinates, so keep those that textually mention the city.
+    if (resolvedCustomerCity) {
       const cityFiltered = allShops.filter((shop) => {
         const coverage = parseCoverageFromZones(shop.delivery_zones);
         if (coverage.mode === "nationwide") return true;
@@ -443,13 +444,10 @@ export async function filterShopsByProximity(
           const target = coverage.city || shop.location || "";
           return cityNamesMatch(target, resolvedCustomerCity);
         }
-        // Radius shops: match free-text shop.location / zones to city name
-        if (browseScope === "city") {
-          if (shop.location && cityNamesMatch(shop.location, resolvedCustomerCity)) return true;
-          const zones = shop.delivery_zones ?? [];
-          return zones.some((z) => cityNamesMatch(z, resolvedCustomerCity));
-        }
-        return true;
+        // Radius shops: match free-text shop.location / zones to city name.
+        if (shop.location && cityNamesMatch(shop.location, resolvedCustomerCity)) return true;
+        const zones = shop.delivery_zones ?? [];
+        return zones.some((z) => cityNamesMatch(z, resolvedCustomerCity));
       });
       return {
         shops: cityFiltered.map((s) => ({ ...s, within_radius: true })),
@@ -459,16 +457,15 @@ export async function filterShopsByProximity(
         totalAfterFilter: cityFiltered.length,
       };
     }
+    // No location at all — return everything; caller shows a "pick location" prompt.
     return {
-      shops: allShops.map((s) => ({ ...s })),
+      shops: allShops.map((s) => ({ ...s, within_radius: true })),
       locationAvailable: false,
       userCoordinates: null,
       totalBeforeFilter,
       totalAfterFilter: allShops.length,
     };
   }
-
-  const skipDistanceCapIds = new Set<string>();
 
   let enriched: ShopWithDistance[] = allShops.map((shop) => {
     const shopLat = shop.latitude ?? null;
@@ -493,7 +490,6 @@ export async function filterShopsByProximity(
 
     if (coverage.mode === "nationwide") {
       within_radius = true;
-      skipDistanceCapIds.add(shop.id);
     } else if (coverage.mode === "city") {
       const target = coverage.city || shop.location || "";
       if (resolvedCustomerCity) {
@@ -504,8 +500,8 @@ export async function filterShopsByProximity(
       } else {
         within_radius = true;
       }
-      skipDistanceCapIds.add(shop.id);
-    } else if (enforceServiceRadius && hasCoords && distance_km != null && serviceRadius != null) {
+    } else if (hasCoords && distance_km != null && serviceRadius != null) {
+      // radius coverage: enforce the merchant's own delivery radius.
       within_radius = distance_km <= serviceRadius;
     } else if (serviceRadius == null) {
       within_radius = true;
@@ -518,7 +514,10 @@ export async function filterShopsByProximity(
     };
   });
 
-  if (enforceServiceRadius && browseScope !== "pakistan") {
+  // Merchant coverage is ALWAYS enforced — regardless of the customer's browse
+  // scope (Near me / This city / All Pakistan). A shop set to "5 km only" must
+  // never be visible to a customer outside that radius, even in "All Pakistan".
+  if (enforceServiceRadius) {
     enriched = enriched.filter((s) => s.within_radius === true);
   }
 
@@ -594,6 +593,73 @@ export async function filterShopsByProximity(
     totalBeforeFilter,
     totalAfterFilter: enriched.length,
   };
+}
+
+/**
+ * Whether a customer at the given coordinates / city falls inside a shop's
+ * delivery coverage. This is the single source of truth for the checkout gate
+ * and any UI that needs to decide "can this customer order from this shop?".
+ *
+ * Coverage modes come from `parseCoverageFromZones`:
+ *   - nationwide  → always within
+ *   - city        → within when the customer's city matches the shop's city
+ *                   (falls back to a ~35 km proximity check when no city known)
+ *   - radius      → within when distance <= service_radius_km (or when radius unset)
+ */
+export function isCustomerWithinCoverage(
+  shop: {
+    latitude?: number | null;
+    longitude?: number | null;
+    service_radius_km?: number | null;
+    delivery_zones?: string[] | null;
+    location?: string | null;
+  },
+  customerLat: number,
+  customerLng: number,
+  customerCity?: string | null,
+): { within: boolean; distanceKm: number | null; coverageMode: ServiceCoverageMode } {
+  const coverage = parseCoverageFromZones(shop.delivery_zones);
+
+  if (coverage.mode === "nationwide") {
+    return { within: true, distanceKm: null, coverageMode: "nationwide" };
+  }
+
+  const hasShopCoords =
+    shop.latitude != null &&
+    shop.longitude != null &&
+    isValidCoordinate(shop.latitude, shop.longitude);
+  const distanceKm = hasShopCoords
+    ? haversineDistance(
+        shop.latitude as number,
+        shop.longitude as number,
+        customerLat,
+        customerLng,
+      )
+    : null;
+
+  if (coverage.mode === "city") {
+    const target = coverage.city || shop.location || "";
+    if (customerCity && target) {
+      return {
+        within: cityNamesMatch(target, customerCity),
+        distanceKm,
+        coverageMode: "city",
+      };
+    }
+    // No explicit city resolved — approximate with ~35 km of the shop pin.
+    return {
+      within: distanceKm != null ? distanceKm <= 35 : true,
+      distanceKm,
+      coverageMode: "city",
+    };
+  }
+
+  // radius
+  const radiusKm = shop.service_radius_km ?? 0;
+  if (radiusKm > 0 && distanceKm != null) {
+    return { within: distanceKm <= radiusKm, distanceKm, coverageMode: "radius" };
+  }
+  return { within: true, distanceKm, coverageMode: "radius" };
 }
 
 export function getDistanceToShop(

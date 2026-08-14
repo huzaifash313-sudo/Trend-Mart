@@ -95,6 +95,10 @@ export default function HeroSlider({
   const [containerWidth, setContainerWidth] = useState(400);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // rAF batching for touchmove — update the state at most once per animation
+  // frame instead of on every high-frequency touchmove event (smoother swipe).
+  const rafRef = useRef<number | null>(null);
+  const latestDeltaRef = useRef(0);
 
   const totalSlides = slides.length;
 
@@ -169,7 +173,12 @@ export default function HeroSlider({
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (touchStartX === null) return;
     const currentX = e.touches[0].clientX;
-    setTouchDeltaX(currentX - touchStartX);
+    latestDeltaRef.current = currentX - touchStartX;
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      setTouchDeltaX(latestDeltaRef.current);
+    });
   }, [touchStartX]);
 
   const handleTouchEnd = useCallback(() => {
@@ -184,6 +193,11 @@ export default function HeroSlider({
 
     setTouchStartX(null);
     setTouchDeltaX(0);
+    latestDeltaRef.current = 0;
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     setIsDragging(false);
     // Resume auto-play after a short delay
     setTimeout(() => setIsPaused(false), 2000);

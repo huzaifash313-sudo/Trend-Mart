@@ -816,7 +816,9 @@ html.dark .trend-card:hover {
   );
   background-size: 220% 220%;
   animation: tm-navbar-gradient-drift 14s ease-in-out infinite;
-  will-change: background-position;
+  /* No will-change here — forcing a persistent layer for a background-position
+     (repaint) animation doubles memory + repaint cost on mobile. The browser
+     promotes the element automatically during the animation when beneficial. */
 }
 
 .tm-navbar-soft-glow {
@@ -830,7 +832,6 @@ html.dark .trend-card:hover {
   );
   opacity: 0.7;
   animation: tm-navbar-glow-drift 9s ease-in-out infinite;
-  will-change: transform, opacity;
 }
 
 .tm-navbar-trend-svg {
@@ -1059,6 +1060,8 @@ html.dark .trend-card:hover {
 .tm-product-card {
   position: relative;
   height: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
   background: #fff;
   border-radius: 0.85rem;
   border: 1.5px solid color-mix(in srgb, var(--tm-sea) 55%, #99f6e4) !important;
@@ -1236,6 +1239,8 @@ html.dark .tm-home-deals-nav-btn {
 }
 
 .tm-home-deal-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 12rem;
   min-height: 10.25rem;
   border-radius: 1.1rem;
   border: 1px solid rgba(28, 25, 23, 0.08);
@@ -2857,12 +2862,75 @@ html.tm-first-paint .tm-boot-splash {
 }
 
 .tm-splash-tagline {
-  margin: 0 auto 1rem;
+  margin: 0 auto 1.25rem;
   max-width: 18rem;
   font-size: 0.92rem;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.92);
   text-wrap: balance;
+}
+
+/* Value intro — clean feature rows instead of page mockups */
+.tm-splash-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0 auto;
+  max-width: 17rem;
+  list-style: none;
+  padding: 0;
+  text-align: left;
+}
+
+.tm-splash-feature {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.tm-splash--details .tm-splash-feature,
+.tm-splash--hold .tm-splash-feature {
+  animation: tm-splash-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.tm-splash--details .tm-splash-feature:nth-child(1),
+.tm-splash--hold .tm-splash-feature:nth-child(1) { animation-delay: 0.08s; }
+.tm-splash--details .tm-splash-feature:nth-child(2),
+.tm-splash--hold .tm-splash-feature:nth-child(2) { animation-delay: 0.18s; }
+.tm-splash--details .tm-splash-feature:nth-child(3),
+.tm-splash--hold .tm-splash-feature:nth-child(3) { animation-delay: 0.28s; }
+
+.tm-splash-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex-shrink: 0;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.tm-splash-feature-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.tm-splash-feature-text strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.tm-splash-feature-text span {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 /* Lightweight CSS phone previews (not heavy screenshots) */
@@ -3018,6 +3086,7 @@ html.tm-first-paint .tm-boot-splash {
   .tm-splash-title,
   .tm-splash-copy,
   .tm-splash-phone,
+  .tm-splash-feature,
   .tm-splash-glow,
   .tm-splash-trend-line,
   .tm-splash--exit {
@@ -3035,7 +3104,8 @@ html.tm-first-paint .tm-boot-splash {
     transform: none;
   }
   .tm-splash-copy,
-  .tm-splash-phone {
+  .tm-splash-phone,
+  .tm-splash-feature {
     opacity: 1;
     transform: none;
   }

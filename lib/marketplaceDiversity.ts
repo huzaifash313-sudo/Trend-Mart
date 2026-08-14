@@ -16,7 +16,8 @@ export type MarketplaceFeedSort =
   | "newest"
   | "price_asc"
   | "price_desc"
-  | "discount";
+  | "discount"
+  | "nearest";
 
 /**
  * Soft caps for the *early* fair window (first screenfuls).
@@ -29,6 +30,7 @@ const MAX_PER_SHOP_EARLY: Record<MarketplaceFeedSort, number> = {
   discount: 5,
   price_asc: 10,
   price_desc: 10,
+  nearest: 4,
 };
 
 /** Optional engagement hint (clicks/orders) when available — 0 if unknown. */
@@ -124,6 +126,10 @@ export function scoreProductForSort(
       );
     }
     case "newest":
+      return imgBoost + created / 1_000 + pop;
+    case "nearest":
+      // Nearest is re-sorted by distance client-side after fair-mix; treat like
+      // newest for the within-shop pick so ordering is stable before distance.
       return imgBoost + created / 1_000 + pop;
     case "discount":
       return imgBoost + disc * 1_000_000 + created / 1_000;
