@@ -1,10 +1,10 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  Recently viewed strip — "pick up where you left off".                     */
+/*  Recently viewed strip — compact "pick up where you left off" chips.       */
 /*  Reads the local behaviour memory (lib/behavior.ts) and renders a           */
-/*  horizontal row of the last products the customer opened. Tapping re-opens  */
-/*  the product quick-view via the /products?product=<id> deep-link.           */
+/*  tight horizontal row of small round thumbnails + name (Instagram-style),   */
+/*  so it takes minimal space and feels natural even with few items.           */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -12,7 +12,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { getRecentlyViewed, type RecentlyViewedItem } from "@/lib/behavior";
 import { getSafeImageUrl } from "@/services/storageService";
-import { formatRupees } from "@/lib/formatters";
 
 function ClockIcon() {
   return (
@@ -42,40 +41,32 @@ export default function RecentlyViewedStrip() {
           Recently viewed
         </h2>
       </div>
-      <div className="-mx-3 flex gap-2.5 overflow-x-auto px-3 pb-1 scrollbar-none sm:-mx-4 sm:px-4">
+      <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-1 scrollbar-none sm:-mx-4 sm:px-4">
         {items.map((item) => (
           <Link
             key={item.id}
             href={`/products?product=${encodeURIComponent(item.id)}`}
-            className="flex w-[7.5rem] shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+            className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           >
-            <div className="relative aspect-square w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+            <div className="relative h-[3.35rem] w-[3.35rem] overflow-hidden rounded-full bg-zinc-100 ring-2 ring-white shadow-sm dark:bg-zinc-800 dark:ring-zinc-950">
               {item.imageUrl ? (
                 <Image
                   src={getSafeImageUrl(item.imageUrl, "product")}
                   alt={item.name}
                   fill
                   className="object-cover"
-                  sizes="7.5rem"
-                  quality={70}
+                  sizes="3.35rem"
+                  quality={60}
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-xl font-bold text-teal-700/40">
+                <div className="flex h-full w-full items-center justify-center text-base font-bold text-teal-700/50">
                   {item.name.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
-            <div className="min-w-0 p-2">
-              <p className="truncate text-[11px] font-semibold leading-tight text-zinc-800 dark:text-zinc-100">
-                {item.name}
-              </p>
-              <p className="mt-0.5 truncate text-[10px] text-zinc-500 dark:text-zinc-400">
-                {item.shopName || "Store"}
-              </p>
-              <p className="mt-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                {formatRupees(item.price)}
-              </p>
-            </div>
+            <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+              {item.name}
+            </span>
           </Link>
         ))}
       </div>

@@ -28,10 +28,8 @@ import { filterShopsByProximity } from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
-import SubCategoryPills from "@/components/SubCategoryPills";
 import OfferDaysStrip from "@/components/OfferDaysStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
-import { fetchShopIdsBySubCategory } from "@/services/productService";
 import { type Coupon } from "@/services/couponService";
 import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
 import { useQueryClient } from "@tanstack/react-query";
@@ -205,10 +203,6 @@ function HomeInner() {
   const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
-  const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(
-    () => searchParams.get("sub") || null,
-  );
-  const [subCategoryShopIds, setSubCategoryShopIds] = useState<Set<string> | null>(null);
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -286,34 +280,13 @@ function HomeInner() {
     };
   }, [queryClient]);
 
-  /* Load shop IDs that have products in the selected sub-category */
-  useEffect(() => {
-    let cancelled = false;
-    if (!activeSubCategoryId) {
-      setSubCategoryShopIds(null);
-      return;
-    }
-    fetchShopIdsBySubCategory(activeSubCategoryId).then((result) => {
-      if (cancelled) return;
-      if (result.success) setSubCategoryShopIds(new Set(result.data));
-      else setSubCategoryShopIds(new Set());
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSubCategoryId]);
-
   /* Client-side filtering */
   const filteredShops = useMemo(() => {
     const dealShopIds = offerDateKey ? shopIdsWithDealOnDate(activeDeals, offerDateKey) : null;
     const base = shops.filter((shop) => {
       const matchesCategory = activeCategory === "All" || shop.category === activeCategory;
-      const matchesSub =
-        !activeSubCategoryId ||
-        !subCategoryShopIds ||
-        subCategoryShopIds.has(shop.id);
       const matchesOffer = !dealShopIds || dealShopIds.has(shop.id);
-      return matchesCategory && matchesSub && matchesOffer;
+      return matchesCategory && matchesOffer;
     });
 
     const query = searchQuery.trim();
@@ -325,7 +298,7 @@ function HomeInner() {
       (shop) => [shop.name, shop.category, shop.location, shop.store_bio],
       { minScore: FUZZY_MIN_SCORE, weights: [1, 0.7, 0.55, 0.45] },
     ).map((r) => r.item);
-  }, [shops, searchQuery, activeCategory, activeSubCategoryId, subCategoryShopIds, offerDateKey, activeDeals]);
+  }, [shops, searchQuery, activeCategory, offerDateKey, activeDeals]);
 
   const getDealStripOfferTags = useCallback(
     (shopId: string) => {
@@ -451,7 +424,6 @@ function HomeInner() {
 
   const handleCategoryChange = useCallback((category: ShopCategory) => {
     setActiveCategory(category);
-    setActiveSubCategoryId(null);
     const params = new URLSearchParams(searchParams.toString());
     if (category === "All") params.delete("category");
     else params.set("category", category);
@@ -460,17 +432,6 @@ function HomeInner() {
     else params.delete("q");
     router.replace(`/?${params.toString()}`, { scroll: false });
   }, [searchParams, searchQuery, router]);
-
-  const handleSubCategoryChange = useCallback(
-    (subId: string | null) => {
-      setActiveSubCategoryId(subId);
-      const params = new URLSearchParams(searchParams.toString());
-      if (subId) params.set("sub", subId);
-      else params.delete("sub");
-      router.replace(`/?${params.toString()}`, { scroll: false });
-    },
-    [searchParams, router],
-  );
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-24 md:px-4 md:py-5 md:pb-8">
@@ -499,15 +460,6 @@ function HomeInner() {
           })}
         </div>
       </section>
-
-      {activeCategory !== "All" && (
-        <SubCategoryPills
-          mainCategory={activeCategory}
-          selectedId={activeSubCategoryId}
-          onSelect={(id) => handleSubCategoryChange(id)}
-          label="Filter by sub-category"
-        />
-      )}
 
       {/* Stories — first content under category tabs */}
       <section aria-label="Merchant stories" className="mt-1 mb-3">
@@ -727,7 +679,6 @@ function HomeInner() {
                   type="button"
                   onClick={() => {
                     handleCategoryChange("All");
-                    handleSubCategoryChange(null);
                   }}
                   className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
                 >

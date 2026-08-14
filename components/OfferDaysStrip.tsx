@@ -76,8 +76,8 @@ export default function OfferDaysStrip({
 
   // Compact pills — sits inside the Deals block, not a second filter bar
   return (
-    <div className={`flex items-center gap-1.5 ${className}`} role="group" aria-label="Offer days">
-      <div className="-mx-0.5 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-0.5 pb-0.5 scrollbar-none">
+    <div className={`flex items-center gap-1 ${className}`} role="group" aria-label="Offer days">
+      <div className="-mx-0.5 flex min-w-0 flex-1 gap-1 overflow-x-auto px-0.5 pb-0.5 scrollbar-none">
         {keys.map((key) => {
           const active = selectedDateKey === key;
           const count = deals.filter((d) => isDealActiveOnDate(d, key)).length;
@@ -87,7 +87,7 @@ export default function OfferDaysStrip({
               type="button"
               onClick={() => onSelect(active ? null : key)}
               aria-pressed={active}
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-5 transition ${
                 active
                   ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
