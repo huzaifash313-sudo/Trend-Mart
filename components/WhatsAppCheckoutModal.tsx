@@ -50,6 +50,24 @@ import {
 import Link from "next/link";
 import { getPublicAppUrl } from "@/lib/appUrl";
 import { getShopPath } from "@/lib/shopSlug";
+import { useToast } from "@/components/Toast";
+
+/** Wrap an async call so a slow/never-resolving request can't hang the UI forever. */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -366,6 +384,7 @@ export default function WhatsAppCheckoutModal({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { location, isDetecting, detectLocationDetailed } = useLocation();
+  const { addToast } = useToast();
 
   // ── State ───────────────────────────────────────────────────────────────
   const [step, setStep] = useState<"review" | "shipping" | "confirm" | "success" | "auth">("review");
@@ -858,22 +877,29 @@ export default function WhatsAppCheckoutModal({
         );
       }
 
-      const orderResult = await createOrder({
-        shopId: shop.id,
-        customerName: shipping.customerName.trim(),
-        customerPhone:
-          toPkWhatsAppDigits(shipping.customerPhone) ||
-          normalizePkPhoneDigits(shipping.customerPhone),
-        items: orderItems,
-        discountAmount,
-        deliveryFee,
-        notes: shipping.deliveryNotes,
-        couponCode: couponResult?.valid ? couponCode : undefined,
-        customerLat: pinLat,
-        customerLng: pinLng,
-        customerCity: location?.city ?? undefined,
-        idempotencyKey: idempotencyKeyRef.current,
-      });
+      const orderResult = await withTimeout(
+        createOrder({
+          shopId: shop.id,
+          customerName: shipping.customerName.trim(),
+          customerPhone:
+            toPkWhatsAppDigits(shipping.customerPhone) ||
+            normalizePkPhoneDigits(shipping.customerPhone),
+          items: orderItems,
+          discountAmount,
+          deliveryFee,
+          notes: shipping.deliveryNotes,
+          couponCode: couponResult?.valid ? couponCode : undefined,
+          customerLat: pinLat,
+          customerLng: pinLng,
+          customerCity: location?.city ?? undefined,
+          idempotencyKey: idempotencyKeyRef.current,
+        }),
+        15_000,
+        "Order request timed out. Please check your connection and try again.",
+      );
+
+      // Debuggability: log the raw API result so a "stuck" order is traceable.
+      console.log("[Checkout] createOrder response:", orderResult);
 
       if (!orderResult.success) {
         throw new Error(orderResult.error);
@@ -885,7 +911,7 @@ export default function WhatsAppCheckoutModal({
       const ref = orderResult.data.id;
       setOrderRef(ref);
 
-      // 2. Save to local history (items array so the orders page can render it)
+      // Save to local history (items array so the orders page can render it)
       saveOrderRecord({
         shopId: shop.id,
         shopName: shop.name,
@@ -904,7 +930,7 @@ export default function WhatsAppCheckoutModal({
         status: "Pending",
       });
 
-      // 3. Build WhatsApp message (TrendMart product links + Maps pin)
+      // Build WhatsApp message (TrendMart product links + Maps pin)
       const whatsappText = buildWhatsAppMessage(
         shop,
         items,
@@ -919,12 +945,29 @@ export default function WhatsAppCheckoutModal({
         { latitude: pinLat, longitude: pinLng },
       );
 
-      setPendingWhatsAppUrl(
-        `https://wa.me/${merchantPhone}?text=${encodeURIComponent(whatsappText)}`,
-      );
-      setStep("success");
+      const whatsappUrl = `https://wa.me/${merchantPhone}?text=${encodeURIComponent(whatsappText)}`;
+      setPendingWhatsAppUrl(whatsappUrl);
+
+      // WhatsApp-first: order placed → open the merchant chat immediately, then
+      // close with a single confirmation toast. If the popup is blocked, fall
+      // back to the success screen so the shopper can still open it with one tap.
+      let opened: Window | null = null;
+      try {
+        opened = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+      } catch {
+        opened = null;
+      }
+
       setIsSubmitting(false);
+      addToast("Order placed — WhatsApp chat opened.", "success");
+
+      if (opened) {
+        onOrderPlaced();
+      } else {
+        setStep("success");
+      }
     } catch (err) {
+      console.error("[Checkout] Order failed:", err);
       setOrderError(
         err instanceof Error
           ? err.message
@@ -952,6 +995,8 @@ export default function WhatsAppCheckoutModal({
     radiusKm,
     location,
     detectLocationDetailed,
+    addToast,
+    onOrderPlaced,
   ]);
 
   const finishOrder = useCallback(() => {

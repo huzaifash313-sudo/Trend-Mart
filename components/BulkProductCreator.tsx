@@ -17,6 +17,7 @@ import { bulkCreateProducts } from "@/services/productService";
 import { isValidUUID } from "@/lib/sanitization";
 import MultiImageUpload from "@/components/MultiImageUpload";
 import { normalizeProductGallery } from "@/lib/productImages";
+import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 
 export interface BulkProductCreatorProps {
   shopId: string;
@@ -405,7 +406,7 @@ export default function BulkProductCreator({
                   type="text"
                   value={row.name}
                   onChange={(e) => updateRow(row.key, { name: e.target.value })}
-                  placeholder="e.g. Factory ERP System"
+                  placeholder={getProductNamePlaceholder(shopCategory)}
                   className={fieldClass}
                 />
               </div>

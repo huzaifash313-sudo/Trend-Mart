@@ -253,27 +253,12 @@ export async function transitionOrderStatus(
 async function broadcastOrderUpdate(
   notification: OrderStatusNotification,
 ): Promise<void> {
-  // Channel 1: Toast notification for dashboard users
+  // Channel 1: Dedicated order-update event for components to hook into
+  // (e.g. the customer tracking page). No global toast here — the merchant
+  // dashboard shows its own single confirmation toast for the action that
+  // caused this transition, and customers are notified via their own
+  // subscription. Emitting a toast here produced duplicate/stacked toasts.
   if (typeof window !== "undefined") {
-    const statusEmoji: Record<OrderStatus, string> = {
-      Pending: "🆕",
-      Processing: "⚙️",
-      Dispatched: "🚚",
-      Delivered: "✅",
-      Cancelled: "❌",
-    };
-
-    window.dispatchEvent(
-      new CustomEvent("trendmart:toast", {
-        detail: {
-          type: notification.newStatus === "Cancelled" ? "warning" : "success",
-          message: `${statusEmoji[notification.newStatus]} Order #${notification.orderId.slice(0, 8)}: ${notification.previousStatus} → ${notification.newStatus} (${notification.shopName})`,
-          duration: 5000,
-        },
-      }),
-    );
-
-    // Also dispatch as a dedicated order-update event for components to hook into
     window.dispatchEvent(
       new CustomEvent("trendmart:order-update", {
         detail: notification,

@@ -1240,8 +1240,10 @@ html.dark .tm-home-deals-nav-btn {
 }
 
 .tm-home-deal-card {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 12rem;
+  /* NOTE: no `content-visibility: auto` here. The home "Featured deals" shelf
+     is a horizontal transform carousel, and content-visibility skips painting
+     off-screen cards — so the next card slid in as a blank/white box ("content
+     goes behind, never comes forward"). These cards must always paint. */
   min-height: 10.25rem;
   border-radius: 1.1rem;
   border: 1px solid rgba(28, 25, 23, 0.08);
@@ -2088,6 +2090,30 @@ html.dark .tm-offer-ticker--delivery {
   white-space: nowrap;
   animation: tm-offer-fade 0.35s ease;
 }
+.tm-offer-ticker__label-inner {
+  display: inline-block;
+  white-space: nowrap;
+}
+/* Long offer labels scroll horizontally instead of hard-clipping mid-word. */
+.tm-offer-ticker__label--marquee {
+  text-overflow: clip;
+}
+.tm-offer-ticker__label--marquee .tm-offer-ticker__label-inner {
+  animation: tm-offer-label-marquee 7s linear infinite;
+}
+@keyframes tm-offer-label-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-offer-ticker__label--marquee .tm-offer-ticker__label-inner {
+    animation: none;
+  }
+}
 .tm-offer-ticker__timer {
   flex-shrink: 0;
   padding: 0.1rem 0.28rem;
@@ -2631,6 +2657,9 @@ html.layout-gallery,
 html.tm-splash-lock,
 html.tm-splash-lock body {
   overflow: hidden !important;
+  /* Keep the teal splash color behind the body so the boot → React splash
+     handoff never flashes white (the app bg is near-white). */
+  background-color: #0f766e;
 }
 
 /* Instant cover before React hydrates — kills homepage flash */

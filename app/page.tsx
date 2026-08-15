@@ -484,7 +484,11 @@ function HomeInner() {
             </button>
           ) : null}
 
-          {stories.length === 0 && !myShop ? (
+          {storiesQuery.isLoading ? (
+            <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5">
+              <div className="h-[3.35rem] w-[3.35rem] animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+            </div>
+          ) : stories.length === 0 && !myShop ? (
             <p className="px-3 text-xs text-zinc-400 dark:text-zinc-500">No active stories right now.</p>
           ) : (
             stories.map((story, i) => {

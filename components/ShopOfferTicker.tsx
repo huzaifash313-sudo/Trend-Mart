@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   formatOfferRemaining,
   type ShopOfferSlide,
@@ -23,17 +23,31 @@ interface ShopOfferTickerProps {
  */
 const ShopOfferTicker = memo(function ShopOfferTicker({ slides }: ShopOfferTickerProps) {
   const now = useOfferClock();
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [overflows, setOverflows] = useState(false);
 
   const active = slides.filter((s) => {
     if (!s.expiresAt) return true;
     return new Date(s.expiresAt).getTime() > now;
   });
 
-  if (active.length === 0) return null;
-
   const index = active.length > 1 ? Math.floor(now / ROTATE_MS) % active.length : 0;
-  const slide = active[Math.min(index, active.length - 1)]!;
-  const timer = formatOfferRemaining(slide.expiresAt, now);
+  const slide = active[Math.min(index, active.length - 1)];
+  const timer = slide ? formatOfferRemaining(slide.expiresAt, now) : null;
+
+  // When the label is longer than the pill, scroll it (marquee) instead of
+  // clipping the text mid-word on narrow cards.
+  useEffect(() => {
+    const el = labelRef.current;
+    if (!el) return;
+    const check = () => setOverflows(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(check) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [slide?.label, active.length]);
+
+  if (active.length === 0 || !slide) return null;
 
   const kindClass =
     slide.kind === "coupon"
@@ -49,8 +63,11 @@ const ShopOfferTicker = memo(function ShopOfferTicker({ slides }: ShopOfferTicke
       title={slide.label}
     >
       <span className="tm-offer-ticker__dot" aria-hidden="true" />
-      <span key={slide.id} className="tm-offer-ticker__label">
-        {slide.label}
+      <span
+        ref={labelRef}
+        className={`tm-offer-ticker__label${overflows ? " tm-offer-ticker__label--marquee" : ""}`}
+      >
+        <span className="tm-offer-ticker__label-inner">{slide.label}</span>
       </span>
       {timer ? (
         <span className="tm-offer-ticker__timer" aria-label={`Ends in ${timer}`}>

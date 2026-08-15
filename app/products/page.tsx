@@ -9,7 +9,6 @@ import { SHOP_CATEGORIES } from "@/types";
 import { type MarketplaceSort } from "@/services/productService";
 import ProductGrid from "@/components/ProductGrid";
 import SubCategoryPills from "@/components/SubCategoryPills";
-import OfferDaysStrip from "@/components/OfferDaysStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { useLocation } from "@/context/LocationContext";
 import { useCart } from "@/context/CartContext";
@@ -22,14 +21,13 @@ import { useMarketplaceProductsInfinite, useDeals, useShopCoupons } from "@/lib/
 import { type Coupon } from "@/services/couponService";
 import {
   isDealActiveOnDate,
-  shopIdsWithDealOnDate,
   toPkDateKey,
   formatDealDisplayLabel,
   formatDealWhenTag,
   dealSearchHaystack,
   type ShopDeal,
 } from "@/lib/dealSchedule";
-import { buildShopTickerTags, formatCouponTickerLabels } from "@/lib/shopOfferLabels";
+import { formatCouponTickerLabels } from "@/lib/shopOfferLabels";
 import type { ProductOfferContext } from "@/components/ProductGrid";
 import {
   fuzzyFilterAndRank,
@@ -42,9 +40,6 @@ import {
   trackCategoryInterest,
 } from "@/lib/behavior";
 
-const FeaturedDealsStrip = dynamic(() => import("@/components/FeaturedDealsStrip"), {
-  loading: () => <div className="h-36 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />,
-});
 const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
   ssr: false,
 });
@@ -119,7 +114,6 @@ function ProductsPageInner() {
   });
   const [areaOpen, setAreaOpen] = useState(false);
 
-  const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
   // Infinite-scroll sentinel element (IntersectionObserver) for auto-load.
@@ -285,24 +279,6 @@ function ProductsPageInner() {
     [offerContextByShop],
   );
 
-  const getDealStripOfferTags = useCallback(
-    (shopId: string) => {
-      const sample = products.find((p) => p.shop_id === shopId);
-      const today = toPkDateKey();
-      const dealLabels = activeDeals
-        .filter((d) => d.shop_id === shopId && isDealActiveOnDate(d, today))
-        .map((d) => formatDealDisplayLabel(d));
-      return buildShopTickerTags({
-        coupons: shopCoupons[shopId] ?? [],
-        dealLabels,
-        freeDeliveryThreshold: sample?.shop_free_delivery_threshold,
-        deliveryFeeFlat: sample?.shop_delivery_fee_flat,
-        deliveryFeePerKm: sample?.shop_delivery_fee_per_km,
-      });
-    },
-    [products, shopCoupons, activeDeals],
-  );
-
   /** Deals matching the current search (when-tag / title / shop). */
   const searchMatchedDeals = useMemo(() => {
     const q = query.trim();
@@ -405,11 +381,6 @@ function ProductsPageInner() {
       });
     }
 
-    if (offerDateKey) {
-      const dealShopIds = shopIdsWithDealOnDate(activeDeals, offerDateKey);
-      list = list.filter((p) => dealShopIds.has(p.shop_id));
-    }
-
     // Search: boost products from shops whose deals match ("Monday deal", "14 August", …)
     const q = query.trim();
     if (q && searchMatchedDeals.length > 0) {
@@ -425,7 +396,6 @@ function ProductsPageInner() {
     geoVisibleShopIds,
     sort,
     globalCoords,
-    offerDateKey,
     activeDeals,
     query,
     searchMatchedDeals,
@@ -579,45 +549,6 @@ function ProductsPageInner() {
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-28 md:px-4 md:py-5 md:pb-10">
-      {/* Header */}
-      <header className="mb-3">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-          Marketplace
-        </p>
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
-          Products for you
-        </h1>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Items from local stores — tap to add to cart or visit the shop
-          </p>
-          <Link
-            href="/deals"
-            className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-          >
-            Browse deals →
-          </Link>
-        </div>
-      </header>
-
-      {/* Featured deals — same home snap shelf (Deals page stays separate) */}
-      <section aria-label="Featured deals" className="mb-4 space-y-2 sm:mb-5">
-        <OfferDaysStrip
-          deals={activeDeals}
-          selectedDateKey={offerDateKey}
-          onSelect={setOfferDateKey}
-          variant="pills"
-        />
-        <FeaturedDealsStrip
-          deals={activeDeals}
-          dateKey={offerDateKey}
-          title="Featured deals"
-          seeAllHref="/deals"
-          variant="home"
-          getOfferTags={getDealStripOfferTags}
-        />
-      </section>
-
       {/* Search — products only; no deal-match chrome */}
       <form onSubmit={handleSearchSubmit} className="mb-3">
         <label className="relative block">

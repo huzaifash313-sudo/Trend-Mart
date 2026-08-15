@@ -45,7 +45,7 @@ const ARROW_EASE_MS = 420;
 const CARD_GAP_PX = 8;
 
 /** Home snap shelf: hold full card(s), then shift to next */
-const HOME_HOLD_MS = 3200;
+const HOME_HOLD_MS = 5000;
 const HOME_SLIDE_MS = 520;
 const HOME_GAP_PX = 10;
 
@@ -373,7 +373,13 @@ function HomeShiftShelf({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onMouseEnter={() => canSlide && setPaused(true)}
+          onPointerEnter={() => canSlide && setPaused(true)}
           onMouseLeave={() => {
+            if (!canSlide || openDeal) return;
+            setPaused(false);
+            setProgressKey((k) => k + 1);
+          }}
+          onPointerLeave={() => {
             if (!canSlide || openDeal) return;
             setPaused(false);
             setProgressKey((k) => k + 1);

@@ -57,6 +57,9 @@ export function useShops() {
     queryKey: queryKeys.shops,
     queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 300 })),
     staleTime: 2 * 60_000,
+    // Keep the previous list on screen during refetch so content never flashes
+    // blank / skeletons when a merchant publishes or the user pulls to refresh.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -70,6 +73,7 @@ export function useMyShop() {
     },
     retry: false,
     staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -80,6 +84,7 @@ export function useStories() {
     queryKey: queryKeys.stories,
     queryFn: () => unwrap(fetchActiveStories()),
     staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -88,6 +93,7 @@ export function useDeals(limit = 48) {
     queryKey: queryKeys.deals(limit),
     queryFn: () => unwrap(fetchActiveDeals(limit)),
     staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 

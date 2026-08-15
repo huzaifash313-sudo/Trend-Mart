@@ -68,9 +68,28 @@ export default function BottomNav() {
   const router = useRouter();
   const { openQuickAdd } = useMerchantQuickAdd();
 
-  const [session, setSession] = useState(false);
+  // `null` = auth still resolving. Don't flash "Sign In" to a signed-in user.
+  const [session, setSession] = useState<boolean | null>(null);
   const [role, setRole] = useState<AuthRole | "admin" | null>(null);
   const [merchantShop, setMerchantShop] = useState<{ id: string; category: string } | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // Hide the fixed bottom nav while the on-screen keyboard is open, so it never
+  // floats over the keyboard or covers the filter/sort row while typing.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const check = () => {
+      setKeyboardOpen(window.innerHeight - vv.height > 150);
+    };
+    check();
+    vv.addEventListener("resize", check);
+    window.addEventListener("resize", check);
+    return () => {
+      vv.removeEventListener("resize", check);
+      window.removeEventListener("resize", check);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,14 +188,14 @@ export default function BottomNav() {
 
   const isMerchant = role === "merchant" || role === "admin" || !!merchantShop;
   if (pathname === "/offline") return null;
-  const accountHref = !session
+  const accountHref = session === false
     ? "/login"
     : role === "admin"
       ? "/admin/dashboard"
       : isMerchant
         ? "/dashboard"
         : "/account";
-  const accountLabel = !session
+  const accountLabel = session === false
     ? "Sign In"
     : role === "admin"
       ? "Admin"
@@ -214,14 +233,24 @@ export default function BottomNav() {
   };
 
   // Merchants: Add / Post. Shoppers: clear “Store” (open a shop), not confusing “Sell”.
-  const centerLabel = merchantShop ? "Add" : session && isMerchant ? "Post" : "Store";
+  // While auth resolves (session === null), default to the most common label so the
+  // button never flips Store → Post → Add on every load/refresh.
+  const centerLabel = merchantShop
+    ? "Add"
+    : session === null
+      ? "Add"
+      : session && isMerchant
+        ? "Post"
+        : "Store";
   const centerAria = merchantShop
     ? "Add product"
-    : session && isMerchant
-      ? "Open product tools"
-      : session
-        ? "Open your store on TrendMart"
-        : "Sign in to open a store";
+    : session === null
+      ? "Add product"
+      : session && isMerchant
+        ? "Open product tools"
+        : session
+          ? "Open your store on TrendMart"
+          : "Sign in to open a store";
 
   const sideTabClass = (active: boolean) =>
     `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
@@ -232,7 +261,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden"
+      className={`bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden${keyboardOpen ? " hidden" : ""}`}
       aria-label="Main navigation"
     >
       <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-end px-1 pb-1">

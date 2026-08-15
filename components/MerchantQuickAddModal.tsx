@@ -13,6 +13,7 @@ import ImageUpload from "@/components/ImageUpload";
 import QuickCouponPanel from "@/components/QuickCouponPanel";
 import DealManager from "@/components/DealManager";
 import { useToast } from "@/components/Toast";
+import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 
 function CloseIcon() {
   return (
@@ -27,6 +28,7 @@ export default function MerchantQuickAddModal() {
   const { open, tab, shopId, shopCategory, closeQuickAdd, setTab } = useMerchantQuickAdd();
   const { addToast } = useToast();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -72,6 +74,7 @@ export default function MerchantQuickAddModal() {
 
   const resetProduct = useCallback(() => {
     setName("");
+    setDescription("");
     setPrice("");
     setOriginalPrice("");
     setImageUrl("");
@@ -85,10 +88,14 @@ export default function MerchantQuickAddModal() {
       addToast("Enter a product name and price.", "error");
       return;
     }
+    if (!description.trim()) {
+      addToast("Add a short product description.", "error");
+      return;
+    }
     setSaving(true);
     const result = await createProduct(shopId, {
       name: name.trim(),
-      description: "",
+      description: description.trim(),
       price: parsedPrice,
       original_price: originalPrice ? Number(originalPrice) : null,
       image_url: imageUrl,
@@ -180,7 +187,19 @@ export default function MerchantQuickAddModal() {
                   required
                   maxLength={120}
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  placeholder="e.g. Chicken Biryani"
+                  placeholder={getProductNamePlaceholder(shopCategory)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Description *</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  required
+                  rows={2}
+                  maxLength={300}
+                  className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  placeholder="Short detail — size, flavour, material, etc."
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">

@@ -55,6 +55,7 @@ import {
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
+import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -485,6 +486,7 @@ export default function ProductsDashboardPage() {
     e.preventDefault();
     if (!activeShopId) return;
     if (!form.name.trim()) { addToast("Product name is required.", "error"); return; }
+    if (!form.description.trim()) { addToast("Product description is required.", "error"); return; }
     if (form.basePrice <= 0) { addToast("Price must be greater than 0.", "error"); return; }
 
     setFormSaving(true);
@@ -904,7 +906,7 @@ export default function ProductsDashboardPage() {
                     required
                     value={form.name}
                     onChange={(e) => handleNameChange(e.target.value)}
-                    placeholder="e.g., Premium Cotton Kurti"
+                    placeholder={getProductNamePlaceholder(activeShop?.category)}
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                   {form.skuPrefix && (
@@ -1018,9 +1020,10 @@ export default function ProductsDashboardPage() {
 
               {/* Description */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Description</label>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Description *</label>
                 <textarea
                   rows={2}
+                  required
                   value={form.description}
                   onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
                   placeholder="High-quality fabric, available in multiple colors..."
@@ -1475,7 +1478,10 @@ export default function ProductsDashboardPage() {
 
                     {/* Info */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      <p
+                        className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                        title={product.name}
+                      >
                         {product.name}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">

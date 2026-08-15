@@ -299,17 +299,10 @@ export function NotificationListenerProvider({
             shopId,
           });
         },
-        (payload) => {
-          const order = (payload as RealtimePostgresChangesPayload<OrderPayload>).new;
-          if (!order || !("id" in order)) return;
-          addNotification({
-            type: "order",
-            title: `Order Updated: ${order.customer_name || "Customer"}`,
-            body: `Status changed to: ${order.status} — Rs. ${(order.total_amount ?? 0).toLocaleString()}`,
-            linkUrl: `/dashboard/orders`,
-            shopId,
-          });
-        },
+        // No onUpdate notification here: order status changes are the merchant's
+        // own action, and the dashboard already shows a single confirmation
+        // toast. Notifying again on every UPDATE stacked toasts and inflated the
+        // bell badge count by 2-3 per action.
       );
 
       // Subscribe to new inquiries

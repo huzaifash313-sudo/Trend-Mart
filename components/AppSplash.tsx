@@ -27,13 +27,13 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  * cannot strand the teal boot cover or abort a first-run play.
  */
 const STAGE_MS = {
-  logoHold: 800,
-  brand: 800,
-  details: 900,
-  holdMin: 2400,
-  exit: 650,
+  logoHold: 450,
+  brand: 550,
+  details: 600,
+  holdMin: 900,
+  exit: 450,
   /** Never block home forever if network is slow. */
-  maxWaitForData: 2400,
+  maxWaitForData: 1200,
 };
 
 const REDUCED_MS = {

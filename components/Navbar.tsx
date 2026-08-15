@@ -110,7 +110,6 @@ function BrandMark({ size = 34 }: { size?: number }) {
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const onProductsPage = pathname === "/products" || pathname.startsWith("/products/");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
 
@@ -144,19 +143,17 @@ export default function Navbar() {
             <span className="tm-navbar-wordmark">TrendMart</span>
           </Link>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <NavbarNotificationButton />
-            {!onProductsPage ? (
-              <button
-                type="button"
-                onClick={navigateToSearch}
-                className="tm-navbar-search-btn w-10 sm:w-auto"
-                aria-label="Search products and shops"
-              >
-                <SearchIcon />
-                <span className="hidden text-sm font-medium text-white sm:inline">Search</span>
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={navigateToSearch}
+              className="tm-navbar-search-btn w-10 sm:w-auto"
+              aria-label="Search products and shops"
+            >
+              <SearchIcon />
+              <span className="hidden text-sm font-medium text-white sm:inline">Search</span>
+            </button>
           </div>
         </div>
       </div>
