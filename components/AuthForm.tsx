@@ -232,12 +232,12 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
   };
 
   const inputClassName = (field: string) =>
-    `w-full rounded-xl border bg-white/70 backdrop-blur-sm px-4 py-3 text-sm text-zinc-900 placeholder-zinc-300/50 transition-all duration-200 outline-none dark:bg-zinc-800/70 dark:text-zinc-100 ${
+    `tm-input w-full px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400/60 transition-all duration-200 outline-none dark:text-zinc-100 ${
       getFieldError(field)
-        ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-red-500"
+        ? "tm-input-error"
         : touched[field] && !getFieldError(field)
-          ? "border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500"
-          : "border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-600 dark:focus:border-emerald-400"
+          ? "border-emerald-400 dark:border-emerald-500"
+          : ""
     }`;
 
   return (
@@ -595,7 +595,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         type="submit"
         disabled={isLoading}
         whileTap={isLoading ? undefined : { scale: 0.98 }}
-        className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-offset-zinc-900 relative overflow-hidden"
+        className="tm-btn-primary relative w-full overflow-hidden rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed dark:focus:ring-offset-zinc-900"
       >
         {isLoading ? (
           <span className="flex items-center justify-center gap-2">

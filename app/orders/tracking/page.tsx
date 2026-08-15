@@ -25,6 +25,7 @@ import {
 import { subscribeToOrderUpdates } from "@/services/notificationService";
 import { formatRupees } from "@/lib/formatters";
 import { formatDate, formatRelativeTime } from "@/lib/formatters";
+import { toWhatsAppDigits } from "@/lib/sanitization";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -326,10 +327,12 @@ function OrderCard({
   highlighted?: boolean;
   justUpdated?: boolean;
 }) {
-  const whatsappNumber = ""; // Will be composed from shop data if available
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
-    `Hi! I'm inquiring about my order:\n\n🆔 Order ID: ${order.id}\n📦 Status: ${order.status}\n💰 Total: Rs. ${order.totalAmount.toLocaleString()}\n\nPlease provide an update. Thanks!`,
-  )}`;
+  const whatsappNumber = toWhatsAppDigits(order.shopWhatsapp ?? "");
+  const whatsappUrl = whatsappNumber
+    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+        `Hi! I'm inquiring about my order:\n\n🆔 Order ID: ${order.id}\n📦 Status: ${order.status}\n💰 Total: Rs. ${order.totalAmount.toLocaleString()}\n\nPlease provide an update. Thanks!`,
+      )}`
+    : null;
 
   return (
     <div
@@ -459,15 +462,24 @@ function OrderCard({
 
       {/* Actions */}
       <div className="flex gap-2 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
-        <a
-          href={whatsappUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
-        >
-          <WhatsAppIcon />
-          Contact Merchant
-        </a>
+        {whatsappUrl ? (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tm-btn-primary inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold"
+          >
+            <WhatsAppIcon />
+            Contact Merchant
+          </a>
+        ) : (
+          <span
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-zinc-100 px-4 py-2.5 text-xs font-medium text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500"
+            title="This shop hasn't set a WhatsApp number yet"
+          >
+            WhatsApp unavailable
+          </span>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -769,7 +781,7 @@ function OrderTrackingInner() {
                         setError(null);
                       }}
                       placeholder="0300-1234567"
-                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      className="tm-input w-full py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400/60 dark:text-zinc-100"
                       aria-label="Enter your phone number"
                     />
                   ) : (
@@ -781,7 +793,7 @@ function OrderTrackingInner() {
                         setError(null);
                       }}
                       placeholder="e.g. a1b2c3d4-..."
-                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      className="tm-input w-full py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400/60 dark:text-zinc-100"
                       aria-label="Enter order reference ID"
                     />
                   )}
@@ -804,7 +816,7 @@ function OrderTrackingInner() {
                 <button
                   type="submit"
                   disabled={searching}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="tm-btn-primary inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed"
                 >
                   {searching ? (
                     <>

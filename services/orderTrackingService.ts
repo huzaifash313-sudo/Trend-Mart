@@ -16,6 +16,7 @@ export interface TrackedOrder {
   id: string;
   shopId: string;
   shopName: string;
+  shopWhatsapp?: string | null;
   customerName: string;
   customerPhone: string;
   items: Array<{
@@ -168,6 +169,10 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
     shopName: (row.shops && typeof row.shops === "object"
       ? (row.shops as Record<string, unknown>).name as string
       : row.shop_name as string) ?? "Unknown Shop",
+    shopWhatsapp:
+      (row.shops && typeof row.shops === "object"
+        ? (row.shops as Record<string, unknown>).whatsapp_number as string
+        : (row.shop_whatsapp as string) ?? (row.whatsapp_number as string)) ?? null,
     customerName: (row.customer_name as string) ?? "",
     customerPhone: (row.customer_phone as string) ?? "",
     items,

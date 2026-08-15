@@ -1060,8 +1060,9 @@ html.dark .trend-card:hover {
 .tm-product-card {
   position: relative;
   height: 100%;
+  /* Safer placeholder size so iOS content-visibility doesn't paint tiny frames */
   content-visibility: auto;
-  contain-intrinsic-size: auto 260px;
+  contain-intrinsic-size: auto 320px;
   background: #fff;
   border-radius: 0.85rem;
   border: 1.5px solid color-mix(in srgb, var(--tm-sea) 55%, #99f6e4) !important;
@@ -1535,14 +1536,17 @@ html.dark .tm-home-deals-progress-bar {
 }
 
 .tm-product-media {
-  /* height:auto + flex:0 0 auto — iOS Safari flex stretch was squashing
-     aspect-ratio boxes into thin empty frames (esp. iPhone X / older WebKit). */
-  aspect-ratio: 5 / 4;
-  width: 100%;
-  height: auto;
-  flex: 0 0 auto;
-  min-height: 7.5rem;
+  /*
+   * Safari/WebKit collapse: aspect-ratio alone fails when every child is
+   * position:absolute (Next/Image `fill`). Drive height from padding-bottom
+   * so the box always has intrinsic size. 5:4 → height/width = 4/5 = 80%.
+   */
   position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 80%;
+  flex: 0 0 auto;
+  align-self: stretch;
   overflow: hidden;
   background: linear-gradient(160deg, #f0fdfa 0%, #ecfeff 55%, #f8fafc 100%);
 }
@@ -1550,6 +1554,8 @@ html.dark .tm-product-media {
   background: linear-gradient(160deg, #042f2e 0%, #0f172a 100%);
 }
 .tm-product-placeholder {
+  position: absolute;
+  inset: 0;
   background: linear-gradient(160deg, #ccfbf1 0%, #e0f2fe 50%, #f1f5f9 100%);
 }
 html.dark .tm-product-placeholder {
@@ -3087,6 +3093,35 @@ html.tm-first-paint .tm-boot-splash {
   to { stroke-dashoffset: 0; }
 }
 
+.tm-splash-skip {
+  position: absolute;
+  top: calc(0.85rem + var(--safe-area-inset-top, 0px));
+  right: calc(0.85rem + var(--safe-area-inset-right, 0px));
+  z-index: 2;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(15, 23, 42, 0.28);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.tm-splash-skip:hover,
+.tm-splash-skip:focus-visible {
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(255, 255, 255, 0.55);
+  outline: none;
+}
+.tm-splash--exit .tm-splash-skip {
+  pointer-events: none;
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tm-splash-stage,
   .tm-splash-logo,
@@ -3116,4 +3151,98 @@ html.tm-first-paint .tm-boot-splash {
     opacity: 1;
     transform: none;
   }
+}
+
+/* ── Shared button primitives ─────────────────────────────────────────────── */
+/* Primary CTA — brand gradient + white text. Sizing (padding/radius/font) is
+   intentionally left to the Tailwind utilities on the element, so this class
+   only normalizes the *color* so primary actions look identical everywhere. */
+.tm-btn-primary {
+  background-image: var(--tm-brand-gradient);
+  color: #fff !important;
+  border: 0;
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.28);
+  transition: background-image 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+.tm-btn-primary:hover:not(:disabled) {
+  background-image: var(--tm-brand-gradient-hover);
+  box-shadow: 0 10px 22px rgba(13, 148, 136, 0.34);
+  filter: saturate(1.05);
+}
+.tm-btn-primary:active:not(:disabled) {
+  filter: brightness(0.98);
+  transform: translateY(1px);
+}
+.tm-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Secondary / neutral action — subtle surface + border, brand on hover. */
+.tm-btn-secondary {
+  background-color: var(--tm-surface);
+  color: var(--tm-text);
+  border: 1px solid var(--tm-border);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.tm-btn-secondary:hover:not(:disabled) {
+  background-color: var(--tm-elevated);
+  border-color: color-mix(in srgb, var(--tm-sea) 40%, var(--tm-border));
+  color: var(--tm-sea-deep);
+}
+html.dark .tm-btn-secondary:hover:not(:disabled) {
+  color: var(--tm-sea);
+}
+.tm-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Shared form input ────────────────────────────────────────────────────── */
+/* One input look for text fields, selects and textareas. Sizing stays on the
+   element; this normalizes surface, border and focus ring. */
+.tm-input {
+  background-color: var(--tm-surface);
+  color: var(--tm-text);
+  border: 1px solid var(--tm-border);
+  border-radius: 0.75rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.tm-input::placeholder {
+  color: var(--tm-muted);
+  opacity: 0.6;
+}
+.tm-input:focus {
+  outline: none;
+  border-color: var(--tm-sea);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tm-sea) 20%, transparent);
+}
+html.dark .tm-input {
+  background-color: var(--tm-elevated);
+}
+.tm-input-error {
+  border-color: #f87171 !important;
+}
+.tm-input-error:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ef4444 20%, transparent) !important;
+}
+
+/* ── Recharts dark-mode axis/grid colors ──────────────────────────────────── */
+/* Recharts writes axis ticks/grid as inline SVG presentation attributes
+   (e.g. fill="#71717a"), which are too faint on dark surfaces. CSS beats
+   presentation attributes, so these overrides theme every chart at once. */
+html.dark .recharts-cartesian-grid line {
+  stroke: rgba(148, 163, 184, 0.16) !important;
+}
+html.dark .recharts-cartesian-axis-line,
+html.dark .recharts-cartesian-axis-tick-line,
+html.dark .recharts-polar-grid line,
+html.dark .recharts-label-line {
+  stroke: rgba(148, 163, 184, 0.2) !important;
+}
+html.dark .recharts-text {
+  fill: var(--tm-muted) !important;
 }

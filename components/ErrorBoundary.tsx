@@ -115,10 +115,10 @@ function reportToSentry(
  * ```
  *
  * Critical paths wrapped by this boundary:
- * - Checkout flow (CheckoutModal)
+ * - Checkout flow (WhatsAppCheckoutModal)
  * - Store catalog (app/shop/[id])
  * - Merchant dashboard (app/dashboard)
- * - Search results (app/search)
+ * - Product marketplace (app/products)
  */
 export class ErrorBoundary extends Component<
   ErrorBoundaryProps,

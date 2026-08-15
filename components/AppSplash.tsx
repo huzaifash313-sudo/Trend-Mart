@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queries";
@@ -21,6 +21,10 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  *   3) A short value introduction (what TrendMart is), not page mockups
  *   4) Hold so it's readable while home data prefetches in the background
  *   5) Slow fade into the (already-warm) homepage
+ *
+ * `SPLASH_KEY` is written only when the intro finishes or the user skips —
+ * never at start — so Strict Mode remounts and mid-animation tab switches
+ * cannot strand the teal boot cover or abort a first-run play.
  */
 const STAGE_MS = {
   logoHold: 800,
@@ -32,7 +36,17 @@ const STAGE_MS = {
   maxWaitForData: 2400,
 };
 
+const REDUCED_MS = {
+  logoHold: 120,
+  brand: 120,
+  details: 120,
+  holdMin: 280,
+  exit: 180,
+  maxWaitForData: 280,
+};
+
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
+type StageTiming = typeof STAGE_MS;
 
 function shouldShowSplash(pathname: string): boolean {
   if (pathname !== "/") return false;
@@ -62,12 +76,32 @@ function removeBootSplash() {
   document.documentElement.classList.remove("tm-boot-splash");
 }
 
+function clearSplashChrome() {
+  document.documentElement.classList.remove(
+    "tm-splash-lock",
+    "tm-boot-splash",
+    "tm-first-paint",
+  );
+}
+
 async function unwrap<T>(
   promise: Promise<{ success: true; data: T } | { success: false; error: string }>,
 ): Promise<T> {
   const result = await promise;
   if (!result.success) throw new Error(result.error);
   return result.data;
+}
+
+function stageTiming(): StageTiming {
+  if (typeof window === "undefined") return STAGE_MS;
+  try {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return REDUCED_MS;
+    }
+  } catch {
+    /* ignore */
+  }
+  return STAGE_MS;
 }
 
 /* Short, human value intro — no page mockups, just "what TrendMart is". */
@@ -81,19 +115,59 @@ export default function AppSplash() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("off");
+  const timersRef = useRef<number[]>([]);
+  const unmountedRef = useRef(false);
+  const exitingRef = useRef(false);
+  const finishedRef = useRef(false);
+
+  const clearTimers = () => {
+    timersRef.current.forEach((id) => window.clearTimeout(id));
+    timersRef.current = [];
+  };
+
+  const trackTimeout = (fn: () => void, ms: number) => {
+    const id = window.setTimeout(fn, ms);
+    timersRef.current.push(id);
+    return id;
+  };
+
+  const isStopped = () => unmountedRef.current || finishedRef.current;
+
+  const finishSplash = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    markSplashSeen();
+    clearSplashChrome();
+    setPhase("off");
+  };
+
+  const beginExit = (exitMs: number) => {
+    if (isStopped() || exitingRef.current) return;
+    exitingRef.current = true;
+    setPhase("exit");
+    trackTimeout(() => {
+      if (unmountedRef.current) return;
+      finishSplash();
+    }, exitMs);
+  };
 
   useEffect(() => {
+    unmountedRef.current = false;
+    exitingRef.current = false;
+    finishedRef.current = false;
+
     if (!shouldShowSplash(pathname)) {
-      // Returning visit / refresh / other route: no intro, no cover flash.
-      document.documentElement.classList.remove("tm-splash-lock");
+      // Returning visit / refresh / other route: drop any leftover boot cover.
+      clearSplashChrome();
       setPhase("off");
       return;
     }
 
-    markSplashSeen();
     document.documentElement.classList.remove("tm-first-paint");
     document.documentElement.classList.add("tm-splash-lock");
     setPhase("logo");
+
+    const ms = stageTiming();
 
     // Warm the homepage cache while the customer watches the intro.
     const prefetch = Promise.allSettled([
@@ -114,54 +188,64 @@ export default function AppSplash() {
       }),
     ]);
 
-    const timers: number[] = [];
-    let cancelled = false;
-
-    timers.push(
-      window.setTimeout(() => {
+    trackTimeout(() => {
+      requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => removeBootSplash());
+          if (!unmountedRef.current) removeBootSplash();
         });
-      }, 0),
-    );
+      });
+    }, 0);
 
     // 1) Logo alone, then rise + wordmark
-    timers.push(window.setTimeout(() => setPhase("brand"), STAGE_MS.logoHold));
-    let t = STAGE_MS.logoHold + STAGE_MS.brand;
+    trackTimeout(() => {
+      if (!isStopped() && !exitingRef.current) setPhase("brand");
+    }, ms.logoHold);
+
+    let t = ms.logoHold + ms.brand;
     // 2) Introduction slides in
-    timers.push(window.setTimeout(() => setPhase("details"), t));
-    t += STAGE_MS.details;
+    trackTimeout(() => {
+      if (!isStopped() && !exitingRef.current) setPhase("details");
+    }, t);
+    t += ms.details;
+
     // 3) Hold for reading + finish prefetch if needed, then slow fade out
-    timers.push(
-      window.setTimeout(() => {
-        setPhase("hold");
-        const holdStarted = Date.now();
-        void (async () => {
-          await Promise.race([
-            prefetch,
-            new Promise((r) => window.setTimeout(r, STAGE_MS.maxWaitForData)),
-          ]);
-          if (cancelled) return;
-          const elapsed = Date.now() - holdStarted;
-          const waitMore = Math.max(0, STAGE_MS.holdMin - elapsed);
-          await new Promise((r) => window.setTimeout(r, waitMore));
-          if (cancelled) return;
-          setPhase("exit");
-          window.setTimeout(() => {
-            if (cancelled) return;
-            document.documentElement.classList.remove("tm-splash-lock");
-            setPhase("off");
-          }, STAGE_MS.exit);
-        })();
-      }, t),
-    );
+    trackTimeout(() => {
+      if (isStopped() || exitingRef.current) return;
+      setPhase("hold");
+      const holdStarted = Date.now();
+      void (async () => {
+        await Promise.race([
+          prefetch,
+          new Promise<void>((resolve) => {
+            trackTimeout(resolve, ms.maxWaitForData);
+          }),
+        ]);
+        if (isStopped() || exitingRef.current) return;
+        const elapsed = Date.now() - holdStarted;
+        const waitMore = Math.max(0, ms.holdMin - elapsed);
+        await new Promise<void>((resolve) => {
+          trackTimeout(resolve, waitMore);
+        });
+        if (isStopped() || exitingRef.current) return;
+        beginExit(ms.exit);
+      })();
+    }, t);
 
     return () => {
-      cancelled = true;
-      timers.forEach((id) => window.clearTimeout(id));
-      document.documentElement.classList.remove("tm-splash-lock");
+      unmountedRef.current = true;
+      clearTimers();
+      // Do NOT strip tm-splash-lock here. React Strict Mode remounts this
+      // effect and shouldShowSplash() still needs the boot-armed lock. Route
+      // changes hit the early-return path which calls clearSplashChrome().
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-gated intro
   }, [pathname, queryClient]);
+
+  const onSkip = () => {
+    if (phase === "off" || phase === "exit" || isStopped() || exitingRef.current) return;
+    clearTimers();
+    beginExit(stageTiming().exit);
+  };
 
   if (phase === "off") return null;
 
@@ -173,6 +257,10 @@ export default function AppSplash() {
       aria-label="Welcome to TrendMart"
       aria-live="polite"
     >
+      <button type="button" className="tm-splash-skip" onClick={onSkip}>
+        Skip
+      </button>
+
       <div className="tm-splash-glow" aria-hidden="true" />
       <div className="tm-splash-glow tm-splash-glow--2" aria-hidden="true" />
 

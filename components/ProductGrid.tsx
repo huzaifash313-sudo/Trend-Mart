@@ -201,7 +201,7 @@ const ProductCard = memo(function ProductCard({
             onError={() => setImgError(true)}
           />
         ) : (
-          <div className="tm-product-placeholder flex h-full w-full items-center justify-center">
+          <div className="tm-product-placeholder flex items-center justify-center">
             <span className="select-none text-2xl font-semibold tracking-tight text-teal-700/35 dark:text-teal-300/30 sm:text-3xl">
               {product.name.charAt(0).toUpperCase()}
             </span>

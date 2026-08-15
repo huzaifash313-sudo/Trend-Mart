@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect } from "react";
+import { SPLASH_KEY } from "@/components/AppSplash";
 
 /**
  * Safety net + first-paint cover:
@@ -59,12 +60,19 @@ export default function InteractionUnlock() {
       root.classList.remove("tm-splash-lock", "tm-boot-splash", "tm-first-paint");
     };
 
-    const failsafe = window.setTimeout(unlock, 12_000);
+    const splashStillPlaying = () => Boolean(document.querySelector(".tm-splash"));
+
+    const failsafe = window.setTimeout(() => {
+      // Last resort — only if something left the lock on with no live overlay.
+      if (!splashStillPlaying()) unlock();
+    }, 12_000);
 
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
+      // Never tear down an in-progress intro (seen flag is set only at finish).
+      if (splashStillPlaying()) return;
       try {
-        if (sessionStorage.getItem("tm_splash_seen_v6") === "1") unlock();
+        if (sessionStorage.getItem(SPLASH_KEY) === "1") unlock();
       } catch {
         unlock();
       }

@@ -11,6 +11,7 @@ import {
 import { logError } from "@/services/errorService";
 import { fetchShopById } from "@/services/shopService";
 import { useToast } from "@/components/Toast";
+import { ErrorState } from "@/components/ErrorState";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline Icons                                                              */
@@ -202,6 +203,8 @@ function WishlistCard({
 export default function WishlistPage() {
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [tab, setTab] = useState<WishlistTab>("shops");
 
   const shops = useMemo(() => items.filter((i) => i.type === "shop"), [items]);
@@ -216,6 +219,7 @@ export default function WishlistPage() {
         // Clear red nav badge — user has opened wishlist
         markWishlistSeen();
 
+        setLoadError(false);
         const all = await getAllFavorites();
         if (cancelled) return;
         setItems(all);
@@ -227,6 +231,7 @@ export default function WishlistPage() {
         else if (productCount > 0) setTab("products");
       } catch (err) {
         logError(err, { module: "WishlistPage.load" });
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -236,7 +241,7 @@ export default function WishlistPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const handleRemove = useCallback(async (id: string) => {
     const item = items.find((f) => f.id === id);
@@ -284,6 +289,32 @@ export default function WishlistPage() {
   }
 
   const totalEmpty = items.length === 0;
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
+        <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
+          <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+            <Link href="/" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Go back">
+              <ChevronLeftIcon />
+            </Link>
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Wishlist</h1>
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">
+          <ErrorState
+            title="Could not load your wishlist"
+            message="We couldn't fetch your saved items. This might be a temporary issue."
+            onRetry={() => {
+              setLoadError(false);
+              setLoading(true);
+              setReloadKey((k) => k + 1);
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
@@ -359,7 +390,7 @@ export default function WishlistPage() {
               <Link href="/" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
                 Browse shops
               </Link>
-              <Link href="/search" className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+              <Link href="/products" className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
                 Search products
               </Link>
             </div>

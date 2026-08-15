@@ -81,7 +81,7 @@ export function EmptyState({
         <button
           type="button"
           onClick={action.onPress}
-          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+          className="tm-btn-primary inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
         >
           {action.label}
         </button>

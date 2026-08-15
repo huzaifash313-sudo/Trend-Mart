@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { detectUserRole } from "@/services/authService";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -105,6 +106,7 @@ function PinIcon() {
 export default function SettingsPage() {
   const router = useRouter();
   const [session, setSession] = useState(false);
+  const [isMerchant, setIsMerchant] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [avatarInitial, setAvatarInitial] = useState("?");
@@ -117,9 +119,14 @@ export default function SettingsPage() {
         const { data } = await supabase.auth.getSession();
         if (!cancelled) {
           setSession(!!data.session);
-          const email = data.session?.user?.email ?? null;
+          const user = data.session?.user ?? null;
+          const email = user?.email ?? null;
           setUserEmail(email);
           setAvatarInitial(email?.charAt(0).toUpperCase() ?? "U");
+          if (user) {
+            const role = await detectUserRole(user);
+            if (!cancelled) setIsMerchant(role === "merchant" || role === "admin");
+          }
         }
       } catch {
         if (!cancelled) setSession(false);
@@ -236,7 +243,7 @@ export default function SettingsPage() {
             Account
           </h2>
           <div className="trend-card divide-y divide-zinc-100 dark:divide-[color:var(--tm-border)] overflow-hidden dark:bg-[color:var(--tm-surface)]">
-            {session && (
+            {session && isMerchant && (
               <>
                 <Link href="/dashboard" className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 dark:hover:bg-emerald-950/40 transition-colors">
                   <span className="flex items-center gap-3">
