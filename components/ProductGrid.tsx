@@ -297,10 +297,11 @@ const ProductCard = memo(function ProductCard({
           </p>
         ) : null}
 
-        <div className="tm-product-footer mt-auto flex items-end justify-between gap-1.5 pt-1">
-          <div className="min-w-0 flex-1">
+        <div className="tm-product-footer mt-auto flex flex-col gap-1 pt-1">
+          {/* Price — full width so it never collapses into a vertical stack */}
+          <div className="min-w-0">
             <p
-              className={`font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${
+              className={`whitespace-nowrap font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${
                 compact ? "text-[13px] sm:text-sm" : "text-sm sm:text-[15px]"
               }`}
             >
@@ -308,11 +309,11 @@ const ProductCard = memo(function ProductCard({
             </p>
             {hasDiscount && originalPrice != null ? (
               <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-                <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
+                <span className="whitespace-nowrap text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
                   {formatRupees(originalPrice)}
                 </span>
                 {discountPercent > 0 ? (
-                  <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                  <span className="whitespace-nowrap rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
                     {discountPercent}% OFF
                   </span>
                 ) : null}
@@ -320,44 +321,51 @@ const ProductCard = memo(function ProductCard({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 pb-px">
-            {onFavoriteToggle ? (
-              <button
-                type="button"
-                onClick={handleFavorite}
-                className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                  isFavorite
-                    ? "text-rose-500"
-                    : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-                }`}
-                aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-              >
-                <HeartIcon filled={isFavorite} />
-              </button>
-            ) : null}
+          {/* Actions — own row (matches DealCard): heart left, Add/Order right */}
+          {(onFavoriteToggle || (product.is_available && (onAddToCart || onOrder))) ? (
+            <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+              {onFavoriteToggle ? (
+                <button
+                  type="button"
+                  onClick={handleFavorite}
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                    isFavorite
+                      ? "text-rose-500"
+                      : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                  }`}
+                  aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <HeartIcon filled={isFavorite} />
+                </button>
+              ) : (
+                <span />
+              )}
 
-            {product.is_available && onAddToCart ? (
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                className="tm-product-add-text shrink-0 px-0.5"
-                aria-label={`Add ${product.name} to cart`}
-              >
-                Add
-              </button>
-            ) : null}
+              <div className="flex items-center gap-2.5">
+                {product.is_available && onAddToCart ? (
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    className="tm-product-add-text"
+                    aria-label={`Add ${product.name} to cart`}
+                  >
+                    Add
+                  </button>
+                ) : null}
 
-            {product.is_available && onOrder ? (
-              <button
-                type="button"
-                onClick={handleOrder}
-                className="shrink-0 text-[12px] font-bold leading-none text-emerald-600 transition-colors hover:text-emerald-700 active:opacity-75 dark:text-emerald-400 dark:hover:text-emerald-300"
-                aria-label={`Order ${product.name} now`}
-              >
-                Order
-              </button>
-            ) : null}
-          </div>
+                {product.is_available && onOrder ? (
+                  <button
+                    type="button"
+                    onClick={handleOrder}
+                    className="text-[12px] font-bold leading-none text-emerald-600 transition-colors hover:text-emerald-700 active:opacity-75 dark:text-emerald-400 dark:hover:text-emerald-300"
+                    aria-label={`Order ${product.name} now`}
+                  >
+                    Order
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </article>
@@ -371,9 +379,12 @@ function SkeletonCard() {
       <div className="tm-product-body flex flex-col gap-0.5">
         <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-        <div className="mt-auto flex items-end justify-between pt-1">
-          <div className="h-4 w-14 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          <div className="h-3 w-10 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="tm-product-footer mt-auto flex flex-col gap-1 pt-1">
+          <div className="h-4 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+          <div className="flex items-center justify-between border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+            <div className="h-5 w-5 animate-pulse rounded-full bg-zinc-100 dark:bg-zinc-800" />
+            <div className="h-3 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+          </div>
         </div>
       </div>
     </div>
