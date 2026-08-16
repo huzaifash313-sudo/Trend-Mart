@@ -202,16 +202,16 @@ body {
   padding-right: var(--safe-area-inset-right);
 }
 
-/* Main + route skeletons fill the viewport so Footer stays below the fold while loading */
+/* Main grows with content; avoid a forced near-full viewport that left a
+   huge empty band above the footer when few shops are listed. */
 .tm-main {
-  min-height: calc(
-    100dvh - var(--tm-navbar-sticky-offset, 62px) - 4.5rem
-  );
-  padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+  /* Mobile: leave clearance for fixed BottomNav (footer also pads itself) */
+  padding-bottom: 0.5rem;
 }
 @media (min-width: 768px) {
   .tm-main {
-    padding-bottom: 1.5rem;
+    padding-bottom: 0;
   }
 }
 .tm-page-loading {

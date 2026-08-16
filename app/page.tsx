@@ -434,7 +434,7 @@ function HomeInner() {
   }, [searchParams, searchQuery, router]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2.5 pb-24 md:px-4 md:py-4 md:pb-8">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2.5 pb-3 md:px-4 md:py-4 md:pb-6">
       {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
         <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">

@@ -506,27 +506,27 @@ function applySecurityHeaders(response: NextResponse): void {
   headers.set("X-Download-Options", "noopen");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
 
+  const isProd = process.env.NODE_ENV === "production";
   const cspDirectives = [
     "default-src 'self'",
     // 'unsafe-inline' is required for the inline theme/splash bootstrap scripts
-    // in app/layout.tsx. 'unsafe-eval' is intentionally OMITTED — Next.js
-    // production builds never need eval, and removing it closes the largest
-    // XSS execution vector.
-    "script-src 'self' 'unsafe-inline' https://*.supabase.co",
+    // in app/layout.tsx. 'unsafe-eval' only in development — React/Next DevTools
+    // need eval for callstacks; production CSP stays without it.
+    isProd
+      ? "script-src 'self' 'unsafe-inline' https://*.supabase.co"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     // Always allow Supabase HTTPS + Realtime WebSockets (prod was missing wss://)
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org",
+    isProd
+      ? "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org"
+      : "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org",
     "font-src 'self'",
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
   ];
-  if (process.env.NODE_ENV !== "production") {
-    cspDirectives[4] =
-      "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org";
-  }
   headers.set("Content-Security-Policy", cspDirectives.join("; "));
 }
 

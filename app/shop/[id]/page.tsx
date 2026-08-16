@@ -440,7 +440,7 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 space-y-3 px-3 py-3 pb-24 md:space-y-4 md:px-4 md:py-5 md:pb-8">
+    <div className="mx-auto w-full max-w-6xl flex-1 space-y-3 px-3 py-3 pb-3 md:space-y-4 md:px-4 md:py-5 md:pb-6">
       {shop ? (
         <>
           <LocalBusinessSchema

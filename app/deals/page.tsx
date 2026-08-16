@@ -209,7 +209,7 @@ function DealsInner() {
           : "active";
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-28 md:px-4 md:py-5 md:pb-10">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-3 md:px-4 md:py-5 md:pb-8">
       <header className="mb-3">
         <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
           Marketplace deals

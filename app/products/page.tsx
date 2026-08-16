@@ -643,7 +643,7 @@ function ProductsPageInner() {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-28 md:px-4 md:py-5 md:pb-10">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-3 md:px-4 md:py-5 md:pb-8">
       {/* Search — products only; no deal-match chrome */}
       <form onSubmit={handleSearchSubmit} className="mb-3">
         <label className="relative block">
