@@ -32,8 +32,8 @@ export default function RecentlyViewedStrip() {
   if (items.length === 0) return null;
 
   return (
-    <section aria-label="Recently viewed" className="mb-5 sm:mb-6">
-      <div className="mb-2 flex items-center gap-1.5">
+    <section aria-label="Recently viewed">
+      <div className="mb-1 flex items-center gap-1.5">
         <span className="text-teal-600 dark:text-teal-400">
           <ClockIcon />
         </span>
@@ -41,7 +41,7 @@ export default function RecentlyViewedStrip() {
           Recently viewed
         </h2>
       </div>
-      <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-1 scrollbar-none sm:-mx-4 sm:px-4">
+      <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-0 scrollbar-none sm:-mx-4 sm:px-4">
         {items.map((item) => (
           <Link
             key={item.id}

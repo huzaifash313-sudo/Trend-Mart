@@ -232,6 +232,10 @@ export default function BottomNav() {
     router.push("/login?redirect=/account/become-merchant");
   };
 
+  const isAuthRoute = pathname === "/login" || pathname === "/signup";
+
+  if (isAuthRoute) return null;
+
   // Merchants: Add / Post. Shoppers: clear “Store” (open a shop), not confusing “Sell”.
   // While auth resolves (session === null), default to the most common label so the
   // button never flips Store → Post → Add on every load/refresh.

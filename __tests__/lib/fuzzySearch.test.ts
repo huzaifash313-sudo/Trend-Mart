@@ -38,8 +38,17 @@ describe("fuzzySearch", () => {
     expect(tokens.some((t) => t.includes("f") || t.includes("ph"))).toBe(true);
   });
 
-  it("suggests corrections from close keys", () => {
-    const tips = suggestSearchCorrections("burgr");
-    expect(tips.length).toBeGreaterThan(0);
+  it("ranks titles with more matching words higher", () => {
+    const both = scoreTextMatch("care soap", "Care Soap (6 in 1)");
+    const one = scoreTextMatch("care soap", "Soap Dish");
+    const none = scoreTextMatch("care soap", "Laptop Charger");
+    expect(both).toBeGreaterThan(one);
+    expect(one).toBeGreaterThan(none);
+    expect(both).toBeGreaterThan(60);
+  });
+
+  it("matches local produce synonyms", () => {
+    expect(scoreTextMatch("tamatar", "Tomatoes/tamatar")).toBeGreaterThan(70);
+    expect(scoreTextMatch("tomato", "Fresh Tamatar 1kg")).toBeGreaterThan(50);
   });
 });

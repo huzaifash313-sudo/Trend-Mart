@@ -22,6 +22,7 @@ import {
   useRef,
   type FormEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createOrder } from "@/services/orderService";
@@ -399,6 +400,8 @@ export default function WhatsAppCheckoutModal({
   const [autofilledFromAccount, setAutofilledFromAccount] = useState(false);
   const [locationFillError, setLocationFillError] = useState<string | null>(null);
   const [locationFillBusy, setLocationFillBusy] = useState(false);
+  // Portal only after mount so fixed overlay escapes transform ancestors (deals carousel).
+  const [portalReady, setPortalReady] = useState(false);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
@@ -598,6 +601,10 @@ export default function WhatsAppCheckoutModal({
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    setPortalReady(true);
   }, []);
 
   // ── Auto-fill from saved delivery address + profile ────────────────────
@@ -1010,9 +1017,11 @@ export default function WhatsAppCheckoutModal({
     finishOrder();
   }, [pendingWhatsAppUrl, finishOrder]);
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Render (portal to body so transform/overflow ancestors can't clip) ──
 
-  return (
+  if (!portalReady) return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[150] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={step === "success" ? undefined : onClose}
@@ -1688,6 +1697,7 @@ export default function WhatsAppCheckoutModal({
         )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -43,7 +43,7 @@ const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
 });
 const FeaturedDealsStrip = dynamic(() => import("@/components/FeaturedDealsStrip"), {
-  loading: () => <div className="h-40 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />,
+  loading: () => <div className="h-36 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />,
 });
 const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
   loading: () => null,
@@ -434,7 +434,7 @@ function HomeInner() {
   }, [searchParams, searchQuery, router]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-24 md:px-4 md:py-5 md:pb-8">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2.5 pb-24 md:px-4 md:py-4 md:pb-8">
       {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
         <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
@@ -462,15 +462,15 @@ function HomeInner() {
       </section>
 
       {/* Stories — first content under category tabs */}
-      <section aria-label="Merchant stories" className="mt-1 mb-3">
-        <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0.5 scrollbar-none">
+      <section aria-label="Merchant stories">
+        <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0 scrollbar-none">
           {myShop ? (
             <button
               type="button"
               onClick={() =>
                 openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" })
               }
-              className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               aria-label="Add your store story"
             >
               <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
@@ -485,7 +485,7 @@ function HomeInner() {
           ) : null}
 
           {storiesQuery.isLoading ? (
-            <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5">
+            <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
               <div className="h-[3.35rem] w-[3.35rem] animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
             </div>
           ) : stories.length === 0 && !myShop ? (
@@ -506,7 +506,7 @@ function HomeInner() {
                     setSelectedStoryIndex(i);
                     setStoryViewerOpen(true);
                   }}
-                  className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                   aria-label={`${label} story${seen ? " (viewed)" : ""}`}
                 >
                   <div
@@ -543,7 +543,7 @@ function HomeInner() {
             })
           )}
         </div>
-        <p className="mt-1 px-0.5 text-[0.55rem] font-medium uppercase tracking-wider text-zinc-400/80 dark:text-zinc-500">
+        <p className="mt-0.5 px-0.5 text-[0.55rem] font-medium uppercase tracking-wider text-zinc-400/80 dark:text-zinc-500">
           Stories
         </p>
       </section>
@@ -560,7 +560,7 @@ function HomeInner() {
       )}
 
       {/* Deals block — day chips + cards together (not split by Stories) */}
-      <section aria-label="Featured deals" className="mb-5 space-y-2 sm:mb-6">
+      <section aria-label="Featured deals" className="space-y-1.5">
         <OfferDaysStrip
           deals={activeDeals}
           selectedDateKey={offerDateKey}
@@ -591,7 +591,7 @@ function HomeInner() {
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="mb-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-[1.05rem]">

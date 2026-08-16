@@ -173,10 +173,31 @@ function ProductsPageInner() {
 
   // Deep-link: open the quick view for a ?product=<id> in the URL.
   useEffect(() => {
-    if (productParam && products.length > 0) {
-      const match = products.find((p) => p.id === productParam);
-      if (match) setQuickView(match);
+    if (!productParam) return;
+    const match = products.find((p) => p.id === productParam);
+    if (match) {
+      setQuickView(match);
+      return;
     }
+    let cancelled = false;
+    void (async () => {
+      const { fetchMarketplaceProductById } = await import("@/services/productService");
+      const res = await fetchMarketplaceProductById(productParam);
+      if (cancelled || !res.success || !res.data) return;
+      setQuickView(res.data);
+      trackProductView({
+        id: res.data.id,
+        name: res.data.name,
+        price: res.data.price,
+        imageUrl: res.data.image_url,
+        shopId: res.data.shop_id,
+        shopName: res.data.shop_name,
+        category: res.data.shop_category ?? res.data.category_id ?? null,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [productParam, products]);
 
   // Invalidate cached queries when merchants publish/update in other tabs.

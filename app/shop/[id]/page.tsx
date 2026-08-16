@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/types";
 import { logShopView } from "@/services/analyticsService";
-import { trackCategoryInterest } from "@/lib/behavior";
+import { trackCategoryInterest, trackProductView } from "@/lib/behavior";
 import { useLocation } from "@/context/LocationContext";
 import { isCustomerWithinCoverage } from "@/services/geoRadiusService";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -362,7 +362,16 @@ function ShopDetailInner({ id }: { id: string }) {
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleProductClick = useCallback((product: Product) => {
     setQuickViewProduct(product);
-  }, []);
+    trackProductView({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      imageUrl: product.image_url,
+      shopId: shop?.id,
+      shopName: shop?.name,
+      category: shop?.category ?? product.category_id ?? null,
+    });
+  }, [shop]);
 
   const handleAddToCart = useCallback((product: Product) => {
     if (!shop) return;
@@ -467,7 +476,18 @@ function ShopDetailInner({ id }: { id: string }) {
                     href={`${getShopPath(shop)}#deal-${deal.id}`}
                     shopWhatsapp={shop.whatsapp_number}
                     offerTags={shopDealOfferTags}
-                    onOpen={() => setQuickViewDeal(deal)}
+                    onOpen={() => {
+                      setQuickViewDeal(deal);
+                      trackProductView({
+                        id: deal.product_id && deal.product_id.length > 10 ? deal.product_id : deal.id,
+                        name: deal.title,
+                        price: Number(deal.price) || 0,
+                        imageUrl: deal.image_url,
+                        shopId: shop.id,
+                        shopName: shop.name,
+                        category: shop.category ?? null,
+                      });
+                    }}
                   />
                 </div>
               ))}

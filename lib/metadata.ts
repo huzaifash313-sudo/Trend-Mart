@@ -83,7 +83,7 @@ export function generateRootMetadata(): Metadata {
     manifest: "/manifest.webmanifest",
     appleWebApp: {
       capable: true,
-      statusBarStyle: "default",
+      statusBarStyle: "black-translucent",
       title: SITE_NAME,
     },
     icons: {

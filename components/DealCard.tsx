@@ -15,9 +15,11 @@ import { OfferTickerMarquee } from "@/components/ProductGrid";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { useCart } from "@/context/CartContext";
 import { toggleFavorite } from "@/services/wishlistService";
+import { fetchShopById } from "@/services/shopService";
 import type { Product, Shop } from "@/types";
 import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import { useToast } from "@/components/Toast";
+import { trackProductView } from "@/lib/behavior";
 
 // Lazy-load the heavy checkout form — it's only needed when a shopper actually
 // taps "Order", so it should never be in the deals-list bundle.
@@ -96,6 +98,8 @@ function DealCard({
   const [imgError, setImgError] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
+  const [orderBusy, setOrderBusy] = useState(false);
 
   const activeUrl = gallery[Math.min(imgIndex, Math.max(gallery.length - 1, 0))] ?? null;
   const safeSrc =
@@ -176,7 +180,7 @@ function DealCard({
     window.dispatchEvent(new Event("favoritesUpdated"));
   };
 
-  const handleOrder = (e: MouseEvent) => {
+  const handleOrder = async (e: MouseEvent) => {
     stop(e);
     if (!canOrderToday) {
       addToast(`Order opens on ${whenTag}. Cart & wishlist still work.`, "info");
@@ -192,7 +196,44 @@ function DealCard({
       goStore();
       return;
     }
-    setCheckoutOpen(true);
+    if (orderBusy) return;
+    setOrderBusy(true);
+
+    // Seed cart so login/verify can resume checkout via CartBar.
+    addItem(product, shopPick, 1);
+    trackProductView({
+      id: product.id,
+      name: deal.title,
+      price: Number(deal.price) || 0,
+      imageUrl: gallery[0] ?? null,
+      shopId: deal.shop_id,
+      shopName: deal.shop_name,
+      category: null,
+    });
+
+    const fallback = {
+      id: deal.shop_id,
+      name: deal.shop_name || "Store",
+      whatsapp_number: shopPick.whatsapp_number,
+      location: "",
+    } as Shop;
+    setResolvedShop(fallback);
+
+    try {
+      const res = await fetchShopById(deal.shop_id);
+      if (res.success && res.data.shop) {
+        setResolvedShop({
+          ...res.data.shop,
+          whatsapp_number: res.data.shop.whatsapp_number || shopPick.whatsapp_number,
+          name: res.data.shop.name || deal.shop_name || "Store",
+        });
+      }
+    } catch {
+      /* keep fallback */
+    } finally {
+      setOrderBusy(false);
+      setCheckoutOpen(true);
+    }
   };
 
   const checkoutItems: WhatsAppCartItem[] = [
@@ -213,19 +254,18 @@ function DealCard({
   const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
   const priceLabel = hasPrice ? formatDealPrice(Number(deal.price)) : null;
 
-  const checkoutModal = checkoutOpen ? (
+  const checkoutModal = checkoutOpen && resolvedShop ? (
     <WhatsAppCheckoutModal
       items={checkoutItems}
-      shop={
-        {
-          id: deal.shop_id,
-          name: deal.shop_name || "Store",
-          whatsapp_number: shopPick.whatsapp_number,
-          location: "",
-        } as Shop
-      }
-      onClose={() => setCheckoutOpen(false)}
-      onOrderPlaced={() => setCheckoutOpen(false)}
+      shop={resolvedShop}
+      onClose={() => {
+        setCheckoutOpen(false);
+        setResolvedShop(null);
+      }}
+      onOrderPlaced={() => {
+        setCheckoutOpen(false);
+        setResolvedShop(null);
+      }}
     />
   ) : null;
 
@@ -268,7 +308,7 @@ function DealCard({
                 onError={() => setImgError(true)}
               />
             ) : (
-              <div className="tm-home-deal-media-fallback flex h-full min-h-[10rem] w-full items-center justify-center">
+              <div className="tm-home-deal-media-fallback flex h-full min-h-[8.5rem] w-full items-center justify-center">
                 <span className="select-none text-3xl font-semibold tracking-tight text-white/35">
                   {deal.title.charAt(0).toUpperCase()}
                 </span>
@@ -283,8 +323,8 @@ function DealCard({
             ) : null}
           </div>
 
-          <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-2.5 p-3.5 sm:p-4 md:p-5">
-            <div className="min-w-0 space-y-2">
+          <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-1.5 p-3 sm:gap-2 sm:p-3.5 md:p-4">
+            <div className="min-w-0 space-y-1.5">
               <h3 className="tm-home-deal-name line-clamp-2" title={deal.title}>
                 {deal.title}
               </h3>
@@ -316,7 +356,7 @@ function DealCard({
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-end justify-between gap-2.5">
+            <div className="flex flex-wrap items-end justify-between gap-2">
               <div className="min-w-0">
                 {hasPrice && priceLabel ? (
                   <>
@@ -329,7 +369,7 @@ function DealCard({
                   <p className="tm-home-deal-meta">{whenTag}</p>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={handleWishlist}
@@ -349,7 +389,7 @@ function DealCard({
                 <button
                   type="button"
                   onClick={handleOrder}
-                  disabled={!canOrderToday}
+                  disabled={!canOrderToday || orderBusy}
                   title={canOrderToday ? "Order via WhatsApp" : `Order on ${whenTag}`}
                   className={`tm-home-deal-order ${
                     canOrderToday ? "" : "tm-home-deal-order--disabled"
@@ -539,7 +579,7 @@ function DealCard({
               <button
                 type="button"
                 onClick={handleOrder}
-                disabled={!canOrderToday}
+                disabled={!canOrderToday || orderBusy}
                 title={canOrderToday ? "Order via WhatsApp" : `Order on ${whenTag}`}
                 className={`text-[12px] font-bold leading-none transition ${
                   canOrderToday

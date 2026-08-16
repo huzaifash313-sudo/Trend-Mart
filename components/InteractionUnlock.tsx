@@ -57,7 +57,13 @@ export default function InteractionUnlock() {
     const unlock = () => {
       const root = document.documentElement;
       // Class-only unlock. Never Node.remove() React-owned splash nodes.
-      root.classList.remove("tm-splash-lock", "tm-boot-splash", "tm-first-paint");
+      root.classList.remove(
+        "tm-splash-lock",
+        "tm-boot-splash",
+        "tm-first-paint",
+        "tm-splash-handoff",
+        "tm-splash-settle",
+      );
     };
 
     const splashStillPlaying = () => Boolean(document.querySelector(".tm-splash"));

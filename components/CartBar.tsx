@@ -123,8 +123,24 @@ export default function CartBar() {
   const [expanded, setExpanded] = useState(false);
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
   const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const shopGroups = useMemo(() => groupItemsByShop(items), [items]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const check = () => {
+      setKeyboardOpen(window.innerHeight - vv.height > 150);
+    };
+    check();
+    vv.addEventListener("resize", check);
+    window.addEventListener("resize", check);
+    return () => {
+      vv.removeEventListener("resize", check);
+      window.removeEventListener("resize", check);
+    };
+  }, []);
 
   // After login/verify — reopen first shop checkout if cart still has items
   useEffect(() => {
@@ -164,7 +180,15 @@ export default function CartBar() {
     };
   }, [checkoutShop]);
 
-  if (pathname === "/offline" || totalItems === 0) return null;
+  if (
+    pathname === "/offline" ||
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    totalItems === 0 ||
+    keyboardOpen
+  ) {
+    return null;
+  }
 
   const checkoutItems: WhatsAppCartItem[] = (checkoutShop?.items ?? []).map((i) => ({
     id: i.id,

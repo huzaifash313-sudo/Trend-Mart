@@ -17,6 +17,8 @@
   --tm-accent-soft: #059669;
   --tm-sea: #14b8a6; /* sea green */
   --tm-sea-deep: #0f766e;
+  /* Exact PWA / splash brand plate — never flash stark white behind boot */
+  --tm-splash-bg: #0f766e;
   --tm-brand-gradient: linear-gradient(135deg, #10b981 0%, #0d9488 52%, #14b8a6 100%);
   --tm-brand-gradient-hover: linear-gradient(135deg, #059669 0%, #0f766e 55%, #2dd4bf 100%);
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -178,10 +180,15 @@ html {
   -webkit-tap-highlight-color: transparent;
   /* auto — smooth scroll makes route changes flash the footer before jumping up */
   scroll-behavior: auto;
+  /*
+   * Brand plate on the root canvas: PWA cold-start, overscroll, and any gap
+   * before body paints stay teal — never browser-default white.
+   */
+  background-color: var(--tm-splash-bg);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans, Arial, Helvetica, sans-serif);
   -webkit-font-smoothing: antialiased;
@@ -1244,7 +1251,7 @@ html.dark .tm-home-deals-nav-btn {
      is a horizontal transform carousel, and content-visibility skips painting
      off-screen cards — so the next card slid in as a blank/white box ("content
      goes behind, never comes forward"). These cards must always paint. */
-  min-height: 10.25rem;
+  min-height: 8.6rem;
   border-radius: 1.1rem;
   border: 1px solid rgba(28, 25, 23, 0.08);
   background: #fff;
@@ -1256,7 +1263,7 @@ html.dark .tm-home-deals-nav-btn {
 @media (min-width: 640px) {
   /* Editorial split only when the card is wide enough (single-slot phone). */
   .tm-home-deal-card {
-    min-height: 12rem;
+    min-height: 10.25rem;
   }
 }
 html.dark .tm-home-deal-card {
@@ -1272,8 +1279,13 @@ html.dark .tm-home-deal-card {
 }
 
 .tm-home-deal-media {
-  min-height: 10.25rem;
+  min-height: 8.6rem;
   background: #1c1917;
+}
+@media (min-width: 640px) {
+  .tm-home-deal-media {
+    min-height: 10.25rem;
+  }
 }
 .tm-home-deal-media-fallback {
   background: linear-gradient(145deg, #292524 0%, #1c1917 55%, #44403c 100%);
@@ -1308,9 +1320,9 @@ html.dark .tm-home-deal-card {
 
 .tm-home-deal-name {
   margin: 0;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.22;
   letter-spacing: -0.025em;
   color: #1c1917;
 }
@@ -1319,12 +1331,12 @@ html.dark .tm-home-deal-name {
 }
 @media (min-width: 640px) {
   .tm-home-deal-name {
-    font-size: 1.08rem;
+    font-size: 1.02rem;
   }
 }
 @media (min-width: 768px) {
   .tm-home-deal-name {
-    font-size: 1.15rem;
+    font-size: 1.1rem;
   }
 }
 
@@ -1393,8 +1405,9 @@ html.dark .tm-home-deal-price {
 
 .tm-home-deal-icon {
   display: inline-flex;
-  height: 2.15rem;
-  width: 2.15rem;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -1415,10 +1428,13 @@ html.dark .tm-home-deal-icon {
 }
 
 .tm-home-deal-add {
+  flex-shrink: 0;
   border-radius: 999px;
-  padding: 0.42rem 0.75rem;
-  font-size: 0.78rem;
+  padding: 0.38rem 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
   color: #1c1917;
   background: transparent;
   border: 1px solid rgba(28, 25, 23, 0.16);
@@ -1437,10 +1453,14 @@ html.dark .tm-home-deal-add:hover {
 }
 
 .tm-home-deal-order {
+  flex-shrink: 0;
   border-radius: 999px;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.78rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.72rem;
   font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   color: #fafaf9;
   background: #1c1917;
   box-shadow: 0 8px 20px rgba(28, 25, 23, 0.22);
@@ -1471,7 +1491,7 @@ html.dark .tm-home-deal-order--disabled {
 }
 
 .tm-home-deals-progress {
-  margin-top: 0.75rem;
+  margin-top: 0.4rem;
   height: 2px;
   width: 100%;
   overflow: hidden;
@@ -2378,15 +2398,15 @@ html.dark .tm-cat-tab.is-active {
   }
 }
 
-/* Tighter page stacks on mobile */
+/* Tighter page stacks on mobile — avoid double gap + section margins */
 .page-stack {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.55rem;
 }
 @media (min-width: 640px) {
   .page-stack {
-    gap: 1.25rem;
+    gap: 0.85rem;
   }
 }
 
@@ -2655,11 +2675,36 @@ html.layout-gallery,
 /*  App splash / brand landing                                                 */
 /* -------------------------------------------------------------------------- */
 html.tm-splash-lock,
-html.tm-splash-lock body {
-  overflow: hidden !important;
+html.tm-splash-lock body,
+html.tm-splash-lock .tm-bg,
+html.tm-splash-lock .tm-main,
+html.tm-splash-handoff:not(.tm-splash-settle),
+html.tm-splash-handoff:not(.tm-splash-settle) body,
+html.tm-splash-handoff:not(.tm-splash-settle) .tm-bg,
+html.tm-splash-handoff:not(.tm-splash-settle) .tm-main {
   /* Keep the teal splash color behind the body so the boot → React splash
      handoff never flashes white (the app bg is near-white). */
-  background-color: #0f766e;
+  background-color: var(--tm-splash-bg) !important;
+  background-image: none !important;
+}
+
+html.tm-splash-lock,
+html.tm-splash-lock body {
+  overflow: hidden !important;
+}
+
+/* After overlay unmounts: ease teal → app surface (no stark white snap). */
+html.tm-splash-settle body,
+html.tm-splash-settle .tm-bg,
+html.tm-splash-settle .tm-main {
+  transition: background-color 0.45s ease;
+  background-color: var(--tm-bg) !important;
+}
+
+html.dark.tm-splash-settle body,
+html.dark.tm-splash-settle .tm-bg,
+html.dark.tm-splash-settle .tm-main {
+  background-color: var(--tm-bg) !important;
 }
 
 /* Instant cover before React hydrates — kills homepage flash */
@@ -2729,7 +2774,8 @@ html.tm-first-paint .tm-boot-splash {
 }
 
 .tm-splash--exit {
-  animation: tm-splash-fade-out 0.5s ease forwards;
+  /* Must stay in sync with AppSplash STAGE_MS.exit (520ms). */
+  animation: tm-splash-fade-out 0.52s ease forwards;
   pointer-events: none;
 }
 
@@ -3105,7 +3151,8 @@ html.tm-first-paint .tm-boot-splash {
 }
 
 @keyframes tm-splash-fade-out {
-  to { opacity: 0; transform: scale(1.02); }
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.015); }
 }
 
 @keyframes tm-splash-glow {

@@ -44,6 +44,20 @@ const SYNONYMS: Record<string, string[]> = {
   daal: ["daal", "dal", "lentils"],
   masala: ["masala", "spices"],
   sabzi: ["sabzi", "vegetables"],
+  soap: ["soap", "sabun"],
+  sabun: ["sabun", "soap"],
+  tomato: ["tomato", "tomatoes", "tamatar"],
+  tomatoes: ["tomatoes", "tomato", "tamatar"],
+  tamatar: ["tamatar", "tomato", "tomatoes"],
+  onion: ["onion", "pyaz", "piyaz"],
+  pyaz: ["pyaz", "piyaz", "onion"],
+  potato: ["potato", "aloo", "alu"],
+  aloo: ["aloo", "alu", "potato"],
+  oil: ["oil", "tel"],
+  tel: ["tel", "oil"],
+  water: ["water", "pani"],
+  pani: ["pani", "water"],
+  bread: ["bread", "roti", "double roti"],
   // Deal day / date search
   monday: ["monday", "mon", "monday deal"],
   tuesday: ["tuesday", "tue", "tuesday deal"],
@@ -145,7 +159,7 @@ function phoneticVariants(token: string): string[] {
  * Expand a user query into search tokens / phrases for ILIKE + ranking.
  * Order: original phrase, words, synonyms, phonetics.
  */
-export function expandSearchQuery(query: string, maxTokens = 8): string[] {
+export function expandSearchQuery(query: string, maxTokens = 12): string[] {
   const q = normalizeSearchText(query);
   if (!q) return [];
 
@@ -208,8 +222,58 @@ export function levenshtein(a: string, b: string): number {
 }
 
 /**
+ * Score one query-token against one text-token (0–100).
+ * Exact > prefix > contains > synonym > edit-distance.
+ */
+function scoreTokenPair(queryToken: string, textToken: string): number {
+  const qw = normalizeSearchText(queryToken);
+  const tw = normalizeSearchText(textToken);
+  if (!qw || !tw) return 0;
+
+  const variants = [qw, ...(SYNONYMS[qw] ?? []).map(normalizeSearchText)];
+  let best = 0;
+
+  for (const v of variants) {
+    if (!v) continue;
+    if (tw === v) best = Math.max(best, 100);
+    else if (tw.startsWith(v) || v.startsWith(tw)) best = Math.max(best, 86);
+    else if (tw.includes(v) || v.includes(tw)) best = Math.max(best, 72);
+    else {
+      const dist = levenshtein(v, tw);
+      const maxLen = Math.max(v.length, tw.length);
+      const ratio = maxLen ? dist / maxLen : 1;
+      if (ratio <= 0.34 && Math.min(v.length, tw.length) >= 3) {
+        best = Math.max(best, clamp(68 - ratio * 40));
+      } else if (ratio <= 0.45 && Math.min(v.length, tw.length) >= 4) {
+        best = Math.max(best, clamp(52 - ratio * 30));
+      }
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Best score for one query word against full text (tokens + substring).
+ */
+function scoreQueryWordAgainstText(qw: string, text: string, tWords: string[]): number {
+  let best = 0;
+  for (const tw of tWords) {
+    best = Math.max(best, scoreTokenPair(qw, tw));
+  }
+  // Substring / contains against whole title (e.g. "soap" in "care soap pack")
+  const variants = [qw, ...(SYNONYMS[qw] ?? []).map(normalizeSearchText)];
+  for (const v of variants) {
+    if (!v || v.length < 2) continue;
+    if (text.includes(v)) best = Math.max(best, clamp(78 + Math.min(8, v.length)));
+  }
+  return best;
+}
+
+/**
  * Score how well `text` matches `query` (0–100).
  * Exact and prefix beat fuzzy/typo matches.
+ * Multi-word queries rank by how many words match ("most match words").
  */
 export function scoreTextMatch(query: string, text: string): number {
   const q = normalizeSearchText(query);
@@ -217,40 +281,28 @@ export function scoreTextMatch(query: string, text: string): number {
   if (!q || !t) return 0;
 
   if (t === q) return 100;
-  if (t.startsWith(q)) return clamp(92 + Math.min(6, (q.length / t.length) * 8));
-  if (t.includes(q)) return clamp(78 + Math.min(10, (q.length / t.length) * 12));
+  if (t.startsWith(q)) return clamp(94 + Math.min(5, (q.length / t.length) * 6));
+  if (t.includes(q)) return clamp(82 + Math.min(10, (q.length / t.length) * 12));
 
-  const qWords = q.split(" ");
-  const tWords = t.split(" ");
+  const qWords = q.split(" ").filter(Boolean);
+  const tWords = t.split(" ").filter(Boolean);
+  if (!qWords.length) return 0;
 
-  // All query words present as substrings
-  if (qWords.every((w) => t.includes(w))) {
-    return clamp(72 + qWords.length * 3);
+  // Per-query-word best hit — prefer titles that match MORE words
+  const wordScores = qWords.map((qw) => scoreQueryWordAgainstText(qw, t, tWords));
+  const matched = wordScores.filter((s) => s >= 50);
+  const matchRatio = matched.length / qWords.length;
+  const avgMatched =
+    matched.length > 0
+      ? matched.reduce((a, b) => a + b, 0) / matched.length
+      : 0;
+
+  if (matched.length > 0) {
+    // All words hit → strong; partial → scales with how many matched
+    const coverageBoost = matchRatio * 28;
+    const multiWordBonus = matched.length > 1 ? matched.length * 4 : 0;
+    return clamp(Math.round(avgMatched * 0.62 + coverageBoost + multiWordBonus));
   }
-
-  // Any word prefix / synonym hit
-  let bestWord = 0;
-  for (const qw of qWords) {
-    const variants = [qw, ...(SYNONYMS[qw] ?? []).map(normalizeSearchText)];
-    for (const v of variants) {
-      for (const tw of tWords) {
-        if (tw === v) bestWord = Math.max(bestWord, 88);
-        else if (tw.startsWith(v) || v.startsWith(tw)) bestWord = Math.max(bestWord, 70);
-        else if (tw.includes(v) || v.includes(tw)) bestWord = Math.max(bestWord, 58);
-        else {
-          const dist = levenshtein(v, tw);
-          const maxLen = Math.max(v.length, tw.length);
-          const ratio = maxLen ? dist / maxLen : 1;
-          if (ratio <= 0.34 && Math.min(v.length, tw.length) >= 3) {
-            bestWord = Math.max(bestWord, clamp(62 - ratio * 40));
-          } else if (ratio <= 0.45 && Math.min(v.length, tw.length) >= 4) {
-            bestWord = Math.max(bestWord, clamp(48 - ratio * 30));
-          }
-        }
-      }
-    }
-  }
-  if (bestWord > 0) return bestWord;
 
   // Whole-string edit distance (short queries vs short titles)
   const window = t.slice(0, Math.max(q.length + 4, Math.min(t.length, q.length * 2)));
@@ -306,9 +358,11 @@ export function fuzzyFilterAndRank<T>(
 
   ranked.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    // Prefer shorter titles when scores tie (closer "most match" feel)
     const an = String(getFields(a.item)[0] ?? "");
     const bn = String(getFields(b.item)[0] ?? "");
-    return an.length - bn.length;
+    if (an.length !== bn.length) return an.length - bn.length;
+    return an.localeCompare(bn);
   });
 
   if (options?.limit != null) return ranked.slice(0, options.limit);

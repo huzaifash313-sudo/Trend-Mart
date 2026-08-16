@@ -20,6 +20,7 @@ import { useDeals, useShopCoupons, useShopDeliveryMeta } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@/lib/fuzzySearch";
+import { trackProductView } from "@/lib/behavior";
 import DealDayDateFilter from "@/components/DealDayDateFilter";
 
 const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
@@ -368,7 +369,19 @@ function DealsInner() {
               deal={deal}
               priority={i < 2}
               offerTags={getOfferTags(deal.shop_id)}
-              onOpen={() => setQuickViewDeal(deal)}
+              onOpen={() => {
+                setQuickViewDeal(deal);
+                const p = dealToProduct(deal);
+                trackProductView({
+                  id: p.id,
+                  name: deal.title,
+                  price: Number(deal.price) || 0,
+                  imageUrl: deal.image_url,
+                  shopId: deal.shop_id,
+                  shopName: deal.shop_name,
+                  category: null,
+                });
+              }}
             />
           ))}
         </div>

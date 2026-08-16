@@ -437,7 +437,7 @@ async function topUpMarketplaceDiversity(
   if (opts.subCategoryId) builder = builder.eq("sub_category_id", opts.subCategoryId);
 
   const fuzzyOr = opts.query
-    ? buildFuzzyIlikeOr(opts.query, ["name", "title"], 6)
+    ? buildFuzzyIlikeOr(opts.query, ["name", "title"], 10)
     : null;
   if (fuzzyOr) {
     builder = builder.or(fuzzyOr);
@@ -509,7 +509,7 @@ export async function fetchMarketplaceProducts(
 
     const q = query.trim();
     if (q) {
-      const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 6);
+      const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 10);
       if (fuzzyOr) {
         builder = builder.or(fuzzyOr);
       } else {
@@ -543,7 +543,7 @@ export async function fetchMarketplaceProducts(
         .range(start, start + pageSize - 1);
       if (availableOnly) legacy = legacy.eq("is_available", true);
       if (q) {
-        const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 6);
+        const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 10);
         if (fuzzyOr) {
           legacy = legacy.or(fuzzyOr);
         } else {
@@ -645,6 +645,47 @@ export async function fetchMarketplaceProducts(
     return { success: true, data: sortMarketplaceProducts(items, sort) };
   } catch (err) {
     logError(err, { module: "productService.fetchMarketplaceProducts", meta: { ...filters } });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/** Single marketplace product by id (deep-links / recently viewed). */
+export async function fetchMarketplaceProductById(
+  productId: string,
+): Promise<ServiceResult<MarketplaceProduct | null>> {
+  if (!productId || !isValidUUID(productId)) {
+    return { success: true, data: null };
+  }
+  const supabase = createClient();
+  try {
+    const primary = await supabase
+      .from("products")
+      .select(MARKETPLACE_SELECT)
+      .eq("id", productId)
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved")
+      .maybeSingle();
+
+    let row: Record<string, unknown> | null =
+      (primary.data as Record<string, unknown> | null) ?? null;
+    let error = primary.error;
+
+    if (error && isMissingRatingColumnError(error)) {
+      const legacy = await supabase
+        .from("products")
+        .select(MARKETPLACE_SELECT_LEGACY)
+        .eq("id", productId)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .maybeSingle();
+      row = (legacy.data as Record<string, unknown> | null) ?? null;
+      error = legacy.error;
+    }
+    if (error) throw error;
+    if (!row) return { success: true, data: null };
+    return { success: true, data: mapMarketplaceRow(row) };
+  } catch (err) {
+    logError(err, { module: "productService.fetchMarketplaceProductById", meta: { productId } });
     return { success: false, error: toError(err) };
   }
 }

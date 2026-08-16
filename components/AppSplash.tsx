@@ -31,7 +31,8 @@ const STAGE_MS = {
   brand: 550,
   details: 600,
   holdMin: 900,
-  exit: 450,
+  /** Keep in sync with `.tm-splash--exit` animation duration in globals.css */
+  exit: 520,
   /** Never block home forever if network is slow. */
   maxWaitForData: 1200,
 };
@@ -41,7 +42,7 @@ const REDUCED_MS = {
   brand: 120,
   details: 120,
   holdMin: 280,
-  exit: 180,
+  exit: 220,
   maxWaitForData: 280,
 };
 
@@ -82,6 +83,21 @@ function clearSplashChrome() {
     "tm-boot-splash",
     "tm-first-paint",
   );
+}
+
+/** Hold brand green under the UI, then ease into the app surface (no white snap). */
+function releaseSplashBackground() {
+  const root = document.documentElement;
+  root.classList.add("tm-splash-handoff");
+  clearSplashChrome();
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      root.classList.add("tm-splash-settle");
+      window.setTimeout(() => {
+        root.classList.remove("tm-splash-handoff", "tm-splash-settle");
+      }, 480);
+    });
+  });
 }
 
 async function unwrap<T>(
@@ -137,7 +153,7 @@ export default function AppSplash() {
     if (finishedRef.current) return;
     finishedRef.current = true;
     markSplashSeen();
-    clearSplashChrome();
+    releaseSplashBackground();
     setPhase("off");
   };
 
@@ -159,6 +175,10 @@ export default function AppSplash() {
     if (!shouldShowSplash(pathname)) {
       // Returning visit / refresh / other route: drop any leftover boot cover.
       clearSplashChrome();
+      document.documentElement.classList.remove(
+        "tm-splash-handoff",
+        "tm-splash-settle",
+      );
       setPhase("off");
       return;
     }

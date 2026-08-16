@@ -17,6 +17,7 @@ import {
   type ShopDeal,
 } from "@/lib/dealSchedule";
 import { getDealImages } from "@/lib/productImages";
+import { trackProductView } from "@/lib/behavior";
 import type { Product, Shop } from "@/types";
 
 interface FeaturedDealsStripProps {
@@ -229,6 +230,16 @@ function HomeShiftShelf({
   const openDealCard = useCallback((deal: ShopDeal) => {
     setPaused(true);
     setOpenDeal(deal);
+    const product = dealToQuickProduct(deal);
+    trackProductView({
+      id: product.id,
+      name: deal.title,
+      price: Number(deal.price) || 0,
+      imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
+      shopId: deal.shop_id,
+      shopName: deal.shop_name,
+      category: null,
+    });
   }, []);
 
   const go = useCallback(
@@ -326,7 +337,7 @@ function HomeShiftShelf({
 
   return (
     <section aria-label={title} className={`tm-home-deals ${className ?? ""}`}>
-      <div className="tm-home-deals-head mb-3 flex items-end justify-between gap-3">
+      <div className="tm-home-deals-head mb-1.5 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="tm-home-deals-kicker">Spotlight</p>
           <h2 className="tm-home-deals-title truncate">{title}</h2>
@@ -641,6 +652,16 @@ function MarqueeShelf({
               if (movedRef.current) return;
               pauseAuto(8000);
               setOpenDeal(deal);
+              const product = dealToQuickProduct(deal);
+              trackProductView({
+                id: product.id,
+                name: deal.title,
+                price: Number(deal.price) || 0,
+                imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
+                shopId: deal.shop_id,
+                shopName: deal.shop_name,
+                category: null,
+              });
             }}
           />
         </div>
