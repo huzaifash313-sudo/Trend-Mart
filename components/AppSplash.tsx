@@ -88,13 +88,65 @@ function clearSplashChrome() {
 /** Hold brand green under the UI, then ease into the app surface (no white snap). */
 function releaseSplashBackground() {
   const root = document.documentElement;
+  // #region agent log
+  const snapBg = (label: string, hypothesisId: string) => {
+    const body = document.body;
+    const tmBg = document.querySelector(".tm-bg") as HTMLElement | null;
+    const tmMain = document.querySelector(".tm-main") as HTMLElement | null;
+    const cs = (el: Element | null) =>
+      el ? window.getComputedStyle(el).backgroundColor : null;
+    const tr = (el: Element | null) =>
+      el ? window.getComputedStyle(el).transition : null;
+    fetch("http://127.0.0.1:7743/ingest/f0bab54e-f32a-44d8-9b34-7f4bedaf0803", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "3e2bf8",
+      },
+      body: JSON.stringify({
+        sessionId: "3e2bf8",
+        runId: "pre-fix",
+        hypothesisId,
+        location: "AppSplash.tsx:releaseSplashBackground",
+        message: label,
+        data: {
+          htmlClass: root.className,
+          htmlInlineBg: root.style.backgroundColor || null,
+          htmlBg: cs(root),
+          bodyBg: cs(body),
+          tmBgBg: cs(tmBg),
+          tmMainBg: cs(tmMain),
+          bodyTransition: tr(body),
+          tmBgTransition: tr(tmBg),
+          hasHandoff: root.classList.contains("tm-splash-handoff"),
+          hasSettle: root.classList.contains("tm-splash-settle"),
+          hasLock: root.classList.contains("tm-splash-lock"),
+          splashOverlay: Boolean(document.querySelector(".tm-splash")),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  };
+  snapBg("release-start-before-handoff", "C");
+  // #endregion
   root.classList.add("tm-splash-handoff");
   clearSplashChrome();
+  // #region agent log
+  snapBg("after-handoff-cleared-lock", "C");
+  // #endregion
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       root.classList.add("tm-splash-settle");
+      // #region agent log
+      snapBg("settle-class-added", "A");
+      window.setTimeout(() => snapBg("settle-mid-fade-220ms", "A"), 220);
+      // #endregion
       window.setTimeout(() => {
         root.classList.remove("tm-splash-handoff", "tm-splash-settle");
+        // #region agent log
+        snapBg("handoff-settle-removed", "B");
+        window.setTimeout(() => snapBg("post-settle-stable-300ms", "D"), 300);
+        // #endregion
       }, 480);
     });
   });
@@ -152,6 +204,28 @@ export default function AppSplash() {
   const finishSplash = () => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    // #region agent log
+    fetch("http://127.0.0.1:7743/ingest/f0bab54e-f32a-44d8-9b34-7f4bedaf0803", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "3e2bf8",
+      },
+      body: JSON.stringify({
+        sessionId: "3e2bf8",
+        runId: "pre-fix",
+        hypothesisId: "E",
+        location: "AppSplash.tsx:finishSplash",
+        message: "finishSplash-called",
+        data: {
+          phaseWasExit: exitingRef.current,
+          htmlClass: document.documentElement.className,
+          splashOverlay: Boolean(document.querySelector(".tm-splash")),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     markSplashSeen();
     releaseSplashBackground();
     setPhase("off");
