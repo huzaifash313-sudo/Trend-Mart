@@ -50,6 +50,8 @@ import {
   deleteAd as deleteAdService,
   createPlatformAd,
 } from "@/services/adsService";
+import { useConfirm } from "@/components/ConfirmProvider";
+import CustomSelect from "@/components/CustomSelect";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -103,6 +105,7 @@ const EMPTY_AD_FORM: PromotionalAdFormData = {
 
 export default function AdminDashboardPage() {
   const supabase = useMemo(() => createClient(), []);
+  const { confirm, prompt } = useConfirm();
 
   const [state, setState] = useState<AdminDashboardState>({
     metrics: null,
@@ -301,7 +304,15 @@ export default function AdminDashboardPage() {
 
   async function handleReviewAd(adId: string, decision: "approved" | "rejected") {
     setAdProcessingId(adId);
-    const reason = decision === "rejected" ? window.prompt("Optional: reason for rejection") ?? undefined : undefined;
+    const reason =
+      decision === "rejected"
+        ? ((await prompt({
+            title: "Reject ad",
+            message: "Optional: reason for rejection",
+            placeholder: "Reason for rejection (optional)",
+            confirmLabel: "Reject ad",
+          })) ?? undefined)
+        : undefined;
     const result = await reviewAd(adId, decision, reason);
     if (result.success) {
       await loadAds();
@@ -323,7 +334,7 @@ export default function AdminDashboardPage() {
   }
 
   async function handleDeleteAd(adId: string) {
-    if (!confirm("Delete this ad permanently?")) return;
+    if (!(await confirm("Delete this ad permanently?"))) return;
     setAdProcessingId(adId);
     const result = await deleteAdService(adId);
     if (result.success) {
@@ -525,9 +536,11 @@ export default function AdminDashboardPage() {
    */
   async function deleteMerchant(shopId: string, shopName: string) {
     if (
-      !window.confirm(
-        `Permanently delete "${shopName}"? This removes the store, its products, and its order history. This cannot be undone.`,
-      )
+      !(await confirm({
+        title: "Delete merchant",
+        message: `Permanently delete "${shopName}"? This removes the store, its products, and its order history. This cannot be undone.`,
+        confirmLabel: "Delete",
+      }))
     ) {
       return;
     }
@@ -942,31 +955,28 @@ export default function AdminDashboardPage() {
                 }
                 className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm flex-grow max-w-xs"
               />
-              <select
+              <CustomSelect
                 value={filterCategory}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  setFilterCategory(e.target.value)
-                }
-                className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm"
-              >
-                <option value="All">All Categories</option>
-                {SHOP_CATEGORIES.filter((c) => c !== "All").map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(val) => setFilterCategory(val)}
+                options={[
+                  { value: "All", label: "All Categories" },
+                  ...SHOP_CATEGORIES.filter((c) => c !== "All").map((cat) => ({
+                    value: cat,
+                    label: cat,
+                  })),
+                ]}
+                fullWidth={false}
+              />
+              <CustomSelect
                 value={filterStatus}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  setFilterStatus(e.target.value)
-                }
-                className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-              </select>
+                onChange={(val) => setFilterStatus(val)}
+                options={[
+                  { value: "all", label: "All Status" },
+                  { value: "active", label: "Active" },
+                  { value: "suspended", label: "Suspended" },
+                ]}
+                fullWidth={false}
+              />
               <span className="text-xs text-zinc-400 ml-auto">
                 {filteredMerchants.length} merchant
                 {filteredMerchants.length !== 1 ? "s" : ""}

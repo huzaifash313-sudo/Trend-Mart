@@ -24,6 +24,8 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchShops } from "@/services/shopService";
 import type { Shop, Order } from "@/types";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
+import CustomSelect from "@/components/CustomSelect";
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 
@@ -110,14 +112,6 @@ function FilterIcon() {
   );
 }
 
-function ChevronDownIcon() {
-  return (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
-}
-
 function DownloadIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -145,6 +139,7 @@ export default function FinancesPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -323,7 +318,7 @@ export default function FinancesPage() {
 
   // ── Delete entry ───────────────────────────────────────────────────────────
   const handleDeleteEntry = useCallback(async (entryId: string) => {
-    if (!confirm("Delete this entry permanently?")) return;
+    if (!(await confirm("Delete this entry permanently?"))) return;
     const { error } = await supabase
       .from("finance_entries")
       .delete()
@@ -334,7 +329,7 @@ export default function FinancesPage() {
       setEntries((prev) => prev.filter((e) => e.id !== entryId));
       addToast("Entry deleted.", "info");
     }
-  }, [supabase, addToast]);
+  }, [supabase, addToast, confirm]);
 
   // ── Export CSV ─────────────────────────────────────────────────────────────
   const handleExportCSV = useCallback(() => {
@@ -386,19 +381,15 @@ export default function FinancesPage() {
               💰 Financial Ledger
             </h1>
             {allShops.length > 1 && (
-              <div className="relative">
-                <select
-                  value={activeShopId ?? ""}
-                  onChange={(e) => setActiveShopId(e.target.value)}
-                  className="appearance-none rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 pr-7 text-xs font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                  aria-label="Switch shop"
-                >
-                  {allShops.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400"><ChevronDownIcon /></span>
-              </div>
+              <CustomSelect
+                value={activeShopId ?? ""}
+                onChange={(val) => setActiveShopId(val)}
+                options={allShops.map((s) => ({ value: s.id, label: s.name }))}
+                ariaLabel="Switch shop"
+                pill
+                size="sm"
+                fullWidth={false}
+              />
             )}
           </div>
           <button
@@ -494,20 +485,16 @@ export default function FinancesPage() {
             <section>
               <div className="flex flex-wrap items-center gap-3">
                 {/* Month filter */}
-                <div className="relative">
-                  <select
-                    value={filterMonth}
-                    onChange={(e) => setFilterMonth(e.target.value)}
-                    className="appearance-none rounded-xl border border-zinc-200 bg-white px-4 py-2 pr-8 text-sm font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                    aria-label="Filter by month"
-                  >
-                    <option value="">All Months</option>
-                    {availableMonths.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400"><ChevronDownIcon /></span>
-                </div>
+                <CustomSelect
+                  value={filterMonth}
+                  onChange={(val) => setFilterMonth(val)}
+                  options={[
+                    { value: "", label: "All Months" },
+                    ...availableMonths.map((m) => ({ value: m, label: m })),
+                  ]}
+                  ariaLabel="Filter by month"
+                  fullWidth={false}
+                />
 
                 {/* Type filter */}
                 <div className="flex overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
@@ -582,15 +569,11 @@ export default function FinancesPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Category</label>
-                      <select
+                      <CustomSelect
                         value={entryForm.category}
-                        onChange={(e) => setEntryForm((f) => ({ ...f, category: e.target.value }))}
-                        className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                      >
-                        {(entryForm.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => setEntryForm((f) => ({ ...f, category: val }))}
+                        options={(entryForm.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((c) => ({ value: c, label: c }))}
+                      />
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Amount (PKR) *</label>

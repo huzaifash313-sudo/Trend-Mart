@@ -13,6 +13,7 @@ import type { Shop } from "@/types";
 import { fetchMyShops } from "@/services/shopService";
 import { useToast } from "@/components/Toast";
 import BulkProductCreator from "@/components/BulkProductCreator";
+import CustomSelect from "@/components/CustomSelect";
 
 function ArrowLeftIcon() {
   return (
@@ -103,23 +104,20 @@ export default function NewProductPage() {
           </div>
 
           {shops.length > 1 && (
-            <select
+            <CustomSelect
               value={activeShopId ?? ""}
-              onChange={(e) => {
-                setActiveShopId(e.target.value);
-                if (e.target.value) {
-                  localStorage.setItem("trendmart_active_shop", e.target.value);
+              onChange={(val) => {
+                setActiveShopId(val);
+                if (val) {
+                  localStorage.setItem("trendmart_active_shop", val);
                 }
               }}
-              className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-              aria-label="Select shop"
-            >
-              {shops.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              options={shops.map((s) => ({ value: s.id, label: s.name }))}
+              ariaLabel="Select shop"
+              pill
+              size="sm"
+              fullWidth={false}
+            />
           )}
         </div>
       </header>

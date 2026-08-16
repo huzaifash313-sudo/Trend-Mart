@@ -16,11 +16,13 @@ import ContactModal from "@/components/ContactModal";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
+import CustomSelect from "@/components/CustomSelect";
 import DealCard, { dealToProduct } from "@/components/DealCard";
 import { isDealActiveOnDate, toPkDateKey } from "@/lib/dealSchedule";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import QuickViewModal from "@/components/QuickViewModal";
+import ProductOrderModal, { type ProductOrderIntent } from "@/components/ProductOrderModal";
 import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import StoreReviews from "@/components/StoreReviews";
@@ -119,6 +121,9 @@ function ShopDetailInner({ id }: { id: string }) {
   // Quick view modal state — cart-first: no single-item checkout
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
+
+  // Direct "Order" checkout (single product, no cart step) — mirrors DealCard.
+  const [orderIntent, setOrderIntent] = useState<ProductOrderIntent | null>(null);
 
   // ── Service-specific state ─────────────────────────────────────────────────
   const [servicePackages, setServicePackages] = useState<ServicePackageItem[]>([]);
@@ -377,6 +382,35 @@ function ShopDetailInner({ id }: { id: string }) {
     if (!shop) return;
     addItem(product, { id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number });
     addToast(`"${product.name}" added to cart`, "success");
+  }, [shop, addItem, addToast]);
+
+  const handleOrder = useCallback((intent: ProductOrderIntent) => {
+    const product = intent.product;
+    if (!shop) return;
+    if (!shop.whatsapp_number) {
+      addToast("This store has no WhatsApp number yet — please contact them directly.", "info");
+      return;
+    }
+    // Seed the cart silently so login/verify can resume checkout via CartBar
+    // (same mechanism as DealCard's "Order" button). No toast — this is an
+    // order action, not an "add to cart".
+    addItem(
+      product,
+      { id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number },
+      intent.quantity,
+      intent.variant,
+      intent.notes,
+    );
+    trackProductView({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      imageUrl: product.image_url,
+      shopId: shop.id,
+      shopName: shop.name,
+      category: shop.category ?? product.category_id ?? null,
+    });
+    setOrderIntent(intent);
   }, [shop, addItem, addToast]);
 
   const handleWishlistToggle = useCallback(
@@ -785,11 +819,7 @@ function ShopDetailInner({ id }: { id: string }) {
                 {searchQuery && (<button type="button" onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-xs text-zinc-400 hover:text-zinc-600" aria-label="Clear search">✕</button>)}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                <select value={priceSort} onChange={(e) => setPriceSort(e.target.value as "default" | "low" | "high")} className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" aria-label="Sort products">
-                  <option value="default">All Items</option>
-                  <option value="low">Price: Low to High</option>
-                  <option value="high">Price: High to Low</option>
-                </select>
+                <CustomSelect value={priceSort} onChange={(val) => setPriceSort(val as "default" | "low" | "high")} options={[{ value: "default", label: "All Items" }, { value: "low", label: "Price: Low to High" }, { value: "high", label: "Price: High to Low" }]} size="sm" pill fullWidth={false} ariaLabel="Sort products" />
                 {priceSort !== "default" && (<button type="button" onClick={() => setPriceSort("default")} className="rounded-full px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" aria-label="Reset sort">✕</button>)}
               </div>
             </div>
@@ -816,6 +846,7 @@ function ShopDetailInner({ id }: { id: string }) {
                 offerContext={productOfferContext}
                 onProductClick={handleProductClick}
                 onAddToCart={handleAddToCart}
+                onOrder={(p) => handleOrder({ product: p, quantity: 1 })}
                 onFavoriteToggle={handleWishlistToggle}
                 favorites={wishlistIds}
               />
@@ -843,6 +874,10 @@ function ShopDetailInner({ id }: { id: string }) {
           onClose={() => setQuickViewProduct(null)}
           isWishlisted={wishlistIds.has(quickViewProduct.id)}
           onWishlistToggle={() => handleWishlistToggle(quickViewProduct)}
+          onOrder={(order) => {
+            setQuickViewProduct(null);
+            handleOrder(order);
+          }}
         />
       )}
       {quickViewDeal && shop && (
@@ -854,6 +889,19 @@ function ShopDetailInner({ id }: { id: string }) {
           })}
           shop={{ id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number }}
           onClose={() => setQuickViewDeal(null)}
+        />
+      )}
+
+      {/* ── Direct Order Modal (single product → WhatsApp checkout) ────── */}
+      {orderIntent && shop && (
+        <ProductOrderModal
+          product={orderIntent.product}
+          shop={shop}
+          variant={orderIntent.variant}
+          quantity={orderIntent.quantity}
+          notes={orderIntent.notes}
+          onClose={() => setOrderIntent(null)}
+          onOrderPlaced={() => setOrderIntent(null)}
         />
       )}
 

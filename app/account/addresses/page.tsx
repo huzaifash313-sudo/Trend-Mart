@@ -23,6 +23,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   formatPkPhoneInput,
   isValidPkMobile,
@@ -144,6 +145,7 @@ export default function AddressesPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -303,7 +305,7 @@ export default function AddressesPage() {
 
   // ── Delete address ─────────────────────────────────────────────────────────
   const handleDelete = useCallback(async (addressId: string) => {
-    if (!confirm("Delete this address permanently?")) return;
+    if (!(await confirm("Delete this address permanently?"))) return;
     setDeletingId(addressId);
     const { error } = await supabase
       .from("customer_addresses")
@@ -318,7 +320,7 @@ export default function AddressesPage() {
       addToast("Address deleted.", "info");
     }
     setDeletingId(null);
-  }, [supabase, userId, addToast]);
+  }, [supabase, userId, addToast, confirm]);
 
   // ── Set as default ─────────────────────────────────────────────────────────
   const handleSetDefault = useCallback(async (addressId: string) => {

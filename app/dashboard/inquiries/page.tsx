@@ -10,9 +10,11 @@ import {
   type CustomerInquiry,
 } from "@/services/inquiryService";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 export default function MerchantInquiriesPage() {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [loading, setLoading] = useState(true);
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopName, setShopName] = useState("");
@@ -58,7 +60,7 @@ export default function MerchantInquiriesPage() {
   }, [addToast, reload]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this inquiry?")) return;
+    if (!(await confirm("Delete this inquiry?"))) return;
     const result = await deleteInquiry(id);
     if (result.success) {
       setRows((prev) => prev.filter((r) => r.id !== id));

@@ -45,6 +45,8 @@ import { downloadProductsCSV } from "@/services/exportService";
 import { getProductDiscount } from "@/lib/formatters";
 import MultiImageUpload from "@/components/MultiImageUpload";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
+import CustomSelect from "@/components/CustomSelect";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import Link from "next/link";
 import { getProductImages, normalizeProductGallery } from "@/lib/productImages";
@@ -189,6 +191,7 @@ export default function ProductsDashboardPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   // ── State ───────────────────────────────────────────────────────────────
   const [userId, setUserId] = useState<string | null>(null);
@@ -596,7 +599,7 @@ export default function ProductsDashboardPage() {
   }, [generateSkuPrefix]);
 
   const handleDelete = useCallback(async (productId: string) => {
-    if (!confirm("Delete this product and all its variants permanently? This action cannot be undone.")) return;
+    if (!(await confirm("Delete this product and all its variants permanently? This action cannot be undone."))) return;
 
     const result = await deleteProduct(productId);
     if (result.success) {
@@ -606,7 +609,7 @@ export default function ProductsDashboardPage() {
     } else {
       addToast(result.error ?? "Failed to delete product.", "error");
     }
-  }, [addToast]);
+  }, [addToast, confirm]);
 
   // ── Bulk Operations ─────────────────────────────────────────────────────
 
@@ -628,7 +631,7 @@ export default function ProductsDashboardPage() {
 
   const handleBulkMarkOutOfStock = useCallback(async () => {
     if (selectedProductIds.size === 0) return;
-    if (!confirm(`Mark ${selectedProductIds.size} product(s) as out of stock?`)) return;
+    if (!(await confirm(`Mark ${selectedProductIds.size} product(s) as out of stock?`))) return;
 
     setBulkActionLoading(true);
     const result = await bulkUpdateAvailability([...selectedProductIds], false);
@@ -642,7 +645,7 @@ export default function ProductsDashboardPage() {
       addToast(result.error ?? "Bulk update failed.", "error");
     }
     setBulkActionLoading(false);
-  }, [selectedProductIds, activeShopId, addToast]);
+  }, [selectedProductIds, activeShopId, addToast, confirm]);
 
   const handleBulkMarkInStock = useCallback(async () => {
     if (selectedProductIds.size === 0) return;
@@ -669,7 +672,7 @@ export default function ProductsDashboardPage() {
       return;
     }
 
-    if (!confirm(`Apply ${percent}% discount to ${selectedProductIds.size} product(s)?`)) return;
+    if (!(await confirm(`Apply ${percent}% discount to ${selectedProductIds.size} product(s)?`))) return;
 
     setBulkActionLoading(true);
     let successCount = 0;
@@ -704,11 +707,11 @@ export default function ProductsDashboardPage() {
     setSelectedProductIds(new Set());
     setBulkDiscountPercent("");
     setBulkActionLoading(false);
-  }, [selectedProductIds, bulkDiscountPercent, products, activeShopId, addToast]);
+  }, [selectedProductIds, bulkDiscountPercent, products, activeShopId, addToast, confirm]);
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedProductIds.size === 0) return;
-    if (!confirm(`Permanently delete ${selectedProductIds.size} product(s)? This cannot be undone.`)) return;
+    if (!(await confirm(`Permanently delete ${selectedProductIds.size} product(s)? This cannot be undone.`))) return;
 
     setBulkActionLoading(true);
     let successCount = 0;
@@ -721,7 +724,7 @@ export default function ProductsDashboardPage() {
     addToast(`${successCount} product(s) deleted.`, successCount > 0 ? "success" : "error");
     if (successCount > 0) emitProductsChanged();
     setBulkActionLoading(false);
-  }, [selectedProductIds, addToast]);
+  }, [selectedProductIds, addToast, confirm]);
 
   /** Instantly pause/resume a single product's availability — no need to open the edit form. */
   const handleToggleAvailability = useCallback(async (product: Product) => {
@@ -850,16 +853,15 @@ export default function ProductsDashboardPage() {
                 View My Store
               </Link>
             )}
-            <select
+            <CustomSelect
               value={activeShopId ?? ""}
-              onChange={(e) => setActiveShopId(e.target.value)}
-              className="appearance-none rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 pr-7 text-xs font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-              aria-label="Select shop"
-            >
-              {shops.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+              onChange={(val) => setActiveShopId(val)}
+              options={shops.map((s) => ({ value: s.id, label: s.name }))}
+              ariaLabel="Select shop"
+              pill
+              size="sm"
+              fullWidth={false}
+            />
           </div>
         </div>
       </header>
@@ -919,22 +921,15 @@ export default function ProductsDashboardPage() {
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                     Sub-Category *
                   </label>
-                  <select
-                    required
+                  <CustomSelect
                     value={form.subCategoryId}
-                    onChange={(e) => setForm((f) => ({ ...f, subCategoryId: e.target.value }))}
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  >
-                    <option value="" disabled>
-                      {subCategories.length ? "Select…" : "No sub-categories"}
-                    </option>
-                    {subCategories.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.icon ? `${s.icon} ` : ""}
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm((f) => ({ ...f, subCategoryId: val }))}
+                    placeholder={subCategories.length ? "Select…" : "No sub-categories"}
+                    options={subCategories.map((s) => ({
+                      value: s.id,
+                      label: `${s.icon ? `${s.icon} ` : ""}${s.name}`,
+                    }))}
+                  />
                   {activeShop && (
                     <p className="mt-1 text-[0.6rem] text-zinc-400">
                       Store: {activeShop.category}
@@ -1308,28 +1303,32 @@ export default function ProductsDashboardPage() {
                 />
 
                 {/* Status Filter */}
-                <select
+                <CustomSelect
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                  className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                >
-                  <option value="all">All</option>
-                  <option value="available">Available</option>
-                  <option value="sold_out">Sold Out</option>
-                </select>
+                  onChange={(val) => setStatusFilter(val as typeof statusFilter)}
+                  options={[
+                    { value: "all", label: "All" },
+                    { value: "available", label: "Available" },
+                    { value: "sold_out", label: "Sold Out" },
+                  ]}
+                  size="sm"
+                  fullWidth={false}
+                />
 
                 {/* Sort */}
-                <select
+                <CustomSelect
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="price_asc">Price: Low → High</option>
-                  <option value="price_desc">Price: High → Low</option>
-                  <option value="name">Name A-Z</option>
-                </select>
+                  onChange={(val) => setSortBy(val as typeof sortBy)}
+                  options={[
+                    { value: "newest", label: "Newest First" },
+                    { value: "oldest", label: "Oldest First" },
+                    { value: "price_asc", label: "Price: Low → High" },
+                    { value: "price_desc", label: "Price: High → Low" },
+                    { value: "name", label: "Name A-Z" },
+                  ]}
+                  size="sm"
+                  fullWidth={false}
+                />
               </div>
 
               {/* Bulk Action Bar */}

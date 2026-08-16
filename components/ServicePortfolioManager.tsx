@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ function CloseIcon() { return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill
 export default function ServicePortfolioManager({ shopId }: ServicePortfolioManagerProps) {
   const supabase = createClient();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,7 +289,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
   // ── Delete ────────────────────────────────────────────────────────────────
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!confirm("Delete this portfolio item? This cannot be undone.")) return;
+    if (!(await confirm("Delete this portfolio item? This cannot be undone."))) return;
 
     setDeleting(id);
     try {
@@ -305,7 +307,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
     } finally {
       setDeleting(null);
     }
-  }, [supabase, addToast]);
+  }, [supabase, addToast, confirm]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 

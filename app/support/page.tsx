@@ -3,6 +3,7 @@
 import { useCallback, useState, type FormEvent } from "react";
 import LegalPageLayout from "@/components/LegalPageLayout";
 import { useToast } from "@/components/Toast";
+import CustomSelect from "@/components/CustomSelect";
 import { createSupportTicket } from "@/services/supportService";
 import type { SupportTicketCategory, SupportTicketFormData } from "@/types";
 import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
@@ -146,15 +147,11 @@ export default function SupportPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Category</label>
-                  <select
+                  <CustomSelect
                     value={form.category}
-                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as SupportTicketCategory }))}
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  >
-                    {CATEGORY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm((f) => ({ ...f, category: val as SupportTicketCategory }))}
+                    options={CATEGORY_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+                  />
                 </div>
               </div>
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { createCoupon, fetchCouponsByShopId, deleteCoupon } from "@/services/couponService";
 import type { Coupon } from "@/services/couponService";
+import CustomSelect from "@/components/CustomSelect";
 
 interface QuickCouponPanelProps {
   shopId: string;
@@ -78,14 +79,14 @@ export default function QuickCouponPanel({ shopId, onChanged }: QuickCouponPanel
           className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm uppercase dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />
         <div className="grid grid-cols-2 gap-2">
-          <select
+          <CustomSelect
             value={discountType}
-            onChange={(e) => setDiscountType(e.target.value as "percent" | "amount")}
-            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          >
-            <option value="percent">Percent %</option>
-            <option value="amount">Fixed Rs.</option>
-          </select>
+            onChange={(val) => setDiscountType(val as "percent" | "amount")}
+            options={[
+              { value: "percent", label: "Percent %" },
+              { value: "amount", label: "Fixed Rs." },
+            ]}
+          />
           <input
             required
             type="number"

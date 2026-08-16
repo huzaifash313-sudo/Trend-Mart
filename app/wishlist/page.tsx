@@ -11,6 +11,7 @@ import {
 import { logError } from "@/services/errorService";
 import { fetchShopById } from "@/services/shopService";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { ErrorState } from "@/components/ErrorState";
 
 /* -------------------------------------------------------------------------- */
@@ -201,6 +202,7 @@ function WishlistCard({
 }
 
 export default function WishlistPage() {
+  const { confirm } = useConfirm();
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -256,7 +258,7 @@ export default function WishlistPage() {
 
   const handleClearTab = useCallback(async () => {
     const label = tab === "shops" ? "shops" : "products";
-    if (!confirm(`Clear all saved ${label} from your wishlist?`)) return;
+    if (!(await confirm(`Clear all saved ${label} from your wishlist?`))) return;
     try {
       await Promise.all(visible.map((item) => removeFavorite(item.id)));
       setItems((prev) => prev.filter((f) => f.type !== (tab === "shops" ? "shop" : "product")));
@@ -264,7 +266,7 @@ export default function WishlistPage() {
     } catch {
       showToast("Failed to clear wishlist. Please try again.", "error");
     }
-  }, [tab, visible]);
+  }, [tab, visible, confirm]);
 
   if (loading) {
     return (

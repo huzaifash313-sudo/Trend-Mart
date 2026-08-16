@@ -18,6 +18,7 @@ import { isValidUUID } from "@/lib/sanitization";
 import MultiImageUpload from "@/components/MultiImageUpload";
 import { normalizeProductGallery } from "@/lib/productImages";
 import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
+import CustomSelect from "@/components/CustomSelect";
 
 export interface BulkProductCreatorProps {
   shopId: string;
@@ -206,17 +207,13 @@ export default function BulkProductCreator({
     onCreated?.();
   }, [shopId, shopCategory, rows, defaultSubId, onToast, onCreated]);
 
-  const subOptions = (
-    <>
-      {subs.length === 0 && <option value="">No sub-categories</option>}
-      {subs.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.icon ? `${s.icon} ` : ""}
-          {s.name}
-        </option>
-      ))}
-    </>
-  );
+  const subSelectOptions = [
+    ...(subs.length === 0 ? [{ value: "", label: "No sub-categories" }] : []),
+    ...subs.map((s) => ({
+      value: s.id,
+      label: `${s.icon ? `${s.icon} ` : ""}${s.name}`,
+    })),
+  ];
 
   return (
     <div className="space-y-3 rounded-2xl border border-teal-200/70 bg-white p-3 shadow-sm dark:border-teal-900/40 dark:bg-[color:var(--tm-surface)] sm:p-4">
@@ -290,16 +287,14 @@ export default function BulkProductCreator({
                     />
                   </td>
                   <td className="px-2 py-2.5">
-                    <select
+                    <CustomSelect
                       value={row.sub_category_id}
-                      onChange={(e) =>
-                        updateRow(row.key, { sub_category_id: e.target.value })
+                      onChange={(val) =>
+                        updateRow(row.key, { sub_category_id: val })
                       }
-                      className={fieldClass}
+                      options={subSelectOptions}
                       disabled={loadingSubs || subs.length === 0}
-                    >
-                      {subOptions}
-                    </select>
+                    />
                   </td>
                   <td className="px-2 py-2.5">
                     <input
@@ -413,16 +408,14 @@ export default function BulkProductCreator({
 
               <div>
                 <label className={labelClass}>Sub-category *</label>
-                <select
+                <CustomSelect
                   value={row.sub_category_id}
-                  onChange={(e) =>
-                    updateRow(row.key, { sub_category_id: e.target.value })
+                  onChange={(val) =>
+                    updateRow(row.key, { sub_category_id: val })
                   }
-                  className={fieldClass}
+                  options={subSelectOptions}
                   disabled={loadingSubs || subs.length === 0}
-                >
-                  {subOptions}
-                </select>
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2">

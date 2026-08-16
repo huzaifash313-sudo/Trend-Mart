@@ -10,6 +10,7 @@ import {
   type ServiceCoverageMode,
 } from "@/services/geoRadiusService";
 import { SUPPORTED_CITIES } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -340,28 +341,22 @@ export default function ShopLocationRadiusPicker({
           <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
             Serve this city
           </label>
-          <select
+          <CustomSelect
             value={
               SUPPORTED_CITIES.includes(serviceCity as (typeof SUPPORTED_CITIES)[number])
                 ? serviceCity
                 : serviceCity || "Gujranwala"
             }
-            onChange={(e) => {
-              const city = e.target.value;
-              applyMode("city", city);
-            }}
-            className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          >
-            {!SUPPORTED_CITIES.includes(serviceCity as (typeof SUPPORTED_CITIES)[number]) &&
-            serviceCity ? (
-              <option value={serviceCity}>{serviceCity}</option>
-            ) : null}
-            {SUPPORTED_CITIES.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => applyMode("city", val)}
+            options={[
+              ...(!SUPPORTED_CITIES.includes(serviceCity as (typeof SUPPORTED_CITIES)[number]) &&
+              serviceCity
+                ? [{ value: serviceCity, label: serviceCity }]
+                : []),
+              ...SUPPORTED_CITIES.map((city) => ({ value: city, label: city })),
+            ]}
+            size="sm"
+          />
         </div>
       )}
 

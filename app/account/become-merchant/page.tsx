@@ -10,6 +10,7 @@ import { createShop } from "@/services/shopService";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
+import CustomSelect from "@/components/CustomSelect";
 import {
   formatPkPhoneInput,
   isValidPkMobile,
@@ -238,17 +239,11 @@ export default function BecomeMerchantPage() {
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
               Category *
             </label>
-            <select
+            <CustomSelect
               value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setForm((f) => ({ ...f, category: val }))}
+              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+            />
             {errors.category ? <p className="mt-1 text-xs text-red-500">{errors.category}</p> : null}
           </div>
 

@@ -12,6 +12,7 @@ import {
 } from "@/services/notificationService";
 import { subscribeToOrders } from "@/lib/supabase/realtime";
 import { useToast } from "@/components/Toast";
+import CustomSelect from "@/components/CustomSelect";
 import type { Order, OrderStatus, Shop } from "@/types";
 import { toPkWhatsAppDigits } from "@/lib/phoneFormat";
 
@@ -250,19 +251,20 @@ export default function MerchantOrdersPage() {
                     >
                       WhatsApp
                     </button>
-                    <select
+                    <CustomSelect
                       value={order.status}
-                      onChange={(e) => handleUpdateStatus(order.id, e.target.value as OrderStatus)}
+                      onChange={(val) => handleUpdateStatus(order.id, val as OrderStatus)}
                       disabled={getValidTransitions(order.status).length === 0}
-                      className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                    >
-                      <option value={order.status}>{getStatusLabel(order.status)}</option>
-                      {getValidTransitions(order.status).map((next) => (
-                        <option key={next} value={next}>
-                          → {getStatusLabel(next)}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: order.status, label: getStatusLabel(order.status) },
+                        ...getValidTransitions(order.status).map((next) => ({
+                          value: next,
+                          label: `→ ${getStatusLabel(next)}`,
+                        })),
+                      ]}
+                      size="sm"
+                      fullWidth={false}
+                    />
                   </div>
                 </div>
 

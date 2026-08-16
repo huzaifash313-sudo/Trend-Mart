@@ -24,6 +24,7 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
+import CustomSelect from "@/components/CustomSelect";
 import type {
   Product,
   VariantGroup,
@@ -617,22 +618,23 @@ export default function InventoryManager({
           </button>
 
           {/* Sort */}
-          <select
+          <CustomSelect
             value={`${sortField}-${sortDir}`}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => {
-              const [field, dir] = e.target.value.split("-") as [SortField, SortDir];
+            onChange={(val) => {
+              const [field, dir] = val.split("-") as [SortField, SortDir];
               setSortField(field);
               setSortDir(dir);
             }}
-            className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm"
-          >
-            <option value="name-asc">Name A-Z</option>
-            <option value="name-desc">Name Z-A</option>
-            <option value="stock-asc">Stock Low→High</option>
-            <option value="stock-desc">Stock High→Low</option>
-            <option value="price-asc">Price Low→High</option>
-            <option value="price-desc">Price High→Low</option>
-          </select>
+            options={[
+              { value: "name-asc", label: "Name A-Z" },
+              { value: "name-desc", label: "Name Z-A" },
+              { value: "stock-asc", label: "Stock Low→High" },
+              { value: "stock-desc", label: "Stock High→Low" },
+              { value: "price-asc", label: "Price Low→High" },
+              { value: "price-desc", label: "Price High→Low" },
+            ]}
+            fullWidth={false}
+          />
 
           {/* Export */}
           <button

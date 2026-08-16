@@ -98,6 +98,8 @@ interface ProductGridProps {
   loading?: boolean;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
+  /** Direct "Order" (opens WhatsApp checkout immediately, no cart step). */
+  onOrder?: (product: Product) => void;
   onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
   onShopClick?: (product: Product) => void;
   favorites?: Set<string>;
@@ -122,6 +124,7 @@ const ProductCard = memo(function ProductCard({
   priority = false,
   onProductClick,
   onAddToCart,
+  onOrder,
   onFavoriteToggle,
   onShopClick,
 }: {
@@ -134,6 +137,7 @@ const ProductCard = memo(function ProductCard({
   priority?: boolean;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
+  onOrder?: (product: Product) => void;
   onFavoriteToggle?: (product: Product, nextFavorited: boolean) => void;
   onShopClick?: (product: Product) => void;
 }) {
@@ -152,6 +156,14 @@ const ProductCard = memo(function ProductCard({
       onAddToCart?.(product);
     },
     [product, onAddToCart],
+  );
+
+  const handleOrder = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onOrder?.(product);
+    },
+    [product, onOrder],
   );
 
   const handleFavorite = useCallback(
@@ -308,7 +320,7 @@ const ProductCard = memo(function ProductCard({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center gap-0.5 pb-px">
+          <div className="flex shrink-0 items-center gap-1.5 pb-px">
             {onFavoriteToggle ? (
               <button
                 type="button"
@@ -332,6 +344,17 @@ const ProductCard = memo(function ProductCard({
                 aria-label={`Add ${product.name} to cart`}
               >
                 Add
+              </button>
+            ) : null}
+
+            {product.is_available && onOrder ? (
+              <button
+                type="button"
+                onClick={handleOrder}
+                className="shrink-0 text-[12px] font-bold leading-none text-emerald-600 transition-colors hover:text-emerald-700 active:opacity-75 dark:text-emerald-400 dark:hover:text-emerald-300"
+                aria-label={`Order ${product.name} now`}
+              >
+                Order
               </button>
             ) : null}
           </div>
@@ -362,6 +385,7 @@ export default function ProductGrid({
   loading = false,
   onProductClick,
   onAddToCart,
+  onOrder,
   onFavoriteToggle,
   onShopClick,
   favorites = new Set(),
@@ -417,6 +441,7 @@ export default function ProductGrid({
           priority={index < 2}
           onProductClick={onProductClick}
           onAddToCart={onAddToCart}
+          onOrder={onOrder}
           onFavoriteToggle={onFavoriteToggle}
           onShopClick={onShopClick}
         />

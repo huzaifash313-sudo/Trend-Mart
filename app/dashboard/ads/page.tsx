@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useMemo, type FormEvent } from "react
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 import ImageUpload from "@/components/ImageUpload";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import {
@@ -62,6 +63,7 @@ export default function MerchantAdsPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopName, setShopName] = useState("");
@@ -178,7 +180,7 @@ export default function MerchantAdsPage() {
   }, [addToast]);
 
   const handleDelete = useCallback(async (adId: string) => {
-    if (!confirm("Delete this ad request permanently?")) return;
+    if (!(await confirm("Delete this ad request permanently?"))) return;
     setDeletingId(adId);
     const result = await deleteAd(adId);
     if (result.success) {
@@ -188,7 +190,7 @@ export default function MerchantAdsPage() {
       addToast(result.error, "error");
     }
     setDeletingId(null);
-  }, [addToast]);
+  }, [addToast, confirm]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) {

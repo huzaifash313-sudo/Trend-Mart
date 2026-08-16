@@ -8,6 +8,7 @@ import WhatsAppCheckoutModal from "@/components/WhatsAppCheckoutModal";
 import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import type { Shop } from "@/types";
 import { fetchShopById } from "@/services/shopService";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline Icons                                                               */
@@ -119,6 +120,7 @@ function stubShopFromGroup(group: ShopGroup): Shop {
 
 export default function CartBar() {
   const pathname = usePathname();
+  const { confirm } = useConfirm();
   const { items, removeItem, updateQuantity, updateItemNotes, totalItems, totalAmount, clearCart } = useCart();
   const [expanded, setExpanded] = useState(false);
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
@@ -204,8 +206,8 @@ export default function CartBar() {
     originalPrice: i.originalPrice ?? undefined,
   }));
 
-  const handleClearCart = () => {
-    if (typeof window !== "undefined" && !window.confirm("Clear your entire cart?")) return;
+  const handleClearCart = async () => {
+    if (!(await confirm("Clear your entire cart?"))) return;
     clearCart();
   };
 

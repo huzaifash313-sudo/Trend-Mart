@@ -65,6 +65,13 @@ interface QuickViewModalProps {
   onClose: () => void;
   isWishlisted?: boolean;
   onWishlistToggle?: () => void;
+  /** Direct "Order" (opens WhatsApp checkout) with selected variants/qty/notes. */
+  onOrder?: (order: {
+    product: Product;
+    variant?: string;
+    quantity: number;
+    notes?: string;
+  }) => void;
 }
 
 export default function QuickViewModal({
@@ -73,6 +80,7 @@ export default function QuickViewModal({
   onClose,
   isWishlisted = false,
   onWishlistToggle,
+  onOrder,
 }: QuickViewModalProps) {
   const { addItem } = useCart();
   const { addToast } = useToast();
@@ -175,6 +183,27 @@ export default function QuickViewModal({
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
   }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, priceAdj, displayPrice]);
+
+  const handleOrder = useCallback(() => {
+    if (!variantsReady) {
+      addToast("Please choose flavour / options first.", "error");
+      return;
+    }
+    if (!shop.whatsapp_number) {
+      addToast("This store has no WhatsApp number yet — please contact them directly.", "info");
+      return;
+    }
+    const productForCart =
+      priceAdj !== 0
+        ? { ...product, price: displayPrice }
+        : product;
+    onOrder?.({
+      product: productForCart,
+      variant: variantLabel || undefined,
+      quantity,
+      notes: itemNotes.trim() || undefined,
+    });
+  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, priceAdj, displayPrice, onOrder]);
 
   const { hasDiscount, originalPrice, discountPercent: discountPct } = getProductDiscount(product);
 
@@ -367,6 +396,16 @@ export default function QuickViewModal({
             >
               {added ? <><CheckIcon /> Added</> : <><CartPlusIcon /> Add to Cart</>}
             </button>
+            {onOrder && (
+              <button
+                type="button"
+                onClick={handleOrder}
+                disabled={!product.is_available || !variantsReady}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Order
+              </button>
+            )}
             {onWishlistToggle && (
               <button
                 type="button"
@@ -393,7 +432,7 @@ export default function QuickViewModal({
 
           <p className="text-center text-[0.6rem] text-zinc-400 dark:text-zinc-500">
             From <span className="font-medium text-zinc-500 dark:text-zinc-400">{shop.name}</span>
-            {" · "}checkout from the cart bar below
+            {" · "}order directly or add to cart below
           </p>
         </div>
       </div>

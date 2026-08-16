@@ -13,6 +13,7 @@ import {
   type PlaceSearchResult,
 } from "@/services/geoRadiusService";
 import { SUPPORTED_CITIES, type SupportedCity } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
   ssr: false,
@@ -512,23 +513,22 @@ export default function LocationPicker() {
                       </button>
                     ))}
                   </div>
-                  <select
+                  <CustomSelect
                     value={location?.city ?? location?.deliveryZone ?? ""}
-                    onChange={(e) => {
-                      const val = e.target.value;
+                    onChange={(val) => {
                       if (val && SUPPORTED_CITIES.includes(val as SupportedCity)) {
                         handleSelectCity(val as SupportedCity);
                       }
                     }}
-                    className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-                  >
-                    <option value="">— All cities —</option>
-                    {SUPPORTED_CITIES.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: "— All cities —" },
+                      ...SUPPORTED_CITIES.map((city) => ({
+                        value: city,
+                        label: city,
+                      })),
+                    ]}
+                    size="sm"
+                  />
                 </div>
               )}
             </div>

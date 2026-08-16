@@ -15,6 +15,7 @@ import { LocationProvider } from "@/context/LocationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { MerchantQuickAddProvider } from "@/context/MerchantQuickAddContext";
 import { ToastProvider } from "@/components/Toast";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
@@ -101,6 +102,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <CartProvider>
           <LocationProvider>
             <ToastProvider>
+              <ConfirmProvider>
               <MerchantQuickAddProvider>
               <AppNotifications>
               <ErrorBoundary name="AppSplash">
@@ -130,6 +132,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <PwaRegister />
               </AppNotifications>
               </MerchantQuickAddProvider>
+              </ConfirmProvider>
             </ToastProvider>
           </LocationProvider>
         </CartProvider>

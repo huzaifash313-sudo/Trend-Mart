@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createOrder } from "@/services/orderService";
 import type { Shop } from "@/types";
 import { formatRupees } from "@/lib/formatters";
+import CustomSelect from "@/components/CustomSelect";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -546,20 +547,15 @@ export default function ServiceBookingModal({
                   <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                     <CalendarIcon /> Preferred Date *
                   </label>
-                  <select
+                  <CustomSelect
                     value={booking.preferredDate}
-                    onChange={(e) => setBooking(b => ({ ...b, preferredDate: e.target.value }))}
-                    className={`w-full rounded-xl border bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
-                      errors.preferredDate ? "border-red-300 focus:ring-red-500/20" : "border-zinc-200 focus:border-orange-500 focus:ring-orange-500/20"
-                    } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
-                  >
-                    <option value="">Select date</option>
-                    {dateOptions.map(d => (
-                      <option key={d} value={d}>
-                        {d === getToday() ? `Today (${d})` : d === getTomorrow() ? `Tomorrow (${d})` : d}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setBooking(b => ({ ...b, preferredDate: val }))}
+                    placeholder="Select date"
+                    options={dateOptions.map((d) => ({
+                      value: d,
+                      label: d === getToday() ? `Today (${d})` : d === getTomorrow() ? `Tomorrow (${d})` : d,
+                    }))}
+                  />
                   {errors.preferredDate && <p className="mt-1 text-xs text-red-500">{errors.preferredDate}</p>}
                 </div>
 
@@ -567,18 +563,12 @@ export default function ServiceBookingModal({
                   <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                     <ClockIcon /> Preferred Time *
                   </label>
-                  <select
+                  <CustomSelect
                     value={booking.preferredTime}
-                    onChange={(e) => setBooking(b => ({ ...b, preferredTime: e.target.value }))}
-                    className={`w-full rounded-xl border bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
-                      errors.preferredTime ? "border-red-300 focus:ring-red-500/20" : "border-zinc-200 focus:border-orange-500 focus:ring-orange-500/20"
-                    } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
-                  >
-                    <option value="">Select time</option>
-                    {TIME_SLOTS.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setBooking(b => ({ ...b, preferredTime: val }))}
+                    placeholder="Select time"
+                    options={TIME_SLOTS.map((t) => ({ value: t, label: t }))}
+                  />
                   {errors.preferredTime && <p className="mt-1 text-xs text-red-500">{errors.preferredTime}</p>}
                 </div>
               </div>

@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Shop } from "@/types";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 import {
   fetchLeadsByShopId,
   markLeadConverted,
@@ -257,6 +258,7 @@ export default function LeadsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
@@ -367,7 +369,7 @@ export default function LeadsPage() {
   }, [addToast]);
 
   const handleDelete = useCallback(async (leadId: string) => {
-    if (!confirm("Delete this lead permanently?")) return;
+    if (!(await confirm("Delete this lead permanently?"))) return;
     setDeleting(true);
     const result = await deleteLead(leadId);
     if (result.success) {
@@ -381,7 +383,7 @@ export default function LeadsPage() {
       addToast(result.error, "error");
     }
     setDeleting(false);
-  }, [addToast, shop]);
+  }, [addToast, shop, confirm]);
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (authLoading) {

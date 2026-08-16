@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { fetchSupportTickets, updateSupportTicket } from "@/services/supportService";
 import type { SupportTicket, SupportTicketStatus } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 const STATUS_OPTIONS: { value: SupportTicketStatus; label: string; color: string }[] = [
   { value: "open", label: "Open", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
@@ -121,16 +122,14 @@ export default function AdminSupportPage() {
                         {ticket.name} · {ticket.email}{ticket.phone ? ` · ${ticket.phone}` : ""} · {timeAgo(ticket.created_at)}
                       </p>
                     </div>
-                    <select
+                    <CustomSelect
                       value={ticket.status}
                       disabled={updatingId === ticket.id}
-                      onChange={(e) => handleStatusChange(ticket.id, e.target.value as SupportTicketStatus)}
-                      className="rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                    >
-                      {STATUS_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                      onChange={(val) => handleStatusChange(ticket.id, val as SupportTicketStatus)}
+                      options={STATUS_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+                      size="sm"
+                      fullWidth={false}
+                    />
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">{ticket.message}</p>
                 </div>

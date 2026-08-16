@@ -42,6 +42,8 @@ import ImageUpload from "@/components/ImageUpload";
 import MultiImageUpload from "@/components/MultiImageUpload";
 import { getProductImages, normalizeProductGallery } from "@/lib/productImages";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmProvider";
+import CustomSelect from "@/components/CustomSelect";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 import BulkProductCreator from "@/components/BulkProductCreator";
@@ -193,14 +195,6 @@ function ShoppingBagIcon() {
   );
 }
 
-function ChevronDownIcon() {
-  return (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
-}
-
 function EyeIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -340,6 +334,7 @@ export default function DashboardPage() {
   const [agreedMerchantGuidelines, setAgreedMerchantGuidelines] = useState(false);
   const [merchantTermsTouched, setMerchantTermsTouched] = useState(false);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -782,13 +777,13 @@ export default function DashboardPage() {
   }, [activeShopId, storyImageUrl, storyCaption, addToast]);
 
   const handleDeleteProduct = useCallback(async (productId: string) => {
-    if (!activeShopId || !confirm("Delete this product permanently?")) return;
+    if (!activeShopId || !(await confirm("Delete this product permanently?"))) return;
     setDeletingProductId(productId);
     const result = await deleteProduct(productId);
     if (result.success) { setProducts((prev) => prev.filter((p) => p.id !== productId)); addToast("Product deleted.", "info"); }
     else { addToast(result.error, "error"); }
     setDeletingProductId(null);
-  }, [activeShopId, addToast]);
+  }, [activeShopId, addToast, confirm]);
 
   const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus) => {
     // Uses the validated lifecycle transition (Pending → Processing → Dispatched →
@@ -847,7 +842,7 @@ export default function DashboardPage() {
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedProductIds.size === 0) return;
-    if (!confirm(`Delete ${selectedProductIds.size} selected product(s) permanently?`)) return;
+    if (!(await confirm(`Delete ${selectedProductIds.size} selected product(s) permanently?`))) return;
     setBatchDeleting(true);
     let successCount = 0;
     for (const id of selectedProductIds) {
@@ -858,7 +853,7 @@ export default function DashboardPage() {
     setSelectedProductIds(new Set());
     addToast(`${successCount} product(s) deleted.`, successCount > 0 ? "success" : "error");
     setBatchDeleting(false);
-  }, [selectedProductIds, addToast]);
+  }, [selectedProductIds, addToast, confirm]);
 
   const handleBatchMarkOutOfStock = useCallback(async () => {
     if (selectedProductIds.size === 0) return;
@@ -971,19 +966,15 @@ export default function DashboardPage() {
             )}
             {/* Multi-shop switcher */}
             {allShops.length > 1 && (
-              <div className="relative shrink-0">
-                <select
-                  value={activeShopId ?? ""}
-                  onChange={(e) => handleSwitchShop(e.target.value)}
-                  className="btn-compact appearance-none rounded-full border border-zinc-200 bg-zinc-50 px-3 pr-7 text-xs font-medium text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
-                  aria-label="Switch shop"
-                >
-                  {allShops.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400"><ChevronDownIcon /></span>
-              </div>
+              <CustomSelect
+                value={activeShopId ?? ""}
+                onChange={(val) => handleSwitchShop(val)}
+                options={allShops.map((s) => ({ value: s.id, label: s.name }))}
+                ariaLabel="Switch shop"
+                pill
+                size="sm"
+                fullWidth={false}
+              />
             )}
           </div>
         </div>
@@ -1042,9 +1033,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Category *</label>
-                <select value={shopForm.category} onChange={(e) => setShopForm((f) => ({ ...f, category: e.target.value }))} className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
-                  {PRODUCT_CATEGORIES.map((c) => (<option key={c} value={c}>{c}</option>))}
-                </select>
+                <CustomSelect value={shopForm.category} onChange={(val) => setShopForm((f) => ({ ...f, category: val }))} options={PRODUCT_CATEGORIES.map((c) => ({ value: c, label: c }))} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
@@ -1429,17 +1418,20 @@ export default function DashboardPage() {
                             {order.customer_name && ` · ${order.customer_name}`}
                           </p>
                         </div>
-                        <select
+                        <CustomSelect
                           value={order.status}
-                          onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value as OrderStatus)}
+                          onChange={(val) => handleUpdateOrderStatus(order.id, val as OrderStatus)}
                           disabled={getValidTransitions(order.status).length === 0}
-                          className="shrink-0 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                        >
-                          <option value={order.status}>{getStatusLabel(order.status)}</option>
-                          {getValidTransitions(order.status).map((next) => (
-                            <option key={next} value={next}>{getStatusLabel(next)}</option>
-                          ))}
-                        </select>
+                          options={[
+                            { value: order.status, label: getStatusLabel(order.status) },
+                            ...getValidTransitions(order.status).map((next) => ({
+                              value: next,
+                              label: getStatusLabel(next),
+                            })),
+                          ]}
+                          size="sm"
+                          fullWidth={false}
+                        />
                       </div>
                       {/* Show items breakdown */}
                       {order.items_json && order.items_json.length > 0 && (
@@ -1493,23 +1485,16 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Sub-Category *</label>
-                  <select
-                    required
+                  <CustomSelect
                     value={productForm.sub_category_id ?? ""}
-                    onChange={(e) => setProductForm((f) => ({ ...f, sub_category_id: e.target.value, category_id: shop.category }))}
+                    onChange={(val) => setProductForm((f) => ({ ...f, sub_category_id: val, category_id: shop.category }))}
                     disabled={productSubsLoading || productSubCategories.length === 0}
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  >
-                    <option value="" disabled>
-                      {productSubsLoading ? "Loading sub-categories…" : "Select sub-category…"}
-                    </option>
-                    {productSubCategories.map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.icon ? `${sub.icon} ` : ""}
-                        {sub.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder={productSubsLoading ? "Loading sub-categories…" : "Select sub-category…"}
+                    options={productSubCategories.map((sub) => ({
+                      value: sub.id,
+                      label: `${sub.icon ? `${sub.icon} ` : ""}${sub.name}`,
+                    }))}
+                  />
                   {productSubCategories.length === 0 && !productSubsLoading && (
                     <p className="mt-1 text-[0.65rem] text-amber-600 dark:text-amber-400">
                       No sub-categories in DB yet — run the Fast Food / retail SQL migration in Supabase.

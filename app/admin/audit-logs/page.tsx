@@ -8,6 +8,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import CustomSelect from "@/components/CustomSelect";
 import {
   fetchAuditLogs,
   fetchAuditStats,
@@ -330,28 +331,31 @@ export default function AuditLogsPage() {
           </div>
 
           {/* Severity filter */}
-          <select
+          <CustomSelect
             value={severityFilter}
-            onChange={(e) => { setSeverityFilter(e.target.value as AuditSeverity | "all"); setPage(1); }}
-            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-          >
-            <option value="all">All Severity</option>
-            <option value="info">Info</option>
-            <option value="warning">Warning</option>
-            <option value="critical">Critical</option>
-          </select>
+            onChange={(val) => { setSeverityFilter(val as AuditSeverity | "all"); setPage(1); }}
+            options={[
+              { value: "all", label: "All Severity" },
+              { value: "info", label: "Info" },
+              { value: "warning", label: "Warning" },
+              { value: "critical", label: "Critical" },
+            ]}
+            fullWidth={false}
+          />
 
           {/* Event type filter */}
-          <select
+          <CustomSelect
             value={eventTypeFilter}
-            onChange={(e) => { setEventTypeFilter(e.target.value); setPage(1); }}
-            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-          >
-            <option value="">All Event Types</option>
-            {eventTypes.map((t) => (
-              <option key={t} value={t}>{t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</option>
-            ))}
-          </select>
+            onChange={(val) => { setEventTypeFilter(val); setPage(1); }}
+            options={[
+              { value: "", label: "All Event Types" },
+              ...eventTypes.map((t) => ({
+                value: t,
+                label: t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              })),
+            ]}
+            fullWidth={false}
+          />
         </section>
 
         {/* Logs List */}

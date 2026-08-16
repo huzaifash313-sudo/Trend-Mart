@@ -20,6 +20,7 @@ import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import { getDealImages, getProductImages, normalizeDealGallery, MAX_DEAL_IMAGES } from "@/lib/productImages";
 import type { Product } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 interface DealManagerProps {
   shopId: string;
@@ -181,18 +182,17 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
               Link product (optional)
             </label>
-            <select
+            <CustomSelect
               value={form.product_id}
-              onChange={(e) => applyProduct(e.target.value)}
-              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            >
-              <option value="">Custom deal (no product link)</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — Rs {p.price}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => applyProduct(val)}
+              options={[
+                { value: "", label: "Custom deal (no product link)" },
+                ...products.map((p) => ({
+                  value: p.id,
+                  label: `${p.name} — Rs ${p.price}`,
+                })),
+              ]}
+            />
             <p className="mt-1 text-[0.65rem] text-zinc-400">
               Picking a product fills title, photos, and prices — you can still edit.
             </p>
@@ -346,17 +346,14 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
               <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                 Day of month
               </label>
-              <select
+              <CustomSelect
                 value={form.day_of_month}
-                onChange={(e) => setForm((f) => ({ ...f, day_of_month: e.target.value }))}
-                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-              >
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm((f) => ({ ...f, day_of_month: val }))}
+                options={Array.from({ length: 31 }, (_, i) => i + 1).map((d) => ({
+                  value: String(d),
+                  label: String(d),
+                }))}
+              />
             </div>
           ) : null}
 

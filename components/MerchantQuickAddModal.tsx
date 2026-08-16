@@ -14,6 +14,7 @@ import QuickCouponPanel from "@/components/QuickCouponPanel";
 import DealManager from "@/components/DealManager";
 import { useToast } from "@/components/Toast";
 import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
+import CustomSelect from "@/components/CustomSelect";
 
 function CloseIcon() {
   return (
@@ -230,17 +231,11 @@ export default function MerchantQuickAddModal() {
               {subs.length > 0 ? (
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Sub-category</label>
-                  <select
+                  <CustomSelect
                     value={subCategoryId}
-                    onChange={(e) => setSubCategoryId(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  >
-                    {subs.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSubCategoryId}
+                    options={subs.map((s) => ({ value: s.id, label: s.name }))}
+                  />
                 </div>
               ) : null}
               <ImageUpload

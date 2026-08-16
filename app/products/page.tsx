@@ -13,6 +13,8 @@ import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilt
 import { useLocation } from "@/context/LocationContext";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
+import ProductOrderModal, { type ProductOrderIntent } from "@/components/ProductOrderModal";
+import { fetchShopById } from "@/services/shopService";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { filterShopsByProximity, haversineDistance } from "@/services/geoRadiusService";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
@@ -116,6 +118,9 @@ function ProductsPageInner() {
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
+  // Direct "Order" checkout (single product → WhatsApp, no cart step).
+  const [orderIntent, setOrderIntent] = useState<ProductOrderIntent | null>(null);
+  const [orderShop, setOrderShop] = useState<Shop | null>(null);
   // Infinite-scroll sentinel element (IntersectionObserver) for auto-load.
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -511,6 +516,75 @@ function ProductsPageInner() {
     [products, addItem, addToast],
   );
 
+  const handleOrder = useCallback(
+    async (intent: ProductOrderIntent) => {
+      const product = intent.product;
+      const full =
+        products.find((p) => p.id === product.id) ?? (product as MarketplaceProduct);
+      if (!full || !full.is_available) {
+        addToast("This product is unavailable.", "error");
+        return;
+      }
+      const shopPick: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
+        id: full.shop_id,
+        name: full.shop_name || "Store",
+        whatsapp_number: full.shop_whatsapp || "",
+      };
+      if (!shopPick.whatsapp_number) {
+        addToast("Store WhatsApp missing — opening store.", "info");
+        router.push(`/shop/${full.shop_id}`);
+        return;
+      }
+
+      // Seed the cart silently (login/verify resumes via CartBar), no toast —
+      // "Order" is a direct order action, not "add to cart".
+      addItem(product, shopPick, intent.quantity, intent.variant, intent.notes);
+      trackProductView({
+        id: full.id,
+        name: full.name,
+        price: full.price,
+        imageUrl: full.image_url,
+        shopId: full.shop_id,
+        shopName: full.shop_name,
+        category: full.shop_category ?? full.category_id ?? null,
+      });
+
+      // Minimal shop from embedded fields, then enrich with the full shop row
+      // (min order, hours, delivery rules) for accurate checkout.
+      const fallback: Shop = {
+        id: full.shop_id,
+        name: shopPick.name,
+        whatsapp_number: shopPick.whatsapp_number,
+        category: full.shop_category ?? "",
+        location: full.shop_location ?? "",
+        is_live: true,
+        latitude: full.shop_latitude ?? null,
+        longitude: full.shop_longitude ?? null,
+        service_radius_km: full.shop_service_radius_km ?? null,
+        delivery_zones: full.shop_delivery_zones ?? null,
+        free_delivery_threshold: full.shop_free_delivery_threshold ?? null,
+        delivery_fee_flat: full.shop_delivery_fee_flat ?? null,
+        delivery_fee_per_km: full.shop_delivery_fee_per_km ?? null,
+      };
+      setOrderShop(fallback);
+      setOrderIntent(intent);
+
+      try {
+        const res = await fetchShopById(full.shop_id);
+        if (res.success && res.data.shop) {
+          setOrderShop({
+            ...res.data.shop,
+            whatsapp_number: res.data.shop.whatsapp_number || shopPick.whatsapp_number,
+            name: res.data.shop.name || shopPick.name,
+          });
+        }
+      } catch {
+        /* keep fallback */
+      }
+    },
+    [products, addItem, addToast, router],
+  );
+
   const handleFavorite = useCallback(
     async (
       product: {
@@ -708,6 +782,7 @@ function ProductsPageInner() {
         getOfferContext={getOfferContext}
         onProductClick={(p) => handleProductClick(p as MarketplaceProduct)}
         onAddToCart={(p) => handleAddToCart(p as MarketplaceProduct)}
+        onOrder={(p) => handleOrder({ product: p, quantity: 1 })}
         onFavoriteToggle={(p, next) => handleFavorite(p, next)}
         onShopClick={handleShopClick}
         emptyState={
@@ -800,6 +875,28 @@ function ProductsPageInner() {
           onWishlistToggle={() =>
             handleFavorite(quickView, !favorites.has(quickView.id))
           }
+          onOrder={(order) => {
+            handleCloseQuickView();
+            handleOrder(order);
+          }}
+        />
+      )}
+
+      {orderIntent && orderShop && (
+        <ProductOrderModal
+          product={orderIntent.product}
+          shop={orderShop}
+          variant={orderIntent.variant}
+          quantity={orderIntent.quantity}
+          notes={orderIntent.notes}
+          onClose={() => {
+            setOrderIntent(null);
+            setOrderShop(null);
+          }}
+          onOrderPlaced={() => {
+            setOrderIntent(null);
+            setOrderShop(null);
+          }}
         />
       )}
     </div>
