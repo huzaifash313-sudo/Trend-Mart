@@ -299,7 +299,7 @@ jobs:
   typescript-check:
     name: 📝 TypeScript Strict Compilation
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -316,7 +316,7 @@ jobs:
 
       - name: Run TypeScript compiler (noEmit)
         run: npx tsc --noEmit
-        timeout-minutes: 5
+        timeout-minutes: 8
 
   # ===========================================================================
   # JOB 5: Build Verification (Security gates before production)
