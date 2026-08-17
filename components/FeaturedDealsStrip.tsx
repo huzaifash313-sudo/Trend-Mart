@@ -10,15 +10,15 @@ import {
 } from "react";
 import Link from "next/link";
 import DealCard from "@/components/DealCard";
-import QuickViewModal from "@/components/QuickViewModal";
+import DealQuickView from "@/components/DealQuickView";
 import {
   isDealActiveOnDate,
   toPkDateKey,
   type ShopDeal,
 } from "@/lib/dealSchedule";
 import { getDealImages } from "@/lib/productImages";
+import { dealToProduct } from "@/lib/dealCommerce";
 import { trackProductView } from "@/lib/behavior";
-import type { Product, Shop } from "@/types";
 
 interface FeaturedDealsStripProps {
   deals: ShopDeal[];
@@ -84,27 +84,6 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-function dealToQuickProduct(deal: ShopDeal): Product {
-  const gallery = getDealImages(deal);
-  const cover = gallery[0] ?? deal.image_url ?? null;
-  const price = deal.price != null && Number.isFinite(deal.price) ? Number(deal.price) : 0;
-  return {
-    id: deal.product_id || `deal-${deal.id}`,
-    shop_id: deal.shop_id,
-    name: deal.title,
-    title: deal.title,
-    description: deal.description ?? "",
-    price,
-    original_price: deal.original_price ?? null,
-    compare_at_price: deal.original_price ?? null,
-    image_url: cover,
-    images: gallery,
-    is_available: true,
-    currency: "PKR",
-    created_at: deal.created_at,
-  } as Product;
-}
-
 function wrapOffset(x: number, width: number): number {
   if (width <= 0) return 0;
   let v = x % width;
@@ -148,13 +127,7 @@ function QuickDealModal({
   onClose: () => void;
 }) {
   if (!deal) return null;
-  const product = dealToQuickProduct(deal);
-  const shop: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
-    id: deal.shop_id,
-    name: deal.shop_name || "Store",
-    whatsapp_number: deal.shop_whatsapp || "",
-  };
-  return <QuickViewModal product={product} shop={shop} onClose={onClose} />;
+  return <DealQuickView deal={deal} onClose={onClose} />;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -230,7 +203,7 @@ function HomeShiftShelf({
   const openDealCard = useCallback((deal: ShopDeal) => {
     setPaused(true);
     setOpenDeal(deal);
-    const product = dealToQuickProduct(deal);
+    const product = dealToProduct(deal);
     trackProductView({
       id: product.id,
       name: deal.title,
@@ -652,7 +625,7 @@ function MarqueeShelf({
               if (movedRef.current) return;
               pauseAuto(8000);
               setOpenDeal(deal);
-              const product = dealToQuickProduct(deal);
+              const product = dealToProduct(deal);
               trackProductView({
                 id: product.id,
                 name: deal.title,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback, memo, type MouseEvent } from "react";
+import { useMemo, useState, useCallback, useEffect, memo, type MouseEvent } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import {
@@ -10,16 +10,25 @@ import {
 } from "@/lib/dealSchedule";
 import { getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
-import { getShopPath, isUuid } from "@/lib/shopSlug";
+import { getShopPath } from "@/lib/shopSlug";
 import { OfferTickerMarquee } from "@/components/ProductGrid";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { useCart } from "@/context/CartContext";
-import { toggleFavorite } from "@/services/wishlistService";
+import { toggleFavorite, isFavorited } from "@/services/wishlistService";
 import { fetchShopById } from "@/services/shopService";
-import type { Product, Shop } from "@/types";
-import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
+import {
+  dealToProduct,
+  dealToShop,
+  dealWishlistId,
+  dealHasPrice,
+  dealToCheckoutItems,
+} from "@/lib/dealCommerce";
+import type { Shop } from "@/types";
 import { useToast } from "@/components/Toast";
 import { trackProductView } from "@/lib/behavior";
+
+// Re-exported so existing call sites (`/deals`) keep a stable import surface.
+export { dealToProduct };
 
 // Lazy-load the heavy checkout form — it's only needed when a shopper actually
 // taps "Order", so it should never be in the deals-list bundle.
@@ -48,26 +57,6 @@ function HeartIcon({ filled }: { filled: boolean }) {
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
-}
-
-export function dealToProduct(deal: ShopDeal): Product {
-  const cover = getDealImages(deal)[0] ?? deal.image_url ?? null;
-  const price = deal.price != null && Number.isFinite(deal.price) ? Number(deal.price) : 0;
-  return {
-    id: deal.product_id && isUuid(deal.product_id) ? deal.product_id : deal.id,
-    shop_id: deal.shop_id,
-    name: deal.title,
-    title: deal.title,
-    description: deal.description ?? "",
-    price,
-    original_price: deal.original_price ?? null,
-    compare_at_price: deal.original_price ?? null,
-    image_url: cover,
-    images: getDealImages(deal),
-    is_available: true,
-    currency: "PKR",
-    created_at: deal.created_at,
-  } as Product;
 }
 
 function formatDealPrice(n: number): string {
@@ -101,6 +90,19 @@ function DealCard({
   const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
   const [orderBusy, setOrderBusy] = useState(false);
 
+  // Keep the heart in sync with persisted favorites (not only after a click).
+  useEffect(() => {
+    let cancelled = false;
+    isFavorited(dealWishlistId(deal))
+      .then((f) => {
+        if (!cancelled) setFavorited(f);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [deal]);
+
   const activeUrl = gallery[Math.min(imgIndex, Math.max(gallery.length - 1, 0))] ?? null;
   const safeSrc =
     activeUrl && !imgError ? getSafeImageUrl(activeUrl, "product") : null;
@@ -116,7 +118,7 @@ function DealCard({
   const canOrderToday = isDealOrderableToday(deal);
   const product = useMemo(() => dealToProduct(deal), [deal]);
   const { hasDiscount, originalPrice, discountPercent } = getProductDiscount(product);
-  const hasPrice = deal.price != null && Number.isFinite(Number(deal.price));
+  const hasPrice = dealHasPrice(deal);
 
   const tickerTags = useMemo(() => {
     const tags: string[] = [];
@@ -127,11 +129,7 @@ function DealCard({
     return tags.slice(0, 3);
   }, [offerTags, whenTag]);
 
-  const shopPick: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
-    id: deal.shop_id,
-    name: deal.shop_name || "Store",
-    whatsapp_number: shopWhatsapp || deal.shop_whatsapp || "",
-  };
+  const shopPick = dealToShop(deal, shopWhatsapp);
 
   const cycleImage = useCallback(
     (e: MouseEvent, dir: 1 | -1) => {
@@ -166,9 +164,8 @@ function DealCard({
 
   const handleWishlist = async (e: MouseEvent) => {
     stop(e);
-    const id = deal.product_id || deal.id;
     const nowFav = await toggleFavorite(
-      id,
+      dealWishlistId(deal),
       "product",
       deal.title,
       gallery[0] ?? undefined,
@@ -236,20 +233,7 @@ function DealCard({
     }
   };
 
-  const checkoutItems: WhatsAppCartItem[] = [
-    {
-      id: product.id,
-      productId: product.id,
-      shopId: deal.shop_id,
-      name: deal.title,
-      price: Number(deal.price),
-      imageUrl: gallery[0] ?? null,
-      quantity: 1,
-      originalPrice: deal.original_price ?? undefined,
-      currency: "PKR",
-      viewKind: deal.product_id && isUuid(deal.product_id) ? "product" : "deal",
-    },
-  ];
+  const checkoutItems = dealToCheckoutItems(deal, product);
 
   const titleClass = compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm";
   const priceLabel = hasPrice ? formatDealPrice(Number(deal.price)) : null;

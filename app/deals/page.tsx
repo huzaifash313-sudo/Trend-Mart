@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } f
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import DealCard, { dealToProduct } from "@/components/DealCard";
+import DealCard from "@/components/DealCard";
+import { dealToProduct } from "@/lib/dealCommerce";
 import {
   formatOfferDayLabel,
   isDealActiveOnDate,
@@ -23,7 +24,7 @@ import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@
 import { trackProductView } from "@/lib/behavior";
 import DealDayDateFilter from "@/components/DealDayDateFilter";
 
-const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
+const DealQuickView = dynamic(() => import("@/components/DealQuickView"), {
   ssr: false,
 });
 
@@ -395,15 +396,7 @@ function DealsInner() {
       )}
 
       {quickViewDeal && (
-        <QuickViewModal
-          product={dealToProduct(quickViewDeal)}
-          shop={{
-            id: quickViewDeal.shop_id,
-            name: quickViewDeal.shop_name || "Store",
-            whatsapp_number: quickViewDeal.shop_whatsapp || "",
-          }}
-          onClose={() => setQuickViewDeal(null)}
-        />
+        <DealQuickView deal={quickViewDeal} onClose={() => setQuickViewDeal(null)} />
       )}
     </div>
   );
