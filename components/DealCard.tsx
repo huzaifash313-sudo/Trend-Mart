@@ -410,7 +410,7 @@ function DealCard({
   return (
     <>
       <article
-        className={`tm-product-card group relative flex h-full w-full flex-col overflow-hidden ${
+        className={`tm-product-card group relative flex w-full flex-col overflow-hidden ${
           onOpen ? "cursor-pointer" : "cursor-default"
         } ${className}`}
         onClick={(e) => {
@@ -490,8 +490,8 @@ function DealCard({
           {tickerTags.length > 0 ? <OfferTickerMarquee tags={tickerTags} /> : null}
         </div>
 
-        <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-1">
-          <h3 className={`tm-product-title min-h-[2.45em] ${titleClass}`} title={deal.title}>
+        <div className="tm-product-body">
+          <h3 className={`tm-product-title ${titleClass}`} title={deal.title}>
             {deal.title}
           </h3>
 
@@ -501,7 +501,7 @@ function DealCard({
               stop(e);
               goStore();
             }}
-            className="flex min-h-[0.875rem] min-w-0 items-center gap-1 text-left"
+            className="tm-product-shop text-left"
             aria-label={`Visit ${deal.shop_name || "store"}`}
           >
             {deal.shop_logo_url ? (
@@ -521,7 +521,7 @@ function DealCard({
             </span>
           </button>
 
-          <div className="mt-auto flex min-h-[2.4rem] flex-col justify-end gap-0.5 pt-1">
+          <div className="tm-product-footer flex flex-col justify-end gap-0.5">
             {hasPrice && priceLabel ? (
               <>
                 <p
@@ -554,7 +554,7 @@ function DealCard({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+          <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1 dark:border-zinc-800">
             <button
               type="button"
               onClick={handleWishlist}

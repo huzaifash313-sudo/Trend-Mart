@@ -40,7 +40,7 @@ export function ShopCardGridSkeleton({ count = 6 }: { count?: number }) {
 /** A full product card skeleton — matches live `tm-product-card` chrome. */
 export function ProductCardSkeleton() {
   return (
-    <div className="tm-product-card flex h-full flex-col overflow-hidden">
+    <div className="tm-product-card flex flex-col overflow-hidden">
       <div className="tm-product-media animate-pulse bg-teal-50 dark:bg-teal-950/30" />
       <div className="tm-product-body flex flex-col gap-0.5">
         <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />

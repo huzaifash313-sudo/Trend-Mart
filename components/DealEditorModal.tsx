@@ -179,7 +179,7 @@ export default function DealEditorModal({ deal, onClose, onSaved }: DealEditorMo
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Note (optional)
+              Description <span className="font-normal text-zinc-400">(optional)</span>
             </label>
             <input
               maxLength={160}

@@ -306,7 +306,8 @@ export type MarketplaceProduct = Product & {
 export interface ProductFormData {
   name: string;
   title?: string;
-  description: string;
+  /** Optional short product detail. Empty or omitted is allowed. */
+  description?: string;
   price: number;
   /** Original ("before discount") price. Set > `price` to show a markdown badge. */
   original_price?: number | null;

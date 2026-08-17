@@ -30,6 +30,7 @@ export interface BulkProductCreatorProps {
 interface BulkRow {
   key: string;
   name: string;
+  description: string;
   sub_category_id: string;
   price: string;
   original_price: string;
@@ -41,6 +42,7 @@ function newRow(defaultSubId = ""): BulkRow {
   return {
     key: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: "",
+    description: "",
     sub_category_id: defaultSubId,
     price: "",
     original_price: "",
@@ -170,7 +172,7 @@ export default function BulkProductCreator({
 
       forms.push({
         name: r.name.trim(),
-        description: "",
+        description: r.description.trim(),
         price,
         original_price: hasDeal ? original : null,
         deal_expires_at:
@@ -284,6 +286,16 @@ export default function BulkProductCreator({
                       onChange={(e) => updateRow(row.key, { name: e.target.value })}
                       placeholder={`Product ${idx + 1} name`}
                       className={fieldClass}
+                    />
+                    <input
+                      type="text"
+                      value={row.description}
+                      onChange={(e) =>
+                        updateRow(row.key, { description: e.target.value })
+                      }
+                      maxLength={300}
+                      placeholder="Description (optional)"
+                      className={`${fieldClass} mt-1.5`}
                     />
                   </td>
                   <td className="px-2 py-2.5">
@@ -402,6 +414,22 @@ export default function BulkProductCreator({
                   value={row.name}
                   onChange={(e) => updateRow(row.key, { name: e.target.value })}
                   placeholder={getProductNamePlaceholder(shopCategory)}
+                  className={fieldClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>
+                  Description <span className="font-normal text-zinc-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={row.description}
+                  onChange={(e) =>
+                    updateRow(row.key, { description: e.target.value })
+                  }
+                  maxLength={300}
+                  placeholder="Short detail — size, flavour, material, etc."
                   className={fieldClass}
                 />
               </div>

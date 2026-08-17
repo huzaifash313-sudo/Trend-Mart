@@ -90,18 +90,18 @@ export default function DealDayDateFilter({
         </div>
       </div>
 
-      {/* Weekday chips */}
-      <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+      {/* Weekday chips — labels only; counts live on the date strip below
+          so a number cannot paint over Sun/Mon/Tue. */}
+      <div className="relative z-10 flex gap-1.5 overflow-x-auto overflow-y-hidden scrollbar-none">
         {WEEKDAY_LABELS.map((label, weekday) => {
           const active = selectedWeekday === weekday && selectedDateKey != null;
           const nextKey = calendarKeys.find((k) => weekdayFromDateKey(k) === weekday);
-          const count = nextKey ? countOn(nextKey) : 0;
           return (
             <button
               key={label}
               type="button"
               onClick={() => pickWeekday(weekday)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+              className={`inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
                 active
                   ? "bg-amber-500 text-zinc-900 shadow-sm shadow-amber-500/30"
                   : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700"
@@ -110,16 +110,13 @@ export default function DealDayDateFilter({
               title={nextKey ? formatOfferDayLabel(nextKey, todayKey) : label}
             >
               {label}
-              <span className={`ml-1 tabular-nums ${active ? "opacity-80" : "text-zinc-400"}`}>
-                {count}
-              </span>
             </button>
           );
         })}
       </div>
 
       {/* Calendar day strip — always visible */}
-      <div className="tm-cat-bar -mx-1">
+      <div className="tm-cat-bar relative z-0 -mx-1 overflow-hidden">
         <div className="tm-cat-scroll px-1 scrollbar-none">
           {calendarKeys.map((key) => {
             const active = selectedDateKey === key;
@@ -133,7 +130,7 @@ export default function DealDayDateFilter({
                 aria-pressed={active}
               >
                 <span className="tm-cat-tab-label">{formatOfferDayLabel(key, todayKey)}</span>
-                <span className="tm-cat-tab-count">{count}</span>
+                {count > 0 ? <span className="tm-cat-tab-count">{count}</span> : null}
                 <span className="tm-cat-tab-line" aria-hidden="true" />
               </button>
             );

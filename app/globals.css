@@ -1066,10 +1066,11 @@ html.dark .trend-card:hover {
 /* Product cards — clear sea-green frame + equal-height layout */
 .tm-product-card {
   position: relative;
-  height: 100%;
-  /* Safer placeholder size so iOS content-visibility doesn't paint tiny frames */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 320px;
+  /*
+   * Do not set height: 100% here. Grid `items-stretch` already sizes the
+   * card to the row. A definite percentage height makes WebKit resolve
+   * flex-item % padding against the CARD HEIGHT (see .tm-product-media).
+   */
   background: #fff;
   border-radius: 0.85rem;
   border: 1.5px solid color-mix(in srgb, var(--tm-sea) 55%, #99f6e4) !important;
@@ -1078,6 +1079,18 @@ html.dark .trend-card:hover {
     border-color 0.22s ease,
     box-shadow 0.22s ease,
     transform 0.18s ease;
+}
+/*
+ * content-visibility is a Chrome scroll win, but iOS Safari (in-page + PWA)
+ * treats contain-intrinsic-size as a used height and clips overflow:hidden
+ * children (title/price/actions vanish; only the image + badge remain).
+ * Keep it on desktop grids only.
+ */
+@media (min-width: 1024px) {
+  .tm-product-card {
+    content-visibility: auto;
+    contain-intrinsic-size: 220px 420px;
+  }
 }
 html.dark .tm-product-card {
   background: var(--tm-surface);
@@ -1559,18 +1572,28 @@ html.dark .tm-home-deals-progress-bar {
 
 .tm-product-media {
   /*
-   * Safari/WebKit collapse: aspect-ratio alone fails when every child is
-   * position:absolute (Next/Image `fill`). Drive height from padding-bottom
-   * so the box always has intrinsic size. 5:4 → height/width = 4/5 = 80%.
+   * 5:4 image slot. MUST NOT put padding-bottom % on this flex item:
+   * when the card has a definite height (CSS grid stretch), WebKit resolves
+   * vertical % padding against the card HEIGHT, so the image eats ~80% of
+   * the card and overflow:hidden clips title/price/buttons. Blink resolves
+   * the same % against WIDTH — that's why Android looked fine and iOS did not.
+   *
+   * ::before is in-flow (not a flex item), so its % padding is of THIS box's
+   * width. Also gives aspect-ratio an in-flow child, which Safari needs when
+   * the real image is position:absolute (Next/Image `fill`).
    */
   position: relative;
   width: 100%;
-  height: 0;
-  padding-bottom: 80%;
   flex: 0 0 auto;
   align-self: stretch;
   overflow: hidden;
   background: linear-gradient(160deg, #f0fdfa 0%, #ecfeff 55%, #f8fafc 100%);
+}
+.tm-product-media::before {
+  content: "";
+  display: block;
+  width: 100%;
+  padding-bottom: 80%;
 }
 html.dark .tm-product-media {
   background: linear-gradient(160deg, #042f2e 0%, #0f172a 100%);
@@ -1585,11 +1608,19 @@ html.dark .tm-product-placeholder {
 }
 
 .tm-product-body {
-  padding: 0.4rem 0.5rem 0.45rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  /* Never collapse on WebKit when the card is height-constrained. */
+  flex-shrink: 0;
+  min-height: auto;
+  min-height: min-content;
+  padding: 0.32rem 0.4rem 0.34rem;
+  gap: 0.2rem;
 }
 @media (min-width: 640px) {
   .tm-product-body {
-    padding: 0.45rem 0.55rem 0.5rem;
+    padding: 0.36rem 0.46rem 0.38rem;
   }
 }
 
@@ -1599,7 +1630,9 @@ html.dark .tm-product-placeholder {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  min-height: 0;
+  flex-shrink: 0;
+  /* Reserve 2 lines so 1-line titles don't leave a ragged gap above the price. */
+  min-height: calc(1.22em * 2);
   font-weight: 600;
   line-height: 1.22;
   letter-spacing: -0.01em;
@@ -1615,9 +1648,19 @@ html.dark .tm-product-title {
   color: #f4f4f5;
 }
 
+.tm-product-shop {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 0.875rem;
+}
+
 .tm-product-footer {
-  min-height: 0;
+  flex-shrink: 0;
   width: 100%;
+  margin-top: 0.15rem;
 }
 
 /* Dark moving offer “patti” on product images */
@@ -2341,8 +2384,6 @@ html.dark .tm-cat-tab.is-active {
   white-space: nowrap;
 }
 .tm-cat-tab-count {
-  position: relative;
-  z-index: 1;
   flex-shrink: 0;
   font-size: 0.68rem;
   font-weight: 600;

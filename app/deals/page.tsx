@@ -309,7 +309,7 @@ function DealsInner() {
       {loading ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="tm-product-card flex h-full flex-col overflow-hidden">
+            <div key={i} className="tm-product-card flex flex-col overflow-hidden">
               <div className="tm-product-media animate-pulse bg-amber-50 dark:bg-amber-950/20" />
               <div className="tm-product-body flex flex-col gap-0.5">
                 <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />

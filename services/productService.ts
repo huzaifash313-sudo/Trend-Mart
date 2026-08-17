@@ -898,7 +898,7 @@ export async function updateProduct(
     let row: Record<string, unknown>;
     if (hasPartialShape) {
       const sanitized = sanitizeProductPricing(form);
-      row = { ...(sanitized as Record<string, unknown>) };
+      row = { ...(sanitized as unknown as Record<string, unknown>) };
       if (
         "sub_category_id" in row &&
         (typeof row.sub_category_id !== "string" ||

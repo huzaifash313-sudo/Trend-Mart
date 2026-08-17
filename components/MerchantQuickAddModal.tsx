@@ -89,10 +89,6 @@ export default function MerchantQuickAddModal() {
       addToast("Enter a product name and price.", "error");
       return;
     }
-    if (!description.trim()) {
-      addToast("Add a short product description.", "error");
-      return;
-    }
     setSaving(true);
     const result = await createProduct(shopId, {
       name: name.trim(),
@@ -192,11 +188,10 @@ export default function MerchantQuickAddModal() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Description *</label>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Description <span className="font-normal text-zinc-400">(optional)</span></label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  required
                   rows={2}
                   maxLength={300}
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"

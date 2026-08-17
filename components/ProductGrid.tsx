@@ -260,7 +260,7 @@ const ProductCard = memo(function ProductCard({
         if (t?.closest("button, a, input, textarea, select, label")) return;
         handleCardClick();
       }}
-      className="tm-product-card group flex h-full scroll-mt-24 cursor-pointer flex-col overflow-hidden"
+      className="tm-product-card group flex scroll-mt-24 cursor-pointer flex-col overflow-hidden"
       role="button"
       tabIndex={0}
       aria-label={`View ${product.name}`}
@@ -319,8 +319,8 @@ const ProductCard = memo(function ProductCard({
         ) : null}
       </div>
 
-      <div className="tm-product-body flex min-h-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-start gap-1">
+      <div className="tm-product-body">
+        <div className="flex shrink-0 items-start gap-1">
           <h3
             className={`tm-product-title min-w-0 flex-1 ${
               compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"
@@ -338,7 +338,7 @@ const ProductCard = memo(function ProductCard({
         </div>
 
         {showShopMeta && product.shop_name ? (
-          <div className="flex min-w-0 items-center gap-1">
+          <div className="tm-product-shop">
             <button
               type="button"
               onClick={(e) => {
@@ -372,12 +372,12 @@ const ProductCard = memo(function ProductCard({
             />
           </div>
         ) : !compact && product.description ? (
-          <p className="line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
+          <p className="tm-product-shop line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
             {product.description}
           </p>
         ) : null}
 
-        <div className="tm-product-footer mt-auto flex flex-col gap-1 pt-1">
+        <div className="tm-product-footer flex flex-col gap-1">
           {/* Price — full width so it never collapses into a vertical stack */}
           <div className="min-w-0">
             <p
@@ -403,7 +403,7 @@ const ProductCard = memo(function ProductCard({
 
           {/* Actions — customer row only; owner manage uses the 3-dot menu above */}
           {!manage && (onFavoriteToggle || (product.is_available && (onAddToCart || onOrder))) ? (
-            <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+            <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1 dark:border-zinc-800">
               {onFavoriteToggle ? (
                 <button
                   type="button"
@@ -454,14 +454,16 @@ const ProductCard = memo(function ProductCard({
 
 function SkeletonCard() {
   return (
-    <div className="tm-product-card flex h-full flex-col overflow-hidden">
+    <div className="tm-product-card flex flex-col overflow-hidden">
       <div className="tm-product-media animate-pulse bg-teal-50 dark:bg-teal-950/30" />
-      <div className="tm-product-body flex flex-col gap-0.5">
+      <div className="tm-product-body">
         <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-        <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-        <div className="tm-product-footer mt-auto flex flex-col gap-1 pt-1">
+        <div className="tm-product-shop">
+          <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        </div>
+        <div className="tm-product-footer flex flex-col gap-1">
           <div className="h-4 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          <div className="flex items-center justify-between border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+          <div className="flex items-center justify-between border-t border-zinc-100 pt-1 dark:border-zinc-800">
             <div className="h-5 w-5 animate-pulse rounded-full bg-zinc-100 dark:bg-zinc-800" />
             <div className="h-3 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
           </div>

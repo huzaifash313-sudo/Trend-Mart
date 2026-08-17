@@ -328,7 +328,7 @@ export default function ProductsDashboardPage() {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
+        (p.description ?? "").toLowerCase().includes(q)
       );
     }
 
@@ -489,7 +489,6 @@ export default function ProductsDashboardPage() {
     e.preventDefault();
     if (!activeShopId) return;
     if (!form.name.trim()) { addToast("Product name is required.", "error"); return; }
-    if (!form.description.trim()) { addToast("Product description is required.", "error"); return; }
     if (form.basePrice <= 0) { addToast("Price must be greater than 0.", "error"); return; }
 
     setFormSaving(true);
@@ -1015,13 +1014,15 @@ export default function ProductsDashboardPage() {
 
               {/* Description */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Description *</label>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  Description <span className="font-normal text-zinc-400">(optional)</span>
+                </label>
                 <textarea
                   rows={2}
-                  required
+                  maxLength={300}
                   value={form.description}
                   onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="High-quality fabric, available in multiple colors..."
+                  placeholder="Short detail — size, flavour, material, etc."
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 resize-none"
                 />
               </div>
