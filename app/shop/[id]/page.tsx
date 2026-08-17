@@ -17,7 +17,7 @@ import AnnouncementBanner from "@/components/AnnouncementBanner";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
 import CustomSelect from "@/components/CustomSelect";
-import DealCard, { dealToProduct } from "@/components/DealCard";
+import FeaturedDealsStrip from "@/components/FeaturedDealsStrip";
 import { isDealActiveOnDate, toPkDateKey } from "@/lib/dealSchedule";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
@@ -237,7 +237,6 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // Quick view modal state — cart-first: no single-item checkout
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
-  const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
 
   // Direct "Order" checkout (single product, no cart step) — mirrors DealCard.
   const [orderIntent, setOrderIntent] = useState<ProductOrderIntent | null>(null);
@@ -1253,51 +1252,18 @@ function ShopDetailInner({ id }: { id: string }) {
             )}
           </section>
         ) : liveShopDeals.length > 0 ? (
-          <section id="deals" aria-label="Store deals" className="space-y-2 scroll-mt-20">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Deals</h2>
-                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                  Order on deal day
-                </p>
-              </div>
-              <Link
-                href="/deals"
-                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
-              >
-                All deals →
-              </Link>
-            </div>
-            <div className="-mx-1 flex snap-x snap-mandatory items-stretch gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
-              {liveShopDeals.map((deal, i) => (
-                <div
-                  key={deal.id}
-                  id={`deal-${deal.id}`}
-                  className="flex w-[calc(50%-0.25rem)] shrink-0 snap-start scroll-mt-24 sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
-                >
-                  <DealCard
-                    deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
-                    compact
-                    priority={i < 2}
-                    href={`${getShopPath(shop)}#deal-${deal.id}`}
-                    shopWhatsapp={shop.whatsapp_number}
-                    offerTags={shopDealOfferTags}
-                    onOpen={() => {
-                      setQuickViewDeal(deal);
-                      trackProductView({
-                        id: deal.product_id && deal.product_id.length > 10 ? deal.product_id : deal.id,
-                        name: deal.title,
-                        price: Number(deal.price) || 0,
-                        imageUrl: deal.image_url,
-                        shopId: shop.id,
-                        shopName: shop.name,
-                        category: shop.category ?? null,
-                      });
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
+          <section id="deals" aria-label="Store deals" className="scroll-mt-20">
+            {/* Zero-height anchors keep WhatsApp #deal-{id} deep links working. */}
+            {liveShopDeals.map((d) => (
+              <div key={`deal-anchor-${d.id}`} id={`deal-${d.id}`} className="h-0 overflow-hidden" aria-hidden="true" />
+            ))}
+            <FeaturedDealsStrip
+              deals={liveShopDeals}
+              title="Deals"
+              seeAllHref="/deals"
+              variant="home"
+              getOfferTags={() => shopDealOfferTags}
+            />
           </section>
         ) : null}
 
@@ -1455,17 +1421,6 @@ function ShopDetailInner({ id }: { id: string }) {
             setQuickViewProduct(null);
             handleOrder(order);
           }}
-        />
-      )}
-      {quickViewDeal && shop && (
-        <QuickViewModal
-          product={dealToProduct({
-            ...quickViewDeal,
-            shop_name: shop.name,
-            shop_whatsapp: shop.whatsapp_number,
-          })}
-          shop={{ id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number }}
-          onClose={() => setQuickViewDeal(null)}
         />
       )}
 
