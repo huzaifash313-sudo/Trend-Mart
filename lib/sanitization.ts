@@ -22,7 +22,8 @@ export function sanitizeHtml(input: string): string {
     .replace(/<[^>]*>/g, "")
     .replace(/javascript:/gi, "")
     .replace(/on\w+\s*=\s*"[^"]*"/gi, "")
-    .replace(/on\w+\s*=\s*"'[^']*"'/gi, "")
+    .replace(/on\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/on\w+\s*=[^\s>]*/gi, "")
     .trim();
 }
 

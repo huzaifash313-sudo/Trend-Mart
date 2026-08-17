@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     const name = truncate(sanitizeLight(body.name ?? ""), 120);
-    const email = (body.email ?? "").trim().toLowerCase();
+    const email = truncate((body.email ?? "").trim().toLowerCase(), 254);
     const phone = body.phone?.trim()
       ? truncate(sanitizeLight(formatPkPhoneDisplay(body.phone)), 30)
       : truncate(sanitizeLight(body.phone ?? ""), 30);

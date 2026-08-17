@@ -12,16 +12,18 @@ import {
   buildRateLimitResponse,
 } from "@/lib/rateLimiter";
 import { sanitizeHtml, sanitizeLight, sanitizeNumeric, truncate } from "@/lib/sanitization";
-import { lockedDisplayName, phonesMatch, MAX_REVIEWS_PER_IP_PER_DAY } from "@/lib/reviewRules";
+import { lockedDisplayName, phonesMatch, normalizePhoneDigits, MAX_REVIEWS_PER_IP_PER_DAY } from "@/lib/reviewRules";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function clientIp(request: NextRequest): string {
+  // SECURITY: prefer proxy-set headers that a client cannot spoof. Only fall
+  // back to `x-forwarded-for` (which a client can forge) as a last resort.
   const raw =
     request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     "unknown";
   return raw.replace(/[^0-9a-fA-F.:]/g, "").slice(0, 45) || "unknown";
 }
@@ -130,18 +132,35 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: orders } = await supabase
+  // Primary: exact account match (orders store customer_user_id). Targeted and
+  // index-friendly — no `.limit(80)` sweep that could miss heavy buyers.
+  const { data: userOrders } = await supabase
     .from("orders")
-    .select("id, customer_user_id, customer_phone, status")
+    .select("id, status")
     .eq("shop_id", shopId)
-    .limit(80);
+    .eq("customer_user_id", user.id)
+    .limit(1);
 
-  const purchased = (orders ?? []).some((row) => {
-    const status = String(row.status ?? "");
-    if (status.toLowerCase() === "cancelled") return false;
-    if (row.customer_user_id === user.id) return true;
-    return phonesMatch(row.customer_phone, profile?.phone);
-  });
+  let purchased = (userOrders ?? []).some(
+    (row) => String(row.status ?? "").toLowerCase() !== "cancelled",
+  );
+
+  // Secondary: phone fallback for orders placed before sign-up (guest checkout).
+  if (!purchased && profile?.phone) {
+    const last10 = normalizePhoneDigits(profile.phone).slice(-10);
+    if (last10.length === 10) {
+      const { data: phoneOrders } = await supabase
+        .from("orders")
+        .select("id, customer_phone, status")
+        .eq("shop_id", shopId)
+        .like("customer_phone", `%${last10}`)
+        .limit(5);
+      purchased = (phoneOrders ?? []).some((row) => {
+        if (String(row.status ?? "").toLowerCase() === "cancelled") return false;
+        return phonesMatch(row.customer_phone, profile.phone);
+      });
+    }
+  }
 
   if (!purchased) {
     return NextResponse.json(

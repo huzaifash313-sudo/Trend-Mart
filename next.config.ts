@@ -424,7 +424,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "2mb",
       allowedOrigins: isProd
-        ? ["trendmart.vercel.app", "trendmart.com"]
+        ? ["trend-marts.vercel.app", "trendmart.com"]
         : ["localhost:3000"],
     },
   },

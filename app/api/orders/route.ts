@@ -114,6 +114,14 @@ function toNumber(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Parse a money value; returns null for invalid (non-numeric) or negative values. */
+function toMoney(v: unknown): number | null {
+  if (typeof v !== "number" && typeof v !== "string") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
 function clampQuantity(v: unknown): number {
   const n = Math.round(toNumber(v, 1));
   if (!Number.isFinite(n) || n < 1) return 1;
@@ -323,26 +331,26 @@ export async function POST(request: Request) {
 
   const productMap = new Map<
     string,
-    { id: string; shop_id: string; name: string; price: number; is_available: boolean; variants: VariantGroup[]; updated_at?: string }
+    { id: string; shop_id: string; name: string; price: number | null; is_available: boolean; variants: VariantGroup[]; updated_at?: string }
   >();
   for (const row of (productRes.data ?? []) as Record<string, unknown>[]) {
     productMap.set(String(row.id), {
       id: String(row.id),
       shop_id: String(row.shop_id ?? ""),
       name: String(row.name ?? ""),
-      price: toNumber(row.price),
+      price: toMoney(row.price),
       is_available: row.is_available !== false,
       variants: (row.variants as VariantGroup[]) ?? [],
       updated_at: row.updated_at as string | undefined,
     });
   }
-  const packageMap = new Map<string, { id: string; shop_id: string; name: string; price: number }>();
+  const packageMap = new Map<string, { id: string; shop_id: string; name: string; price: number | null }>();
   for (const row of (packageRes.data ?? []) as Record<string, unknown>[]) {
     packageMap.set(String(row.id), {
       id: String(row.id),
       shop_id: String(row.shop_id ?? ""),
       name: String(row.name ?? ""),
-      price: toNumber(row.price),
+      price: toMoney(row.price),
     });
   }
 
@@ -415,6 +423,12 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
+      if (product.price == null) {
+        return NextResponse.json(
+          { success: false, error: `"${product.name}" has an invalid price. Ask the shop to fix it.` },
+          { status: 409 },
+        );
+      }
       resolvedItems.push({
         productId: item.productId,
         name: product.name || item.name,
@@ -470,6 +484,12 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { success: false, error: "Cart contains an item from another shop." },
           { status: 400 },
+        );
+      }
+      if (pkg.price == null) {
+        return NextResponse.json(
+          { success: false, error: `"${pkg.name || item.name}" has an invalid price. Ask the shop to fix it.` },
+          { status: 409 },
         );
       }
       resolvedItems.push({
@@ -602,7 +622,34 @@ export async function POST(request: Request) {
 
   const total = Math.max(0, Math.round((subtotal - discount + deliveryFee) * 100) / 100);
 
-  // 11. Atomic coupon redemption — BEFORE insert, so the usage limit can never
+  // 11. Idempotency — if this checkout token already produced an order, return
+  //     it instead of creating a duplicate. This MUST run BEFORE any mutation
+  //     (coupon increment / stock deduction) so a retry or double-click can
+  //     never double-spend a coupon or double-deduct stock.
+  if (idempotencyKey) {
+    const { data: existing } = await admin
+      .from("orders")
+      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
+      .eq("client_token", idempotencyKey)
+      .maybeSingle();
+    if (existing) {
+      const prior = existing as Record<string, unknown>;
+      const order: Order = {
+        id: String(prior.id),
+        shop_id: String(prior.shop_id),
+        customer_name: String(prior.customer_name ?? ""),
+        customer_phone: String(prior.customer_phone ?? ""),
+        items_json: (prior.items_json as OrderItem[]) ?? [],
+        total_amount: toNumber(prior.total_amount, 0),
+        status: (prior.status as Order["status"]) ?? "Pending",
+        created_at: String(prior.created_at ?? new Date().toISOString()),
+        updated_at: prior.updated_at as string | undefined,
+      };
+      return NextResponse.json({ success: true, order });
+    }
+  }
+
+  // 12. Atomic coupon redemption — BEFORE insert, so the usage limit can never
   //     be exceeded even under concurrent checkouts (closes the TOCTOU race).
   if (appliedCoupon) {
     let rpcOk: boolean | null = null;
@@ -650,7 +697,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // 12. SOFT stock deduction — advisory, never blocks checkout.
+  // 13. SOFT stock deduction — advisory, never blocks checkout.
   //     TrendMart is a WhatsApp-first marketplace: the merchant is the human
   //     gatekeeper who confirms/declines each order in WhatsApp. Digital stock
   //     is only a rough guide (merchants also sell walk-in), so we NEVER reject
@@ -680,31 +727,6 @@ export async function POST(request: Request) {
       }
     } catch {
       // RPC missing (old DB) — skip deduction; availability was already checked.
-    }
-  }
-
-  // 13. Idempotency — if this checkout token already produced an order, return
-  //     it instead of creating a duplicate (guards double-click / retry).
-  if (idempotencyKey) {
-    const { data: existing } = await admin
-      .from("orders")
-      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
-      .eq("client_token", idempotencyKey)
-      .maybeSingle();
-    if (existing) {
-      const prior = existing as Record<string, unknown>;
-      const order: Order = {
-        id: String(prior.id),
-        shop_id: String(prior.shop_id),
-        customer_name: String(prior.customer_name ?? ""),
-        customer_phone: String(prior.customer_phone ?? ""),
-        items_json: (prior.items_json as OrderItem[]) ?? [],
-        total_amount: toNumber(prior.total_amount, 0),
-        status: (prior.status as Order["status"]) ?? "Pending",
-        created_at: String(prior.created_at ?? new Date().toISOString()),
-        updated_at: prior.updated_at as string | undefined,
-      };
-      return NextResponse.json({ success: true, order });
     }
   }
 

@@ -21,7 +21,7 @@ export const revalidate = 3600; // 1 hour — Next.js ISR revalidation
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendmart.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trend-marts.vercel.app";
 
 function createSupabase() {
   return createClient(

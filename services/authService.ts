@@ -182,8 +182,9 @@ export async function upsertSignupProfile(
       },
       { onConflict: "user_id" },
     );
-  } catch {
+  } catch (err) {
     // Non-fatal — checkout can still collect name/phone later.
+    console.warn("[authService] upsertSignupProfile failed (non-fatal):", err);
   }
 }
 
@@ -218,6 +219,7 @@ export async function claimSignupRole(
     }
   } catch {
     /* RPC may not exist yet — fall through */
+    console.warn("[authService] set_my_signup_role RPC unavailable — falling back to upsert.");
   }
 
   try {

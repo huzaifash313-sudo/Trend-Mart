@@ -12,7 +12,7 @@ import {
   isSeedSubCategoryId,
 } from "@/lib/defaultSubCategories";
 import { isValidUUID } from "@/lib/sanitization";
-import { requireSignedInUser } from "@/lib/requireAdmin";
+import { requireAdminUser } from "@/lib/requireAdmin";
 
 export const runtime = "nodejs";
 
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   try {
     // Idempotent built-in catalog upsert — merchants need this when adding
     // products; guests never hit it (fetchSubCategories no longer auto-POSTs).
-    const gate = await requireSignedInUser();
+    const gate = await requireAdminUser();
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

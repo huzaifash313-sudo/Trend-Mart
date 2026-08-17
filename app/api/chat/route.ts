@@ -117,7 +117,7 @@ async function fetchShopContext(shopId: string): Promise<ShopContext | null> {
 
   const { data: shop, error: shopError } = await supabase
     .from("shops")
-    .select("*")
+    .select("name, category, location, operating_status, business_hours, whatsapp_number")
     .eq("id", safeShopId)
     .single();
 
@@ -125,7 +125,7 @@ async function fetchShopContext(shopId: string): Promise<ShopContext | null> {
 
   const { data: products } = await supabase
     .from("products")
-    .select("*")
+    .select("name, price, description, is_available")
     .eq("shop_id", safeShopId)
     .order("created_at", { ascending: false })
     .limit(50);

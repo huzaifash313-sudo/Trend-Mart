@@ -18,7 +18,7 @@ import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
   const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendmart.vercel.app";
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://trend-marts.vercel.app";
 
   return {
     rules: [
