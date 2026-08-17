@@ -499,7 +499,7 @@ export default function ServiceBookingModal({
                   required
                   value={booking.customerName}
                   onChange={(e) => setBooking(b => ({ ...b, customerName: e.target.value }))}
-                  placeholder="Ahmed Khan"
+                  placeholder="Full name"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerName ? "border-red-300 focus:ring-red-500/20" : "border-zinc-200 focus:border-orange-500 focus:ring-orange-500/20"
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
@@ -515,7 +515,7 @@ export default function ServiceBookingModal({
                   required
                   value={booking.customerPhone}
                   onChange={(e) => setBooking(b => ({ ...b, customerPhone: e.target.value }))}
-                  placeholder="+92 300 1234567"
+                  placeholder="0300-1234567"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerPhone ? "border-red-300 focus:ring-red-500/20" : "border-zinc-200 focus:border-orange-500 focus:ring-orange-500/20"
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
@@ -533,7 +533,7 @@ export default function ServiceBookingModal({
                   required
                   value={booking.customerAddress}
                   onChange={(e) => setBooking(b => ({ ...b, customerAddress: e.target.value }))}
-                  placeholder="House 123, Street 4, Gulberg, Lahore"
+                  placeholder="Full address"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerAddress ? "border-red-300 focus:ring-red-500/20" : "border-zinc-200 focus:border-orange-500 focus:ring-orange-500/20"
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
@@ -606,7 +606,7 @@ export default function ServiceBookingModal({
                   rows={2}
                   value={booking.notes}
                   onChange={(e) => setBooking(b => ({ ...b, notes: e.target.value }))}
-                  placeholder="Describe your specific needs, any particular issue..."
+                  placeholder="Describe your needs"
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>

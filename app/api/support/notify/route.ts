@@ -86,7 +86,7 @@ async function persistTicket(row: SupportTicketInsert) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {
-    throw new Error("Supabase is not configured on the server.");
+    throw new Error("Support is temporarily unavailable. Please try again.");
   }
 
   const client = createSupabaseClient(url, anon, {

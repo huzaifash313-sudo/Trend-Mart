@@ -584,7 +584,7 @@ export default function FinancesPage() {
                         step={1}
                         value={entryForm.amount || ""}
                         onChange={(e) => setEntryForm((f) => ({ ...f, amount: Number(e.target.value) }))}
-                        placeholder="5000"
+                        placeholder="Amount"
                         className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                       />
                     </div>
@@ -598,7 +598,7 @@ export default function FinancesPage() {
                         required
                         value={entryForm.description}
                         onChange={(e) => setEntryForm((f) => ({ ...f, description: e.target.value }))}
-                        placeholder="What was this for?"
+                        placeholder="Note"
                         className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                       />
                     </div>

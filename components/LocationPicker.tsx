@@ -349,7 +349,7 @@ export default function LocationPicker() {
                           type="search"
                           value={placeQuery}
                           onChange={(e) => setPlaceQuery(e.target.value)}
-                          placeholder="Search shop, hospital, academy, colony…"
+                          placeholder="Search your area"
                           autoComplete="off"
                           className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-300/50 dark:text-zinc-50"
                         />

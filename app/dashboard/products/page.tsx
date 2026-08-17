@@ -923,7 +923,7 @@ export default function ProductsDashboardPage() {
                   <CustomSelect
                     value={form.subCategoryId}
                     onChange={(val) => setForm((f) => ({ ...f, subCategoryId: val }))}
-                    placeholder={subCategories.length ? "Select…" : "No sub-categories"}
+                    placeholder={subCategories.length ? "Select" : "No sub-categories"}
                     options={subCategories.map((s) => ({
                       value: s.id,
                       label: `${s.icon ? `${s.icon} ` : ""}${s.name}`,
@@ -946,7 +946,7 @@ export default function ProductsDashboardPage() {
                     step={1}
                     value={form.basePrice || ""}
                     onChange={(e) => setForm(f => ({ ...f, basePrice: Number(e.target.value) }))}
-                    placeholder="2499"
+                    placeholder="Price"
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 </div>
@@ -964,7 +964,7 @@ export default function ProductsDashboardPage() {
                   step={1}
                   value={form.originalPrice}
                   onChange={(e) => setForm(f => ({ ...f, originalPrice: e.target.value }))}
-                  placeholder="3999 (before discount)"
+                  placeholder="Original price"
                   className="w-full max-w-xs rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
                 {form.originalPrice && parseFloat(form.originalPrice) <= form.basePrice && (
@@ -1022,7 +1022,7 @@ export default function ProductsDashboardPage() {
                   maxLength={300}
                   value={form.description}
                   onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Short detail — size, flavour, material, etc."
+                  placeholder="Short description"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 resize-none"
                 />
               </div>
@@ -1238,7 +1238,7 @@ export default function ProductsDashboardPage() {
                     ))}
                     <input
                       type="text"
-                      placeholder="Add tag..."
+                      placeholder="Add tag"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1299,7 +1299,7 @@ export default function ProductsDashboardPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search products..."
+                  placeholder="Search products"
                   className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
 

@@ -402,7 +402,7 @@ export default function WhatsAppCheckoutModal({
 }: WhatsAppCheckoutModalProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const { location, isDetecting, detectLocationDetailed } = useLocation();
+  const { location, isDetecting, detectLocationDetailed, seedLocation } = useLocation();
   const { addToast } = useToast();
 
   // ── State ───────────────────────────────────────────────────────────────
@@ -641,7 +641,7 @@ export default function WhatsAppCheckoutModal({
         const [{ data: profile }, { data: savedAddr }] = await Promise.all([
           supabase
             .from("user_profiles")
-            .select("full_name, phone, address")
+            .select("full_name, phone, address, latitude, longitude, city, location_label")
             .eq("user_id", user.id)
             .maybeSingle(),
           supabase
@@ -661,6 +661,29 @@ export default function WhatsAppCheckoutModal({
               .join(", ")
           : "";
 
+        const profileLat =
+          typeof profile?.latitude === "number" && Number.isFinite(profile.latitude)
+            ? profile.latitude
+            : null;
+        const profileLng =
+          typeof profile?.longitude === "number" && Number.isFinite(profile.longitude)
+            ? profile.longitude
+            : null;
+        const profileLocLabel = (profile?.location_label as string | undefined)?.trim() || "";
+
+        // Seed the location context from the saved profile pin so distance +
+        // coverage checks run immediately without a fresh GPS prompt.
+        if (profileLat != null && profileLng != null) {
+          seedLocation({
+            coordinates: { latitude: profileLat, longitude: profileLng },
+            city: (profile?.city as string | undefined) ?? null,
+            deliveryZone: (profile?.city as string | undefined) ?? null,
+            address: profileLocLabel || profile?.address || null,
+            updatedAt: Date.now(),
+            source: "cached",
+          });
+        }
+
         const nextName =
           savedAddr?.full_name ||
           profile?.full_name ||
@@ -672,7 +695,7 @@ export default function WhatsAppCheckoutModal({
           user.user_metadata?.phone ||
           "";
         const nextPhone = nextPhoneRaw ? formatPkPhoneDisplay(String(nextPhoneRaw)) : "";
-        const nextAddress = line || profile?.address || "";
+        const nextAddress = line || profile?.address || profileLocLabel || "";
         const nextNotes = savedAddr?.delivery_notes || "";
 
         setShipping((prev) => ({
@@ -694,7 +717,7 @@ export default function WhatsAppCheckoutModal({
 
     loadProfile();
     return () => { cancelled = true; };
-  }, [supabase, authGate]);
+  }, [supabase, authGate, seedLocation]);
 
   // If account had no saved address, fall back to header map location (still editable).
   useEffect(() => {
@@ -1430,7 +1453,7 @@ export default function WhatsAppCheckoutModal({
                     setAutofilledFromAccount(false);
                     setShipping(s => ({ ...s, customerName: e.target.value }));
                   }}
-                  placeholder="Ahmed Khan"
+                  placeholder="Full name"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerName
                       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
@@ -1504,7 +1527,7 @@ export default function WhatsAppCheckoutModal({
                     setLocationFillError(null);
                     setShipping(s => ({ ...s, shippingAddress: e.target.value }));
                   }}
-                  placeholder="House 123, Street 4, Gulberg, Lahore"
+                  placeholder="Full address"
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.shippingAddress
                       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
@@ -1537,7 +1560,7 @@ export default function WhatsAppCheckoutModal({
                   rows={2}
                   value={shipping.deliveryNotes}
                   onChange={(e) => setShipping(s => ({ ...s, deliveryNotes: e.target.value }))}
-                  placeholder="e.g., Ring bell, leave at gate, call before delivery..."
+                  placeholder="Delivery instructions"
                   className={`w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-${accentColor}-500 focus:outline-none focus:ring-2 focus:ring-${accentColor}-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
               </div>

@@ -521,7 +521,7 @@ export async function updateShopDeal(
         // Still empty — likely RLS; stop retrying strips
         error = {
           message:
-            "Update blocked by database permissions. Run supabase/FIX_SHOP_DEALS_SCHEMA.sql",
+            "Could not update deal due to a permissions issue. Please try again",
         };
         break;
       }
@@ -533,7 +533,7 @@ export async function updateShopDeal(
     if (!data) {
       return {
         success: false,
-        error: "Could not update deal (check merchant RLS / run FIX_SHOP_DEALS_SCHEMA.sql).",
+        error: "Could not update deal. Please try again.",
       };
     }
     return { success: true, data: parseDeal(data as Record<string, unknown>) };

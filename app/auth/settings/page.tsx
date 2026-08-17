@@ -129,7 +129,7 @@ export default function AccountSettingsPage() {
         // Column may be missing until SQL is run — still keep name/phone if possible
         addToast(
           profileErr.message.includes("avatar_url")
-            ? "Profile saved, but photo needs SQL setup (avatar_url). Run PROFILE_AND_TIKTOK_SETUP.sql."
+            ? "Profile saved. Your photo may take a moment to appear."
             : profileErr.message,
           profileErr.message.includes("avatar_url") ? "info" : "error",
         );
@@ -173,7 +173,7 @@ export default function AccountSettingsPage() {
       if (error) {
         addToast(
           error.message.includes("avatar_url")
-            ? "Photo uploaded locally — run PROFILE_AND_TIKTOK_SETUP.sql in Supabase to persist."
+            ? "Couldn't save your photo. Please try again."
             : error.message,
           "error",
         );
@@ -409,7 +409,7 @@ export default function AccountSettingsPage() {
                 required
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="Enter your email"
                 className={inputClass}
               />
             </div>

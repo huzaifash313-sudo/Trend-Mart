@@ -11,8 +11,8 @@ function requireEnv(key: string): string {
   const value = process.env[key];
   if (!value || value.trim().length === 0) {
     throw new Error(
-      `[TrendMart Server] Missing required environment variable: ${key}. ` +
-      `Ensure it is defined in .env.local (dev) or in your deployment environment variables.`,
+      `[TrendMart Server] Missing required configuration (${key}). ` +
+      `Please complete the platform setup.`,
     );
   }
   return value;

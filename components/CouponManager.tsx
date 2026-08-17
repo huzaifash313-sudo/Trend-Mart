@@ -355,7 +355,7 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
                 type="text"
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-                placeholder="e.g. SUMMER25, EID50"
+                placeholder="Coupon code"
                 maxLength={20}
                 className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-zinc-900 focus:outline-none focus:ring-2 ${
                   formErrors.code ? "border-red-300 focus:ring-red-500/20" : "border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20"
@@ -415,7 +415,7 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
                 type="number"
                 value={form.minOrderAmount}
                 onChange={(e) => setForm((f) => ({ ...f, minOrderAmount: e.target.value }))}
-                placeholder="e.g. 1000"
+                placeholder="Minimum order"
                 min="0"
                 step="100"
                 className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -433,7 +433,7 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
                 type="number"
                 value={form.usageLimit}
                 onChange={(e) => setForm((f) => ({ ...f, usageLimit: e.target.value }))}
-                placeholder="0"
+                placeholder="Usage limit"
                 min="0"
                 step="1"
                 className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"

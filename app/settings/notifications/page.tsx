@@ -138,11 +138,11 @@ export default function NotificationsPage() {
     }
     if (result.reason === "unsupported") {
       setPushStatus("unsupported");
-      addToast("Push is not available (needs HTTPS + VAPID keys).", "error");
+      addToast("Push notifications are not available.", "error");
       return;
     }
     addToast(
-      "Could not enable push. Sign in, run the push_subscriptions SQL, then try again.",
+      "Could not enable push notifications. Please try again.",
       "error",
     );
   }, [addToast]);
@@ -168,7 +168,6 @@ export default function NotificationsPage() {
   }
 
   const serverReady = serverStatus?.ready === true;
-  const missingAdmin = serverStatus && !serverStatus.adminConfigured;
   const missingVapid = serverStatus && !serverStatus.vapidConfigured;
 
   return (
@@ -190,25 +189,11 @@ export default function NotificationsPage() {
         {serverStatus && !serverReady && (
           <section className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 dark:border-amber-900 dark:bg-amber-950/30">
             <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-              Server setup incomplete
+              Push notifications unavailable
             </p>
-            <ul className="mt-2 space-y-1 text-xs text-amber-900/80 dark:text-amber-200/80">
-              {missingVapid && (
-                <li>
-                  Add <code className="font-mono">NEXT_PUBLIC_VAPID_PUBLIC_KEY</code> +{" "}
-                  <code className="font-mono">VAPID_PRIVATE_KEY</code> to{" "}
-                  <code className="font-mono">.env.local</code>, then restart{" "}
-                  <code className="font-mono">npm run dev</code>.
-                </li>
-              )}
-              {missingAdmin && (
-                <li>
-                  Add <code className="font-mono">SUPABASE_SERVICE_ROLE_KEY</code> from Supabase →
-                  Project Settings → API (service_role). Without it, subscribe works but OS push
-                  cannot be sent to other devices.
-                </li>
-              )}
-            </ul>
+            <p className="mt-2 text-xs text-amber-900/80 dark:text-amber-200/80">
+              Push notifications are not set up yet. Please contact support for help.
+            </p>
           </section>
         )}
 

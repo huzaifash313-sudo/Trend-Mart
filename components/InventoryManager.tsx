@@ -598,7 +598,7 @@ export default function InventoryManager({
             </span>
             <input
               type="text"
-              placeholder="Search products or variants..."
+              placeholder="Search products"
               value={searchQuery}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -671,7 +671,7 @@ export default function InventoryManager({
           </span>
           <input
             type="number"
-            placeholder="Set stock..."
+            placeholder="Stock"
             value={bulkStockValue}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setBulkStockValue(e.target.value)}
             className="w-32 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-zinc-800 text-sm"

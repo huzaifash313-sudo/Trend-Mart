@@ -74,7 +74,7 @@ export default function QuickCouponPanel({ shopId, onChanged }: QuickCouponPanel
           required
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="Code e.g. SAVE10"
+          placeholder="Coupon code"
           maxLength={24}
           className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm uppercase dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />

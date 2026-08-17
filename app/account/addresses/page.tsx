@@ -442,7 +442,7 @@ export default function AddressesPage() {
                     required
                     value={form.full_name}
                     onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
-                    placeholder="Ahmed Khan"
+                    placeholder="Full name"
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 </div>
@@ -471,7 +471,7 @@ export default function AddressesPage() {
                   required
                   value={form.address_line1}
                   onChange={(e) => setForm((f) => ({ ...f, address_line1: e.target.value }))}
-                  placeholder="House 123, Street 4, Gulberg"
+                  placeholder="House, street, area"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -484,7 +484,7 @@ export default function AddressesPage() {
                   type="text"
                   value={form.address_line2}
                   onChange={(e) => setForm((f) => ({ ...f, address_line2: e.target.value }))}
-                  placeholder="Near Supermarket, Block B"
+                  placeholder="Landmark"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -497,7 +497,7 @@ export default function AddressesPage() {
                     required
                     value={form.city}
                     onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                    placeholder="Lahore"
+                    placeholder="City"
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 </div>
@@ -509,7 +509,7 @@ export default function AddressesPage() {
                     type="text"
                     value={form.postal_code}
                     onChange={(e) => setForm((f) => ({ ...f, postal_code: e.target.value }))}
-                    placeholder="54000"
+                    placeholder="Postal code"
                     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 </div>
@@ -523,7 +523,7 @@ export default function AddressesPage() {
                   rows={2}
                   value={form.delivery_notes}
                   onChange={(e) => setForm((f) => ({ ...f, delivery_notes: e.target.value }))}
-                  placeholder="Ring the bell, leave at the gate..."
+                  placeholder="Delivery instructions"
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>

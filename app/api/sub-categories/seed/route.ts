@@ -23,7 +23,7 @@ function isAllowedCategory(category: string): boolean {
 async function seedCategory(category: string) {
   const admin = getSupabaseAdminClient();
   if (!admin) {
-    return { seeded: false, reason: "SUPABASE_SERVICE_ROLE_KEY not configured", rows: [] as Array<Record<string, unknown>> };
+    return { seeded: false, reason: "Configuration not complete", rows: [] as Array<Record<string, unknown>> };
   }
 
   const defs = getDefaultSubCategories(category);

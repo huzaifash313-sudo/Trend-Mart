@@ -56,6 +56,8 @@ interface LocationContextValue {
   setManualPin: (lat: number, lng: number) => Promise<UserLocation | null>;
   /** Set location from a manually selected city. */
   setManualCity: (city: SupportedCity) => void;
+  /** Seed a saved location (e.g. from account profile) without re-geocoding. */
+  seedLocation: (loc: UserLocation) => void;
   /** Clear the saved location (reset to no location). */
   clearLocation: () => void;
 }
@@ -204,6 +206,12 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     if (loc.coordinates) storeUserLocation(loc.coordinates);
   }, []);
 
+  const seedLocation = useCallback((loc: UserLocation) => {
+    saveLocation(loc);
+    setLocation(loc);
+    if (loc.coordinates) storeUserLocation(loc.coordinates);
+  }, []);
+
   const clearLocation = useCallback(() => {
     clearSavedLocation();
     setLocation(null);
@@ -219,6 +227,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       detectLocationDetailed,
       setManualPin,
       setManualCity,
+      seedLocation,
       clearLocation,
     }),
     [
@@ -230,6 +239,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       detectLocationDetailed,
       setManualPin,
       setManualCity,
+      seedLocation,
       clearLocation,
     ],
   );

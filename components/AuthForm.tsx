@@ -5,14 +5,22 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { signInSchema, signUpSchema, type SignInFormValues, type SignUpFormValues } from "@/lib/validations";
 import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
+import { useLocation } from "@/context/LocationContext";
+import { locationErrorMessage } from "@/services/geoRadiusService";
+import type { UserLocation } from "@/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/** Sign-up submit values extended with the precise location captured in the form. */
+export interface SignUpSubmitValues extends SignUpFormValues {
+  location?: UserLocation | null;
+}
+
 export interface AuthFormProps {
   mode: "sign-in" | "sign-up";
-  onSubmit: (values: SignInFormValues | SignUpFormValues) => Promise<void>;
+  onSubmit: (values: SignInFormValues | SignUpSubmitValues) => Promise<void>;
   isLoading: boolean;
   serverError?: string | null;
 }
@@ -75,6 +83,9 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [termsTouched, setTermsTouched] = useState(false);
+
+  const { location, isDetecting, detectLocationDetailed } = useLocation();
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const passwordStrength = calculatePasswordStrength(password);
 
@@ -149,6 +160,14 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
     return false;
   }, [email, password, confirmPassword, fullName, phone, role, mode]);
 
+  const handleUsePreciseLocation = useCallback(async () => {
+    setLocationError(null);
+    const result = await detectLocationDetailed();
+    if (!result.location) {
+      setLocationError(locationErrorMessage(result.error));
+    }
+  }, [detectLocationDetailed]);
+
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -179,6 +198,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
               password,
               confirmPassword,
               role,
+              location: location ?? null,
             };
 
       await onSubmit(values);
@@ -194,6 +214,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
       onSubmit,
       validateAll,
       agreedToTerms,
+      location,
     ],
   );
 
@@ -362,6 +383,61 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
               </p>
             )}
           </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <label
+                htmlFor="signup_location"
+                className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                Your location <span className="text-zinc-400 dark:text-zinc-500">(optional)</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleUsePreciseLocation}
+                disabled={isLoading || isDetecting}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[0.7rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+              >
+                {isDetecting ? (
+                  <>
+                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Detecting…
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    Use my precise location
+                  </>
+                )}
+              </button>
+            </div>
+            <div
+              id="signup_location"
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                location
+                  ? "border-emerald-200 bg-emerald-50/50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                  : "border-zinc-200 bg-zinc-50 text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-500"
+              }`}
+            >
+              {location
+                ? location.address ||
+                  [location.deliveryZone, location.city].filter(Boolean).join(", ") ||
+                  "Location set"
+                : "Not set — tap “Use my precise location” to save your area."}
+            </div>
+            {locationError && (
+              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">{locationError}</p>
+            )}
+            <p className="mt-1 text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+              Saved to your profile and auto-filled at checkout.
+            </p>
+          </div>
         </>
       )}
 
@@ -383,7 +459,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             type="email"
             required
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder="Enter your email"
             value={email}
             onChange={(e) => handleChange("email", e.target.value)}
             className={`${inputClassName("email")} pl-10`}

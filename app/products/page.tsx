@@ -696,7 +696,7 @@ function ProductsPageInner() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products, shops, categories… (typos OK)"
+            placeholder="Search products, shops, categories"
             className="w-full rounded-2xl border border-zinc-200 bg-white py-2.5 pl-10 pr-24 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             aria-label="Search products"
           />

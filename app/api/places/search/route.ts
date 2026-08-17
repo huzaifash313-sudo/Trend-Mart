@@ -347,6 +347,6 @@ export async function GET(req: NextRequest) {
     provider: merged[0]?.source ?? null,
     tip: hasGoogle
       ? "No Google results for this query — try a fuller name or nearby landmark."
-      : "Add GOOGLE_MAPS_API_KEY for Google Maps–level places (hospitals, academies, shops).",
+      : "Try a fuller name or nearby landmark.",
   });
 }

@@ -33,6 +33,13 @@ export default function CustomerAccountPage() {
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
+  const [profile, setProfile] = useState<{
+    full_name?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    location_label?: string | null;
+    city?: string | null;
+  } | null>(null);
 
   const localOrders = useMemo(() => {
     try {
@@ -90,6 +97,17 @@ export default function CustomerAccountPage() {
         setEmail(user.email ?? null);
         setEmailVerified(!!user.email_confirmed_at);
         setAuthed(true);
+
+        try {
+          const { data: profileData } = await supabase
+            .from("user_profiles")
+            .select("full_name, phone, address, location_label, city")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (!cancelled && profileData) setProfile(profileData);
+        } catch {
+          /* profile optional — keep portal usable without it */
+        }
       } catch {
         if (!cancelled) {
           window.location.replace("/login?redirect=/account");
@@ -184,6 +202,47 @@ export default function CustomerAccountPage() {
               Verify email →
             </Link>
           )}
+        </section>
+
+        {/* Profile summary — name / phone / email / location (auto-filled at checkout) */}
+        <section className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Your details</h2>
+            <Link
+              href="/auth/settings"
+              className="text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              Edit →
+            </Link>
+          </div>
+          <dl className="mt-3 space-y-2">
+            <div className="flex justify-between gap-3 border-b border-zinc-100 pb-2 dark:border-zinc-800">
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">Name</dt>
+              <dd className="truncate text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {profile?.full_name || "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-zinc-100 pb-2 dark:border-zinc-800">
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">Phone</dt>
+              <dd className="truncate text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {profile?.phone || "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-zinc-100 pb-2 dark:border-zinc-800">
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">Email</dt>
+              <dd className="truncate text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {email || "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">Location</dt>
+              <dd className="truncate text-right text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {profile?.location_label
+                  ? [profile.location_label, profile.city].filter(Boolean).join(", ")
+                  : profile?.address || "Not set"}
+              </dd>
+            </div>
+          </dl>
         </section>
 
         {/* Quick stats */}

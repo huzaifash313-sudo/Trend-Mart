@@ -792,7 +792,7 @@ function OrderTrackingInner() {
                         setOrderId(e.target.value);
                         setError(null);
                       }}
-                      placeholder="e.g. a1b2c3d4-..."
+                      placeholder="Order ID"
                       className="tm-input w-full py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400/60 dark:text-zinc-100"
                       aria-label="Enter order reference ID"
                     />

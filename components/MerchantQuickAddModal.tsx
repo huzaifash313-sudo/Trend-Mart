@@ -195,7 +195,7 @@ export default function MerchantQuickAddModal() {
                   rows={2}
                   maxLength={300}
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  placeholder="Short detail — size, flavour, material, etc."
+                  placeholder="Short description"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -285,7 +285,7 @@ export default function MerchantQuickAddModal() {
                 value={storyCaption}
                 onChange={(e) => setStoryCaption(e.target.value)}
                 maxLength={80}
-                placeholder="Caption (optional)"
+                placeholder="Caption"
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
               <button

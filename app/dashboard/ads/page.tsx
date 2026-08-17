@@ -265,7 +265,7 @@ export default function MerchantAdsPage() {
                   maxLength={120}
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Flat 20% Off — Winter Collection"
+                  placeholder="Ad title"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -276,7 +276,7 @@ export default function MerchantAdsPage() {
                   maxLength={24}
                   value={form.badge_label}
                   onChange={(e) => setForm((f) => ({ ...f, badge_label: e.target.value }))}
-                  placeholder="Sale, New, Trending..."
+                  placeholder="Tags"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -291,7 +291,7 @@ export default function MerchantAdsPage() {
                 maxLength={220}
                 value={form.subtitle}
                 onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))}
-                placeholder="Shop the season's best deals before they're gone"
+                placeholder="Ad description"
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>

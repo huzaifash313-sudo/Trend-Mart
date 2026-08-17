@@ -188,7 +188,7 @@ export default function MerchantOrdersPage() {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name, phone, order id…"
+          placeholder="Search orders"
           className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 sm:max-w-xs"
         />
         <div className="flex flex-wrap gap-1.5">

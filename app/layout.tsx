@@ -21,6 +21,7 @@ import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
+import OnboardingWizard from "@/components/OnboardingWizard";
 import ScrollToTop from "@/components/ScrollToTop";
 import { ScrollToTopSuspense } from "@/components/PageLoadingShell";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
@@ -132,6 +133,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <CartBar />
               </ErrorBoundary>
               <MerchantQuickAddHost />
+              <OnboardingWizard />
               <PwaRegister />
               </AppNotifications>
               </MerchantQuickAddProvider>

@@ -358,7 +358,7 @@ export default function ShopProfileEditorModal({
                 value={businessHours}
                 onChange={(e) => setBusinessHours(e.target.value)}
                 maxLength={150}
-                placeholder="e.g. Mon-Sat: 9 AM - 10 PM"
+                placeholder="Opening hours"
                 className={fieldCls}
               />
             </div>
@@ -388,7 +388,7 @@ export default function ShopProfileEditorModal({
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
                 maxLength={500}
-                placeholder="Tell customers about your store…"
+                placeholder="Store description"
                 className={`${fieldCls} resize-none`}
               />
             </div>

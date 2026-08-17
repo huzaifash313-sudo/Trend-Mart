@@ -226,7 +226,7 @@ export default function QuickRatingModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your name"
+                placeholder="Your name"
                 maxLength={60}
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
@@ -245,7 +245,7 @@ export default function QuickRatingModal({
                 rows={2}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="Share a quick note about your experience..."
+                placeholder="Your feedback"
                 maxLength={300}
                 className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />

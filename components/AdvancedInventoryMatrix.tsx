@@ -711,7 +711,7 @@ export default function AdvancedInventoryMatrix({
           {/* Search */}
           <input
             type="text"
-            placeholder="🔍 Filter variants…"
+            placeholder="Filter variants"
             value={searchFilter}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchFilter(e.target.value)}
             className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm w-48"
@@ -763,7 +763,7 @@ export default function AdvancedInventoryMatrix({
           <div className="flex gap-2 flex-wrap">
             <input
               type="text"
-              placeholder="Group name (e.g. Color)"
+              placeholder="Group name"
               value={newGroupName}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setNewGroupName(e.target.value)}
               className="flex-1 min-w-[120px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm"
@@ -771,7 +771,7 @@ export default function AdvancedInventoryMatrix({
             />
             <input
               type="text"
-              placeholder="Options (comma-separated)"
+              placeholder="Options (comma separated)"
               value={newOptionLabels}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setNewOptionLabels(e.target.value)}
               className="flex-[2] min-w-[200px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm"
@@ -802,7 +802,7 @@ export default function AdvancedInventoryMatrix({
           </span>
           <input
             type="number"
-            placeholder="Set stock…"
+            placeholder="Stock quantity"
             value={bulkStockValue}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setBulkStockValue(e.target.value)}
             className="w-28 px-2 py-1 rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-zinc-800 text-sm"
@@ -817,7 +817,7 @@ export default function AdvancedInventoryMatrix({
           </button>
           <input
             type="number"
-            placeholder="Price adj (±)"
+            placeholder="Price adjustment"
             value={bulkPriceAdjValue}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setBulkPriceAdjValue(e.target.value)}
             className="w-28 px-2 py-1 rounded-lg border border-blue-200 dark:border-blue-700 bg-white dark:bg-zinc-800 text-sm"

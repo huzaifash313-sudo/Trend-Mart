@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import { getPublicAppUrl } from "@/lib/appUrl";
+import type { UserLocation } from "@/types";
+import { getAuthCallbackUrl, getPublicAppUrl } from "@/lib/appUrl";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -86,48 +87,84 @@ export async function signUpWithEmail(
   email: string,
   password: string,
   role: AuthRole = "customer",
-  profile?: { fullName: string; phone: string },
+  profile?: { fullName: string; phone: string; location?: UserLocation | null },
 ): Promise<AuthResult & { needsOtpVerification: boolean }> {
   try {
     const signupRole: AuthRole = role === "merchant" ? "merchant" : "customer";
     const fullName = (profile?.fullName ?? "").trim();
     const phone = (profile?.phone ?? "").trim();
+    const location = profile?.location ?? null;
+    const locLat = location?.coordinates?.latitude ?? null;
+    const locLng = location?.coordinates?.longitude ?? null;
+    const locCity = location?.city ?? null;
+    const locLabel = location?.address ?? location?.deliveryZone ?? null;
 
-    // Custom OTP flow: the server creates the user as UNCONFIRMED (no Supabase
-    // email) and emails a branded 6-digit code via Resend. The account only
-    // becomes usable after the code is verified — see /api/auth/verify-otp.
-    const res = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        password,
-        role: signupRole,
-        fullName,
-        phone,
-      }),
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        // Always send users to the public app URL (never stale Supabase Site URL / localhost).
+        emailRedirectTo: getAuthCallbackUrl(),
+        data: {
+          role: signupRole,
+          full_name: fullName || undefined,
+          phone: phone || undefined,
+          // Phone SMS OTP is intentionally disabled (budget) — contact field only.
+          phone_otp_enabled: false,
+          // Precise location captured at signup (flattened so it survives email OTP).
+          latitude: locLat,
+          longitude: locLng,
+          city: locCity,
+          location_label: locLabel,
+        },
+      },
     });
 
-    const jsonBody = (await res.json().catch(() => ({}))) as {
-      success?: boolean;
-      error?: string;
-      role?: AuthRole;
-      needsOtpVerification?: boolean;
-    };
-
-    if (!res.ok || !jsonBody.success) {
+    if (error) {
       return {
         success: false,
-        error: jsonBody.error ?? "Sign up failed. Please try again.",
+        error: mapSupabaseError(error.message),
         needsOtpVerification: false,
       };
     }
 
-    // Verification is always required — the caller shows the 6-digit code modal.
+    // Persist role into user_roles (trigger also reads metadata; this is a safety net).
+    // Only when a session exists — otherwise claim after email OTP verifies.
+    if (data.user && data.session) {
+      await claimSignupRole(signupRole);
+      await upsertSignupProfile(data.user.id, fullName, phone, location);
+    }
+
+    if (!data.user) {
+      return {
+        success: false,
+        error: "Sign-up failed. Please try again.",
+        needsOtpVerification: false,
+      };
+    }
+
+    // Email confirmation is mandatory. Never treat signup as complete until verified.
+    // If Supabase auto-created a session (confirm-email disabled), sign out and force OTP UI.
+    if (!data.user.email_confirmed_at) {
+      // Persist profile when we have a user id even if session is cleared next.
+      if (data.session) {
+        await supabase.auth.signOut();
+      }
+      return {
+        success: true,
+        user: data.user,
+        role: signupRole,
+        needsOtpVerification: true,
+      };
+    }
+
+    await upsertSignupProfile(data.user.id, fullName, phone, location);
+    const resolved = await detectUserRole(data.user);
     return {
       success: true,
-      role: jsonBody.role ?? signupRole,
-      needsOtpVerification: true,
+      user: data.user,
+      role: resolved,
+      needsOtpVerification: false,
     };
   } catch (err) {
     return {
@@ -139,30 +176,38 @@ export async function signUpWithEmail(
   }
 }
 
-/** Save mandatory name/phone contact fields (no SMS OTP verification). */
+/** Save mandatory name/phone/address contact fields + precise location. */
 export async function upsertSignupProfile(
   userId: string,
   fullName: string,
   phone: string,
+  location?: UserLocation | null,
 ): Promise<void> {
-  if (!userId || (!fullName && !phone)) return;
+  if (!userId) return;
+
+  const lat = location?.coordinates?.latitude ?? null;
+  const lng = location?.coordinates?.longitude ?? null;
   try {
     await supabase.from("user_profiles").upsert(
       {
         user_id: userId,
         full_name: fullName || null,
         phone: phone || null,
+        latitude: typeof lat === "number" && Number.isFinite(lat) ? lat : null,
+        longitude: typeof lng === "number" && Number.isFinite(lng) ? lng : null,
+        city: location?.city ?? null,
+        location_label: location?.address ?? location?.deliveryZone ?? null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" },
     );
   } catch (err) {
-    // Non-fatal — checkout can still collect name/phone later.
+    // Non-fatal — checkout can still collect name/phone/location later.
     console.warn("[authService] upsertSignupProfile failed (non-fatal):", err);
   }
 }
 
-/** After email OTP, copy contact fields from auth metadata into user_profiles. */
+/** After email OTP, copy contact + location fields from auth metadata into user_profiles. */
 export async function syncContactProfileFromMetadata(user: User): Promise<void> {
   const fullName =
     typeof user.user_metadata?.full_name === "string"
@@ -172,7 +217,33 @@ export async function syncContactProfileFromMetadata(user: User): Promise<void> 
     typeof user.user_metadata?.phone === "string"
       ? user.user_metadata.phone.trim()
       : "";
-  await upsertSignupProfile(user.id, fullName, phone);
+
+  const rawLat = user.user_metadata?.latitude;
+  const rawLng = user.user_metadata?.longitude;
+  const lat = typeof rawLat === "number" && Number.isFinite(rawLat) ? rawLat : null;
+  const lng = typeof rawLng === "number" && Number.isFinite(rawLng) ? rawLng : null;
+  const city =
+    typeof user.user_metadata?.city === "string"
+      ? user.user_metadata.city.trim()
+      : "";
+  const locationLabel =
+    typeof user.user_metadata?.location_label === "string"
+      ? user.user_metadata.location_label.trim()
+      : "";
+
+  const location: UserLocation | null =
+    lat != null && lng != null
+      ? {
+          coordinates: { latitude: lat, longitude: lng },
+          city: city || null,
+          deliveryZone: city || null,
+          address: locationLabel || null,
+          updatedAt: Date.now(),
+          source: "cached",
+        }
+      : null;
+
+  await upsertSignupProfile(user.id, fullName, phone, location);
 }
 
 /**
@@ -233,34 +304,44 @@ export async function verifyOtp(
   token: string,
 ): Promise<OtpVerificationResult> {
   try {
-    const res = await fetch("/api/auth/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        code: token.trim(),
-      }),
+    const normalized = email.trim().toLowerCase();
+    const cleaned = token.trim();
+
+    // Supabase templates may send signup or email OTP depending on project settings.
+    let result = await supabase.auth.verifyOtp({
+      email: normalized,
+      token: cleaned,
+      type: "signup",
     });
 
-    const jsonBody = (await res.json().catch(() => ({}))) as {
-      success?: boolean;
-      error?: string;
-    };
+    if (result.error) {
+      result = await supabase.auth.verifyOtp({
+        email: normalized,
+        token: cleaned,
+        type: "email",
+      });
+    }
 
-    if (!res.ok || !jsonBody.success) {
+    if (result.error) {
       return {
         success: false,
-        error: jsonBody.error ?? "Verification failed. Please try again.",
+        error: mapSupabaseError(result.error.message),
       };
     }
 
-    // NOTE: verification confirms the account but does NOT create a session.
-    // The signup page signs the user in with their password after this resolves.
+    if (!result.data.session) {
+      return {
+        success: false,
+        error: "Verification succeeded but no session was returned.",
+      };
+    }
+
     return { success: true };
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Verification failed.",
+      error:
+        err instanceof Error ? err.message : "Verification failed.",
     };
   }
 }
@@ -345,21 +426,18 @@ export async function resendOtp(
   email: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch("/api/auth/resend-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    const { error } = await supabase.auth.resend({
+      email: email.trim().toLowerCase(),
+      type: "signup",
+      options: {
+        emailRedirectTo: getAuthCallbackUrl(),
+      },
     });
 
-    const jsonBody = (await res.json().catch(() => ({}))) as {
-      success?: boolean;
-      error?: string;
-    };
-
-    if (!res.ok || !jsonBody.success) {
+    if (error) {
       return {
         success: false,
-        error: jsonBody.error ?? "Could not resend the code. Please try again.",
+        error: mapSupabaseError(error.message),
       };
     }
 
@@ -367,7 +445,8 @@ export async function resendOtp(
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Could not resend code.",
+      error:
+        err instanceof Error ? err.message : "Could not resend code.",
     };
   }
 }

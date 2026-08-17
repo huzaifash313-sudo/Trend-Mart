@@ -206,7 +206,7 @@ export default function ProductEditorModal({
               onChange={(e) => setName(e.target.value)}
               required
               maxLength={120}
-              placeholder="e.g. Chicken Biryani"
+              placeholder="Product name"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
@@ -220,7 +220,7 @@ export default function ProductEditorModal({
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               maxLength={300}
-              placeholder="Short detail — size, flavour, material, etc."
+              placeholder="Short description"
               className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
@@ -237,7 +237,7 @@ export default function ProductEditorModal({
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required
-                placeholder="940"
+                placeholder="Discounted price"
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
@@ -252,7 +252,7 @@ export default function ProductEditorModal({
                 step="1"
                 value={originalPrice}
                 onChange={(e) => setOriginalPrice(e.target.value)}
-                placeholder="1000"
+                placeholder="Original price"
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>

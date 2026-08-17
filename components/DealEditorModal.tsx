@@ -120,7 +120,7 @@ export default function DealEditorModal({ deal, onClose, onSaved }: DealEditorMo
               onChange={(e) => setTitle(e.target.value)}
               required
               maxLength={80}
-              placeholder="e.g. Friday Biryani Deal"
+              placeholder="Deal name"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
@@ -137,7 +137,7 @@ export default function DealEditorModal({ deal, onClose, onSaved }: DealEditorMo
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required
-                placeholder="940"
+                placeholder="Deal price"
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
@@ -152,7 +152,7 @@ export default function DealEditorModal({ deal, onClose, onSaved }: DealEditorMo
                 step="1"
                 value={originalPrice}
                 onChange={(e) => setOriginalPrice(e.target.value)}
-                placeholder="1000"
+                placeholder="Original price"
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
@@ -172,7 +172,7 @@ export default function DealEditorModal({ deal, onClose, onSaved }: DealEditorMo
               maxLength={24}
               value={badgeText}
               onChange={(e) => setBadgeText(e.target.value)}
-              placeholder="e.g. 20% OFF · BOGO"
+              placeholder="Deal type"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
@@ -185,7 +185,7 @@ export default function DealEditorModal({ deal, onClose, onSaved }: DealEditorMo
               maxLength={160}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short detail for customers"
+              placeholder="Description"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>

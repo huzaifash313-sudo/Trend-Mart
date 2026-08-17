@@ -84,7 +84,7 @@ export function toServiceError(err: unknown): string {
     return "Permission denied. Make sure you own this shop and are signed in, then try again.";
   }
   if (/column .* does not exist|PGRST204|schema cache/i.test(msg)) {
-    return `Database schema is out of date: ${msg}. Run supabase/RUN_THIS_IN_SUPABASE_SQL_EDITOR.sql in the Supabase SQL Editor, then retry.`;
+    return "Something went wrong while saving. Please try again or contact support.";
   }
   if (/foreign key|23503/i.test(msg)) {
     return "Invalid category or related record. Re-select the category and try again.";

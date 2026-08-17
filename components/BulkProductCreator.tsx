@@ -294,7 +294,7 @@ export default function BulkProductCreator({
                         updateRow(row.key, { description: e.target.value })
                       }
                       maxLength={300}
-                      placeholder="Description (optional)"
+                      placeholder="Description"
                       className={`${fieldClass} mt-1.5`}
                     />
                   </td>
@@ -315,7 +315,7 @@ export default function BulkProductCreator({
                       step={1}
                       value={row.price}
                       onChange={(e) => updateRow(row.key, { price: e.target.value })}
-                      placeholder="4500"
+                      placeholder="Price"
                       className={fieldClass}
                     />
                   </td>
@@ -328,7 +328,7 @@ export default function BulkProductCreator({
                       onChange={(e) =>
                         updateRow(row.key, { original_price: e.target.value })
                       }
-                      placeholder="5999"
+                      placeholder="Original price"
                       className={fieldClass}
                       title="Original / was price"
                     />
@@ -429,7 +429,7 @@ export default function BulkProductCreator({
                     updateRow(row.key, { description: e.target.value })
                   }
                   maxLength={300}
-                  placeholder="Short detail — size, flavour, material, etc."
+                  placeholder="Short description"
                   className={fieldClass}
                 />
               </div>
@@ -454,7 +454,7 @@ export default function BulkProductCreator({
                     min={0}
                     value={row.price}
                     onChange={(e) => updateRow(row.key, { price: e.target.value })}
-                    placeholder="4500"
+                    placeholder="Price"
                     className={fieldClass}
                   />
                 </div>
@@ -467,7 +467,7 @@ export default function BulkProductCreator({
                     onChange={(e) =>
                       updateRow(row.key, { original_price: e.target.value })
                     }
-                    placeholder="5999"
+                    placeholder="Original price"
                     className={fieldClass}
                   />
                 </div>

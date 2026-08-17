@@ -185,7 +185,7 @@ function ReviewCard({
               onChange={(e) => setReply(e.target.value)}
               maxLength={500}
               rows={3}
-              placeholder="Thank the customer or address their feedback…"
+              placeholder="Reply"
               className="w-full resize-none rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             <div className="flex gap-2">
@@ -287,7 +287,7 @@ function ReviewForm({
           rows={3}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Share your experience…"
+          placeholder="Share your experience"
           maxLength={500}
           className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />

@@ -229,7 +229,7 @@ export default function BecomeMerchantPage() {
               type="text"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="e.g. Gujranwala Fresh Mart"
+              placeholder="Store name"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             {errors.name ? <p className="mt-1 text-xs text-red-500">{errors.name}</p> : null}
@@ -255,7 +255,7 @@ export default function BecomeMerchantPage() {
               type="text"
               value={form.location}
               onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-              placeholder="e.g. Gujranwala, G.T. Road"
+              placeholder="Store address"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             {errors.location ? <p className="mt-1 text-xs text-red-500">{errors.location}</p> : null}

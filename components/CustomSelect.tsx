@@ -89,7 +89,7 @@ export default function CustomSelect({
   value,
   onChange,
   options,
-  placeholder = "Select…",
+  placeholder = "Select",
   ariaLabel,
   disabled = false,
   size = "md",

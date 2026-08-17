@@ -59,14 +59,14 @@ export const NOTIFICATION_CHANNELS: NotificationChannel[] = [
     id: "realtime",
     name: "Real-Time In-App",
     type: "realtime",
-    description: "Instant in-app alerts via Supabase Realtime WebSockets",
+    description: "Instant in-app alerts",
     is_active: true,
   },
   {
     id: "web_push",
     name: "Browser / OS Push",
     type: "push",
-    description: "Background OS notifications via Web Push (VAPID)",
+    description: "Background OS notifications",
     is_active: true,
   },
   {
@@ -80,14 +80,14 @@ export const NOTIFICATION_CHANNELS: NotificationChannel[] = [
     id: "email",
     name: "Email Alerts",
     type: "email",
-    description: "Order status update emails to customers (optional Resend)",
+    description: "Order status update emails to customers",
     is_active: false,
   },
   {
     id: "sms",
     name: "SMS Alerts",
     type: "sms",
-    description: "SMS notifications via Twilio/Vonage (future integration)",
+    description: "SMS notifications (coming soon)",
     is_active: false,
   },
 ];

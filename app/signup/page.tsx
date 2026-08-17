@@ -4,12 +4,12 @@ import { useState, useCallback, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import AuthForm from "@/components/AuthForm";
+import AuthForm, { type SignUpSubmitValues } from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
 import { signUpWithEmail, signInWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { useToast } from "@/components/Toast";
-import type { SignInFormValues, SignUpFormValues } from "@/lib/validations";
+import type { SignInFormValues } from "@/lib/validations";
 import type { AuthRole } from "@/services/authService";
 
 /* -------------------------------------------------------------------------- */
@@ -123,8 +123,8 @@ function SignupPageInner() {
   );
 
   const handleSubmit = useCallback(
-    async (values: SignInFormValues | SignUpFormValues) => {
-      const signupValues = values as SignUpFormValues;
+    async (values: SignInFormValues | SignUpSubmitValues) => {
+      const signupValues = values as SignUpSubmitValues;
       setIsLoading(true);
       setServerError(null);
 
@@ -135,6 +135,7 @@ function SignupPageInner() {
         {
           fullName: signupValues.full_name,
           phone: signupValues.phone,
+          location: signupValues.location ?? null,
         },
       );
 
@@ -348,6 +349,21 @@ function SignupPageInner() {
                 className="font-semibold text-emerald-600 underline underline-offset-2 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
               >
                 Sign in
+              </Link>
+            </motion.p>
+
+            {/* Browse as guest */}
+            <motion.p
+              className="mt-3 text-center text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.55 }}
+            >
+              <Link
+                href="/"
+                className="font-medium text-zinc-400 underline underline-offset-2 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors"
+              >
+                Browse as guest →
               </Link>
             </motion.p>
           </div>

@@ -466,7 +466,7 @@ export default function DashboardSettingsPage() {
       setPushStatus(nextStatus);
       addToast(
         result.reason === "unsupported"
-          ? "Push alerts are not supported or VAPID is not configured."
+          ? "Push alerts are not supported on this device."
           : result.reason === "denied"
             ? "Notifications are blocked for this browser."
             : "Could not enable order alerts. Please try again.",
@@ -590,7 +590,7 @@ export default function DashboardSettingsPage() {
                 type="text"
                 value={form.tiktok_handle}
                 onChange={(e) => setForm((current) => ({ ...current, tiktok_handle: e.target.value }))}
-                placeholder="@yourstore or tiktok.com/@yourstore"
+                placeholder="Username"
               />
               <p className="mt-1 text-[0.7rem] text-zinc-400 dark:text-zinc-500">
                 Customers can open your TikTok profile from the store page.
@@ -602,7 +602,7 @@ export default function DashboardSettingsPage() {
                 type="url"
                 value={form.facebook_url}
                 onChange={(e) => setForm((current) => ({ ...current, facebook_url: e.target.value }))}
-                placeholder="https://facebook.com/yourstore"
+                placeholder="Facebook link"
               />
             </div>
           </div>
@@ -620,28 +620,28 @@ export default function DashboardSettingsPage() {
               helper="Orders below this amount cannot be placed."
               value={form.min_order_amount}
               onChange={(value) => setForm((current) => ({ ...current, min_order_amount: value }))}
-              placeholder="e.g. 500"
+              placeholder="Minimum order"
             />
             <MoneyInput
               label="Free delivery above (Rs.)"
               helper="Orders at or above this amount get delivery free."
               value={form.free_delivery_threshold}
               onChange={(value) => setForm((current) => ({ ...current, free_delivery_threshold: value }))}
-              placeholder="e.g. 2000"
+              placeholder="Free delivery threshold"
             />
             <MoneyInput
               label="Flat delivery fee (Rs.)"
               helper="Base delivery fee before any distance charge."
               value={form.delivery_fee_flat}
               onChange={(value) => setForm((current) => ({ ...current, delivery_fee_flat: value }))}
-              placeholder="e.g. 100"
+              placeholder="Delivery fee"
             />
             <MoneyInput
               label="Per-km delivery fee (Rs.)"
               helper="Extra fee added for each km of customer distance."
               value={form.delivery_fee_per_km}
               onChange={(value) => setForm((current) => ({ ...current, delivery_fee_per_km: value }))}
-              placeholder="e.g. 10"
+              placeholder="Radius"
             />
           </div>
         </SectionShell>
@@ -650,7 +650,7 @@ export default function DashboardSettingsPage() {
           id="alerts"
           icon={<BellIcon />}
           title="Alerts"
-          helper="Get a ping when a new order arrives. Needs NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY."
+          helper="Get a ping when a new order arrives."
         >
           <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/70 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">

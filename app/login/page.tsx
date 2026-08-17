@@ -299,6 +299,21 @@ function LoginPageInner() {
                 Sign up
               </Link>
             </motion.p>
+
+            {/* Browse as guest */}
+            <motion.p
+              className="mt-3 text-center text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.55 }}
+            >
+              <Link
+                href="/"
+                className="font-medium text-zinc-400 underline underline-offset-2 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors"
+              >
+                Browse as guest →
+              </Link>
+            </motion.p>
           </div>
 
           {/* Back to home link */}

@@ -1354,7 +1354,7 @@ function ShopDetailInner({ id }: { id: string }) {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2"><SearchIcon /></span>
-                <input type="search" placeholder="Search products (typos OK)..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full rounded-full border border-zinc-200 bg-white py-2 pl-9 pr-8 text-sm text-zinc-900 placeholder-zinc-300/50 transition-shadow focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" aria-label="Search products" />
+                <input type="search" placeholder="Search products" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full rounded-full border border-zinc-200 bg-white py-2 pl-9 pr-8 text-sm text-zinc-900 placeholder-zinc-300/50 transition-shadow focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" aria-label="Search products" />
                 {searchQuery && (<button type="button" onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-xs text-zinc-400 hover:text-zinc-600" aria-label="Clear search">✕</button>)}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">

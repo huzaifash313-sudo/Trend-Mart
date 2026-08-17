@@ -1130,7 +1130,7 @@ export default function AdminDashboardPage() {
                 🔴 Live Transaction Monitor
               </h3>
               <span className="text-xs text-zinc-400">
-                Supabase Realtime — WebSocket connected
+                Live updates connected
               </span>
             </div>
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-[60vh] overflow-y-auto">
@@ -1277,7 +1277,7 @@ export default function AdminDashboardPage() {
                     onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
                       if (e.key === "Enter") handleAddSubCategory(expandedCategory);
                     }}
-                    placeholder="New sub-category name..."
+                    placeholder="Sub-category name"
                     className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm flex-grow max-w-xs"
                   />
                   <button
@@ -1341,14 +1341,14 @@ export default function AdminDashboardPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input
                       type="text"
-                      placeholder="Title *"
+                      placeholder="Title"
                       value={platformAdForm.title}
                       onChange={(e) => setPlatformAdForm((f) => ({ ...f, title: e.target.value }))}
                       className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
                     />
                     <input
                       type="text"
-                      placeholder="Badge label (e.g. New)"
+                      placeholder="Badge label"
                       value={platformAdForm.badge_label}
                       onChange={(e) => setPlatformAdForm((f) => ({ ...f, badge_label: e.target.value }))}
                       className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
@@ -1356,14 +1356,14 @@ export default function AdminDashboardPage() {
                   </div>
                   <input
                     type="text"
-                    placeholder="Subtitle (optional)"
+                    placeholder="Subtitle"
                     value={platformAdForm.subtitle}
                     onChange={(e) => setPlatformAdForm((f) => ({ ...f, subtitle: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
                   />
                   <input
                     type="text"
-                    placeholder="Link to (e.g. /?category=Fashion) *"
+                    placeholder="Link"
                     value={platformAdForm.link_url}
                     onChange={(e) => setPlatformAdForm((f) => ({ ...f, link_url: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
@@ -1496,7 +1496,7 @@ export default function AdminDashboardPage() {
       <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <div className="max-w-7xl mx-auto px-6 py-3 text-xs text-zinc-400 flex justify-between">
           <span>TrendMart Super Admin v1.0</span>
-          <span>Realtime monitoring active</span>
+          <span>Live monitoring active</span>
         </div>
       </div>
     </div>

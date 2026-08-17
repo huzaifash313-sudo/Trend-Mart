@@ -496,7 +496,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
                   required
                   value={form.title}
                   onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g., AC Deep Clean — Split Unit"
+                  placeholder="Service name"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -508,7 +508,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
                   rows={3}
                   value={form.description}
                   onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Brief description of the completed job..."
+                  placeholder="Description"
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -589,7 +589,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
                   type="text"
                   value={form.client_name}
                   onChange={(e) => setForm(f => ({ ...f, client_name: e.target.value }))}
-                  placeholder="Anonymized or with permission"
+                  placeholder="Customer name (optional)"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -601,7 +601,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
                   rows={2}
                   value={form.client_review}
                   onChange={(e) => setForm(f => ({ ...f, client_review: e.target.value }))}
-                  placeholder="What did the client say about your work?"
+                  placeholder="Client feedback"
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>

@@ -216,7 +216,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
               maxLength={80}
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="e.g. Friday Biryani Deal"
+              placeholder="Deal name"
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
@@ -233,7 +233,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                 step="1"
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                placeholder="940"
+                placeholder="Deal price"
                 className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
@@ -247,7 +247,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                 step="1"
                 value={form.original_price}
                 onChange={(e) => setForm((f) => ({ ...f, original_price: e.target.value }))}
-                placeholder="1000"
+                placeholder="Original price"
                 className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
             </div>
@@ -261,7 +261,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
               maxLength={24}
               value={form.badge_text}
               onChange={(e) => setForm((f) => ({ ...f, badge_text: e.target.value }))}
-              placeholder="e.g. 20% OFF · BOGO"
+              placeholder="Deal type"
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
@@ -365,7 +365,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
               maxLength={160}
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Short detail for customers"
+              placeholder="Description"
               className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>

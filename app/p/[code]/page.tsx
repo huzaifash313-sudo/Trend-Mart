@@ -341,7 +341,7 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
               onChange={(e) => setItemNotes(e.target.value.slice(0, 200))}
               rows={2}
               maxLength={200}
-              placeholder="e.g. Extra spicy · No onion · Flavour: mango"
+              placeholder="Any special instructions"
               className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
