@@ -16,7 +16,7 @@ import {
 } from "@/lib/dealSchedule";
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeliveryMeta } from "@/services/shopDeliveryMeta";
-import { useDeals, useShopCoupons, useShopDeliveryMeta } from "@/lib/queries";
+import { useDeals, useShopCoupons, useShopDeliveryMeta, useMyShop } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@/lib/fuzzySearch";
@@ -61,8 +61,15 @@ function DealsInner() {
 
   const queryClient = useQueryClient();
 
+  // Merchants never see their own deals in the marketplace feed.
+  const myShopQuery = useMyShop();
+  const myShopId = myShopQuery.data?.id ?? null;
+
   const dealsQuery = useDeals(100);
-  const deals = dealsQuery.data ?? EMPTY_DEALS;
+  const deals = useMemo(() => {
+    const all = dealsQuery.data ?? EMPTY_DEALS;
+    return myShopId ? all.filter((d) => d.shop_id !== myShopId) : all;
+  }, [dealsQuery.data, myShopId]);
   const loading = dealsQuery.isLoading;
   const error = dealsQuery.error ? dealsQuery.error.message : null;
 

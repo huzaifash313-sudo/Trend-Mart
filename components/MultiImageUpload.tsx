@@ -4,6 +4,14 @@ import { useCallback, useRef, useState } from "react";
 import { uploadImage, validateImage } from "@/services/storageService";
 import { MAX_PRODUCT_IMAGES } from "@/lib/productImages";
 
+/* -------------------------------------------------------------------------- */
+/*  MultiImageUpload — clean multi-photo picker (products, deals).            */
+/*                                                                             */
+/*  A wrapping row of square thumbnails: tap the dashed "+" tile to pick       */
+/*  photos (up to the max), tap a thumbnail to replace it, tap its ✕ to       */
+/*  remove. The first photo is the cover. No verbose helper text.              */
+/* -------------------------------------------------------------------------- */
+
 interface MultiImageUploadProps {
   urls: string[];
   onChange: (urls: string[]) => void;
@@ -12,16 +20,23 @@ interface MultiImageUploadProps {
   label?: string;
   disabled?: boolean;
   maxImages?: number;
-  /** compact: tighter “Add” control for bulk rows */
   variant?: "default" | "compact";
 }
 
-function UploadIcon() {
+function PlusIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17 8 12 3 7 8" />
-      <line x1="12" y1="3" x2="12" y2="15" />
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
@@ -35,21 +50,22 @@ function Spinner() {
   );
 }
 
-/**
- * Multi photo picker for products — select several at once or tap “Add more”.
- * No URL fields; file upload only. Images are compressed in storageService.
- */
+const TILE = "h-20 w-20";
+const TILE_COMPACT = "h-12 w-12";
+
 export default function MultiImageUpload({
   urls,
   onChange,
   folder = "products",
   fileIdPrefix,
-  label = "Product photos",
+  label = "Photos",
   disabled = false,
   maxImages = MAX_PRODUCT_IMAGES,
   variant = "default",
 }: MultiImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceIndexRef = useRef<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,74 +109,60 @@ export default function MultiImageUpload({
     if (e.target.files?.length) await uploadFiles(e.target.files);
   };
 
+  // Tap a thumbnail to replace that specific photo.
+  const openReplace = (index: number) => {
+    replaceIndexRef.current = index;
+    replaceInputRef.current?.click();
+  };
+
+  const handleReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const index = replaceIndexRef.current;
+    replaceIndexRef.current = null;
+    if (replaceInputRef.current) replaceInputRef.current.value = "";
+    if (!file || index == null) return;
+
+    setError(null);
+    setUploading(true);
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      setError(validation.message ?? "Invalid image.");
+      setUploading(false);
+      return;
+    }
+    const id = `${fileIdPrefix}-replace-${Date.now()}`;
+    const result = await uploadImage(file, folder, id);
+    if (result.success) {
+      const next = [...urls];
+      next[index] = result.data;
+      onChange(next);
+    } else {
+      setError(result.error);
+    }
+    setUploading(false);
+  };
+
   const removeAt = (index: number) => {
     onChange(urls.filter((_, i) => i !== index));
   };
 
-  const moveToCover = (index: number) => {
-    if (index <= 0) return;
-    const next = [...urls];
-    const [item] = next.splice(index, 1);
-    if (item) next.unshift(item);
-    onChange(next);
-  };
-
   const compact = variant === "compact";
+  const tile = compact ? TILE_COMPACT : TILE;
 
   return (
-    <div className={`tm-multi-img space-y-1.5 ${compact ? "tm-multi-img--compact" : ""}`}>
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <span className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
           {label}
-          <span className="ml-1 font-normal text-zinc-400">
-            ({urls.length}/{maxImages})
-          </span>
-        </label>
+        </span>
+        <span className="text-[0.65rem] text-zinc-400">
+          {urls.length}/{maxImages}
+        </span>
+        {urls.length > 0 ? (
+          <span className="text-[0.65rem] text-zinc-400">· tap a photo to change it</span>
+        ) : null}
         {error ? <span className="text-[11px] text-red-500">{error}</span> : null}
       </div>
-
-      {urls.length > 0 ? (
-        <div className="tm-multi-img__strip">
-          {urls.map((url, i) => (
-            <div key={`${url}-${i}`} className="tm-multi-img__tile">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt={`Photo ${i + 1}`} className="h-full w-full" />
-              {i === 0 ? (
-                <span className="tm-multi-img__cover">Cover</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => moveToCover(i)}
-                  className="tm-multi-img__set-cover"
-                  title="Make cover"
-                >
-                  Set cover
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => removeAt(i)}
-                className="tm-multi-img__remove"
-                aria-label={`Remove photo ${i + 1}`}
-                disabled={disabled || uploading}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        !compact && (
-          <div className="tm-multi-img__empty">
-            <p className="text-xs font-medium text-teal-800/70 dark:text-teal-300/70">
-              No photos yet
-            </p>
-            <p className="mt-0.5 text-[11px] text-zinc-400">
-              Pick up to {maxImages} at once — JPG, PNG or WebP
-            </p>
-          </div>
-        )
-      )}
 
       <input
         ref={inputRef}
@@ -171,40 +173,62 @@ export default function MultiImageUpload({
         onChange={handleChange}
         disabled={disabled || uploading || remaining <= 0}
       />
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/avif"
+        className="hidden"
+        onChange={handleReplace}
+        disabled={disabled || uploading}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={disabled || uploading || remaining <= 0}
-          className={
-            compact
-              ? "text-xs font-semibold text-teal-700 hover:underline disabled:opacity-40 dark:text-teal-300"
-              : "tm-img-upload__btn flex-1 sm:flex-none"
-          }
-        >
-          {uploading ? (
-            compact ? (
-              "Uploading…"
-            ) : (
-              <>
-                <Spinner />
-                Uploading…
-              </>
-            )
-          ) : compact ? (
-            urls.length === 0 ? "Add photos" : "Add more"
-          ) : (
-            <>
-              <UploadIcon />
-              {urls.length === 0 ? "Upload photos" : "Add more"}
-            </>
-          )}
-        </button>
-        {!compact && urls.length > 0 && remaining > 0 ? (
-          <p className="self-center text-[11px] text-zinc-400">
-            {remaining} more slot{remaining === 1 ? "" : "s"}
-          </p>
+      <div className={`flex flex-wrap items-start gap-2 ${compact ? "" : ""}`}>
+        {urls.map((url, i) => (
+          <div
+            key={`${url}-${i}`}
+            className={`group relative shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 ${tile} dark:border-zinc-700 dark:bg-zinc-800`}
+          >
+            <button
+              type="button"
+              onClick={() => openReplace(i)}
+              disabled={disabled || uploading}
+              className="h-full w-full cursor-pointer disabled:cursor-default"
+              aria-label={`Change photo ${i + 1}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt={`Photo ${i + 1}`}
+                className="h-full w-full object-cover"
+              />
+            </button>
+            {i === 0 ? (
+              <span className="pointer-events-none absolute bottom-0.5 left-0.5 rounded bg-zinc-950/70 px-1 py-px text-[8px] font-semibold text-white">
+                Cover
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => removeAt(i)}
+              disabled={disabled || uploading}
+              className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900/60 text-white opacity-0 transition-opacity hover:bg-zinc-900/90 group-hover:opacity-100 disabled:opacity-0"
+              aria-label={`Remove photo ${i + 1}`}
+            >
+              <XIcon />
+            </button>
+          </div>
+        ))}
+
+        {remaining > 0 ? (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={disabled || uploading}
+            className={`flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 text-zinc-400 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 ${tile}`}
+            aria-label={`Add ${label.toLowerCase()}`}
+          >
+            {uploading ? <Spinner /> : <PlusIcon />}
+          </button>
         ) : null}
       </div>
     </div>

@@ -56,6 +56,7 @@ const SHOP_EXTENDED_KEYS = [
   "business_hours",
   "operating_status",
   "slug",
+  "sensitive_info_updated_at",
 ] as const;
 
 /** Persist offer end time; empty / invalid → null (no countdown). */
@@ -257,14 +258,34 @@ export async function fetchShopById(
     if (!shop) throw new Error("Shop not found.");
 
     // Fetch products (capped — storefront paginates client-side / load-more)
-    const { data: products, error: productError } = await supabase
+    const PRODUCT_SELECT =
+      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, is_pinned, stock_status, category_id, sub_category_id, created_at";
+    const PRODUCT_SELECT_LEGACY =
+      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, stock_status, category_id, sub_category_id, created_at";
+
+    let products: Product[] | null = null;
+    let productError: unknown = null;
+
+    const first = await supabase
       .from("products")
-      .select(
-        "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, stock_status, category_id, sub_category_id, created_at",
-      )
+      .select(PRODUCT_SELECT)
       .eq("shop_id", shop.id)
       .order("created_at", { ascending: false })
       .limit(120);
+    products = (first.data as Product[] | null) ?? null;
+    productError = first.error;
+
+    // Older schemas may not have is_pinned yet — retry without it.
+    if (productError && isMissingColumnError(productError)) {
+      const retry = await supabase
+        .from("products")
+        .select(PRODUCT_SELECT_LEGACY)
+        .eq("shop_id", shop.id)
+        .order("created_at", { ascending: false })
+        .limit(120);
+      products = (retry.data as Product[] | null) ?? null;
+      productError = retry.error;
+    }
 
     if (productError) throw productError;
 
@@ -723,6 +744,98 @@ export async function updateShop(
     return { success: true, data: data as Shop };
   } catch (err) {
     logError(err, { module: "shopService.updateShop", meta: { shopId, form } });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/** Sensitive profile fields are locked to one change per rolling 30 days. */
+const SENSITIVE_INFO_LOCK_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function sensitiveInfoLockedUntil(
+  updatedAt: string | null | undefined,
+): Date | null {
+  if (!updatedAt) return null;
+  const t = new Date(updatedAt).getTime();
+  if (!Number.isFinite(t)) return null;
+  const next = t + SENSITIVE_INFO_LOCK_MS;
+  return next > Date.now() ? new Date(next) : null;
+}
+
+/**
+ * Update a shop's profile with an optional once-per-month lock on sensitive
+ * fields (name, whatsapp number, secondary phone, location).
+ *
+ * When `sensitiveChanged` is true, the current `sensitive_info_updated_at` is
+ * checked; if it was changed within the last 30 days the update is rejected
+ * with the next available date. Otherwise the timestamp is bumped so the lock
+ * window resets. Callers must already have verified the account password.
+ */
+export async function updateShopProfile(
+  shopId: string,
+  form: ShopFormData,
+  sensitiveChanged: boolean,
+): Promise<ServiceResult<Shop>> {
+  const supabase = createClient();
+
+  try {
+    const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
+    sanitized.slug = generateShopSlug(String(sanitized.name ?? form.name), shopId);
+
+    if (sensitiveChanged) {
+      const { data: current, error: readError } = await supabase
+        .from("shops")
+        .select("sensitive_info_updated_at")
+        .eq("id", shopId)
+        .maybeSingle();
+
+      // Missing column degrades gracefully — lock simply won't persist yet.
+      if (readError && !isMissingColumnError(readError)) throw readError;
+
+      const lastRaw = (
+        current as { sensitive_info_updated_at?: string | null } | null
+      )?.sensitive_info_updated_at;
+      const lockedUntil = sensitiveInfoLockedUntil(lastRaw);
+      if (lockedUntil) {
+        return {
+          success: false,
+          error: `Store name, numbers and location can only be changed once per month. Available again after ${lockedUntil.toLocaleDateString("en-PK", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })}.`,
+        };
+      }
+
+      sanitized.sensitive_info_updated_at = new Date().toISOString();
+    }
+
+    let { data, error } = await supabase
+      .from("shops")
+      .update(sanitized)
+      .eq("id", shopId)
+      .select()
+      .single();
+
+    // If the DB is missing extended columns, retry with core shop fields.
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await supabase
+        .from("shops")
+        .update(stripExtendedShopFields(sanitized))
+        .eq("id", shopId)
+        .select()
+        .single());
+    }
+
+    if (error) throw error;
+    if (!data) {
+      return {
+        success: false,
+        error: "Update did not persist. Confirm you own this shop and try again.",
+      };
+    }
+    return { success: true, data: data as Shop };
+  } catch (err) {
+    logError(err, { module: "shopService.updateShopProfile", meta: { shopId, sensitiveChanged } });
     return { success: false, error: toError(err) };
   }
 }

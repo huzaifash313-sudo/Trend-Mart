@@ -10,7 +10,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
-import type { AnalyticsLog, AnalyticsSummary } from "@/types";
+import type { AnalyticsSummary } from "@/types";
 import { logError } from "@/services/errorService";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -364,44 +364,43 @@ export async function fetchAnalyticsSummary(
   const supabase = createClient();
 
   try {
-    // Get all logs for this shop
-    const { data: logs, error } = await supabase
-      .from("analytics_logs")
-      .select("event_type, created_at")
-      .eq("shop_id", shopId);
-
-    if (error) throw error;
-
-    const allLogs =
-      (logs as Pick<AnalyticsLog, "event_type" | "created_at">[]) ?? [];
+    // Server-side COUNT (head: true) instead of streaming every log row to the
+    // browser and counting client-side — O(1) transfer regardless of how many
+    // analytics events a shop has accumulated.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayISO = today.toISOString();
 
-    const total_views = allLogs.filter(
-      (l) => l.event_type === "shop_view",
-    ).length;
-    const total_product_clicks = allLogs.filter(
-      (l) => l.event_type === "product_click",
-    ).length;
-    const views_today = allLogs.filter(
-      (l) =>
-        l.event_type === "shop_view" &&
-        l.created_at &&
-        l.created_at >= todayISO,
-    ).length;
-    const clicks_today = allLogs.filter(
-      (l) =>
-        l.event_type === "product_click" &&
-        l.created_at &&
-        l.created_at >= todayISO,
-    ).length;
+    const buildCount = (eventType: string, from?: string) => {
+      let q = supabase
+        .from("analytics_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("shop_id", shopId)
+        .eq("event_type", eventType);
+      if (from) q = q.gte("created_at", from);
+      return q;
+    };
+
+    const [viewsRes, clicksRes, viewsTodayRes, clicksTodayRes] =
+      await Promise.all([
+        buildCount("shop_view"),
+        buildCount("product_click"),
+        buildCount("shop_view", todayISO),
+        buildCount("product_click", todayISO),
+      ]);
+
+    const err =
+      viewsRes.error ||
+      clicksRes.error ||
+      viewsTodayRes.error ||
+      clicksTodayRes.error;
+    if (err) throw err;
 
     const summary = {
-      total_views,
-      total_product_clicks,
-      views_today,
-      clicks_today,
+      total_views: viewsRes.count ?? 0,
+      total_product_clicks: clicksRes.count ?? 0,
+      views_today: viewsTodayRes.count ?? 0,
+      clicks_today: clicksTodayRes.count ?? 0,
     };
 
     // Cache the summary

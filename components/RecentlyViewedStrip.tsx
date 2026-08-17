@@ -12,6 +12,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getRecentlyViewed, type RecentlyViewedItem } from "@/lib/behavior";
 import { getSafeImageUrl } from "@/services/storageService";
+import { useMyShop } from "@/lib/queries";
 
 function ClockIcon() {
   return (
@@ -24,10 +25,13 @@ function ClockIcon() {
 
 export default function RecentlyViewedStrip() {
   const [items, setItems] = useState<RecentlyViewedItem[]>([]);
+  const myShopQuery = useMyShop();
+  const myShopId = myShopQuery.data?.id ?? null;
 
   useEffect(() => {
-    setItems(getRecentlyViewed());
-  }, []);
+    const all = getRecentlyViewed();
+    setItems(myShopId ? all.filter((i) => i.shopId !== myShopId) : all);
+  }, [myShopId]);
 
   if (items.length === 0) return null;
 

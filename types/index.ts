@@ -74,6 +74,8 @@ export interface Shop {
   avg_rating?: number | null;
   /** Denormalized count of shop reviews. */
   review_count?: number | null;
+  /** Timestamp when sensitive info (name/phone/location) was last changed. */
+  sensitive_info_updated_at?: string | null;
 }
 
 export type ShopVerificationStatus = "pending" | "approved" | "rejected";
@@ -256,6 +258,8 @@ export interface Product {
   is_available: boolean;
   /** Stock status: in_stock, low_stock, out_of_stock, pre_order */
   stock_status?: string;
+  /** Merchant pin-to-top flag — pinned items sort first in the storefront. */
+  is_pinned?: boolean | null;
   /** Optional product variants (sizes, colors, etc.) stored as JSON */
   variants?: VariantGroup[] | null;
   /** FK to main category */

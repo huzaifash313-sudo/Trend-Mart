@@ -1,0 +1,419 @@
+"use client";
+
+import { useCallback, useMemo, useState, type FormEvent } from "react";
+import type { Shop, ShopFormData } from "@/types";
+import { updateShopProfile, sensitiveInfoLockedUntil } from "@/services/shopService";
+import { verifyPassword } from "@/services/authService";
+import ImageUpload from "@/components/ImageUpload";
+import ToggleSwitch from "@/components/ToggleSwitch";
+import { useToast } from "@/components/Toast";
+
+/* -------------------------------------------------------------------------- */
+/*  ShopProfileEditorModal — edit the store profile right on the storefront.  */
+/*                                                                             */
+/*  Sensitive fields (name, whatsapp, other number, location) are locked to    */
+/*  one change per 30 days AND require the account password. Other fields      */
+/*  (banner, logo, hours, bio) can be changed any time without a password.     */
+/* -------------------------------------------------------------------------- */
+
+interface ShopProfileEditorModalProps {
+  shop: Shop;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function CloseIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+/** Build a full ShopFormData from a Shop, preserving every non-edited field. */
+function shopToFormData(source: Shop): ShopFormData {
+  return {
+    name: source.name,
+    category: source.category,
+    location: source.location,
+    whatsapp_number: source.whatsapp_number,
+    logo_url: source.logo_url ?? "",
+    banner_url: source.banner_url ?? "",
+    is_live: source.is_live,
+    instagram_handle: source.instagram_handle ?? "",
+    facebook_url: source.facebook_url ?? "",
+    tiktok_handle: source.tiktok_handle ?? "",
+    secondary_phone: source.secondary_phone ?? "",
+    business_hours: source.business_hours ?? "",
+    operating_status: source.operating_status?.trim() || "Open",
+    accent_color: source.accent_color ?? "#10b981",
+    store_bio: source.store_bio ?? "",
+    announcement: source.announcement ?? "",
+    announcement_expires_at: source.announcement_expires_at ?? "",
+    service_area: source.service_area ?? "",
+    hourly_rate: source.hourly_rate != null ? String(source.hourly_rate) : "",
+    call_out_charge: source.call_out_charge != null ? String(source.call_out_charge) : "",
+    emergency_available: source.emergency_available ?? false,
+    shop_type: source.shop_type ?? "retail",
+    latitude: source.latitude ?? null,
+    longitude: source.longitude ?? null,
+    service_radius_km: source.service_radius_km ?? 10,
+    delivery_zones: source.delivery_zones ?? [],
+    address_display: source.address_display ?? "",
+    min_order_amount:
+      source.min_order_amount != null && source.min_order_amount > 0
+        ? String(source.min_order_amount)
+        : "",
+    free_delivery_threshold:
+      source.free_delivery_threshold != null
+        ? String(source.free_delivery_threshold)
+        : "",
+    delivery_fee_flat:
+      source.delivery_fee_flat != null && source.delivery_fee_flat > 0
+        ? String(source.delivery_fee_flat)
+        : "",
+    delivery_fee_per_km:
+      source.delivery_fee_per_km != null && source.delivery_fee_per_km > 0
+        ? String(source.delivery_fee_per_km)
+        : "",
+  };
+}
+
+export default function ShopProfileEditorModal({
+  shop,
+  onClose,
+  onSaved,
+}: ShopProfileEditorModalProps) {
+  const { addToast } = useToast();
+
+  const [name, setName] = useState(shop.name ?? "");
+  const [whatsapp, setWhatsapp] = useState(shop.whatsapp_number ?? "");
+  const [secondaryPhone, setSecondaryPhone] = useState(shop.secondary_phone ?? "");
+  const [location, setLocation] = useState(shop.location ?? "");
+  const [businessHours, setBusinessHours] = useState(shop.business_hours ?? "");
+  const [bio, setBio] = useState(shop.store_bio ?? "");
+  const [logoUrl, setLogoUrl] = useState(shop.logo_url ?? "");
+  const [bannerUrl, setBannerUrl] = useState(shop.banner_url ?? "");
+  const [isOpen, setIsOpen] = useState(
+    !(shop.operating_status ?? "Open").toLowerCase().includes("closed"),
+  );
+
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Did any sensitive field change vs the stored shop?
+  const sensitiveChanged = useMemo(() => {
+    return (
+      name.trim() !== (shop.name ?? "").trim() ||
+      whatsapp.trim() !== (shop.whatsapp_number ?? "").trim() ||
+      secondaryPhone.trim() !== (shop.secondary_phone ?? "").trim() ||
+      location.trim() !== (shop.location ?? "").trim()
+    );
+  }, [name, whatsapp, secondaryPhone, location, shop]);
+
+  const lockedUntil = useMemo(
+    () => sensitiveInfoLockedUntil(shop.sensitive_info_updated_at),
+    [shop.sensitive_info_updated_at],
+  );
+  const sensitiveLocked = sensitiveChanged && lockedUntil != null;
+
+  const handleSubmit = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+
+      if (!name.trim()) {
+        setError("Store name is required.");
+        return;
+      }
+      const phone = whatsapp.replace(/\D/g, "");
+      if (phone && phone.length < 10) {
+        setError("Enter a valid WhatsApp number (min 10 digits).");
+        return;
+      }
+
+      // Sensitive fields need the account password (re-auth) before saving.
+      if (sensitiveChanged) {
+        if (sensitiveLocked) {
+          setError(
+            `Name, numbers and location are locked until ${lockedUntil!.toLocaleDateString(
+              "en-PK",
+              { day: "numeric", month: "long", year: "numeric" },
+            )}.`,
+          );
+          return;
+        }
+        if (!password.trim()) {
+          setError("Enter your account password to change name, numbers or location.");
+          return;
+        }
+        setSaving(true);
+        const verified = await verifyPassword(password);
+        if (!verified.success) {
+          setError(verified.error ?? "Incorrect password.");
+          setSaving(false);
+          return;
+        }
+      } else {
+        setSaving(true);
+      }
+
+      const form = shopToFormData(shop);
+      form.name = name.trim();
+      form.whatsapp_number = whatsapp.trim();
+      form.secondary_phone = secondaryPhone.trim();
+      form.location = location.trim();
+      form.business_hours = businessHours.trim();
+      form.store_bio = bio.trim();
+      form.operating_status = isOpen ? "Open" : "Closed";
+      form.logo_url = logoUrl;
+      form.banner_url = bannerUrl;
+
+      const result = await updateShopProfile(shop.id, form, sensitiveChanged);
+      setSaving(false);
+
+      if (result.success) {
+        addToast("Store profile updated.", "success");
+        window.dispatchEvent(new Event("trendmart:shops-updated"));
+        onSaved();
+      } else {
+        setError(result.error);
+      }
+    },
+    [
+      name,
+      whatsapp,
+      secondaryPhone,
+      location,
+      businessHours,
+      bio,
+      isOpen,
+      logoUrl,
+      bannerUrl,
+      password,
+      sensitiveChanged,
+      sensitiveLocked,
+      lockedUntil,
+      shop,
+      addToast,
+      onSaved,
+    ],
+  );
+
+  const fieldCls =
+    "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100";
+
+  return (
+    <div
+      className="fixed inset-0 z-[170] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-zinc-900"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit store profile"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-100 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Edit store profile</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            aria-label="Close"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 p-4">
+          {/* Logo + banner (editable any time) */}
+          <div className="space-y-2">
+            <ImageUpload
+              label="Store logo"
+              currentUrl={logoUrl}
+              onUploaded={setLogoUrl}
+              folder="shops"
+              fileId={`${shop.id}-logo`}
+              fallbackType="shop"
+            />
+            <ImageUpload
+              label="Store banner"
+              currentUrl={bannerUrl}
+              onUploaded={setBannerUrl}
+              folder="shops"
+              fileId={`${shop.id}-banner`}
+              fallbackType="shop"
+            />
+          </div>
+
+          {/* Sensitive group */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+            <p className="mb-2 flex items-center gap-1.5 text-[0.7rem] font-semibold text-amber-800 dark:text-amber-300">
+              <LockIcon /> Name, numbers &amp; location — once per month
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  Store name *
+                </label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={100}
+                  disabled={sensitiveLocked}
+                  className={fieldCls}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    WhatsApp number
+                  </label>
+                  <input
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    disabled={sensitiveLocked}
+                    inputMode="tel"
+                    className={fieldCls}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    Other number
+                  </label>
+                  <input
+                    value={secondaryPhone}
+                    onChange={(e) => setSecondaryPhone(e.target.value)}
+                    disabled={sensitiveLocked}
+                    inputMode="tel"
+                    className={fieldCls}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  Location
+                </label>
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  disabled={sensitiveLocked}
+                  maxLength={200}
+                  className={fieldCls}
+                />
+              </div>
+
+              {sensitiveLocked ? (
+                <p className="text-[0.7rem] font-medium text-amber-700 dark:text-amber-400">
+                  Locked until{" "}
+                  {lockedUntil!.toLocaleDateString("en-PK", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  . Other fields below can still be edited.
+                </p>
+              ) : null}
+
+              {sensitiveChanged && !sensitiveLocked ? (
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    Account password (to confirm)
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    className={fieldCls}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Free group */}
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Business hours
+              </label>
+              <input
+                value={businessHours}
+                onChange={(e) => setBusinessHours(e.target.value)}
+                maxLength={150}
+                placeholder="e.g. Mon-Sat: 9 AM - 10 PM"
+                className={fieldCls}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Store open
+                </p>
+                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                  {isOpen ? "Customers can order now" : "Store is closed for now"}
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={isOpen}
+                onChange={setIsOpen}
+                label="Store open or closed"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Store bio / about
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="Tell customers about your store…"
+                className={`${fieldCls} resize-none`}
+              />
+            </div>
+          </div>
+
+          {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={saving || sensitiveLocked}
+              className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

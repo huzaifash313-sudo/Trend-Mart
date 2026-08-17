@@ -9,85 +9,29 @@ import {
 } from "@/services/storageService";
 
 /* -------------------------------------------------------------------------- */
-/*  Types                                                                     */
+/*  ImageUpload — minimal single-image picker (logo, banner, story).          */
+/*                                                                             */
+/*  One clean clickable box: tap to pick (or re-pick) a photo, tap the small   */
+/*  ✕ to remove. No verbose helper text, no "Change"/"Remove" buttons.        */
 /* -------------------------------------------------------------------------- */
 
 export interface ImageUploadProps {
-  /** Current image URL (from Supabase Storage). */
   currentUrl: string;
-  /** Called with the public URL after a successful upload (or "" when cleared). */
   onUploaded: (url: string) => void;
-  /** Subfolder inside the bucket (e.g. "shops" or "products"). */
   folder: string;
-  /** Unique file identifier (e.g. shop uuid or "new-product"). */
   fileId: string;
-  /** Optional label override. */
   label?: string;
-  /** If true, disable the picker. */
   disabled?: boolean;
-  /** If true, show a preview of the current image. */
   showPreview?: boolean;
-  /** Fallback type for missing images. */
   fallbackType?: "shop" | "product" | "generic";
-  /**
-   * compact: single-row upload control (bulk table / tight layouts).
-   * default: stacked preview + full-width upload button.
-   */
   variant?: "default" | "compact";
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Icons                                                                     */
-/* -------------------------------------------------------------------------- */
-
-function UploadIcon({ className = "h-4 w-4" }: { className?: string }) {
+function PlusIcon() {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17 8 12 3 7 8" />
-      <line x1="12" y1="3" x2="12" y2="15" />
-    </svg>
-  );
-}
-
-function Spinner({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-      <path
-        d="M4 12a8 8 0 0 1 8-8"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg
-      className="h-4 w-4 shrink-0"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
@@ -101,9 +45,14 @@ function XIcon() {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Component — file upload only (no manual URL field)                        */
-/* -------------------------------------------------------------------------- */
+function Spinner() {
+  return (
+    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+      <path d="M4 12a8 8 0 0 1 8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export default function ImageUpload({
   currentUrl,
@@ -124,7 +73,6 @@ export default function ImageUpload({
 
   const hasImage = !!(currentUrl && currentUrl.trim());
   const previewUrl = hasImage ? currentUrl : FALLBACK_URLS[fallbackType];
-  const acceptTypes = "image/jpeg,image/png,image/webp,image/avif";
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,18 +91,15 @@ export default function ImageUpload({
 
       setUploading(true);
       const result = await uploadImage(file, folder, fileId);
-      if (result.success) {
-        onUploaded(result.data);
-      } else {
-        setUploadError(result.error);
-      }
+      if (result.success) onUploaded(result.data);
+      else setUploadError(result.error);
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [folder, fileId, onUploaded],
   );
 
-  const handleClear = useCallback(
+  const remove = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       onUploaded("");
@@ -172,151 +117,119 @@ export default function ImageUpload({
     <input
       ref={fileInputRef}
       type="file"
-      accept={acceptTypes}
+      accept="image/jpeg,image/png,image/webp,image/avif"
       onChange={handleFileChange}
       className="hidden"
       aria-label={`Upload ${label.toLowerCase()}`}
     />
   );
 
-  /* ── Compact: single horizontal line (bulk desktop / tight UIs) ─────────── */
+  /* ── Compact: small inline control (bulk rows) ─────────────────────────── */
   if (variant === "compact") {
     return (
-      <div className="tm-img-upload tm-img-upload--compact">
+      <div className="flex items-center gap-2">
         {fileInput}
         <button
           type="button"
           onClick={openPicker}
           disabled={disabled || uploading}
-          className="tm-img-upload__btn tm-img-upload__btn--compact"
+          className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-zinc-400 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
         >
           {uploading ? (
-            <>
-              <Spinner className="h-3.5 w-3.5" />
-              <span>…</span>
-            </>
+            <Spinner />
           ) : hasImage ? (
-            <>
-              {showPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewUrl}
-                  alt=""
-                  className="tm-img-upload__thumb"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
-                  }}
-                />
-              ) : null}
-              <span>Change</span>
-            </>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <>
-              <UploadIcon className="h-3.5 w-3.5" />
-              <span>Upload</span>
-            </>
+            <PlusIcon />
           )}
         </button>
         {hasImage ? (
           <button
             type="button"
-            onClick={handleClear}
-            className="tm-img-upload__clear"
-            aria-label="Remove image"
+            onClick={remove}
             disabled={disabled || uploading}
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-zinc-600 hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-700 dark:text-zinc-300"
+            aria-label="Remove image"
           >
             <XIcon />
           </button>
         ) : null}
         {(uploadError || validationError) && (
-          <p className="tm-img-upload__err">
+          <span className="text-[11px] text-red-500">
             {uploadError || validationError?.message}
-          </p>
+          </span>
         )}
       </div>
     );
   }
 
-  /* ── Default: stacked, mobile-friendly ──────────────────────────────────── */
+  /* ── Default: one clean clickable box ──────────────────────────────────── */
   return (
-    <div className="tm-img-upload tm-img-upload--stack space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-          {label}
-        </label>
-        {uploadError ? <span className="text-xs text-red-500">{uploadError}</span> : null}
-      </div>
-
-      {showPreview ? (
-        <div className="flex items-center gap-3">
-          <div className="tm-img-upload__preview">
-            {hasImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={previewUrl}
-                alt={`${label} preview`}
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
-                }}
-              />
-            ) : (
-              <span className="text-[10px] font-medium text-teal-700/50 dark:text-teal-300/40">
-                No image
-              </span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-              {hasImage ? "Image ready" : "Tap upload to add a photo"}
-            </p>
-            <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-              JPG, PNG or WebP · auto-compressed
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      {validationError ? (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-          <AlertIcon />
-          <span>{validationError.message}</span>
-        </div>
-      ) : null}
+    <div className="space-y-1.5">
+      <span className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+        {label}
+      </span>
 
       {fileInput}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={openPicker}
-          disabled={disabled || uploading}
-          className="tm-img-upload__btn w-full sm:w-auto sm:min-w-[9.5rem]"
-        >
-          {uploading ? (
-            <>
-              <Spinner />
-              Uploading…
-            </>
-          ) : (
-            <>
-              <UploadIcon />
-              {hasImage ? "Change photo" : "Upload photo"}
-            </>
-          )}
-        </button>
-        {hasImage ? (
-          <button
-            type="button"
-            onClick={handleClear}
-            disabled={disabled || uploading}
-            className="tm-img-upload__clear-btn"
-            aria-label="Remove image"
-          >
-            Remove
-          </button>
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={disabled || uploading}
+        className="group relative block h-40 w-full overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50 transition-colors hover:border-emerald-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+        aria-label={hasImage ? `Change ${label.toLowerCase()}` : `Upload ${label.toLowerCase()}`}
+      >
+        {uploading ? (
+          <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-zinc-400">
+            <Spinner />
+          </span>
+        ) : hasImage && showPreview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt={`${label} preview`}
+            className="h-full w-full object-contain p-1.5"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
+            }}
+          />
+        ) : (
+          <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-zinc-400">
+            <PlusIcon />
+            <span className="text-xs font-medium">Upload</span>
+          </span>
+        )}
+
+        {hasImage && !uploading ? (
+          <>
+            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/70 to-transparent px-2 pb-1.5 pt-5 text-center text-[10px] font-semibold text-white/95">
+              Tap to change
+            </span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={remove}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  remove(e as unknown as React.MouseEvent);
+                }
+              }}
+              className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900/60 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-zinc-900/90"
+              aria-label="Remove image"
+            >
+              <XIcon />
+            </span>
+          </>
         ) : null}
-      </div>
+      </button>
+
+      {(uploadError || validationError) && (
+        <p className="text-[11px] text-red-500">
+          {uploadError || validationError?.message}
+        </p>
+      )}
     </div>
   );
 }

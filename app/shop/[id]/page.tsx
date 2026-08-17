@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
 import type { Product } from "@/types";
 import { logShopView } from "@/services/analyticsService";
 import { trackCategoryInterest, trackProductView } from "@/lib/behavior";
@@ -60,6 +60,18 @@ import ServiceBookingModal, { type ServicePackageItem } from "@/components/Servi
 import AvailabilitySchedule, { type AvailabilityDay } from "@/components/AvailabilitySchedule";
 import type { PortfolioItem } from "@/components/ServicePortfolioManager";
 import { createClient } from "@/lib/supabase/client";
+import ToggleSwitch from "@/components/ToggleSwitch";
+import { getDealImages } from "@/lib/productImages";
+import { getSafeImageUrl } from "@/services/storageService";
+import { deleteShopDeal, fetchDealsByShopId, updateShopDeal } from "@/services/dealService";
+import { deleteProduct, setProductPinned } from "@/services/productService";
+import ProductEditorModal from "@/components/ProductEditorModal";
+import DealEditorModal from "@/components/DealEditorModal";
+import ShopProfileEditorModal from "@/components/ShopProfileEditorModal";
+import { type StoreManageAction } from "@/components/StoreManageActions";
+import KebabMenu, { type KebabMenuItem } from "@/components/KebabMenu";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { deleteCoupon } from "@/services/couponService";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -90,10 +102,101 @@ function SearchIcon() {
 
 function GridIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>); }
 
+/** Owner-facing deal card (horizontal strip) — 3-dot menu: pin, edit, delete. */
+function OwnerDealCard({
+  deal,
+  deleting,
+  onEdit,
+  onPinToggle,
+  onDelete,
+}: {
+  deal: ShopDeal;
+  deleting: boolean;
+  onEdit: () => void;
+  onPinToggle: () => void;
+  onDelete: () => void;
+}) {
+  const cover = getDealImages(deal)[0] ?? deal.image_url ?? null;
+  const pinned = deal.is_featured === true;
+
+  const menuItems = useMemo<KebabMenuItem[]>(
+    () => [
+      {
+        label: pinned ? "Unpin from top" : "Pin to top",
+        onClick: onPinToggle,
+        icon: (
+          <svg
+            className={`h-3.5 w-3.5 ${pinned ? "text-amber-500" : "text-zinc-400"}`}
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" />
+          </svg>
+        ),
+      },
+      { label: "Edit", onClick: onEdit },
+      { label: "Delete", onClick: onDelete, destructive: true },
+    ],
+    [pinned, onPinToggle, onEdit, onDelete],
+  );
+
+  return (
+    <div
+      className={`flex w-[15rem] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition-opacity dark:border-zinc-700 dark:bg-zinc-900 ${
+        deleting ? "pointer-events-none opacity-60" : ""
+      }`}
+    >
+      <div className="relative aspect-[16/9] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+        {cover ? (
+          <Image
+            src={getSafeImageUrl(cover, "product")}
+            alt={deal.title}
+            fill
+            className="object-cover"
+            sizes="15rem"
+            unoptimized
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[0.6rem] font-bold uppercase text-zinc-400">
+            Deal
+          </div>
+        )}
+        {!deal.is_active ? (
+          <span className="absolute left-1.5 top-1.5 rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+            Paused
+          </span>
+        ) : null}
+        <div className="absolute right-1.5 top-1.5">
+          <KebabMenu items={menuItems} ariaLabel={`Options for ${deal.title}`} variant="overlay" />
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-2">
+        <p className="truncate text-xs font-semibold text-zinc-900 dark:text-zinc-100" title={deal.title}>
+          {pinned ? (
+            <svg
+              className="mr-1 inline-block h-3 w-3 shrink-0 align-[-1px] text-amber-500"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" />
+            </svg>
+          ) : null}
+          {deal.title}
+        </p>
+        <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+          {deal.price != null ? `Rs ${Math.round(deal.price).toLocaleString("en-PK")}` : "—"}
+          {pinned ? " · Pinned" : ""}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Shop Detail Inner ──────────────────────────────────────────────────────
 
 function ShopDetailInner({ id }: { id: string }) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const shopQuery = useShopDetail(id);
   const shop = shopQuery.data?.shop ?? null;
@@ -115,8 +218,22 @@ function ShopDetailInner({ id }: { id: string }) {
   const [isOwner, setIsOwner] = useState(false);
   const { addToast } = useToast();
   const { addItem } = useCart();
+  const { confirm } = useConfirm();
   const { openQuickAdd } = useMerchantQuickAdd();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+
+  // Owner-only deal manager state (all deals, incl. paused).
+  const [ownerDeals, setOwnerDeals] = useState<ShopDeal[]>([]);
+  const [deletingDealId, setDeletingDealId] = useState<string | null>(null);
+  const [dealEditor, setDealEditor] = useState<ShopDeal | null>(null);
+  const [dealEditorOpen, setDealEditorOpen] = useState(false);
+
+  // Owner-only inline product editor (add + edit).
+  const [editorProduct, setEditorProduct] = useState<Product | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  // Owner-only profile editor.
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
 
   // Quick view modal state — cart-first: no single-item checkout
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
@@ -136,6 +253,10 @@ function ShopDetailInner({ id }: { id: string }) {
   });
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [deals, setDeals] = useState<ShopDeal[]>([]);
+  const [couponsOpen, setCouponsOpen] = useState(false);
+  const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null);
+  // Optimistic open/closed override — flips instantly, reconciled on reload.
+  const [openStatusOverride, setOpenStatusOverride] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const resolvedShopId = shop?.id ?? null;
 
@@ -321,6 +442,24 @@ function ShopDetailInner({ id }: { id: string }) {
     };
   }, []);
 
+  // ── Owner deal manager: load ALL deals (active + paused) ─────────────────
+  useEffect(() => {
+    if (!isOwner || !resolvedShopId) return;
+    let cancelled = false;
+    const load = () => {
+      fetchDealsByShopId(resolvedShopId).then((res) => {
+        if (!cancelled && res.success) setOwnerDeals(res.data);
+      });
+    };
+    load();
+    const onDealsUpdated = () => load();
+    window.addEventListener("trendmart:deals-updated", onDealsUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("trendmart:deals-updated", onDealsUpdated);
+    };
+  }, [isOwner, resolvedShopId]);
+
   // ── Service Data Fetching ─────────────────────────────────────────────────
   useEffect(() => {
     if (!shop || !isServiceCategory) return;
@@ -344,6 +483,24 @@ function ShopDetailInner({ id }: { id: string }) {
     return ids;
   }, [products]);
 
+  // Pinned deals first, then the fetched order (newest first).
+  const sortedOwnerDeals = useMemo(() => {
+    return [...ownerDeals].sort((a, b) => {
+      const ap = a.is_featured === true ? 1 : 0;
+      const bp = b.is_featured === true ? 1 : 0;
+      return bp - ap;
+    });
+  }, [ownerDeals]);
+
+  // Pinned product ids — drives the pin indicator + "Pin/Unpin" menu label.
+  const pinnedProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of products) {
+      if (p.is_pinned) ids.add(p.id);
+    }
+    return ids;
+  }, [products]);
+
   // ── Filtered & Sorted Products ────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
     let result = products;
@@ -361,6 +518,7 @@ function ShopDetailInner({ id }: { id: string }) {
     }
     if (priceSort === "low") result = [...result].sort((a, b) => a.price - b.price);
     else if (priceSort === "high") result = [...result].sort((a, b) => b.price - a.price);
+    else result = [...result].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
     return result;
   }, [products, debouncedQuery, priceSort, activeSubCategoryId]);
 
@@ -379,14 +537,14 @@ function ShopDetailInner({ id }: { id: string }) {
   }, [shop]);
 
   const handleAddToCart = useCallback((product: Product) => {
-    if (!shop) return;
+    if (!shop || isOwner) return;
     addItem(product, { id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number });
     addToast(`"${product.name}" added to cart`, "success");
-  }, [shop, addItem, addToast]);
+  }, [shop, isOwner, addItem, addToast]);
 
   const handleOrder = useCallback((intent: ProductOrderIntent) => {
     const product = intent.product;
-    if (!shop) return;
+    if (!shop || isOwner) return;
     if (!shop.whatsapp_number) {
       addToast("This store has no WhatsApp number yet — please contact them directly.", "info");
       return;
@@ -411,7 +569,7 @@ function ShopDetailInner({ id }: { id: string }) {
       category: shop.category ?? product.category_id ?? null,
     });
     setOrderIntent(intent);
-  }, [shop, addItem, addToast]);
+  }, [shop, isOwner, addItem, addToast]);
 
   const handleWishlistToggle = useCallback(
     async (product: Product) => {
@@ -436,6 +594,292 @@ function ShopDetailInner({ id }: { id: string }) {
       );
     },
     [shop, addToast],
+  );
+
+  // Owner taps "Edit" on a product → open the inline editor right here.
+  const ownerEditProduct = useCallback((product: Product) => {
+    setEditorProduct(product);
+    setEditorOpen(true);
+  }, []);
+
+  // Stable per-card Order wrapper (avoids inline arrow defeating ProductCard memo).
+  const handleGridOrder = useCallback(
+    (product: Product) => handleOrder({ product, quantity: 1 }),
+    [handleOrder],
+  );
+
+  const openAddProduct = useCallback(() => {
+    setEditorProduct(null);
+    setEditorOpen(true);
+  }, []);
+
+  const closeEditor = useCallback(() => {
+    setEditorOpen(false);
+    setEditorProduct(null);
+  }, []);
+
+  // Owner quick-action chips (also reused by the floating "+" chooser).
+  const manageActions = useMemo<StoreManageAction[]>(() => {
+    if (!shop) return [];
+    return [
+      {
+        id: "product",
+        label: "Add product",
+        tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+          </svg>
+        ),
+        onClick: openAddProduct,
+      },
+      {
+        id: "bulk",
+        label: "Bulk add",
+        tone: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+          </svg>
+        ),
+        onClick: () => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "bulk" }),
+      },
+      {
+        id: "deal",
+        label: "Add deal",
+        tone: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 4a2 2 0 0 0-1 3.59l.76.76a2 2 0 0 0 1.41.59H6l7.41 7.41a2 2 0 0 0 2.83 0l3.35-3.35a2 2 0 0 0 0-2.83z" transform="rotate(-45 12 12)" />
+            <circle cx="7.5" cy="7.5" r="0.5" fill="currentColor" />
+          </svg>
+        ),
+        onClick: () => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "deal" }),
+      },
+      {
+        id: "coupon",
+        label: "Add coupon",
+        tone: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" />
+            <path d="M13 5v2" />
+            <path d="M13 17v2" />
+            <path d="M13 11v2" />
+          </svg>
+        ),
+        onClick: () => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "coupon" }),
+      },
+      {
+        id: "story",
+        label: "Add story",
+        tone: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
+          </svg>
+        ),
+        onClick: () => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "story" }),
+      },
+      {
+        id: "analytics",
+        label: "Analytics",
+        tone: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="12" y1="20" x2="12" y2="10" />
+            <line x1="18" y1="20" x2="18" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="16" />
+          </svg>
+        ),
+        href: "/dashboard/analytics",
+      },
+      {
+        id: "settings",
+        label: "Store settings",
+        tone: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        ),
+        href: "/dashboard/settings",
+      },
+    ];
+  }, [shop, openAddProduct, openQuickAdd]);
+
+  const handleDeleteDeal = useCallback(
+    async (dealId: string) => {
+      const deal = ownerDeals.find((d) => d.id === dealId);
+      const ok = await confirm({
+        title: "Delete deal?",
+        message: deal
+          ? `"${deal.title}" will be permanently removed. This cannot be undone.`
+          : "This deal will be permanently removed. This cannot be undone.",
+        confirmLabel: "Delete",
+        cancelLabel: "Cancel",
+        variant: "danger",
+      });
+      if (!ok) return;
+
+      setDeletingDealId(dealId);
+      const res = await deleteShopDeal(dealId);
+      if (res.success) {
+        setOwnerDeals((prev) => prev.filter((d) => d.id !== dealId));
+        addToast("Deal deleted.", "success");
+        queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+        queryClient.invalidateQueries({ queryKey: ["deals"] });
+        window.dispatchEvent(new Event("trendmart:deals-updated"));
+      } else {
+        addToast(res.error, "error");
+      }
+      setDeletingDealId(null);
+    },
+    [ownerDeals, confirm, addToast, queryClient, id],
+  );
+
+  const openDealEditor = useCallback((deal: ShopDeal) => {
+    setDealEditor(deal);
+    setDealEditorOpen(true);
+  }, []);
+
+  const closeDealEditor = useCallback(() => {
+    setDealEditorOpen(false);
+    setDealEditor(null);
+  }, []);
+
+  const handlePinDeal = useCallback(
+    async (deal: ShopDeal) => {
+      const nextPinned = deal.is_featured !== true;
+      setOwnerDeals((prev) =>
+        prev.map((d) => (d.id === deal.id ? { ...d, is_featured: nextPinned } : d)),
+      );
+      const res = await updateShopDeal(deal.id, { is_featured: nextPinned });
+      if (res.success) {
+        addToast(nextPinned ? "Deal pinned to top." : "Deal unpinned.", "success");
+        queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+        queryClient.invalidateQueries({ queryKey: ["deals"] });
+        window.dispatchEvent(new Event("trendmart:deals-updated"));
+      } else {
+        setOwnerDeals((prev) =>
+          prev.map((d) =>
+            d.id === deal.id ? { ...d, is_featured: deal.is_featured === true } : d,
+          ),
+        );
+        addToast(res.error, "error");
+      }
+    },
+    [addToast, queryClient, id],
+  );
+
+  const handlePinProduct = useCallback(
+    async (product: Product, nextPinned: boolean) => {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, is_pinned: nextPinned } : p)),
+      );
+      const res = await setProductPinned(product.id, nextPinned);
+      if (res.success) {
+        addToast(nextPinned ? "Product pinned to top." : "Product unpinned.", "success");
+      } else {
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === product.id ? { ...p, is_pinned: product.is_pinned === true } : p,
+          ),
+        );
+        addToast(res.error, "error");
+      }
+    },
+    [addToast],
+  );
+
+  const handleDeleteProduct = useCallback(
+    async (product: Product) => {
+      const ok = await confirm({
+        title: "Delete product?",
+        message: `"${product.name}" will be permanently removed. This cannot be undone.`,
+        confirmLabel: "Delete",
+        cancelLabel: "Cancel",
+        variant: "danger",
+      });
+      if (!ok) return;
+      const res = await deleteProduct(product.id);
+      if (res.success) {
+        setProducts((prev) => prev.filter((p) => p.id !== product.id));
+        addToast("Product deleted.", "success");
+        window.dispatchEvent(new Event("trendmart:products-updated"));
+      } else {
+        addToast(res.error ?? "Failed to delete product.", "error");
+      }
+    },
+    [confirm, addToast],
+  );
+
+  // Owner-only quick open/closed toggle right in the storefront hours card.
+  const handleToggleOpen = useCallback(
+    async (open: boolean) => {
+      if (!shop) return;
+      const nextStatus = open ? "Open" : "Closed";
+
+      // Optimistic: flip the toggle instantly, no network wait.
+      setOpenStatusOverride(nextStatus);
+
+      const { error } = await supabase
+        .from("shops")
+        .update({ operating_status: nextStatus })
+        .eq("id", shop.id);
+      if (error) {
+        // Revert to the stored status on failure.
+        setOpenStatusOverride(shop.operating_status?.trim() || "Open");
+        addToast("Could not update store status.", "error");
+        return;
+      }
+      addToast(open ? "Store is now open." : "Store is now closed.", "success");
+      queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+      window.dispatchEvent(new Event("trendmart:shops-updated"));
+    },
+    [shop, supabase, addToast, queryClient, id],
+  );
+
+  // When the storefront refetch returns the real status, clear the optimistic
+  // override so the card reflects the persisted value going forward.
+  useEffect(() => {
+    setOpenStatusOverride(null);
+  }, [shop?.operating_status]);
+
+  // Owner-only coupon delete.
+  const handleDeleteCoupon = useCallback(
+    async (couponId: string) => {
+      const coupon = coupons.find((c) => c.id === couponId);
+      const ok = await confirm({
+        title: "Delete coupon?",
+        message: coupon
+          ? `Coupon "${coupon.code}" will be permanently removed.`
+          : "This coupon will be permanently removed.",
+        confirmLabel: "Delete",
+        cancelLabel: "Cancel",
+        variant: "danger",
+      });
+      if (!ok) return;
+      setDeletingCouponId(couponId);
+      const res = await deleteCoupon(couponId);
+      if (res.success) {
+        setCoupons((prev) => prev.filter((c) => c.id !== couponId));
+        addToast("Coupon deleted.", "success");
+        queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+        window.dispatchEvent(new Event("trendmart:coupons-updated"));
+      } else {
+        addToast(res.error, "error");
+      }
+      setDeletingCouponId(null);
+    },
+    [coupons, confirm, addToast, queryClient, id],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -467,68 +911,6 @@ function ShopDetailInner({ id }: { id: string }) {
       {loading && (<div className="space-y-4"><ShopBannerSkeleton /><ProductGridSkeleton count={4} /></div>)}
       {!loading && error && (<ErrorState title="Failed to load shop" message={error} onRetry={() => window.location.reload()} />)}
       {!loading && !error && shop && (<>
-        {/* Promo strip — offer + free delivery + coupons in one marquee */}
-        {displayPrefs.showAnnouncementBanner && promoBannerSegments.length > 0 && (
-          <section className="-mx-3 md:-mx-4">
-            <AnnouncementBanner
-              segments={promoBannerSegments}
-              variant="marquee"
-              accentColor={THEME_ACCENT}
-              dismissible={false}
-            />
-          </section>
-        )}
-
-        {/* Deals first — Visit from /deals lands here (#deals) */}
-        {liveShopDeals.length > 0 ? (
-          <section id="deals" aria-label="Store deals" className="space-y-2 scroll-mt-20">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Deals</h2>
-                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                  Order on deal day
-                </p>
-              </div>
-              <Link
-                href="/deals"
-                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
-              >
-                All deals →
-              </Link>
-            </div>
-            <div className="-mx-1 flex snap-x snap-mandatory items-stretch gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
-              {liveShopDeals.map((deal, i) => (
-                <div
-                  key={deal.id}
-                  id={`deal-${deal.id}`}
-                  className="flex w-[calc(50%-0.25rem)] shrink-0 snap-start scroll-mt-24 sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
-                >
-                  <DealCard
-                    deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
-                    compact
-                    priority={i < 2}
-                    href={`${getShopPath(shop)}#deal-${deal.id}`}
-                    shopWhatsapp={shop.whatsapp_number}
-                    offerTags={shopDealOfferTags}
-                    onOpen={() => {
-                      setQuickViewDeal(deal);
-                      trackProductView({
-                        id: deal.product_id && deal.product_id.length > 10 ? deal.product_id : deal.id,
-                        name: deal.title,
-                        price: Number(deal.price) || 0,
-                        imageUrl: deal.image_url,
-                        shopId: shop.id,
-                        shopName: shop.name,
-                        category: shop.category ?? null,
-                      });
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
         {/* Hero — banner wide; logo beside shop name */}
         <section className="trend-card overflow-hidden">
           <ShopMediaHeader
@@ -573,6 +955,19 @@ function ShopDetailInner({ id }: { id: string }) {
                   <span className={`max-w-full truncate rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold ${theme.badgeClass}`}>
                     {shop.category}
                   </span>
+                  {isOwner ? (
+                    <button
+                      type="button"
+                      onClick={() => setProfileEditorOpen(true)}
+                      className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                    >
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+                      </svg>
+                      Edit profile
+                    </button>
+                  ) : null}
                 </div>
                 <CompactRating
                   average={shop.avg_rating}
@@ -591,12 +986,14 @@ function ShopDetailInner({ id }: { id: string }) {
 
             {/* Store hours — shown on storefront visit (not on homepage cards) */}
             {(() => {
+              const operatingStatus = openStatusOverride ?? shop.operating_status;
               const hours = getShopHoursSummary({
                 business_hours: shop.business_hours,
-                operating_status: shop.operating_status,
+                operating_status: operatingStatus,
               });
               const hasHours =
-                !!(shop.business_hours?.trim() || shop.operating_status?.trim());
+                !!(shop.business_hours?.trim() || operatingStatus?.trim());
+              const isOpen = hours.state !== "closed";
               return (
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-teal-100 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 px-3 py-2 dark:border-teal-900/40 dark:from-emerald-950/30 dark:to-teal-950/20">
                   <ClockIcon />
@@ -607,24 +1004,34 @@ function ShopDetailInner({ id }: { id: string }) {
                     <p className="text-xs leading-snug text-zinc-700 dark:text-zinc-300">
                       {hasHours ? hours.hoursText : "Hours not set by merchant yet"}
                     </p>
-                    {shop.operating_status?.trim() &&
-                    shop.operating_status.trim() !== hours.hoursText ? (
+                    {operatingStatus?.trim() &&
+                    operatingStatus.trim() !== hours.hoursText ? (
                       <p className="mt-0.5 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                        {shop.operating_status}
+                        {operatingStatus}
                       </p>
                     ) : null}
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold ${
-                      hours.state === "open"
-                        ? "bg-emerald-600 text-white"
-                        : hours.state === "closed"
-                          ? "bg-rose-500 text-white"
-                          : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100"
-                    }`}
-                  >
-                    {hours.label}
-                  </span>
+                  {isOwner ? (
+                    <ToggleSwitch
+                      checked={isOpen}
+                      onChange={(open) => handleToggleOpen(open)}
+                      label="Store open or closed"
+                      size="sm"
+                      visibleLabel={isOpen ? "Open" : "Closed"}
+                    />
+                  ) : (
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold ${
+                        hours.state === "open"
+                          ? "bg-emerald-600 text-white"
+                          : hours.state === "closed"
+                            ? "bg-rose-500 text-white"
+                            : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100"
+                      }`}
+                    >
+                      {hours.label}
+                    </span>
+                  )}
                 </div>
               );
             })()}
@@ -660,23 +1067,32 @@ function ShopDetailInner({ id }: { id: string }) {
             {isOwner ? (
               <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
                 <p className="mb-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">Manage this store</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openQuickAdd({ shopId: shop.id, shopCategory: shop.category, tab: "product" })}
-                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                  >
-                    Quick add (+)
-                  </button>
-                  <Link
-                    href="/dashboard/settings"
-                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
-                  >
-                    Store settings
-                  </Link>
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
+                  {manageActions.map((a) =>
+                    a.href ? (
+                      <Link
+                        key={a.id}
+                        href={a.href}
+                        className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-emerald-950/40"
+                      >
+                        <span className={`flex h-5 w-5 items-center justify-center rounded-md ${a.tone}`}>{a.icon}</span>
+                        {a.label}
+                      </Link>
+                    ) : (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={a.onClick}
+                        className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-emerald-950/40"
+                      >
+                        <span className={`flex h-5 w-5 items-center justify-center rounded-md ${a.tone}`}>{a.icon}</span>
+                        {a.label}
+                      </button>
+                    ),
+                  )}
                 </div>
                 <p className="mt-2 text-[0.65rem] text-emerald-800/80 dark:text-emerald-300/80">
-                  Products, coupons &amp; deals: bottom + button or Store settings. No duplicate menus.
+                  Tap a product&apos;s three dots to pin, edit or delete it — right here in the store.
                 </p>
               </div>
             ) : null}
@@ -727,6 +1143,163 @@ function ShopDetailInner({ id }: { id: string }) {
             )}
           </div>
         </section>
+
+        {/* Promo strip — offer + free delivery + coupons in one marquee */}
+        {displayPrefs.showAnnouncementBanner && promoBannerSegments.length > 0 && (
+          <section className="-mx-3 md:-mx-4">
+            <AnnouncementBanner
+              segments={promoBannerSegments}
+              variant="marquee"
+              accentColor={THEME_ACCENT}
+              dismissible={false}
+            />
+          </section>
+        )}
+
+        {/* Coupons — owner manage list (above deals); customers see via ticker */}
+        {isOwner ? (
+          <section id="coupons" aria-label="Manage your coupons" className="space-y-2 scroll-mt-20">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setCouponsOpen((v) => !v)}
+                className="flex min-w-0 items-center gap-2 text-left"
+                aria-expanded={couponsOpen}
+              >
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Coupons</h2>
+                <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                  {coupons.length}
+                </span>
+                <svg
+                  className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${couponsOpen ? "rotate-180" : ""}`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            </div>
+
+            {couponsOpen ? (
+              coupons.length === 0 ? (
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">No coupons yet.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {coupons.map((c) => (
+                    <li
+                      key={c.id}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                          {c.code}
+                        </p>
+                        <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                          {c.discount_percent != null
+                            ? `${c.discount_percent}% off`
+                            : `Rs. ${Math.round(c.discount_amount || 0)} off`}
+                          {c.expiry_date
+                            ? ` · expires ${new Date(c.expiry_date).toLocaleDateString("en-PK", { day: "numeric", month: "short" })}`
+                            : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCoupon(c.id)}
+                        disabled={deletingCouponId === c.id}
+                        className="shrink-0 rounded-lg px-2 py-1 text-[0.7rem] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
+                      >
+                        {deletingCouponId === c.id ? "Deleting…" : "Delete"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : null}
+          </section>
+        ) : null}
+
+        {/* Deals — owner sees a manage strip (delete/add); customers browse live */}
+        {isOwner ? (
+          <section id="deals" aria-label="Manage your deals" className="space-y-2 scroll-mt-20">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Your deals</h2>
+                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                  Tap a deal&apos;s three dots to pin, edit or delete it. Pinned deals show first.
+                </p>
+              </div>
+            </div>
+            {ownerDeals.length === 0 ? (
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">No deals yet.</p>
+            ) : (
+              <div className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
+                {sortedOwnerDeals.map((deal) => (
+                  <OwnerDealCard
+                    key={deal.id}
+                    deal={deal}
+                    deleting={deletingDealId === deal.id}
+                    onEdit={() => openDealEditor(deal)}
+                    onPinToggle={() => handlePinDeal(deal)}
+                    onDelete={() => handleDeleteDeal(deal.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        ) : liveShopDeals.length > 0 ? (
+          <section id="deals" aria-label="Store deals" className="space-y-2 scroll-mt-20">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Deals</h2>
+                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                  Order on deal day
+                </p>
+              </div>
+              <Link
+                href="/deals"
+                className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
+              >
+                All deals →
+              </Link>
+            </div>
+            <div className="-mx-1 flex snap-x snap-mandatory items-stretch gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
+              {liveShopDeals.map((deal, i) => (
+                <div
+                  key={deal.id}
+                  id={`deal-${deal.id}`}
+                  className="flex w-[calc(50%-0.25rem)] shrink-0 snap-start scroll-mt-24 sm:w-[calc(33.333%-0.333rem)] lg:w-[calc(25%-0.375rem)]"
+                >
+                  <DealCard
+                    deal={{ ...deal, shop_name: shop.name, shop_logo_url: shop.logo_url, shop_slug: shop.slug, shop_whatsapp: shop.whatsapp_number }}
+                    compact
+                    priority={i < 2}
+                    href={`${getShopPath(shop)}#deal-${deal.id}`}
+                    shopWhatsapp={shop.whatsapp_number}
+                    offerTags={shopDealOfferTags}
+                    onOpen={() => {
+                      setQuickViewDeal(deal);
+                      trackProductView({
+                        id: deal.product_id && deal.product_id.length > 10 ? deal.product_id : deal.id,
+                        name: deal.title,
+                        price: Number(deal.price) || 0,
+                        imageUrl: deal.image_url,
+                        shopId: shop.id,
+                        shopName: shop.name,
+                        category: shop.category ?? null,
+                      });
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {/* Category Description */}
         <div className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
@@ -844,10 +1417,14 @@ function ShopDetailInner({ id }: { id: string }) {
                 compact={true}
                 categoryLabel={shop.category}
                 offerContext={productOfferContext}
-                onProductClick={handleProductClick}
-                onAddToCart={handleAddToCart}
-                onOrder={(p) => handleOrder({ product: p, quantity: 1 })}
-                onFavoriteToggle={handleWishlistToggle}
+                onProductClick={isOwner ? ownerEditProduct : handleProductClick}
+                onAddToCart={isOwner ? undefined : handleAddToCart}
+                onOrder={isOwner ? undefined : handleGridOrder}
+                onFavoriteToggle={isOwner ? undefined : handleWishlistToggle}
+                onEdit={isOwner ? ownerEditProduct : undefined}
+                onPinToggle={isOwner ? handlePinProduct : undefined}
+                onDelete={isOwner ? handleDeleteProduct : undefined}
+                pinnedIds={pinnedProductIds}
                 favorites={wishlistIds}
               />
             )}
@@ -902,6 +1479,45 @@ function ShopDetailInner({ id }: { id: string }) {
           notes={orderIntent.notes}
           onClose={() => setOrderIntent(null)}
           onOrderPlaced={() => setOrderIntent(null)}
+        />
+      )}
+
+      {/* ── Owner profile editor ─────────────────────────────────── */}
+      {profileEditorOpen && shop && (
+        <ShopProfileEditorModal
+          shop={shop}
+          onClose={() => setProfileEditorOpen(false)}
+          onSaved={() => {
+            setProfileEditorOpen(false);
+            queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+          }}
+        />
+      )}
+
+      {/* ── Owner inline product editor (add + edit) ─────────────────── */}
+      {editorOpen && shop && (
+        <ProductEditorModal
+          shopId={shop.id}
+          shopCategory={shop.category}
+          product={editorProduct}
+          onClose={closeEditor}
+          onSaved={() => {
+            closeEditor();
+            queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+          }}
+        />
+      )}
+
+      {/* ── Owner inline deal editor (edit from 3-dot menu) ──────────── */}
+      {dealEditorOpen && dealEditor && (
+        <DealEditorModal
+          deal={dealEditor}
+          onClose={closeDealEditor}
+          onSaved={() => {
+            closeDealEditor();
+            queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+            queryClient.invalidateQueries({ queryKey: ["deals"] });
+          }}
         />
       )}
 

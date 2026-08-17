@@ -1012,3 +1012,34 @@ export async function bulkUpdateAvailability(
     return { success: false, error: toError(err) };
   }
 }
+
+/**
+ * Toggle the merchant "pin to top" flag on a product. Pinned products sort
+ * first in the storefront. Degrades gracefully if the column hasn't been
+ * added yet (run supabase/migrations/20260817000000_products_is_pinned.sql).
+ */
+export async function setProductPinned(
+  productId: string,
+  isPinned: boolean,
+): Promise<ServiceResult<null>> {
+  const supabase = createClient();
+
+  try {
+    const { error } = await supabase
+      .from("products")
+      .update({ is_pinned: isPinned })
+      .eq("id", productId);
+
+    if (error) throw error;
+    return { success: true, data: null };
+  } catch (err) {
+    if (isMissingColumnError(err)) {
+      return {
+        success: false,
+        error: "Pin is not available yet — run the products is_pinned migration.",
+      };
+    }
+    logError(err, { module: "productService.setProductPinned", meta: { productId, isPinned } });
+    return { success: false, error: toError(err) };
+  }
+}

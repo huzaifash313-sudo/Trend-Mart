@@ -162,25 +162,10 @@ function HomeInner() {
 
   const queryClient = useQueryClient();
 
-  const shopsQuery = useShops();
-  const shops = shopsQuery.data ?? EMPTY_SHOPS;
-  const loading = shopsQuery.isLoading;
-  const error = shopsQuery.error ? shopsQuery.error.message : null;
-
-  const dealsQuery = useDeals(48);
-  const activeDeals = dealsQuery.data ?? EMPTY_DEALS;
-
-  const storiesQuery = useStories();
-  const [storiesVersion, setStoriesVersion] = useState(0);
-  const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
-  const stories = useMemo(() => {
-    void storiesVersion; // re-sort when a story gets marked as seen
-    const base = sortStoriesUnseenFirst(storiesQuery.data ?? EMPTY_STORIES);
-    if (!geoVisibleShopIds) return base;
-    return base.filter((s) => geoVisibleShopIds.has(s.shop_id));
-  }, [storiesQuery.data, storiesVersion, geoVisibleShopIds]);
-
+  // A merchant must never see (or order from) their own store in the public
+  // marketplace — shops, deals, and stories are all filtered by owner id.
   const myShopQuery = useMyShop();
+  const myShopId = myShopQuery.data?.id ?? null;
   const myShop = useMemo(
     () =>
       myShopQuery.data
@@ -192,6 +177,31 @@ function HomeInner() {
         : null,
     [myShopQuery.data],
   );
+
+  const shopsQuery = useShops();
+  const shops = useMemo(() => {
+    const all = shopsQuery.data ?? EMPTY_SHOPS;
+    return myShopId ? all.filter((s) => s.id !== myShopId) : all;
+  }, [shopsQuery.data, myShopId]);
+  const loading = shopsQuery.isLoading;
+  const error = shopsQuery.error ? shopsQuery.error.message : null;
+
+  const dealsQuery = useDeals(48);
+  const activeDeals = useMemo(() => {
+    const all = dealsQuery.data ?? EMPTY_DEALS;
+    return myShopId ? all.filter((d) => d.shop_id !== myShopId) : all;
+  }, [dealsQuery.data, myShopId]);
+
+  const storiesQuery = useStories();
+  const [storiesVersion, setStoriesVersion] = useState(0);
+  const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
+  const stories = useMemo(() => {
+    void storiesVersion; // re-sort when a story gets marked as seen
+    let base = sortStoriesUnseenFirst(storiesQuery.data ?? EMPTY_STORIES);
+    if (myShopId) base = base.filter((s) => s.shop_id !== myShopId);
+    if (!geoVisibleShopIds) return base;
+    return base.filter((s) => geoVisibleShopIds.has(s.shop_id));
+  }, [storiesQuery.data, storiesVersion, geoVisibleShopIds, myShopId]);
 
   const shopIds = useMemo(
     () => shops.map((s) => s.id).filter(Boolean),

@@ -9,7 +9,8 @@ import {
 } from "recharts";
 import { formatRupees } from "@/lib/formatters";
 import { downloadOrdersCSV, downloadProductsCSV } from "@/services/exportService";
-import type { Order, Product } from "@/types";
+import { fetchAnalyticsSummary } from "@/services/analyticsService";
+import type { Order, Product, AnalyticsSummary } from "@/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -129,11 +130,12 @@ function renderPieLabel(props: Record<string, any>) {
 export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [shop, setShop] = useState<{ id: string; name: string } | null>(null);
+  const [shop, setShop] = useState<{ id: string; name: string; is_live?: boolean; verification_status?: string } | null>(null);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [timeRange, setTimeRange] = useState<7 | 30 | 90>(30);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,7 +146,7 @@ export default function AnalyticsDashboard() {
         if (!user) { setError("Not authenticated"); setLoading(false); return; }
 
         const { data: shopData } = await supabase
-          .from("shops").select("id, name").eq("owner_id", user.id).limit(1).single();
+          .from("shops").select("id, name, is_live, verification_status").eq("owner_id", user.id).limit(1).single();
 
         if (!shopData || cancelled) { setLoading(false); return; }
         if (cancelled) return;
@@ -173,6 +175,11 @@ export default function AnalyticsDashboard() {
         const productList = (products as Product[]) ?? [];
         setAllOrders(orderList);
         setAllProducts(productList);
+
+        // Analytics Overview summary (views + clicks) — fetched in parallel.
+        const summaryRes = await fetchAnalyticsSummary(shopData.id);
+        if (!cancelled && summaryRes.success) setSummary(summaryRes.data);
+
         const logList = (logs as { event_type: string; product_id?: string; created_at: string }[]) ?? [];
 
         const dailyMap = new Map<string, { revenue: number; orders: number; customers: Set<string> }>();
@@ -343,6 +350,103 @@ export default function AnalyticsDashboard() {
             </button>
           </div>
         </div>
+
+        {/* Analytics Overview — views, clicks, products, orders, status */}
+        <section aria-label="Analytics Overview">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+            📊 Analytics Overview
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="trend-card p-4 text-center">
+              <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{summary?.total_views ?? "—"}</p>
+              <p className="text-[0.65rem] text-zinc-400 dark:text-zinc-500">Total Views</p>
+            </div>
+            <div className="trend-card p-4 text-center">
+              <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{summary?.total_product_clicks ?? "—"}</p>
+              <p className="text-[0.65rem] text-zinc-400 dark:text-zinc-500">Product Clicks</p>
+            </div>
+            <div className="trend-card p-4 text-center">
+              <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{summary?.views_today ?? "—"}</p>
+              <p className="text-[0.65rem] text-zinc-400 dark:text-zinc-500">Views Today</p>
+            </div>
+            <div className="trend-card p-4 text-center">
+              <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{summary?.clicks_today ?? "—"}</p>
+              <p className="text-[0.65rem] text-zinc-400 dark:text-zinc-500">Clicks Today</p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="trend-card p-4 text-center">
+              <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                {allProducts.filter((p) => p.is_available).length}
+              </p>
+              <p className="text-[0.65rem] text-zinc-400 dark:text-zinc-500">Active Products</p>
+            </div>
+            <div className="trend-card p-4 text-center">
+              <p className={`text-lg font-bold ${shop?.is_live ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"}`}>
+                {shop?.is_live ? "🟢 Live" : "⚫ Offline"}
+              </p>
+              <p className="text-[0.65rem] text-zinc-400 dark:text-zinc-500">Publishing Status</p>
+            </div>
+            <div className="trend-card p-4 text-center">
+              <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{allOrders.length}</p>
+              <p className="text-[0.65rem] text-zinc-400 dark:text-zinc-500">Orders</p>
+            </div>
+            <a
+              href={`/shop/${shop?.id ?? ""}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="trend-card flex flex-col items-center justify-center p-4 text-center transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+            >
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">View Shop</p>
+              <p className="text-[0.65rem] text-emerald-500 dark:text-emerald-400">Preview ↗</p>
+            </a>
+          </div>
+
+          {/* Product Category Breakdown */}
+          {allProducts.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Product Category Breakdown
+              </h4>
+              <div className="space-y-2">
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">{shop?.name ?? "Store"}</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">{allProducts.length} product{allProducts.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                    <div className="h-full rounded-full bg-emerald-500" style={{ width: "100%" }} />
+                  </div>
+                </div>
+                {(() => {
+                  const available = allProducts.filter((p) => p.is_available).length;
+                  const soldOut = allProducts.length - available;
+                  const availablePct = Math.round((available / allProducts.length) * 100);
+                  const soldOutPct = Math.round((soldOut / allProducts.length) * 100);
+                  return (
+                    <>
+                      <div className="mt-3 mb-1 flex items-center justify-between text-xs">
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">Available ({available})</span>
+                        <span className="text-zinc-500 dark:text-zinc-400">{availablePct}%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${availablePct}%` }} />
+                      </div>
+                      <div className="mt-2 mb-1 flex items-center justify-between text-xs">
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">Sold Out ({soldOut})</span>
+                        <span className="text-zinc-500 dark:text-zinc-400">{soldOutPct}%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                        <div className="h-full rounded-full bg-red-400" style={{ width: `${soldOutPct}%` }} />
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+        </section>
 
         {!data ? (
           <div className="py-20 text-center text-sm text-zinc-400 dark:text-zinc-500">No analytics data available yet.</div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "rea
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { MarketplaceProduct, Shop, ShopCategory } from "@/types";
+import type { MarketplaceProduct, Product, Shop, ShopCategory } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import { type MarketplaceSort } from "@/services/productService";
 import ProductGrid from "@/components/ProductGrid";
@@ -19,7 +19,7 @@ import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { filterShopsByProximity, haversineDistance } from "@/services/geoRadiusService";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMarketplaceProductsInfinite, useDeals, useShopCoupons } from "@/lib/queries";
+import { useMarketplaceProductsInfinite, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { type Coupon } from "@/services/couponService";
 import {
   isDealActiveOnDate,
@@ -126,6 +126,10 @@ function ProductsPageInner() {
 
   const queryClient = useQueryClient();
 
+  // Merchants never see their own products in the marketplace feed.
+  const myShopQuery = useMyShop();
+  const myShopId = myShopQuery.data?.id ?? null;
+
   const productsQuery = useMarketplaceProductsInfinite({
     query: qParam,
     category: categoryParam === "All" ? undefined : categoryParam,
@@ -139,15 +143,25 @@ function ProductsPageInner() {
     const seen = new Set<string>();
     return flat.filter((p) => {
       if (seen.has(p.id)) return false;
+      if (myShopId && p.shop_id === myShopId) return false;
       seen.add(p.id);
       return true;
     });
-  }, [productsQuery.data]);
+  }, [productsQuery.data, myShopId]);
   const loading = productsQuery.isLoading;
   const error = productsQuery.error ? productsQuery.error.message : null;
   const hasNextPage = !!productsQuery.hasNextPage;
   const isFetchingNextPage = productsQuery.isFetchingNextPage;
   const fetchNextPage = productsQuery.fetchNextPage;
+
+  // Keep the latest products + URL-sync fn in refs so the per-card handlers
+  // stay stable across re-renders (search typing, sort, infinite-scroll page
+  // loads). Without this, memoized ProductCard re-renders the whole grid on
+  // every keystroke / new page — the main lag at 8k products.
+  const productsRef = useRef(products);
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
 
   const dealsQuery = useDeals(80);
   const activeDeals = dealsQuery.data ?? EMPTY_DEALS;
@@ -181,6 +195,7 @@ function ProductsPageInner() {
     if (!productParam) return;
     const match = products.find((p) => p.id === productParam);
     if (match) {
+      if (myShopId && match.shop_id === myShopId) return;
       setQuickView(match);
       return;
     }
@@ -189,6 +204,7 @@ function ProductsPageInner() {
       const { fetchMarketplaceProductById } = await import("@/services/productService");
       const res = await fetchMarketplaceProductById(productParam);
       if (cancelled || !res.success || !res.data) return;
+      if (myShopId && res.data.shop_id === myShopId) return;
       setQuickView(res.data);
       trackProductView({
         id: res.data.id,
@@ -203,7 +219,7 @@ function ProductsPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [productParam, products]);
+  }, [productParam, products, myShopId]);
 
   // Invalidate cached queries when merchants publish/update in other tabs.
   useEffect(() => {
@@ -244,6 +260,13 @@ function ProductsPageInner() {
     },
     [query, activeCategory, activeSubCategoryId, sort, productParam, router],
   );
+
+  // Stable reference to the latest syncUrl so product-click handlers don't
+  // re-create (and re-render every memoized card) on each keystroke.
+  const syncUrlRef = useRef(syncUrl);
+  useEffect(() => {
+    syncUrlRef.current = syncUrl;
+  }, [syncUrl]);
 
   // Keep local state in sync when URL changes (back/forward)
   useEffect(() => {
@@ -472,9 +495,11 @@ function ProductsPageInner() {
 
   const handleProductClick = useCallback(
     (product: MarketplaceProduct | { id: string }) => {
-      const full = products.find((p) => p.id === product.id) ?? (product as MarketplaceProduct);
+      const full =
+        productsRef.current.find((p) => p.id === product.id) ??
+        (product as MarketplaceProduct);
       setQuickView(full);
-      syncUrl({ product: full.id });
+      syncUrlRef.current({ product: full.id });
       // Behaviour memory: recently viewed + category affinity.
       trackProductView({
         id: full.id,
@@ -487,20 +512,20 @@ function ProductsPageInner() {
       });
       trackCategoryInterest(full.shop_category ?? full.category_id, "click");
     },
-    [products, syncUrl],
+    [],
   );
 
   const handleCloseQuickView = useCallback(() => {
     setQuickView(null);
-    syncUrl({ product: null });
-  }, [syncUrl]);
+    syncUrlRef.current({ product: null });
+  }, []);
 
   const handleAddToCart = useCallback(
     (product: MarketplaceProduct | { id: string; shop_id?: string; name?: string }) => {
       const full =
         "shop_name" in product
           ? (product as MarketplaceProduct)
-          : products.find((p) => p.id === product.id);
+          : productsRef.current.find((p) => p.id === product.id);
       if (!full || !full.is_available) {
         addToast("This product is unavailable.", "error");
         return;
@@ -513,14 +538,15 @@ function ProductsPageInner() {
       addItem(full, shop, 1);
       addToast(`“${full.name}” added to cart`, "success");
     },
-    [products, addItem, addToast],
+    [addItem, addToast],
   );
 
   const handleOrder = useCallback(
     async (intent: ProductOrderIntent) => {
       const product = intent.product;
       const full =
-        products.find((p) => p.id === product.id) ?? (product as MarketplaceProduct);
+        productsRef.current.find((p) => p.id === product.id) ??
+        (product as MarketplaceProduct);
       if (!full || !full.is_available) {
         addToast("This product is unavailable.", "error");
         return;
@@ -582,7 +608,7 @@ function ProductsPageInner() {
         /* keep fallback */
       }
     },
-    [products, addItem, addToast, router],
+    [addItem, addToast, router],
   );
 
   const handleFavorite = useCallback(
@@ -620,11 +646,11 @@ function ProductsPageInner() {
         addToast("Could not update wishlist", "error");
       } else if (next) {
         // Strong interest signal — wishlist add boosts category affinity.
-        const full = products.find((p) => p.id === product.id);
+        const full = productsRef.current.find((p) => p.id === product.id);
         trackCategoryInterest(full?.shop_category ?? full?.category_id, "wishlist");
       }
     },
-    [addToast, products],
+    [addToast],
   );
 
   const handleShopClick = useCallback(
@@ -632,6 +658,14 @@ function ProductsPageInner() {
       if (product.shop_id) router.push(`/shop/${product.shop_id}`);
     },
     [router],
+  );
+
+  // Stable per-card handlers so memoized ProductCard actually skips re-renders
+  // during search/sort/infinite-scroll. Inline arrows here would otherwise
+  // recreate on every parent render and defeat React.memo at 8k products.
+  const handleGridOrder = useCallback(
+    (product: Product) => handleOrder({ product, quantity: 1 }),
+    [handleOrder],
   );
 
   const quickViewShop: Pick<Shop, "id" | "name" | "whatsapp_number"> | null = quickView
@@ -780,10 +814,10 @@ function ProductsPageInner() {
         showShopMeta
         favorites={favorites}
         getOfferContext={getOfferContext}
-        onProductClick={(p) => handleProductClick(p as MarketplaceProduct)}
-        onAddToCart={(p) => handleAddToCart(p as MarketplaceProduct)}
-        onOrder={(p) => handleOrder({ product: p, quantity: 1 })}
-        onFavoriteToggle={(p, next) => handleFavorite(p, next)}
+        onProductClick={handleProductClick}
+        onAddToCart={handleAddToCart}
+        onOrder={handleGridOrder}
+        onFavoriteToggle={handleFavorite}
         onShopClick={handleShopClick}
         emptyState={
           <div className="mx-auto max-w-md py-14 text-center">
