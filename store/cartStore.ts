@@ -32,6 +32,8 @@ export interface CartItem {
   /** Per-item special instructions (spice, flavour, etc.). */
   notes?: string;
   currency?: string;
+  /** Compact deep-link code for the direct product page `/p/{code}`. */
+  shortCode?: string | null;
 }
 
 /* ── Sanitization Helpers — Strict Data Validation ─────────────────────────── */
@@ -93,10 +95,11 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
   const originalPrice = raw.originalPrice != null ? sanitizePrice(raw.originalPrice) : null;
 
   const imageUrl = raw.imageUrl ? sanitizeString(raw.imageUrl, 500) : null;
+  const shortCode = raw.shortCode ? sanitizeString(raw.shortCode, 32) : null;
   if (imageUrl && !/^https?:\/\/.+/i.test(imageUrl)) {
     return {
       id, productId, shopId, shopName, shopWhatsapp, name, price, originalPrice,
-      imageUrl: null, quantity, variant, notes, currency,
+      imageUrl: null, quantity, variant, notes, currency, shortCode,
     };
   }
 
@@ -114,6 +117,7 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
     variant,
     notes,
     currency,
+    shortCode,
   };
 }
 
@@ -169,6 +173,9 @@ export const useCartStore = create<CartState>()(
           : undefined;
         const validCurrency =
           safeCurrency && /^[A-Z]{3}$/.test(safeCurrency) ? safeCurrency : undefined;
+        const safeShortCode = product.short_code
+          ? sanitizeString(product.short_code, 32)
+          : null;
 
         if (!safeProductId || !safeShopId || !safeName) return;
 
@@ -213,6 +220,7 @@ export const useCartStore = create<CartState>()(
                 variant: safeVariant,
                 notes: safeNotes,
                 currency: validCurrency,
+                shortCode: safeShortCode,
               },
             ],
           };

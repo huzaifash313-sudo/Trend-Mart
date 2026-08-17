@@ -51,6 +51,7 @@ import {
 import Link from "next/link";
 import { getPublicAppUrl } from "@/lib/appUrl";
 import { getShopPath } from "@/lib/shopSlug";
+import { getProductShortPath } from "@/lib/shortCode";
 import { useToast } from "@/components/Toast";
 
 /** Wrap an async call so a slow/never-resolving request can't hang the UI forever. */
@@ -87,10 +88,14 @@ export interface WhatsAppCartItem {
   /** Original price before discount (for showing savings). */
   originalPrice?: number;
   /**
-   * Deep-link target on the shop page.
-   * `product` → #product-{id} | `deal` → #deal-{id} (standalone deal, no catalog product).
+   * Direct product-page deep link target.
+   * `product` → `/p/{shortCode}` | `deal` → `#deal-{id}` (standalone deal,
+   * no catalog product). `shortCode` falls back to `productId` when the
+   * short-code migration hasn't backfilled a row yet.
    */
   viewKind?: "product" | "deal";
+  /** Compact `/p/{code}` short code when available. */
+  shortCode?: string;
 }
 
 export interface ShippingDetails {
@@ -279,11 +284,24 @@ function buildWhatsAppMessage(
 
     const hashKind = item.viewKind === "deal" ? "deal" : "product";
     const itemId = (item.productId || item.id || "").trim();
-    if (itemId) {
-      const viewUrl = `${siteOrigin}${shopPath}#${hashKind}-${itemId}`;
-      const safeViewUrl = sanitizePayloadUrl(viewUrl);
-      if (safeViewUrl) {
-        lines.push(`  🔗 View on TrendMart: ${safeViewUrl}`);
+    if (item.viewKind === "deal") {
+      // Standalone deals keep the store hash deep-link (no standalone deal page).
+      if (itemId) {
+        const viewUrl = `${siteOrigin}${shopPath}#${hashKind}-${itemId}`;
+        const safeViewUrl = sanitizePayloadUrl(viewUrl);
+        if (safeViewUrl) {
+          lines.push(`  🔗 View deal: ${safeViewUrl}`);
+        }
+      }
+    } else {
+      // Direct product page — short link that opens straight to the photo.
+      const shortPath = getProductShortPath(item.shortCode || itemId);
+      if (shortPath) {
+        const viewUrl = `${siteOrigin}${shortPath}`;
+        const safeViewUrl = sanitizePayloadUrl(viewUrl);
+        if (safeViewUrl) {
+          lines.push(`  🔗 ${safeViewUrl}`);
+        }
       }
     }
 
@@ -742,9 +760,12 @@ export default function WhatsAppCheckoutModal({
       setErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) return;
 
-      // Live map pin is required so the rider can find the customer.
+      // Live map pin is required so the rider can find the customer. A manually
+      // selected city resolves to a city centroid (not the customer's street),
+      // so it doesn't count as an exact pin — force a fresh high-accuracy read.
       let hasPin =
         !!location?.coordinates &&
+        location.source === "gps" &&
         Number.isFinite(location.coordinates.latitude) &&
         Number.isFinite(location.coordinates.longitude);
       if (!hasPin) {
@@ -858,9 +879,12 @@ export default function WhatsAppCheckoutModal({
         notes: item.notes,
       }));
 
-      // Prefer live GPS from checkout; fall back to a fresh detect — pin is mandatory.
-      let pinLat = location?.coordinates?.latitude ?? null;
-      let pinLng = location?.coordinates?.longitude ?? null;
+      // Prefer an exact GPS pin from checkout (never a city centroid); fall back
+      // to a fresh high-accuracy detect — the rider needs the real location.
+      let pinLat =
+        location?.source === "gps" ? location?.coordinates?.latitude ?? null : null;
+      let pinLng =
+        location?.source === "gps" ? location?.coordinates?.longitude ?? null : null;
       if (pinLat == null || pinLng == null) {
         try {
           const fresh = await detectLocationDetailed();

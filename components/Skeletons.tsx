@@ -105,3 +105,19 @@ export function AnalyticsCardSkeleton() {
     </div>
   );
 }
+
+/** Direct product page skeleton (image-first detail). */
+export function ProductDetailSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="aspect-square animate-pulse bg-gradient-to-br from-teal-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-700" />
+      <div className="space-y-2.5 p-4">
+        <div className="h-5 w-2/3 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-4 w-1/2 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-6 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-20 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+        <div className="h-11 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      </div>
+    </div>
+  );
+}

@@ -289,6 +289,8 @@ interface ProductStructuredData {
   shopName: string;
   shopId: string;
   productId: string;
+  /** Compact `/p/{code}` code — falls back to `productId` when unset. */
+  shortCode?: string | null;
   isAvailable: boolean;
 }
 
@@ -301,6 +303,7 @@ export function generateProductStructuredData({
   shopName,
   shopId,
   productId,
+  shortCode,
   isAvailable,
 }: ProductStructuredData): Record<string, unknown> {
   return {
@@ -322,7 +325,7 @@ export function generateProductStructuredData({
         url: absoluteUrl(`/shop/${shopId}`),
       },
     },
-    url: absoluteUrl(`/shop/${shopId}#product-${productId}`),
+    url: absoluteUrl(`/p/${shortCode || productId}`),
   };
 }
 

@@ -58,6 +58,7 @@ export default function ProductOrderModal({
       notes,
       originalPrice: product.original_price ?? undefined,
       currency: product.currency || "PKR",
+      shortCode: product.short_code ?? undefined,
       viewKind: "product",
     },
   ];

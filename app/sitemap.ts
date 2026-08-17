@@ -75,17 +75,22 @@ async function getActiveCategories(): Promise<
 }
 
 async function getProductSlugs(): Promise<
-  { id: string; shop_id: string; name: string }[]
+  { id: string; shop_id: string; name: string; short_code: string | null }[]
 > {
   try {
     const supabase = createSupabase();
     const { data } = await supabase
       .from("products")
-      .select("id, shop_id, name")
+      .select("id, shop_id, name, short_code")
       .eq("is_available", true)
       .order("created_at", { ascending: false })
       .limit(5000);
-    return (data as { id: string; shop_id: string; name: string }[]) ?? [];
+    return (data as {
+      id: string;
+      shop_id: string;
+      name: string;
+      short_code: string | null;
+    }[]) ?? [];
   } catch {
     return [];
   }
@@ -230,7 +235,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // ── Product Deep-Link Routes ────────────────────────────────────────────
   const productRoutes: MetadataRoute.Sitemap = products.map((p) => ({
-    url: `${BASE_URL}/shop/${p.shop_id}#product-${p.id}`,
+    url: `${BASE_URL}/p/${p.short_code || p.id}`,
     lastModified: now,
     changeFrequency: "weekly" as const,
     priority: 0.7,

@@ -259,7 +259,7 @@ export async function fetchShopById(
 
     // Fetch products (capped — storefront paginates client-side / load-more)
     const PRODUCT_SELECT =
-      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, is_pinned, stock_status, category_id, sub_category_id, created_at";
+      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, is_pinned, stock_status, category_id, sub_category_id, created_at, short_code";
     const PRODUCT_SELECT_LEGACY =
       "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, stock_status, category_id, sub_category_id, created_at";
 

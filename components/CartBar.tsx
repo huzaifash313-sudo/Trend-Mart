@@ -204,6 +204,7 @@ export default function CartBar() {
     notes: i.notes,
     currency: i.currency,
     originalPrice: i.originalPrice ?? undefined,
+    shortCode: i.shortCode ?? undefined,
   }));
 
   const handleClearCart = async () => {

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { MarketplaceProduct, Product, ProductFormData } from "@/types";
 import { logError, toServiceError } from "@/services/errorService";
 import { isValidUUID } from "@/lib/sanitization";
+import { generateProductShortCode } from "@/lib/shortCode";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 import {
   buildFuzzyIlikeOr,
@@ -43,6 +44,12 @@ function isMissingColumnError(err: unknown): boolean {
 function isInvalidUuidSyntaxError(err: unknown): boolean {
   const msg = toServiceError(err);
   return /22P02|invalid input syntax for type uuid/i.test(msg);
+}
+
+/** Postgres 23505 — unique constraint violation (e.g. short_code collision). */
+function isUniqueViolation(err: unknown): boolean {
+  const msg = toServiceError(err);
+  return /23505|duplicate key|unique constraint/i.test(msg);
 }
 
 const CATEGORY_ID_UUID_FLAG = "tm_products_category_id_is_uuid";
@@ -310,6 +317,7 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     category_id: (row.category_id as string | null) ?? null,
     sub_category_id: (row.sub_category_id as string | null) ?? null,
     created_at: (row.created_at as string | undefined) ?? undefined,
+    short_code: (row.short_code as string | null) ?? null,
     shop_name: String(shop.name),
     shop_logo_url: shop.logo_url ?? null,
     shop_whatsapp: shop.whatsapp_number ?? null,
@@ -356,7 +364,7 @@ function sortMarketplaceProducts(
 const MARKETPLACE_SELECT = `
   id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
-  category_id, sub_category_id, created_at,
+  category_id, sub_category_id, created_at, short_code,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude, location,
@@ -690,6 +698,46 @@ export async function fetchMarketplaceProductById(
   }
 }
 
+/**
+ * Resolve a direct product-page reference (`/p/[code]`) to a product.
+ * Accepts either a short code (from the `short_code` column) or a full UUID.
+ * Returns `null` data when no matching live/approved product exists.
+ */
+export async function fetchProductByReference(
+  ref: string,
+): Promise<ServiceResult<MarketplaceProduct | null>> {
+  const trimmed = (ref ?? "").trim();
+  if (!trimmed) return { success: true, data: null };
+
+  // Full UUID — look up directly (also the fallback before short_code exists).
+  if (isValidUUID(trimmed)) {
+    return fetchMarketplaceProductById(trimmed);
+  }
+
+  const supabase = createClient();
+  try {
+    const res = await supabase
+      .from("products")
+      .select(MARKETPLACE_SELECT)
+      .eq("short_code", trimmed)
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved")
+      .maybeSingle();
+
+    if (res.error && isMissingColumnError(res.error)) {
+      // short_code migration not applied — can't resolve a short code.
+      return { success: true, data: null };
+    }
+    if (res.error) throw res.error;
+
+    const row = res.data as Record<string, unknown> | null;
+    return { success: true, data: row ? mapMarketplaceRow(row) : null };
+  } catch (err) {
+    logError(err, { module: "productService.fetchProductByReference", meta: { ref: trimmed } });
+    return { success: false, error: toError(err) };
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────── */
 /*  Mutations (protected by RLS)                                               */
 /* ──────────────────────────────────────────────────────────────────────────── */
@@ -717,8 +765,13 @@ export async function createProduct(
   try {
     const productFields = buildProductRow(form);
     const productName = String(productFields.name ?? form.name.trim());
-    const fullRow: Record<string, unknown> = {
+    // Compact deep-link code for `/p/{short_code}`. Regenerate on the extremely
+    // rare unique collision; the existing missing-column fallback below strips
+    // it gracefully when the short_code migration hasn't been applied yet.
+    let shortCode = generateProductShortCode();
+    let fullRow: Record<string, unknown> = {
       ...productFields,
+      short_code: shortCode,
       shop_id: shopId,
     };
     let { data, error } = await supabase
@@ -726,6 +779,17 @@ export async function createProduct(
       .insert(fullRow)
       .select()
       .single();
+
+    // Retry a short_code unique violation (23505) with a fresh code.
+    for (let attempt = 0; attempt < 3 && error && isUniqueViolation(error); attempt++) {
+      shortCode = generateProductShortCode();
+      fullRow = { ...productFields, short_code: shortCode, shop_id: shopId };
+      ({ data, error } = await supabase
+        .from("products")
+        .insert(fullRow)
+        .select()
+        .single());
+    }
 
     // Legacy DBs typed category_id as uuid — category NAMES like
     // "Tech & IT Services" then fail with 22P02. Remember that and retry

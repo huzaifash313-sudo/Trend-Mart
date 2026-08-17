@@ -260,6 +260,13 @@ export interface Product {
   stock_status?: string;
   /** Merchant pin-to-top flag — pinned items sort first in the storefront. */
   is_pinned?: boolean | null;
+  /**
+   * Compact, URL-safe code for the direct product page `/p/{short_code}`.
+   * Used in WhatsApp order links so each item deep-links straight to the
+   * product photo instead of the store. Null for rows created before the
+   * short-code migration was applied (links fall back to the product id).
+   */
+  short_code?: string | null;
   /** Optional product variants (sizes, colors, etc.) stored as JSON */
   variants?: VariantGroup[] | null;
   /** FK to main category */
