@@ -142,7 +142,6 @@ function SignupPageInner() {
         {
           fullName: signupValues.full_name,
           phone: signupValues.phone,
-          location: signupValues.location ?? null,
         },
       );
 
