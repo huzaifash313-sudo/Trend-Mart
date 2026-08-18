@@ -382,6 +382,14 @@ function HomeInner() {
       const scope = geoFilter.scope;
       const coords = geoFilter.coordinates ?? globalCoords ?? null;
 
+      // Shops not loaded yet → don't compute an (empty) visible set, otherwise
+      // every story would be filtered out and the tray would vanish until the
+      // shops query resolves. `null` means "no restriction" so stories show.
+      if (!shops || shops.length === 0) {
+        setGeoVisibleShopIds(null);
+        return;
+      }
+
       // No pin + nationwide/city browse → no location restriction on stories.
       if ((scope === "pakistan" || scope === "city") && !coords) {
         setGeoVisibleShopIds(null);
