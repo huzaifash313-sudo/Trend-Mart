@@ -50,15 +50,20 @@ export default function CompleteProfilePage() {
         return;
       }
 
-      const role = await detectUserRole(user);
-      if (cancelled) return;
-      if (role === "admin") {
-        router.replace("/admin/dashboard");
-        return;
-      }
-      if (role === "merchant") {
-        router.replace("/dashboard");
-        return;
+      try {
+        const role = await detectUserRole(user);
+        if (cancelled) return;
+        if (role === "admin") {
+          router.replace("/admin/dashboard");
+          return;
+        }
+        if (role === "merchant") {
+          router.replace("/dashboard");
+          return;
+        }
+      } catch {
+        // Role detection failed — still let customers finish their profile
+        // instead of leaving the page stuck on the loading spinner.
       }
 
       setUserId(user.id);
@@ -81,29 +86,29 @@ export default function CompleteProfilePage() {
           .eq("user_id", user.id)
           .maybeSingle();
 
-        if (cancelled || !profile) return;
+        if (!cancelled && profile) {
+          if (profile.full_name) setFullName(profile.full_name);
+          if (profile.phone) setPhone(formatPkPhoneInput(profile.phone));
+          if (profile.address) setAddress(profile.address);
 
-        if (profile.full_name) setFullName(profile.full_name);
-        if (profile.phone) setPhone(formatPkPhoneInput(profile.phone));
-        if (profile.address) setAddress(profile.address);
-
-        // Seed the location context from a previously saved profile location
-        // so the picker (and city/GPS flows) reflect what the user already set.
-        const lat = typeof profile.latitude === "number" ? profile.latitude : null;
-        const lng = typeof profile.longitude === "number" ? profile.longitude : null;
-        if (lat != null && lng != null && !location) {
-          const saved: UserLocation = {
-            coordinates: { latitude: lat, longitude: lng },
-            city: typeof profile.city === "string" ? profile.city : null,
-            deliveryZone: typeof profile.city === "string" ? profile.city : null,
-            address:
-              typeof profile.location_label === "string"
-                ? profile.location_label
-                : null,
-            updatedAt: Date.now(),
-            source: "cached",
-          };
-          seedLocation(saved);
+          // Seed the location context from a previously saved profile location
+          // so the picker (and city/GPS flows) reflect what the user already set.
+          const lat = typeof profile.latitude === "number" ? profile.latitude : null;
+          const lng = typeof profile.longitude === "number" ? profile.longitude : null;
+          if (lat != null && lng != null && !location) {
+            const saved: UserLocation = {
+              coordinates: { latitude: lat, longitude: lng },
+              city: typeof profile.city === "string" ? profile.city : null,
+              deliveryZone: typeof profile.city === "string" ? profile.city : null,
+              address:
+                typeof profile.location_label === "string"
+                  ? profile.location_label
+                  : null,
+              updatedAt: Date.now(),
+              source: "cached",
+            };
+            seedLocation(saved);
+          }
         }
       } catch {
         /* profile optional — form still works without it */
