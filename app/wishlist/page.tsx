@@ -245,6 +245,16 @@ export default function WishlistPage() {
     };
   }, [reloadKey]);
 
+  // Live-refresh whenever the wishlist changes anywhere in the app (add/remove
+  // from deals, products, shop pages, etc.) so saved items appear immediately
+  // instead of only after a manual page refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refresh = () => setReloadKey((k) => k + 1);
+    window.addEventListener("favoritesUpdated", refresh);
+    return () => window.removeEventListener("favoritesUpdated", refresh);
+  }, []);
+
   const handleRemove = useCallback(async (id: string) => {
     const item = items.find((f) => f.id === id);
     try {
