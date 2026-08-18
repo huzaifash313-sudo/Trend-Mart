@@ -2,18 +2,23 @@
 
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import type { Shop, ShopFormData } from "@/types";
+import { PRODUCT_CATEGORIES } from "@/types";
 import { updateShopProfile, sensitiveInfoLockedUntil } from "@/services/shopService";
 import { verifyPassword } from "@/services/authService";
+import { normalizePkPhoneDigits } from "@/lib/sanitization";
 import ImageUpload from "@/components/ImageUpload";
 import ToggleSwitch from "@/components/ToggleSwitch";
+import CustomSelect from "@/components/CustomSelect";
 import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
 /*  ShopProfileEditorModal — edit the store profile right on the storefront.  */
 /*                                                                             */
-/*  Sensitive fields (name, whatsapp, other number, location) are locked to    */
-/*  one change per 30 days AND require the account password. Other fields      */
-/*  (banner, logo, hours, bio) can be changed any time without a password.     */
+/*  Sensitive fields (name, whatsapp number, other number) are locked to one   */
+/*  change per week AND require the account password. The password field only  */
+/*  appears the moment those locked fields are edited once the weekly window   */
+/*  has passed — every other field (category, location, hours, bio, logo,      */
+/*  banner) is always free with no password prompt.                            */
 /* -------------------------------------------------------------------------- */
 
 interface ShopProfileEditorModalProps {
@@ -97,6 +102,7 @@ export default function ShopProfileEditorModal({
   const { addToast } = useToast();
 
   const [name, setName] = useState(shop.name ?? "");
+  const [category, setCategory] = useState(shop.category ?? "");
   const [whatsapp, setWhatsapp] = useState(shop.whatsapp_number ?? "");
   const [secondaryPhone, setSecondaryPhone] = useState(shop.secondary_phone ?? "");
   const [location, setLocation] = useState(shop.location ?? "");
@@ -113,14 +119,15 @@ export default function ShopProfileEditorModal({
   const [error, setError] = useState<string | null>(null);
 
   // Did any sensitive field change vs the stored shop?
+  // Only name + phone numbers are weekly-locked. Everything else (category,
+  // location, hours, bio, logo, banner) is free and never needs a password.
   const sensitiveChanged = useMemo(() => {
     return (
       name.trim() !== (shop.name ?? "").trim() ||
       whatsapp.trim() !== (shop.whatsapp_number ?? "").trim() ||
-      secondaryPhone.trim() !== (shop.secondary_phone ?? "").trim() ||
-      location.trim() !== (shop.location ?? "").trim()
+      secondaryPhone.trim() !== (shop.secondary_phone ?? "").trim()
     );
-  }, [name, whatsapp, secondaryPhone, location, shop]);
+  }, [name, whatsapp, secondaryPhone, shop]);
 
   const lockedUntil = useMemo(
     () => sensitiveInfoLockedUntil(shop.sensitive_info_updated_at),
@@ -142,19 +149,48 @@ export default function ShopProfileEditorModal({
         return;
       }
 
-      // Sensitive fields need the account password (re-auth) before saving.
-      if (sensitiveChanged) {
-        if (sensitiveLocked) {
-          setError(
-            `Name, numbers and location are locked until ${lockedUntil!.toLocaleDateString(
+      const secondaryDigits = normalizePkPhoneDigits(secondaryPhone);
+      if (secondaryPhone.trim() && !secondaryDigits) {
+        setError("Enter a valid other number (e.g. 0300-1234567).");
+        return;
+      }
+
+      // Case A: name/numbers edited while the weekly lock is still active —
+      //         save every OTHER field but skip the locked name/numbers, and
+      //         tell the user those specific changes were skipped.
+      if (sensitiveChanged && sensitiveLocked) {
+        setSaving(true);
+        const form = shopToFormData(shop); // carries the ORIGINAL name/numbers
+        form.category = category.trim();
+        form.location = location.trim();
+        form.business_hours = businessHours.trim();
+        form.store_bio = bio.trim();
+        form.operating_status = isOpen ? "Open" : "Closed";
+        form.logo_url = logoUrl;
+        form.banner_url = bannerUrl;
+        const result = await updateShopProfile(shop.id, form, false);
+        setSaving(false);
+        if (result.success) {
+          addToast(
+            `Saved. Name and numbers can only change once per week — available again after ${lockedUntil!.toLocaleDateString(
               "en-PK",
               { day: "numeric", month: "long", year: "numeric" },
-            )}.`,
+            )}. Those changes were skipped.`,
+            "info",
           );
-          return;
+          window.dispatchEvent(new Event("trendmart:shops-updated"));
+          onSaved();
+        } else {
+          setError(result.error);
         }
+        return;
+      }
+
+      // Case B: name/numbers edited and the weekly window has passed —
+      //         require the account password before saving.
+      if (sensitiveChanged) {
         if (!password.trim()) {
-          setError("Enter your account password to change name, numbers or location.");
+          setError("Enter your account password to change the name or numbers.");
           return;
         }
         setSaving(true);
@@ -169,6 +205,7 @@ export default function ShopProfileEditorModal({
       }
 
       const form = shopToFormData(shop);
+      form.category = category.trim();
       form.name = name.trim();
       form.whatsapp_number = whatsapp.trim();
       form.secondary_phone = secondaryPhone.trim();
@@ -192,6 +229,7 @@ export default function ShopProfileEditorModal({
     },
     [
       name,
+      category,
       whatsapp,
       secondaryPhone,
       location,
@@ -258,10 +296,23 @@ export default function ShopProfileEditorModal({
             />
           </div>
 
-          {/* Sensitive group */}
+          {/* Category — freely editable, no password or weekly lock required */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Category
+            </label>
+            <CustomSelect
+              value={category}
+              onChange={setCategory}
+              options={PRODUCT_CATEGORIES.map((c) => ({ value: c, label: c }))}
+              ariaLabel="Store category"
+            />
+          </div>
+
+          {/* Sensitive group — name + numbers, one change per week */}
           <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
             <p className="mb-2 flex items-center gap-1.5 text-[0.7rem] font-semibold text-amber-800 dark:text-amber-300">
-              <LockIcon /> Name, numbers &amp; location — once per month
+              <LockIcon /> Name &amp; numbers — once per week
             </p>
 
             <div className="space-y-3">
@@ -273,7 +324,6 @@ export default function ShopProfileEditorModal({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={100}
-                  disabled={sensitiveLocked}
                   className={fieldCls}
                 />
               </div>
@@ -286,7 +336,6 @@ export default function ShopProfileEditorModal({
                   <input
                     value={whatsapp}
                     onChange={(e) => setWhatsapp(e.target.value)}
-                    disabled={sensitiveLocked}
                     inputMode="tel"
                     className={fieldCls}
                   />
@@ -298,38 +347,31 @@ export default function ShopProfileEditorModal({
                   <input
                     value={secondaryPhone}
                     onChange={(e) => setSecondaryPhone(e.target.value)}
-                    disabled={sensitiveLocked}
                     inputMode="tel"
                     className={fieldCls}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                  Location
-                </label>
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  disabled={sensitiveLocked}
-                  maxLength={200}
-                  className={fieldCls}
-                />
-              </div>
-
-              {sensitiveLocked ? (
-                <p className="text-[0.7rem] font-medium text-amber-700 dark:text-amber-400">
-                  Locked until{" "}
+              {/* Shown the instant a locked field is edited and the weekly
+                  window hasn't passed yet — explains why and keeps the rest
+                  of the form saveable. */}
+              {sensitiveChanged && sensitiveLocked ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-100 px-3 py-2 text-[0.7rem] font-medium leading-relaxed text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+                  Name aur numbers haftay mein sirf ek baar change ho sakte
+                  hain. Agli change{" "}
                   {lockedUntil!.toLocaleDateString("en-PK", {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
-                  })}
-                  . Other fields below can still be edited.
-                </p>
+                  })}{" "}
+                  ke baad hogi. Baaki fields (category, location, hours, bio…)
+                  abhi bhi save ho sakti hain.
+                </div>
               ) : null}
 
+              {/* Password is ONLY requested when the user actually edits the
+                  locked fields AND the weekly window has passed. */}
               {sensitiveChanged && !sensitiveLocked ? (
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
@@ -343,13 +385,28 @@ export default function ShopProfileEditorModal({
                     autoComplete="current-password"
                     className={fieldCls}
                   />
+                  <p className="mt-1 text-[0.7rem] text-amber-700 dark:text-amber-400">
+                    Required to change the name or numbers.
+                  </p>
                 </div>
               ) : null}
             </div>
           </div>
 
-          {/* Free group */}
+          {/* Free group — never asks for a password */}
           <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Location
+              </label>
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                maxLength={200}
+                className={fieldCls}
+              />
+            </div>
+
             <div>
               <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                 Business hours
@@ -399,7 +456,7 @@ export default function ShopProfileEditorModal({
           <div className="flex gap-2 pt-1">
             <button
               type="submit"
-              disabled={saving || sensitiveLocked}
+              disabled={saving}
               className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save changes"}

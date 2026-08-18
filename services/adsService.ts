@@ -199,15 +199,46 @@ export async function fetchAllAdsForAdmin(): Promise<ServiceResult<PromotionalAd
   try {
     const { data, error } = await supabase
       .from("promotional_ads")
-      .select("*, shops(name)")
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    const rows = ((data as Array<Record<string, unknown>>) ?? []).map((row) => ({
-      ...row,
-      shop_name: (row.shops as { name?: string } | null)?.name ?? "Platform Ad",
-    })) as PromotionalAd[];
-    return { success: true, data: rows };
+
+    const rows = ((data as unknown as PromotionalAd[]) ?? []) as PromotionalAd[];
+
+    // Resolve shop names in one follow-up query instead of the
+    // `*, shops(name)` embed — the embed 400s ("Could not find a
+    // relationship") whenever PostgREST's schema cache hasn't picked up
+    // the FK yet, which made the whole admin Ads tab fail.
+    const shopIds = [
+      ...new Set(
+        rows
+          .map((r) => r.shop_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const shopNames = new Map<string, string>();
+    if (shopIds.length > 0) {
+      const { data: shops, error: shopsErr } = await supabase
+        .from("shops")
+        .select("id, name")
+        .in("id", shopIds);
+      if (!shopsErr) {
+        for (const s of (shops as Array<{ id: string; name: string }>) ?? []) {
+          shopNames.set(s.id, s.name);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: rows.map((row) => ({
+        ...row,
+        shop_name: row.shop_id
+          ? (shopNames.get(row.shop_id) ?? "Unknown Shop")
+          : "Platform Ad",
+      })),
+    };
   } catch (err) {
     logError(err, { module: "adsService.fetchAllAdsForAdmin" });
     return { success: false, error: toError(err) };

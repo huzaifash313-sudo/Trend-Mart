@@ -429,20 +429,38 @@ async function resolveUserRole(
     const VALID_ROLES: readonly string[] = ["customer", "merchant", "admin"];
     const { data: rpcRole, error: rpcError } = await supabase.rpc("get_my_role");
     if (!rpcError && typeof rpcRole === "string" && VALID_ROLES.includes(rpcRole)) {
-      if (rpcRole === "customer") {
-        const { data: shop } = await supabase
-          .from("shops")
-          .select("id")
-          .eq("owner_id", user.id)
-          .limit(1)
-          .maybeSingle();
-        if (shop?.id) {
-          authDebug("resolveUserRole: customer row but owns shop → merchant");
-          return "merchant";
-        }
+      // A DB row that says "admin" is authoritative.
+      if (rpcRole === "admin") {
+        authDebug("resolveUserRole: admin via get_my_role");
+        return "admin";
       }
-      authDebug("resolveUserRole: SUCCESS via get_my_role", { role: rpcRole });
-      return rpcRole as AppRole;
+      // app_metadata is written ONLY by the service role (never by the user).
+      // It must be consulted even when get_my_role returns a valid non-admin
+      // role, because an admin promoted via app_metadata (or whose user_roles
+      // row lags behind) would otherwise be locked out of /admin with a 403.
+      const appMeta =
+        typeof user.app_metadata?.role === "string" ? user.app_metadata.role : "";
+      if (appMeta === "admin") {
+        authDebug("resolveUserRole: admin via app_metadata");
+        return "admin";
+      }
+      if (appMeta === "merchant" || rpcRole === "merchant") {
+        authDebug("resolveUserRole: merchant", { rpcRole, appMeta });
+        return "merchant";
+      }
+      // rpcRole === "customer" — still check shop ownership.
+      const { data: shop } = await supabase
+        .from("shops")
+        .select("id")
+        .eq("owner_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      if (shop?.id) {
+        authDebug("resolveUserRole: customer row but owns shop → merchant");
+        return "merchant";
+      }
+      authDebug("resolveUserRole: customer via get_my_role");
+      return "customer";
     }
 
     // 2) app_metadata.role — written only by the service role.

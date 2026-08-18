@@ -5,7 +5,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { Shop, Product, ShopFormData } from "@/types";
-import { logError, toServiceError } from "@/services/errorService";
+import { logError, toErrorMessage, toServiceError } from "@/services/errorService";
 import { isValidLatitude, isValidLongitude } from "@/lib/geoCoords";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
 import {
@@ -25,7 +25,9 @@ function toError(err: unknown): string {
 }
 
 function isMissingColumnError(err: unknown): boolean {
-  const msg = toServiceError(err);
+  // Inspect the RAW PostgREST error — toServiceError() rewrites missing-column
+  // errors into a friendly message that would never match these patterns.
+  const msg = toErrorMessage(err);
   return /column .* does not exist|PGRST204|schema cache|Could not find/i.test(msg);
 }
 
@@ -748,8 +750,9 @@ export async function updateShop(
   }
 }
 
-/** Sensitive profile fields are locked to one change per rolling 30 days. */
-const SENSITIVE_INFO_LOCK_MS = 30 * 24 * 60 * 60 * 1000;
+/** Sensitive profile fields (name + phone numbers) are locked to one change
+ * per rolling 7 days. */
+const SENSITIVE_INFO_LOCK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function sensitiveInfoLockedUntil(
   updatedAt: string | null | undefined,
@@ -762,11 +765,12 @@ export function sensitiveInfoLockedUntil(
 }
 
 /**
- * Update a shop's profile with an optional once-per-month lock on sensitive
- * fields (name, whatsapp number, secondary phone, location).
+ * Update a shop's profile with an optional once-per-week lock on sensitive
+ * fields (name, whatsapp number, secondary phone). Location and every other
+ * field are always free.
  *
  * When `sensitiveChanged` is true, the current `sensitive_info_updated_at` is
- * checked; if it was changed within the last 30 days the update is rejected
+ * checked; if it was changed within the last 7 days the update is rejected
  * with the next available date. Otherwise the timestamp is bumped so the lock
  * window resets. Callers must already have verified the account password.
  */
@@ -782,31 +786,40 @@ export async function updateShopProfile(
     sanitized.slug = generateShopSlug(String(sanitized.name ?? form.name), shopId);
 
     if (sensitiveChanged) {
+      let lockColumnAvailable = true;
       const { data: current, error: readError } = await supabase
         .from("shops")
         .select("sensitive_info_updated_at")
         .eq("id", shopId)
         .maybeSingle();
 
-      // Missing column degrades gracefully — lock simply won't persist yet.
-      if (readError && !isMissingColumnError(readError)) throw readError;
-
-      const lastRaw = (
-        current as { sensitive_info_updated_at?: string | null } | null
-      )?.sensitive_info_updated_at;
-      const lockedUntil = sensitiveInfoLockedUntil(lastRaw);
-      if (lockedUntil) {
-        return {
-          success: false,
-          error: `Store name, numbers and location can only be changed once per month. Available again after ${lockedUntil.toLocaleDateString("en-PK", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}.`,
-        };
+      if (readError && isMissingColumnError(readError)) {
+        // Lock column isn't in the DB yet (migration not applied) — skip the
+        // lock entirely. Writing the column here would fail the whole update
+        // and the fallback below would also drop the secondary phone, so the
+        // number would silently never save.
+        lockColumnAvailable = false;
+      } else if (readError) {
+        throw readError;
       }
 
-      sanitized.sensitive_info_updated_at = new Date().toISOString();
+      if (lockColumnAvailable) {
+        const lastRaw = (
+          current as { sensitive_info_updated_at?: string | null } | null
+        )?.sensitive_info_updated_at;
+        const lockedUntil = sensitiveInfoLockedUntil(lastRaw);
+        if (lockedUntil) {
+          return {
+            success: false,
+            error: `Store name and phone numbers can only be changed once per week. Available again after ${lockedUntil.toLocaleDateString("en-PK", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}.`,
+          };
+        }
+        sanitized.sensitive_info_updated_at = new Date().toISOString();
+      }
     }
 
     let { data, error } = await supabase

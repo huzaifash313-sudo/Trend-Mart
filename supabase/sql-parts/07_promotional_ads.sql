@@ -161,6 +161,11 @@ $$;
 GRANT EXECUTE ON FUNCTION public.increment_ad_impression(uuid) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.increment_ad_click(uuid) TO anon, authenticated;
 
+-- Table-level grants are REQUIRED for PostgREST to touch this table at all —
+-- RLS policies alone are not enough (roles get 403/400 without them).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.promotional_ads TO authenticated;
+GRANT SELECT ON public.promotional_ads TO anon;
+
 COMMENT ON TABLE public.promotional_ads IS
   'Sponsored homepage banners. Merchant requests default to pending review; only Super-Admin approval (via is_admin()) makes them publicly visible, enforced by both RLS and the guard trigger above.';
 

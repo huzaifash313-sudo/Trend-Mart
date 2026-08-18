@@ -70,9 +70,11 @@ export default function ImageUpload({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [validationError, setValidationError] =
     useState<ImageValidationResult | null>(null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
 
   const hasImage = !!(currentUrl && currentUrl.trim());
-  const previewUrl = hasImage ? currentUrl : FALLBACK_URLS[fallbackType];
+  const showImage = !!(localPreview || hasImage);
+  const previewUrl = localPreview ?? (hasImage ? currentUrl : FALLBACK_URLS[fallbackType]);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,8 +91,15 @@ export default function ImageUpload({
         return;
       }
 
+      // Show the selected file immediately — upload + WebP compression can
+      // take a moment, so a local object-URL preview keeps the UI honest.
+      const objectUrl = URL.createObjectURL(file);
+      setLocalPreview(objectUrl);
+
       setUploading(true);
       const result = await uploadImage(file, folder, fileId);
+      URL.revokeObjectURL(objectUrl);
+      setLocalPreview(null);
       if (result.success) onUploaded(result.data);
       else setUploadError(result.error);
       setUploading(false);
@@ -105,6 +114,7 @@ export default function ImageUpload({
       onUploaded("");
       setUploadError(null);
       setValidationError(null);
+      setLocalPreview(null);
     },
     [onUploaded],
   );
@@ -135,16 +145,16 @@ export default function ImageUpload({
           disabled={disabled || uploading}
           className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-zinc-400 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
         >
-          {uploading ? (
+          {uploading && !showImage ? (
             <Spinner />
-          ) : hasImage ? (
+          ) : showImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             <PlusIcon />
           )}
         </button>
-        {hasImage ? (
+        {showImage ? (
           <button
             type="button"
             onClick={remove}
@@ -180,16 +190,17 @@ export default function ImageUpload({
         className="group relative block h-40 w-full overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50 transition-colors hover:border-emerald-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
         aria-label={hasImage ? `Change ${label.toLowerCase()}` : `Upload ${label.toLowerCase()}`}
       >
-        {uploading ? (
+        {uploading && !showImage ? (
           <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-zinc-400">
             <Spinner />
+            <span className="text-xs font-medium">Uploading…</span>
           </span>
-        ) : hasImage && showPreview ? (
+        ) : showImage && showPreview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={previewUrl}
             alt={`${label} preview`}
-            className="h-full w-full object-contain p-1.5"
+            className="h-full w-full object-cover"
             onError={(e) => {
               (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
             }}
@@ -201,7 +212,7 @@ export default function ImageUpload({
           </span>
         )}
 
-        {hasImage && !uploading ? (
+        {showImage && !uploading ? (
           <>
             <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/70 to-transparent px-2 pb-1.5 pt-5 text-center text-[10px] font-semibold text-white/95">
               Tap to change

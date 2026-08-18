@@ -5,7 +5,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { MarketplaceProduct, Product, ProductFormData } from "@/types";
-import { logError, toServiceError } from "@/services/errorService";
+import { logError, toErrorMessage, toServiceError } from "@/services/errorService";
 import { isValidUUID } from "@/lib/sanitization";
 import { generateProductShortCode } from "@/lib/shortCode";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
@@ -36,19 +36,21 @@ const PRODUCT_CORE_KEYS = [
 ] as const;
 
 function isMissingColumnError(err: unknown): boolean {
-  const msg = toServiceError(err);
+  // Inspect the RAW PostgREST error — toServiceError() rewrites missing-column
+  // errors into a friendly message that would never match these patterns.
+  const msg = toErrorMessage(err);
   return /column .* does not exist|PGRST204|schema cache|Could not find/i.test(msg);
 }
 
 /** Postgres 22P02 — e.g. writing a category name into a uuid-typed category_id. */
 function isInvalidUuidSyntaxError(err: unknown): boolean {
-  const msg = toServiceError(err);
+  const msg = toErrorMessage(err);
   return /22P02|invalid input syntax for type uuid/i.test(msg);
 }
 
 /** Postgres 23505 — unique constraint violation (e.g. short_code collision). */
 function isUniqueViolation(err: unknown): boolean {
-  const msg = toServiceError(err);
+  const msg = toErrorMessage(err);
   return /23505|duplicate key|unique constraint/i.test(msg);
 }
 

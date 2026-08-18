@@ -68,7 +68,7 @@
 - Password reset (forgot-password → OTP → reset-password).
 - OAuth/magic-link callback with open-redirect protection.
 - Phone verification flag `phone_verified_at` (verified phone = no OTP re-prompt at checkout).
-- Sensitive-info lock: store name/phone/location changes need password + once per 30 days.
+- Sensitive-info lock: store name/phone numbers changes need password + once per week.
 
 ### ⚙️ Kese Kaam Karta Hai
 1. **Signup** → `signUpWithEmail` role + profile metadata ke sath, `recordLegalAcceptance` T&C save karta hai.

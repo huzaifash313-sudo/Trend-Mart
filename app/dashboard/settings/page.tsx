@@ -19,6 +19,8 @@ import {
 } from "@/lib/pushClient";
 import { useMyShop } from "@/lib/queries";
 import type { Shop, ShopFormData } from "@/types";
+import { PRODUCT_CATEGORIES } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -565,6 +567,19 @@ export default function DashboardSettingsPage() {
               onChange={(checked) => setForm((current) => ({ ...current, is_live: checked }))}
               label="Toggle store visibility"
             />
+          </div>
+
+          <div>
+            <FieldLabel>Category</FieldLabel>
+            <CustomSelect
+              value={form.category}
+              onChange={(value) => setForm((current) => ({ ...current, category: value }))}
+              options={PRODUCT_CATEGORIES.map((c) => ({ value: c, label: c }))}
+              ariaLabel="Store category"
+            />
+            <p className="mt-1.5 text-[0.7rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
+              Customers find your store under this category.
+            </p>
           </div>
         </SectionShell>
 
