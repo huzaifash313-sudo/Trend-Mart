@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { formatRupees } from "@/lib/formatters";
@@ -219,11 +220,21 @@ export default function CartBar() {
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg transition-all dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
             {expanded && (
               <div className="max-h-72 overflow-y-auto border-b border-zinc-100 dark:border-zinc-800">
-                {shopGroups.length > 1 && (
-                  <p className="px-3 pt-2 pb-1 text-[0.6rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                    {shopGroups.length} shops — checkout each shop separately
-                  </p>
-                )}
+                <div className="flex items-center justify-between px-3 pt-2 pb-1">
+                  {shopGroups.length > 1 ? (
+                    <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                      {shopGroups.length} shops — checkout each shop separately
+                    </p>
+                  ) : (
+                    <span />
+                  )}
+                  <Link
+                    href="/cart"
+                    className="shrink-0 text-[0.65rem] font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+                  >
+                    View full cart →
+                  </Link>
+                </div>
 
                 {shopGroups.map((group) => (
                   <div key={group.shopId}>
