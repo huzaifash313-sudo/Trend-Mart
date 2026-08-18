@@ -628,15 +628,27 @@ function ProductsPageInner() {
         else n.delete(product.id);
         return n;
       });
-      const ok = await toggleFavorite(
-        product.id,
-        "product",
-        product.name || "Product",
-        product.image_url ?? undefined,
-        product.shop_id,
-        product.shop_name ?? undefined,
-      );
-      if (!ok) {
+      try {
+        // `toggleFavorite` returns the RESULTING favorited state (true = now
+        // saved, false = now removed) — NOT a success flag. Treating `false`
+        // as an error made every successful REMOVE roll back and show a
+        // spurious "Could not update wishlist" toast. Only a thrown error is a
+        // real failure; the service already falls back to localStorage on DB
+        // errors, so it rarely throws.
+        await toggleFavorite(
+          product.id,
+          "product",
+          product.name || "Product",
+          product.image_url ?? undefined,
+          product.shop_id,
+          product.shop_name ?? undefined,
+        );
+        if (next) {
+          // Strong interest signal — wishlist add boosts category affinity.
+          const full = productsRef.current.find((p) => p.id === product.id);
+          trackCategoryInterest(full?.shop_category ?? full?.category_id, "wishlist");
+        }
+      } catch {
         setFavorites((prev) => {
           const n = new Set(prev);
           if (next) n.delete(product.id);
@@ -644,10 +656,6 @@ function ProductsPageInner() {
           return n;
         });
         addToast("Could not update wishlist", "error");
-      } else if (next) {
-        // Strong interest signal — wishlist add boosts category affinity.
-        const full = productsRef.current.find((p) => p.id === product.id);
-        trackCategoryInterest(full?.shop_category ?? full?.category_id, "wishlist");
       }
     },
     [addToast],

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import { getAuthCallbackUrl, getPublicAppUrl } from "@/lib/appUrl";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -93,67 +93,41 @@ export async function signUpWithEmail(
     const fullName = (profile?.fullName ?? "").trim();
     const phone = (profile?.phone ?? "").trim();
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: {
-        // Always send users to the public app URL (never stale Supabase Site URL / localhost).
-        emailRedirectTo: getAuthCallbackUrl(),
-        data: {
-          role: signupRole,
-          full_name: fullName || undefined,
-          phone: phone || undefined,
-          // Phone SMS OTP is intentionally disabled (budget) — contact field only.
-          phone_otp_enabled: false,
-        },
-      },
+    // Custom OTP flow: the server creates the user as UNCONFIRMED (no Supabase
+    // email) and emails a branded 6-digit code via Resend. The account only
+    // becomes usable after the code is verified — see /api/auth/verify-otp.
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password,
+        role: signupRole,
+        fullName,
+        phone,
+      }),
     });
 
-    if (error) {
+    const jsonBody = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+      role?: AuthRole;
+      needsOtpVerification?: boolean;
+    };
+
+    if (!res.ok || !jsonBody.success) {
       return {
         success: false,
-        error: mapSupabaseError(error.message),
+        error: jsonBody.error ?? "Sign up failed. Please try again.",
         needsOtpVerification: false,
       };
     }
 
-    // Persist role into user_roles (trigger also reads metadata; this is a safety net).
-    // Only when a session exists — otherwise claim after email OTP verifies.
-    if (data.user && data.session) {
-      await claimSignupRole(signupRole);
-      await upsertSignupProfile(data.user.id, fullName, phone);
-    }
-
-    if (!data.user) {
-      return {
-        success: false,
-        error: "Sign-up failed. Please try again.",
-        needsOtpVerification: false,
-      };
-    }
-
-    // Email confirmation is mandatory. Never treat signup as complete until verified.
-    // If Supabase auto-created a session (confirm-email disabled), sign out and force OTP UI.
-    if (!data.user.email_confirmed_at) {
-      // Persist profile when we have a user id even if session is cleared next.
-      if (data.session) {
-        await supabase.auth.signOut();
-      }
-      return {
-        success: true,
-        user: data.user,
-        role: signupRole,
-        needsOtpVerification: true,
-      };
-    }
-
-    await upsertSignupProfile(data.user.id, fullName, phone);
-    const resolved = await detectUserRole(data.user);
+    // Verification is always required — the caller shows the 6-digit code modal.
     return {
       success: true,
-      user: data.user,
-      role: resolved,
-      needsOtpVerification: false,
+      role: jsonBody.role ?? signupRole,
+      needsOtpVerification: true,
     };
   } catch (err) {
     return {
@@ -259,44 +233,34 @@ export async function verifyOtp(
   token: string,
 ): Promise<OtpVerificationResult> {
   try {
-    const normalized = email.trim().toLowerCase();
-    const cleaned = token.trim();
-
-    // Supabase templates may send signup or email OTP depending on project settings.
-    let result = await supabase.auth.verifyOtp({
-      email: normalized,
-      token: cleaned,
-      type: "signup",
+    const res = await fetch("/api/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        code: token.trim(),
+      }),
     });
 
-    if (result.error) {
-      result = await supabase.auth.verifyOtp({
-        email: normalized,
-        token: cleaned,
-        type: "email",
-      });
-    }
+    const jsonBody = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+    };
 
-    if (result.error) {
+    if (!res.ok || !jsonBody.success) {
       return {
         success: false,
-        error: mapSupabaseError(result.error.message),
+        error: jsonBody.error ?? "Verification failed. Please try again.",
       };
     }
 
-    if (!result.data.session) {
-      return {
-        success: false,
-        error: "Verification succeeded but no session was returned.",
-      };
-    }
-
+    // NOTE: verification confirms the account but does NOT create a session.
+    // The signup page signs the user in with their password after this resolves.
     return { success: true };
   } catch (err) {
     return {
       success: false,
-      error:
-        err instanceof Error ? err.message : "Verification failed.",
+      error: err instanceof Error ? err.message : "Verification failed.",
     };
   }
 }
@@ -381,18 +345,21 @@ export async function resendOtp(
   email: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.auth.resend({
-      email: email.trim().toLowerCase(),
-      type: "signup",
-      options: {
-        emailRedirectTo: getAuthCallbackUrl(),
-      },
+    const res = await fetch("/api/auth/resend-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
     });
 
-    if (error) {
+    const jsonBody = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+    };
+
+    if (!res.ok || !jsonBody.success) {
       return {
         success: false,
-        error: mapSupabaseError(error.message),
+        error: jsonBody.error ?? "Could not resend the code. Please try again.",
       };
     }
 
@@ -400,8 +367,7 @@ export async function resendOtp(
   } catch (err) {
     return {
       success: false,
-      error:
-        err instanceof Error ? err.message : "Could not resend code.",
+      error: err instanceof Error ? err.message : "Could not resend code.",
     };
   }
 }
