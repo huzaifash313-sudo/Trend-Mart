@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
-import { signUpWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
+import { signUpWithEmail, signInWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { useToast } from "@/components/Toast";
 import type { SignInFormValues, SignUpFormValues } from "@/lib/validations";
@@ -107,6 +107,9 @@ function SignupPageInner() {
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [pendingRole, setPendingRole] = useState<AuthRole>("customer");
+  // Held in memory only (never persisted) so we can sign the user in right after
+  // the emailed 6-digit code is verified — verification itself creates no session.
+  const [pendingPassword, setPendingPassword] = useState<string>("");
 
   const goAfterAuth = useCallback(
     (role: AuthRole | "admin") => {
@@ -154,8 +157,9 @@ function SignupPageInner() {
         setIsLoading(false);
         setOtpEmail(signupValues.email);
         setPendingRole(signupValues.role);
+        setPendingPassword(signupValues.password);
         setShowOtpModal(true);
-        addToast("Please verify your email to continue.", "info");
+        addToast("We emailed you a 6-digit code. Enter it to finish signing up.", "info");
         return;
       }
 
@@ -167,22 +171,46 @@ function SignupPageInner() {
   );
 
   const handleOtpVerified = useCallback(async () => {
+    const email = otpEmail;
+    const password = pendingPassword;
     setShowOtpModal(false);
     setOtpEmail(null);
+    setPendingPassword("");
+
+    // The code is verified and the account is now confirmed, but no session
+    // exists yet — sign the user in with the password they just chose.
+    if (email && password) {
+      const signIn = await signInWithEmail(email, password);
+      if (signIn.success && signIn.user?.id) {
+        recordLegalAcceptance(signIn.user.id, ["terms", "privacy"]);
+        await claimSignupRole(pendingRole);
+        await syncContactProfileFromMetadata(signIn.user);
+        addToast(
+          pendingRole === "merchant"
+            ? "Email verified! Set up your store next."
+            : "Email verified! Welcome to TrendMart.",
+          "success",
+        );
+        goAfterAuth(signIn.role ?? pendingRole);
+        return;
+      }
+    }
+
+    // Fallback (e.g. page was reloaded so the password is gone): the account is
+    // verified — send them to sign in manually.
     const user = await getCurrentUser();
     if (user?.id) {
       recordLegalAcceptance(user.id, ["terms", "privacy"]);
       await claimSignupRole(pendingRole);
       await syncContactProfileFromMetadata(user);
+      addToast("Email verified! Welcome to TrendMart.", "success");
+      goAfterAuth(pendingRole);
+      return;
     }
-    addToast(
-      pendingRole === "merchant"
-        ? "Email verified! Set up your store next."
-        : "Email verified! Welcome to TrendMart.",
-      "success",
-    );
-    goAfterAuth(pendingRole);
-  }, [addToast, pendingRole, goAfterAuth]);
+
+    addToast("Email verified! Please log in to continue.", "success");
+    window.location.href = "/login";
+  }, [addToast, otpEmail, pendingPassword, pendingRole, goAfterAuth]);
 
   return (
     <div className="relative flex min-h-screen overflow-y-auto">
