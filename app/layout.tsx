@@ -9,6 +9,7 @@ import AppSplash from "@/components/AppSplash";
 import ChunkReloadGuard from "@/components/ChunkReloadGuard";
 import InteractionUnlock from "@/components/InteractionUnlock";
 import AccountScopeGuard from "@/components/AccountScopeGuard";
+import RouteErrorBoundary from "@/components/RouteErrorBoundary";
 import CartBar from "@/components/CartBar";
 import CartProvider from "@/context/CartContext";
 import QueryProvider from "@/components/QueryProvider";
@@ -118,9 +119,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <ScrollToTopSuspense>
                 <ScrollToTop />
               </ScrollToTopSuspense>
-              <ErrorBoundary name="MainContent">
-                <main className="tm-main flex-1">{children}</main>
-              </ErrorBoundary>
+              <RouteErrorBoundary name="MainContent">
+                <main className="tm-main tm-route-fade flex-1">{children}</main>
+              </RouteErrorBoundary>
               <ErrorBoundary name="Footer">
                 <Footer />
               </ErrorBoundary>

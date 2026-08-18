@@ -214,6 +214,26 @@ body {
     padding-bottom: 0;
   }
 }
+
+/* ── Route transition ──────────────────────────────────────────────────────
+   The main content slot is keyed by pathname (RouteErrorBoundary), so it
+   remounts on every client navigation. A short opacity fade turns that
+   remount into a smooth transition instead of a hard swap. Opacity-only
+   (no transform) to avoid layout jank; skipped during the boot splash and
+   for users who prefer reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.tm-splash-lock):not(.tm-splash-handoff) .tm-route-fade {
+    animation: tm-route-fade-in 160ms ease-out both;
+  }
+}
+@keyframes tm-route-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .tm-page-loading {
   min-height: calc(
     100dvh - var(--tm-navbar-sticky-offset, 62px) - 5.5rem
