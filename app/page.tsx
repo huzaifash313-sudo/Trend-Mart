@@ -28,22 +28,17 @@ import { filterShopsByProximity } from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
-import OfferDaysStrip from "@/components/OfferDaysStrip";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { type Coupon } from "@/services/couponService";
-import { shopIdsWithDealOnDate, type ShopDeal } from "@/lib/dealSchedule";
+import { type ShopDeal } from "@/lib/dealSchedule";
 import { useQueryClient } from "@tanstack/react-query";
 import { useShops, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
-import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import { getTopAffinityCategories } from "@/lib/behavior";
 import RecentlyViewedStrip from "@/components/RecentlyViewedStrip";
 
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
-});
-const FeaturedDealsStrip = dynamic(() => import("@/components/FeaturedDealsStrip"), {
-  loading: () => <div className="h-36 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />,
 });
 const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
   loading: () => null,
@@ -210,7 +205,6 @@ function HomeInner() {
   const couponsQuery = useShopCoupons(shopIds);
   const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
 
-  const [offerDateKey, setOfferDateKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
@@ -292,11 +286,9 @@ function HomeInner() {
 
   /* Client-side filtering */
   const filteredShops = useMemo(() => {
-    const dealShopIds = offerDateKey ? shopIdsWithDealOnDate(activeDeals, offerDateKey) : null;
     const base = shops.filter((shop) => {
       const matchesCategory = activeCategory === "All" || shop.category === activeCategory;
-      const matchesOffer = !dealShopIds || dealShopIds.has(shop.id);
-      return matchesCategory && matchesOffer;
+      return matchesCategory;
     });
 
     const query = searchQuery.trim();
@@ -308,20 +300,7 @@ function HomeInner() {
       (shop) => [shop.name, shop.category, shop.location, shop.store_bio],
       { minScore: FUZZY_MIN_SCORE, weights: [1, 0.7, 0.55, 0.45] },
     ).map((r) => r.item);
-  }, [shops, searchQuery, activeCategory, offerDateKey, activeDeals]);
-
-  const getDealStripOfferTags = useCallback(
-    (shopId: string) => {
-      const shop = shops.find((s) => s.id === shopId);
-      return buildShopTickerTags({
-        coupons: shopCoupons[shopId] ?? [],
-        freeDeliveryThreshold: shop?.free_delivery_threshold,
-        deliveryFeeFlat: shop?.delivery_fee_flat,
-        deliveryFeePerKm: shop?.delivery_fee_per_km,
-      });
-    },
-    [shops, shopCoupons],
-  );
+  }, [shops, searchQuery, activeCategory]);
 
   /* Geo filter — Near me (range) / This city / All Pakistan */
   useEffect(() => {
@@ -577,25 +556,7 @@ function HomeInner() {
         />
       )}
 
-      {/* Deals block — day chips + cards together (not split by Stories) */}
-      <section aria-label="Featured deals" className="space-y-1.5">
-        <OfferDaysStrip
-          deals={activeDeals}
-          selectedDateKey={offerDateKey}
-          onSelect={setOfferDateKey}
-          variant="pills"
-        />
-        <FeaturedDealsStrip
-          deals={activeDeals}
-          dateKey={offerDateKey}
-          title="Featured deals"
-          seeAllHref="/deals"
-          variant="home"
-          getOfferTags={getDealStripOfferTags}
-        />
-      </section>
-
-      {/* ── Sponsored / Promotional Ads Carousel ───────────────────── */}
+      {/* ── Sponsored / Promotional Ads (platform placements) ───────────── */}
       <PromoAdsCarousel placement="homepage_top" />
 
       {/* ── Recently viewed (personal: pick up where you left off) ───── */}

@@ -1590,6 +1590,97 @@ html.dark .tm-home-deals-progress-bar {
   }
 }
 
+/* Sponsored ads shelf — banner card (image on top, text below). Shares the
+   home deals shell (header / arrows / progress) but its own card so platform
+   ads keep a first-class, banner-friendly 16:9 creative slot. */
+.tm-sponsored-card {
+  min-height: 8.6rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(28, 25, 23, 0.08);
+  background: #fff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 18px 40px rgba(28, 25, 23, 0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+html.dark .tm-sponsored-card {
+  background: #1c1917;
+  border-color: rgba(250, 250, 249, 0.08);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+}
+.tm-sponsored-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 24px 48px rgba(28, 25, 23, 0.12);
+}
+
+.tm-sponsored-media {
+  position: relative;
+  width: 100%;
+  flex: 0 0 auto;
+  align-self: stretch;
+  overflow: hidden;
+  background: #1c1917;
+}
+/* In-flow 16:9 ratio child — Safari needs an in-flow sized box to anchor an
+   absolutely-positioned `fill` image (same trick as .tm-product-media). */
+.tm-sponsored-media::before {
+  content: "";
+  display: block;
+  width: 100%;
+  padding-bottom: 56.25%;
+}
+.tm-sponsored-media-fallback {
+  background: linear-gradient(145deg, #292524 0%, #1c1917 55%, #44403c 100%);
+}
+
+.tm-sponsored-badge {
+  border-radius: 999px;
+  padding: 0.28rem 0.55rem;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1c1917;
+  background: rgba(250, 250, 249, 0.94);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.tm-sponsored-body {
+  gap: 0.3rem;
+}
+.tm-sponsored-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  color: #1c1917;
+}
+html.dark .tm-sponsored-title {
+  color: #fafaf9;
+}
+.tm-sponsored-subtitle {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #78716c;
+}
+html.dark .tm-sponsored-subtitle {
+  color: #a8a29e;
+}
+.tm-sponsored-cta {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #059669;
+}
+html.dark .tm-sponsored-cta {
+  color: #34d399;
+}
+
 .tm-product-media {
   /*
    * 5:4 image slot. MUST NOT put padding-bottom % on this flex item:
