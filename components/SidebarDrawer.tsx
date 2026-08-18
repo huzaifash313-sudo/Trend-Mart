@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/services/authService";
 import { SHOP_CATEGORIES, CATEGORY_ICONS } from "@/types";
 import PwaInstallTip from "@/components/PwaInstallTip";
 
@@ -352,10 +353,9 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
     return () => document.removeEventListener("keydown", handleKey, { capture: true });
   }, [isOpen, onClose]);
 
-  /* ── Sign Out handler (close drawer then redirect) ────────────────────── */
+  /* ── Sign Out handler (clear cache + close drawer then redirect) ────────── */
   const handleSignOut = useCallback(async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut();
     onClose();
     router.push("/");
   }, [onClose, router]);

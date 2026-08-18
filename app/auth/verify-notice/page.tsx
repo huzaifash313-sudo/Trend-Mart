@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { resendOtp, detectUserRole, getDashboardPath } from "@/services/authService";
+import {
+  resendOtp,
+  detectUserRole,
+  getDashboardPath,
+  signOut,
+} from "@/services/authService";
 import { useToast } from "@/components/Toast";
 
 /** Skip static prerender — this page reads search params at request time. */
@@ -123,8 +128,7 @@ function VerifyNoticeInner() {
   }, [redirectParam, router, addToast]);
 
   const handleSignOut = useCallback(async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut();
     router.replace("/login");
   }, [router]);
 

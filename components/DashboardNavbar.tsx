@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/services/authService";
 import type { AlertCounts } from "@/services/alertService";
 import {
   fetchAlertCounts,
@@ -124,9 +125,9 @@ export default function DashboardNavbar() {
   }, [shopId]);
 
   const handleSignOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await signOut();
     router.push("/");
-  }, [supabase, router]);
+  }, [router]);
 
   const togglePopover = useCallback(() => setPopoverOpen((prev) => !prev), []);
   const closePopover = useCallback(() => setPopoverOpen(false), []);

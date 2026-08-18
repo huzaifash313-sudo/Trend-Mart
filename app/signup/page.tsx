@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AuthForm, { type SignUpSubmitValues } from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
-import { signUpWithEmail, signInWithEmail, redirectToDashboard, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
+import { signUpWithEmail, signInWithEmail, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { useToast } from "@/components/Toast";
 import type { SignInFormValues } from "@/lib/validations";
@@ -117,7 +117,14 @@ function SignupPageInner() {
         window.location.href = redirectTo;
         return;
       }
-      redirectToDashboard(role);
+      if (role === "admin") {
+        window.location.href = "/admin/dashboard";
+        return;
+      }
+      // Merchants must register their store before the dashboard unlocks;
+      // customers finish their delivery profile (name / phone / location).
+      window.location.href =
+        role === "merchant" ? "/account/become-merchant" : "/account/complete-profile";
     },
     [redirectTo],
   );

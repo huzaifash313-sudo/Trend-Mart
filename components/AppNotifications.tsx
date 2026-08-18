@@ -7,6 +7,7 @@ import {
   useNotifications,
 } from "@/components/NotificationListener";
 import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/services/authService";
 import {
   getPushPermissionState,
   isPushClientSupported,
@@ -65,7 +66,7 @@ function AutoRegisterMerchantShops() {
       if (error || !user || cancelled) {
         if (error) {
           try {
-            await supabase.auth.signOut();
+            await signOut();
           } catch {
             /* ignore */
           }

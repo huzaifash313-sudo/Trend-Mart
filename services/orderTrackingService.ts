@@ -5,10 +5,8 @@
 /*  Returns color-coded status with full lifecycle timelines.                  */
 /* -------------------------------------------------------------------------- */
 
-import { createClient } from "@/lib/supabase/client";
-import { logError } from "@/services/errorService";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
-import type { Order, OrderStatus } from "@/types";
+import type { OrderStatus } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,20 +185,71 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Raw order row returned by the server-side tracking API (`/api/orders/track`). */
+interface TrackedOrderRow {
+  id: string;
+  shop_id: string;
+  shop_name?: string | null;
+  shop_whatsapp?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  customer_user_id?: string | null;
+  items_json?: unknown;
+  total_amount?: number | null;
+  status?: string | null;
+  tracking_number?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  [key: string]: unknown;
+}
+
+/**
+ * Server-side "Trace Order" lookup.
+ *
+ * Calls the strict `/api/orders/track` route instead of the SECURITY DEFINER
+ * RPCs directly. The route re-verifies on every request that the order belongs
+ * to the current session's auth.uid() (direct buyer, owning merchant, or admin)
+ * even when the phone number matches — so a phone number can never be used to
+ * read another user's order history.
+ */
+async function fetchTrackedOrders(params: {
+  phone?: string;
+  orderId?: string;
+}): Promise<ServiceResult<TrackedOrderRow[]>> {
+  const query = new URLSearchParams();
+  if (params.phone) query.set("phone", params.phone);
+  if (params.orderId) query.set("orderId", params.orderId);
+
+  try {
+    const res = await fetch(`/api/orders/track?${query.toString()}`);
+    const json = (await res.json()) as {
+      success?: boolean;
+      orders?: TrackedOrderRow[];
+      error?: string;
+    };
+    if (!res.ok || !json.success) {
+      return {
+        success: false,
+        error: json.error || "Could not track your order. Please try again.",
+      };
+    }
+    return { success: true, data: json.orders ?? [] };
+  } catch (err) {
+    return { success: false, error: toError(err) };
+  }
+}
+
 /**
  * Track orders by phone number.
  * Searches orders where customer_phone contains the given phone digits.
  *
- * NOTE: This calls the `track_orders_by_phone` SECURITY DEFINER RPC rather
- * than selecting from `orders` directly. Direct table reads are restricted
- * to the owning merchant/admin (see the RLS hardening migration) since the
- * `orders` table holds customer PII (name, phone, address); the RPC only
- * ever returns rows matching the exact phone the caller supplies.
+ * Strict ownership: the server route only ever returns orders whose
+ * `customer_user_id` matches the signed-in user, or shops the caller owns
+ * (merchant/admin) — even when the phone number matches.
  */
 export async function trackOrdersByPhone(
   phone: string,
 ): Promise<ServiceResult<TrackingResult>> {
-  const supabase = createClient();
   const cleaned =
     normalizePkPhoneDigits(phone) || phone.replace(/\D/g, "");
 
@@ -211,44 +260,30 @@ export async function trackOrdersByPhone(
     };
   }
 
-  try {
-    const { data, error } = await supabase.rpc("track_orders_by_phone", {
-      p_phone: cleaned,
-    });
+  const result = await fetchTrackedOrders({ phone: cleaned });
+  if (!result.success) return result;
 
-    if (error) throw error;
+  const orders = result.data.map(parseTrackedOrder);
 
-    const orders = ((data as Record<string, unknown>[]) ?? []).map(
-      parseTrackedOrder,
-    );
-
-    return {
-      success: true,
-      data: {
-        orders,
-        query: phone,
-        found: orders.length > 0,
-      },
-    };
-  } catch (err) {
-    logError(err, {
-      module: "orderTrackingService.trackOrdersByPhone",
-      meta: { phone: cleaned },
-    });
-    return { success: false, error: toError(err) };
-  }
+  return {
+    success: true,
+    data: {
+      orders,
+      query: phone,
+      found: orders.length > 0,
+    },
+  };
 }
 
 /**
  * Track a single order by its reference/order ID.
  *
- * NOTE: Uses the `track_order_by_id` SECURITY DEFINER RPC — see
- * `trackOrdersByPhone` above for why direct table reads aren't used here.
+ * Strict ownership: the server route only returns the order when the signed-in
+ * user placed it (customer_user_id), owns the shop, or is a platform admin.
  */
 export async function trackOrderById(
   orderId: string,
 ): Promise<ServiceResult<TrackedOrder>> {
-  const supabase = createClient();
   const trimmed = orderId.trim();
 
   if (!trimmed) {
@@ -264,28 +299,17 @@ export async function trackOrderById(
     };
   }
 
-  try {
-    const { data, error } = await supabase
-      .rpc("track_order_by_id", { p_order_id: trimmed })
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) {
-      return {
-        success: false,
-        error: "No order found with that reference ID. Please double-check and try again.",
-      };
-    }
-
-    const order = parseTrackedOrder(data as Record<string, unknown>);
-    return { success: true, data: order };
-  } catch (err) {
-    logError(err, {
-      module: "orderTrackingService.trackOrderById",
-      meta: { orderId: trimmed },
-    });
-    return { success: false, error: toError(err) };
+  const result = await fetchTrackedOrders({ orderId: trimmed });
+  if (!result.success) return result;
+  if (result.data.length === 0) {
+    return {
+      success: false,
+      error: "No order found with that reference ID. Please double-check and try again.",
+    };
   }
+
+  const order = parseTrackedOrder(result.data[0]);
+  return { success: true, data: order };
 }
 
 /**

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { detectUserRole } from "@/services/authService";
+import { detectUserRole, signOut } from "@/services/authService";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -140,8 +140,7 @@ export default function SettingsPage() {
 
   const handleSignOut = useCallback(async () => {
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await signOut();
       router.push("/");
     } catch {
       // Silently fail

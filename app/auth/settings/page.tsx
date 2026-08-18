@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { signOut } from "@/services/authService";
 import { useToast } from "@/components/Toast";
 import { uploadImage } from "@/services/storageService";
 import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
@@ -254,9 +255,9 @@ export default function AccountSettingsPage() {
   );
 
   const handleSignOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await signOut();
     window.location.href = "/";
-  }, [supabase.auth]);
+  }, []);
 
   if (loading) {
     return (

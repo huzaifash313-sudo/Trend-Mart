@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { SHOP_CATEGORIES } from "@/types";
 import type { ShopFormData } from "@/types";
 import { claimSignupRole, detectUserRole } from "@/services/authService";
-import { createShop } from "@/services/shopService";
+import { createShop, fetchMyShop } from "@/services/shopService";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
@@ -82,7 +82,16 @@ export default function BecomeMerchantPage() {
       }
       const role = await detectUserRole(user);
       if (cancelled) return;
-      if (role === "merchant" || role === "admin") {
+      if (role === "admin") {
+        router.replace("/admin/dashboard");
+        return;
+      }
+      // Only skip the form when a store already exists. A merchant who signed
+      // up but hasn't created a shop stays here to finish onboarding — this
+      // also breaks the old dashboard ↔ become-merchant redirect loop.
+      const shopResult = await fetchMyShop();
+      if (cancelled) return;
+      if (shopResult.success && shopResult.data) {
         router.replace("/dashboard");
         return;
       }

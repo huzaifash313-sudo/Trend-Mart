@@ -55,7 +55,8 @@ const CUSTOMER_STEPS: OnboardingStep[] = [
     icon: "🎉",
     title: "Welcome aboard!",
     subtitle:
-      "Your name, phone and precise location are already saved from signup — checkout now fills them in automatically.",
+      "Finish your delivery profile — name, phone and precise location — so checkout auto-fills everything for you.",
+    actions: [{ label: "Complete my profile", href: "/account/complete-profile", primary: true }],
   },
   {
     icon: "📍",
@@ -98,6 +99,9 @@ const MERCHANT_STEPS: OnboardingStep[] = [
 
 const STORAGE_PREFIX = "tm_onboarding_v1";
 
+/** Dedicated onboarding pages already guide the user — never stack the wizard on top. */
+const ONBOARDING_PAGES = new Set(["/account/become-merchant", "/account/complete-profile"]);
+
 /* -------------------------------------------------------------------------- */
 /*  Component                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -119,6 +123,12 @@ export default function OnboardingWizard() {
       let key = `${STORAGE_PREFIX}:guest`;
 
       try {
+        // The onboarding pages ARE the onboarding — no wizard overlay needed.
+        if (ONBOARDING_PAGES.has(pathname)) {
+          if (!cancelled) setVariant(null);
+          return;
+        }
+
         const {
           data: { session },
         } = await supabase.auth.getSession();

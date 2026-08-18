@@ -43,3 +43,12 @@ export function invalidateQuery(queryKey: readonly unknown[]): void {
   if (!queryClient) return;
   queryClient.invalidateQueries({ queryKey });
 }
+
+/**
+ * Wipe every cached query. Called on account sign-out so one user's cached
+ * queries can never leak to the next user on the same device/browser.
+ */
+export function clearQueryCache(): void {
+  if (!queryClient) return;
+  queryClient.resetQueries();
+}

@@ -41,6 +41,10 @@ export default function CustomerAccountPage() {
     city?: string | null;
   } | null>(null);
 
+  const profileIncomplete = useMemo(() => {
+    return !profile?.full_name || !profile?.phone || (!profile?.location_label && !profile?.city);
+  }, [profile]);
+
   const localOrders = useMemo(() => {
     try {
       return getOrderHistory();
@@ -171,6 +175,24 @@ export default function CustomerAccountPage() {
           </Link>
         </div>
       </header>
+
+      {/* Profile completion nudge — new customers finish their details here */}
+      {profileIncomplete && (
+        <section className="border-b border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
+            <p className="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+              Complete your delivery profile — name, phone and location make checkout
+              instant and auto-filled.
+            </p>
+            <Link
+              href="/account/complete-profile"
+              className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+            >
+              Complete profile →
+            </Link>
+          </div>
+        </section>
+      )}
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         {/* Verification status */}

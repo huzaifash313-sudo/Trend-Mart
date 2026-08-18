@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { UserLocation } from "@/types";
 import { getAuthCallbackUrl, getPublicAppUrl } from "@/lib/appUrl";
+import { clearQueryCache } from "@/lib/cacheBus";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -560,12 +561,21 @@ export async function verifyPassword(
 
 /**
  * Sign out the current user.
+ *
+ * After the Supabase session is closed, this ALSO wipes the React Query cache
+ * (`queryClient.resetQueries()`) and clears localStorage so a previous user's
+ * cached storefront/order data and local state can never surface for the next
+ * user on the same device.
  */
 export async function signOut(): Promise<{ success: boolean; error?: string }> {
   try {
     const { error } = await supabase.auth.signOut();
     if (error) {
       return { success: false, error: error.message };
+    }
+    clearQueryCache();
+    if (typeof window !== "undefined") {
+      localStorage.clear();
     }
     return { success: true };
   } catch (err) {
