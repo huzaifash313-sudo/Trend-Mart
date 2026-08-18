@@ -120,6 +120,39 @@ describe("AccountScopeGuard", () => {
     expect(localStorage.getItem(ACTIVE_UID_KEY)).toBe("user-A");
   });
 
+  it("keeps 10 sequential accounts fully unlinked (no cross-account bleed)", () => {
+    const { fire } = renderGuard();
+
+    let previousOrderId: string | null = null;
+
+    for (let n = 1; n <= 10; n++) {
+      const uid = `user-${n}`;
+
+      // Each account signs in, then records its own order into device-local history.
+      fire(n === 1 ? "SIGNED_IN" : "SIGNED_IN", { user: { id: uid } });
+
+      // On sign-in of a *different* account, the previous account's order must be gone.
+      if (previousOrderId) {
+        const raw = localStorage.getItem(ORDERS_KEY);
+        const ids = raw ? (JSON.parse(raw) as Array<{ id: string }>).map((o) => o.id) : [];
+        expect(ids).not.toContain(previousOrderId);
+      }
+
+      // This account is scoped correctly.
+      expect(localStorage.getItem(ACTIVE_UID_KEY)).toBe(uid);
+
+      // Simulate this account placing an order (writes to the shared device key).
+      const orderId = `order-of-${uid}`;
+      localStorage.setItem(ORDERS_KEY, JSON.stringify([{ id: orderId, shopId: "s1" }]));
+      previousOrderId = orderId;
+
+      // Sign out between accounts — must wipe this account's data too.
+      fire("SIGNED_OUT", null);
+      expect(localStorage.getItem(ORDERS_KEY)).toBeNull();
+      expect(localStorage.getItem(ACTIVE_UID_KEY)).toBeNull();
+    }
+  });
+
   it("unsubscribes from the auth listener on unmount", () => {
     let captured: AuthCallback = () => {};
     const unsubscribe = jest.fn();
