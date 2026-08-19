@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { fetchSupportTickets, updateSupportTicket } from "@/services/supportService";
+import { subscribeToSupportTickets } from "@/lib/supabase/realtime";
 import type { SupportTicket, SupportTicketStatus } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 
@@ -43,7 +44,34 @@ export default function AdminSupportPage() {
       setLoading(false);
     }
     load();
-    return () => { cancelled = true; };
+
+    // Live feed — a new ticket (e.g. from the public support desk) appears
+    // instantly in the inbox. RLS only broadcasts to admins.
+    const unsub = subscribeToSupportTickets((payload) => {
+      const row = payload.new;
+      if (!row || !("id" in row)) return;
+      const ticket: SupportTicket = {
+        id: row.id,
+        user_id: row.user_id,
+        name: row.name,
+        email: row.email,
+        phone: row.phone ?? "",
+        category: row.category as SupportTicket["category"],
+        subject: row.subject,
+        message: row.message,
+        status: row.status as SupportTicketStatus,
+        created_at: row.created_at,
+      };
+      setTickets((prev) => {
+        if (prev.some((t) => t.id === ticket.id)) return prev;
+        return [ticket, ...prev].slice(0, 200);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, []);
 
   const filtered = useMemo(

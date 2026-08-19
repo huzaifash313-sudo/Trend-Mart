@@ -48,17 +48,26 @@ function BrowserNotifyBridge() {
   return null;
 }
 
-function AutoRegisterMerchantShops() {
-  const { registerShop } = useNotifications();
+function AutoRegisterUserNotifications() {
+  const { registerUser } = useNotifications();
 
   useEffect(() => {
     const supabase = createClient();
+    let cleanup: (() => void) | undefined;
     let cancelled = false;
-    const cleanups: Array<() => void> = [];
+    // Guard against the INITIAL_SESSION auth event racing the explicit
+    // getUser() IIFE — both would otherwise register and churn the channel.
+    let lastRegisteredUserId: string | null = null;
+
+    const registerForUser = (userId: string) => {
+      if (cancelled) return;
+      if (lastRegisteredUserId === userId) return; // already subscribed
+      cleanup?.();
+      lastRegisteredUserId = userId;
+      cleanup = registerUser(userId);
+    };
 
     void (async () => {
-      // getUser() validates the JWT. getSession() can return a wiped/stale
-      // local session after SQL resets → 401 on shops?owner_id=...
       const {
         data: { user },
         error,
@@ -73,53 +82,6 @@ function AutoRegisterMerchantShops() {
         }
         return;
       }
-
-      const { data: shops, error: shopError } = await supabase
-        .from("shops")
-        .select("id")
-        .eq("owner_id", user.id);
-
-      if (shopError || !shops?.length || cancelled) return;
-
-      for (const shop of shops) {
-        if (shop.id) cleanups.push(registerShop(shop.id));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      cleanups.forEach((fn) => fn());
-    };
-  }, [registerShop]);
-
-  return null;
-}
-
-function AutoRegisterCustomerOrders() {
-  const { registerCustomer } = useNotifications();
-
-  useEffect(() => {
-    const supabase = createClient();
-    let cleanup: (() => void) | undefined;
-    let cancelled = false;
-    // Guard against the INITIAL_SESSION auth event racing the explicit
-    // getSession() IIFE — both would otherwise register and churn the channel.
-    let lastRegisteredUserId: string | null = null;
-
-    const registerForUser = (userId: string) => {
-      if (cancelled) return;
-      if (lastRegisteredUserId === userId) return; // already subscribed
-      cleanup?.();
-      lastRegisteredUserId = userId;
-      cleanup = registerCustomer(userId);
-    };
-
-    void (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user || cancelled) return;
       registerForUser(user.id);
     })();
 
@@ -138,7 +100,7 @@ function AutoRegisterCustomerOrders() {
       cleanup?.();
       sub.subscription.unsubscribe();
     };
-  }, [registerCustomer]);
+  }, [registerUser]);
 
   return null;
 }
@@ -191,8 +153,7 @@ function NotificationChrome() {
   return (
     <>
       <BrowserNotifyBridge />
-      <AutoRegisterMerchantShops />
-      <AutoRegisterCustomerOrders />
+      <AutoRegisterUserNotifications />
       <AutoSubscribeWebPush />
       <NotificationPanel isOpen={isPanelOpen} onClose={closePanel} />
     </>

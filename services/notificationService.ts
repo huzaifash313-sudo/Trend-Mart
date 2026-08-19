@@ -749,6 +749,87 @@ export function cleanupAllSubscriptions(): void {
   globalTransitionListeners.clear();
 }
 
+// ─── DB-Backed In-App Notifications (Bell) ───────────────────────────────────
+// The `public.notifications` table is the durable source of truth for the
+// notification bell. Rows are created by DB triggers (see
+// supabase/migrations/20260819020000_db_notifications.sql), and clients read /
+// mark / clear their own rows via RLS.
+
+export type AppNotificationType =
+  | "support"
+  | "order"
+  | "sale"
+  | "inquiry"
+  | "system";
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: AppNotificationType;
+  title: string;
+  body: string;
+  link_url: string;
+  entity_id: string;
+  read: boolean;
+  created_at: string;
+}
+
+/** Fetch the signed-in user's latest notifications (newest first). */
+export async function fetchMyNotifications(
+  limit = 50,
+): Promise<ServiceResult<AppNotification[]>> {
+  const supabase = createClient();
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return { success: true, data: (data as AppNotification[]) ?? [] };
+  } catch (err) {
+    logError(err, { module: "notificationService.fetchMyNotifications" });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/** Mark a single notification as read (RLS scopes to the caller). */
+export async function markNotificationRead(id: string): Promise<void> {
+  const supabase = createClient();
+  try {
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
+  } catch (err) {
+    logError(err, { module: "notificationService.markNotificationRead", meta: { id } });
+  }
+}
+
+/** Mark every one of the caller's notifications as read. */
+export async function markAllNotificationsRead(): Promise<void> {
+  const supabase = createClient();
+  try {
+    await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("read", false);
+  } catch (err) {
+    logError(err, { module: "notificationService.markAllNotificationsRead" });
+  }
+}
+
+/** Clear the caller's notification history entirely. */
+export async function clearMyNotifications(): Promise<void> {
+  const supabase = createClient();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("notifications").delete().eq("user_id", user.id);
+  } catch (err) {
+    logError(err, { module: "notificationService.clearMyNotifications" });
+  }
+}
+
 // ─── Page Visibility Handler ─────────────────────────────────────────────────
 
 if (typeof window !== "undefined") {

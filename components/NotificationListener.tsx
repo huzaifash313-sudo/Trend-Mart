@@ -1,16 +1,18 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Real-Time Order Notification Sound & Toast Alert Engine         */
+/*  TrendMart — DB-Backed In-App Notification Engine                           */
 /*                                                                             */
-/*  Features:                                                                  */
-/*   - Supabase Realtime channel subscription for new orders & inquiries       */
-/*   - Professional chime sound on new order/inquiry dispatch                 */
-/*   - Animated floating toast notification in merchand dashboard header       */
-/*   - Unread notification badge counter                                       */
-/*   - Notification history panel (last 20 notifications)                     */
-/*   - Sound mute toggle                                                       */
-/*   - Auto-cleanup on unmount                                                 */
+/*  The `public.notifications` table (populated by server-side triggers) is    */
+/*  the durable source of truth. This provider:                                */
+/*   - Hydrates the bell/panel from the DB on sign-in                          */
+/*   - Listens on Supabase Realtime for new notification rows                 */
+/*   - Plays a chime + floating toast for live notifications                  */
+/*   - Persists a small localStorage cache so the panel renders instantly     */
+/*   - Marks rows read / clears history against the DB (RLS-scoped)           */
+/*                                                                             */
+/*  Notification sources (triggers): support tickets (admin + reporter),       */
+/*  orders (merchant sale + buyer confirmation/status), shop inquiries.        */
 /* -------------------------------------------------------------------------- */
 
 import {
@@ -22,15 +24,18 @@ import {
   useContext,
   type ReactNode,
 } from "react";
-import {
-  subscribeToOrders,
-  subscribeToInquiries,
-  subscribeToCustomerOrders,
-} from "@/lib/supabase/realtime";
-import type { OrderPayload, InquiryPayload } from "@/lib/supabase/realtime";
+import { subscribeToNotifications } from "@/lib/supabase/realtime";
+import type { NotificationPayload } from "@/lib/supabase/realtime";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import {
+  fetchMyNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  clearMyNotifications,
+  type AppNotification,
+} from "@/services/notificationService";
 
-const HISTORY_KEY = "trendmart_notif_history_v1";
+const HISTORY_KEY = "trendmart_notif_history_v2";
 const PREFS_KEY = "trendmart_notifications";
 
 function loadHistory(): Notification[] {
@@ -54,14 +59,18 @@ function saveHistory(items: Notification[]) {
   }
 }
 
-function prefsAllow(type: "order" | "inquiry"): boolean {
+/** Sound/toast preference — bell always lists DB notifications regardless. */
+function prefsAllow(type: Notification["type"]): boolean {
   if (typeof window === "undefined") return true;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return true;
     const prefs = JSON.parse(raw) as Record<string, boolean>;
     if (type === "order") return prefs.order_updates !== false;
-    return prefs.merchant_alerts !== false;
+    if (type === "sale" || type === "inquiry") {
+      return prefs.merchant_alerts !== false;
+    }
+    return true; // support & system always alert
   } catch {
     return true;
   }
@@ -69,17 +78,45 @@ function prefsAllow(type: "order" | "inquiry"): boolean {
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 
+export type NotificationType =
+  | "support"
+  | "order"
+  | "sale"
+  | "inquiry"
+  | "system";
+
 export interface Notification {
   id: string;
-  type: "order" | "inquiry";
+  type: NotificationType;
   title: string;
   body: string;
   timestamp: string;
   read: boolean;
-  /** Optional link to navigate to (e.g., order details, inquiry) */
+  /** Optional link to navigate to (e.g., order details, support inbox). */
   linkUrl?: string;
-  /** Optional shop ID for context */
-  shopId?: string;
+  /** Related entity id (ticket / order / inquiry). */
+  entityId?: string;
+}
+
+const NOTIF_EMOJI: Record<NotificationType, string> = {
+  support: "🎫",
+  order: "🛒",
+  sale: "💰",
+  inquiry: "📩",
+  system: "🔔",
+};
+
+function mapRow(row: AppNotification): Notification {
+  return {
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    body: row.body,
+    timestamp: row.created_at,
+    read: row.read,
+    linkUrl: row.link_url || undefined,
+    entityId: row.entity_id || undefined,
+  };
 }
 
 interface NotificationContextValue {
@@ -95,10 +132,8 @@ interface NotificationContextValue {
   openPanel: () => void;
   closePanel: () => void;
   togglePanel: () => void;
-  /** Register a shop to listen for notifications. Returns cleanup function. */
-  registerShop: (shopId: string) => () => void;
-  /** Register customer order-status listening for the signed-in user. */
-  registerCustomer: (userId: string) => () => void;
+  /** Register the signed-in user's DB-backed notification stream. */
+  registerUser: (userId: string) => () => void;
 }
 
 /* ─── Context ──────────────────────────────────────────────────────────────── */
@@ -118,10 +153,6 @@ export function useNotifications(): NotificationContextValue {
 
 /* ─── Chime Sound Generator (Synthesized, no external file needed) ─────────── */
 
-/**
- * Play a subtle professional chime using the Web Audio API.
- * No external audio files needed — synthesized in-browser.
- */
 function playChimeSound() {
   try {
     const audioContext = new (window.AudioContext ||
@@ -171,23 +202,22 @@ export function NotificationListenerProvider({
   const [historyReady, setHistoryReady] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const channelRefs = useRef<Set<string>>(new Set());
-  const customerChannelRef = useRef<string | null>(null);
-  // Mute is read via a ref inside addNotification so toggling mute does NOT
-  // change addNotification's identity → registerShop/registerCustomer stay
-  // stable → no full unsubscribe/resubscribe churn on mute toggle.
+  // Track which user ids we've already registered to avoid duplicate streams.
+  const registeredUsers = useRef<Set<string>>(new Set());
+  // All live unsubscribe closures, so provider unmount actually tears down.
+  const cleanupFns = useRef<Set<() => void>>(new Set());
+  // Mute is read via a ref so live inserts don't churn callback identities.
   const isMutedRef = useRef(isMuted);
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
-  // All live unsubscribe closures, so provider unmount actually tears them down.
-  const cleanupFns = useRef<Set<() => void>>(new Set());
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const openPanel = useCallback(() => setIsPanelOpen(true), []);
   const closePanel = useCallback(() => setIsPanelOpen(false), []);
   const togglePanel = useCallback(() => setIsPanelOpen((v) => !v), []);
 
+  // Hydrate the localStorage cache for instant first paint.
   useEffect(() => {
     setNotifications(loadHistory());
     setHistoryReady(true);
@@ -199,14 +229,13 @@ export function NotificationListenerProvider({
   }, [notifications, historyReady]);
 
   // ── Mute Toggle ────────────────────────────────────────────────────────────
-  // Hydrate mute preference from localStorage after hydration to avoid SSR mismatch
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem("trendmart_notifications_muted");
         if (stored === "true") setIsMuted(true);
       } catch {
-        // Ignore
+        /* ignore */
       }
     }
   }, []);
@@ -218,175 +247,113 @@ export function NotificationListenerProvider({
         try {
           localStorage.setItem("trendmart_notifications_muted", String(next));
         } catch {
-          // Ignore
+          /* ignore */
         }
       }
       return next;
     });
   }, []);
 
-  // ── Notification Management ────────────────────────────────────────────────
-  const addNotification = useCallback(
-    (notification: Omit<Notification, "id" | "timestamp" | "read">) => {
-      if (!prefsAllow(notification.type)) return;
+  /* ── Live notification handling ─────────────────────────────────────────── */
 
-      const newNotif: Notification = {
-        ...notification,
-        id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        timestamp: new Date().toISOString(),
-        read: false,
-      };
+  // Ingest a fresh DB row: dedupe, prepend, cap at 50, chime + toast.
+  const addFromDb = useCallback((row: AppNotification) => {
+    const notif = mapRow(row);
+    if (!notif.id || !notif.title) return;
 
-      setNotifications((prev) => {
-        const next = [newNotif, ...prev].slice(0, 50);
-        saveHistory(next);
-        return next;
-      });
+    setNotifications((prev) => {
+      if (prev.some((n) => n.id === notif.id)) return prev;
+      const next = [notif, ...prev].slice(0, 50);
+      saveHistory(next);
+      return next;
+    });
 
+    if (prefsAllow(notif.type)) {
       if (!isMutedRef.current) {
         playChimeSound();
       }
-
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("trendmart:toast", {
             detail: {
               type: "info",
-              message: `${notification.type === "order" ? "🛒" : "📩"} ${notification.title}`,
+              message: `${NOTIF_EMOJI[notif.type] ?? "🔔"} ${notif.title}`,
               duration: 5000,
             },
           }),
         );
       }
+    }
+  }, []);
+
+  /* ── User Registration (fetch + realtime stream) ────────────────────────── */
+
+  const registerUser = useCallback(
+    (userId: string): (() => void) => {
+      if (!userId) return () => {};
+      if (registeredUsers.current.has(userId)) return () => {};
+      registeredUsers.current.add(userId);
+
+      // Hydrate the bell from the DB (source of truth).
+      void fetchMyNotifications().then((result) => {
+        if (result.success) {
+          setNotifications((prev) => {
+            const byId = new Map(prev.map((n) => [n.id, n]));
+            for (const row of result.data) byId.set(row.id, mapRow(row));
+            const merged = [...byId.values()]
+              .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+              .slice(0, 50);
+            saveHistory(merged);
+            return merged;
+          });
+        }
+      });
+
+      const unsub = subscribeToNotifications(
+        userId,
+        (payload) => {
+          const row = (
+            payload as RealtimePostgresChangesPayload<NotificationPayload>
+          ).new;
+          if (!row || !("id" in row)) return;
+          addFromDb(row as unknown as AppNotification);
+        },
+      );
+
+      const cleanup = () => {
+        unsub();
+        registeredUsers.current.delete(userId);
+        cleanupFns.current.delete(cleanup);
+      };
+      cleanupFns.current.add(cleanup);
+      return cleanup;
     },
-    [],
+    [addFromDb],
   );
+
+  /* ── Mark read / clear ───────────────────────────────────────────────────── */
 
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
     );
+    void markNotificationRead(id);
   }, []);
 
   const markAllAsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    void markAllNotificationsRead();
   }, []);
 
   const clearNotifications = useCallback(() => {
     setNotifications([]);
     saveHistory([]);
+    void clearMyNotifications();
   }, []);
-
-  // ── Shop Registration for Realtime Subscriptions ───────────────────────────
-  const registerShop = useCallback(
-    (shopId: string): (() => void) => {
-      if (channelRefs.current.has(shopId)) {
-        // Already subscribed — no-op
-        return () => {};
-      }
-
-      // Subscribe to new orders
-      const unsubOrders = subscribeToOrders(
-        shopId,
-        (payload) => {
-          const order = (payload as RealtimePostgresChangesPayload<OrderPayload>).new;
-          if (!order || !("id" in order)) return;
-          addNotification({
-            type: "order",
-            title: `New Order from ${order.customer_name || "a customer"}`,
-            body: `Amount: Rs. ${(order.total_amount ?? 0).toLocaleString()} — Status: ${order.status}`,
-            linkUrl: `/dashboard/orders`,
-            shopId,
-          });
-        },
-        // No onUpdate notification here: order status changes are the merchant's
-        // own action, and the dashboard already shows a single confirmation
-        // toast. Notifying again on every UPDATE stacked toasts and inflated the
-        // bell badge count by 2-3 per action.
-      );
-
-      // Subscribe to new inquiries
-      const unsubInquiries = subscribeToInquiries(
-        shopId,
-        (payload) => {
-          const inquiry = (payload as RealtimePostgresChangesPayload<InquiryPayload>).new;
-          if (!inquiry || !("id" in inquiry)) return;
-          addNotification({
-            type: "inquiry",
-            title: `New Inquiry from ${inquiry.customer_name || "a customer"}`,
-            body: inquiry.message?.slice(0, 120) ?? "No message content",
-            linkUrl: `/dashboard/inquiries`,
-            shopId,
-          });
-        },
-        (payload) => {
-          const inquiry = (payload as RealtimePostgresChangesPayload<InquiryPayload>).new;
-          if (!inquiry || !("id" in inquiry)) return;
-          if (inquiry.is_read) {
-            addNotification({
-              type: "inquiry",
-              title: `Inquiry Read: ${inquiry.customer_name || "Customer"}`,
-              body: "Inquiry marked as read",
-              linkUrl: `/dashboard/inquiries`,
-              shopId,
-            });
-          }
-        },
-      );
-
-      channelRefs.current.add(shopId);
-
-      // Return cleanup
-      const cleanup = () => {
-        unsubOrders();
-        unsubInquiries();
-        channelRefs.current.delete(shopId);
-        cleanupFns.current.delete(cleanup);
-      };
-      cleanupFns.current.add(cleanup);
-      return cleanup;
-    },
-    [addNotification],
-  );
-
-  const registerCustomer = useCallback(
-    (userId: string): (() => void) => {
-      if (!userId) return () => {};
-
-      customerChannelRef.current = userId;
-      const unsub = subscribeToCustomerOrders(userId, (payload) => {
-        const order = (payload as RealtimePostgresChangesPayload<OrderPayload>).new;
-        if (!order || !("id" in order)) return;
-        addNotification({
-          type: "order",
-          title: `Order update: ${order.status}`,
-          body: `Your order is now ${order.status}${
-            typeof order.total_amount === "number"
-              ? ` — Rs. ${Math.round(order.total_amount).toLocaleString()}`
-              : ""
-          }.`,
-          linkUrl: `/orders/tracking?orderId=${encodeURIComponent(order.id)}`,
-          shopId: order.shop_id,
-        });
-      });
-
-      const cleanup = () => {
-        unsub();
-        cleanupFns.current.delete(cleanup);
-        if (customerChannelRef.current === userId) {
-          customerChannelRef.current = null;
-        }
-      };
-      cleanupFns.current.add(cleanup);
-      return cleanup;
-    },
-    [addNotification],
-  );
 
   // ── Cleanup all subscriptions on unmount ───────────────────────────────────
   useEffect(() => {
     return () => {
-      // Actually tear down every live channel — not just clear the ref Set.
       for (const fn of cleanupFns.current) {
         try {
           fn();
@@ -395,16 +362,9 @@ export function NotificationListenerProvider({
         }
       }
       cleanupFns.current.clear();
-      channelRefs.current.clear();
+      registeredUsers.current.clear();
     };
   }, []);
-
-  // NOTE: the previous localStorage-driven re-registration of shop channels was
-  // removed. It re-subscribed to saved shop IDs with NO auth/ownership check,
-  // so a logged-out visitor (or a different user on the same browser) could
-  // inherit the previous merchant's order/inquiry streams. Correct registration
-  // now happens exclusively via AutoRegisterMerchantShops (auth + ownership
-  // verified) in components/AppNotifications.tsx.
 
   return (
     <NotificationContext.Provider
@@ -420,8 +380,7 @@ export function NotificationListenerProvider({
         openPanel,
         closePanel,
         togglePanel,
-        registerShop,
-        registerCustomer,
+        registerUser,
       }}
     >
       {children}
@@ -443,15 +402,13 @@ export function NotificationToast({
     return () => clearTimeout(timer);
   }, [onDismiss]);
 
-  const icon = notification.type === "order" ? "🛒" : "📩";
-
   return (
     <div
       role="status"
       className="pointer-events-auto flex w-full items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm shadow-lg animate-in slide-in-from-top-2 fade-in dark:border-emerald-800 dark:bg-zinc-900"
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-lg dark:bg-emerald-900/30">
-        {icon}
+        {NOTIF_EMOJI[notification.type] ?? "🔔"}
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
@@ -634,7 +591,7 @@ export function NotificationPanel({
                   No notifications yet
                 </p>
                 <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                  New orders and inquiries will appear here
+                  Order updates, support replies and new sales appear here
                 </p>
               </div>
             </div>
@@ -659,7 +616,7 @@ export function NotificationPanel({
                 >
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 shrink-0 text-lg">
-                      {notif.type === "order" ? "🛒" : "📩"}
+                      {NOTIF_EMOJI[notif.type] ?? "🔔"}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">

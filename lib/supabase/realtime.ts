@@ -76,6 +76,31 @@ export type InventoryVariantPayload = {
   updated_at: string;
 };
 
+export type NotificationPayload = {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  link_url: string;
+  entity_id: string;
+  read: boolean;
+  created_at: string;
+};
+
+export type SupportTicketPayload = {
+  id: string;
+  user_id: string | null;
+  name: string;
+  email: string;
+  phone: string;
+  category: string;
+  subject: string;
+  message: string;
+  status: string;
+  created_at: string;
+};
+
 export type AnalyticsPayload = {
   id: string;
   shop_id: string;
@@ -261,6 +286,81 @@ export function subscribeToCustomerOrders(
     )
     .subscribe((status) => {
       if (status === "SUBSCRIBED") {
+        notifyStateChange("connected", channelKey);
+      } else if (status === "CHANNEL_ERROR") {
+        notifyStateChange("error", channelKey);
+      }
+    });
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
+/**
+ * Subscribe to new DB-backed notifications for a signed-in user.
+ * Rows are created by server-side triggers (support tickets, orders,
+ * inquiries) — see supabase/migrations/20260819020000_db_notifications.sql.
+ */
+export function subscribeToNotifications(
+  userId: string,
+  onInsert: RealtimeCallback<NotificationPayload>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = uniqueKey(`notifications-${userId}`);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "notifications",
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        onInsert(payload as RealtimePostgresChangesPayload<NotificationPayload>);
+      },
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        console.log(`[Realtime] ✅ Subscribed to notifications for user: ${userId}`);
+        notifyStateChange("connected", channelKey);
+      } else if (status === "CHANNEL_ERROR") {
+        notifyStateChange("error", channelKey);
+      }
+    });
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
+/**
+ * Subscribe to new platform support tickets (Admin Support Inbox live feed).
+ * Only admins receive rows via RLS; the dashboard re-queries on insert.
+ */
+export function subscribeToSupportTickets(
+  onInsert: RealtimeCallback<SupportTicketPayload>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = uniqueKey(`support-tickets`);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "support_tickets",
+      },
+      (payload) => {
+        onInsert(payload as RealtimePostgresChangesPayload<SupportTicketPayload>);
+      },
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        console.log("[Realtime] ✅ Subscribed to new support tickets");
         notifyStateChange("connected", channelKey);
       } else if (status === "CHANNEL_ERROR") {
         notifyStateChange("error", channelKey);

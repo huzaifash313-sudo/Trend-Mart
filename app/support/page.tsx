@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import LegalPageLayout from "@/components/LegalPageLayout";
+import MySupportRequests from "@/components/MySupportRequests";
 import { useToast } from "@/components/Toast";
 import CustomSelect from "@/components/CustomSelect";
 import { createSupportTicket } from "@/services/supportService";
@@ -57,6 +58,10 @@ export default function SupportPage() {
 
   return (
     <LegalPageLayout title="Contact Support" icon="💬" lastUpdated="August 8, 2026">
+      <div className="mb-6">
+        <MySupportRequests />
+      </div>
+
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
           <p className="mb-4 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">

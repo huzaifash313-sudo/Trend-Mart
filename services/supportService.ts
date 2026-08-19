@@ -245,6 +245,33 @@ export async function fetchSupportTickets(): Promise<ServiceResult<SupportTicket
 }
 
 /**
+ * Fetch the signed-in user's OWN submitted tickets (RLS: own_read).
+ * Powers the "My Requests" status list on the public support desk.
+ */
+export async function fetchMySupportTickets(): Promise<ServiceResult<SupportTicket[]>> {
+  const supabase = createClient();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { success: true, data: [] };
+
+    const { data, error } = await supabase
+      .from("support_tickets")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    return { success: true, data: (data as SupportTicket[]) ?? [] };
+  } catch (err) {
+    logError(err, { module: "supportService.fetchMySupportTickets" });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
  * Update a ticket's status and/or admin notes — admin only (enforced by RLS).
  */
 export async function updateSupportTicket(
