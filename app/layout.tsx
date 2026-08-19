@@ -22,6 +22,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
 import OnboardingWizard from "@/components/OnboardingWizard";
+import PolicyNotice from "@/components/PolicyNotice";
 import ScrollToTop from "@/components/ScrollToTop";
 import { ScrollToTopSuspense } from "@/components/PageLoadingShell";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
@@ -60,10 +61,12 @@ const THEME_BOOTSTRAP = `(function(){try{var k="trendmart_theme_prefs_v4";var ra
 
 /* Instant cover BEFORE first paint.
  * - First-ever homepage open (session flag unset): teal cover + lock until
- *   AppSplash takes over and plays the intro.
+ *   AppSplash takes over and plays the intro. The inline teal is painted only
+ *   here and removed by AppSplash.releaseSplashBackground() when the intro
+ *   finishes, so no green residue ever stays behind the app surface.
  * - Refresh / returning visit: show NOTHING (no cover, no logo flash) — the
  *   intro must only appear on a fresh open, never on every refresh. */
-const SPLASH_BOOTSTRAP = `(function(){try{var r=document.documentElement;r.style.backgroundColor="#0f766e";var p=location.pathname||"/";var home=p==="/"||p==="";var full=home&&sessionStorage.getItem("tm_splash_seen_v6")!=="1";if(full){r.classList.add("tm-boot-splash","tm-splash-lock");}}catch(e){}})();`;
+const SPLASH_BOOTSTRAP = `(function(){try{var r=document.documentElement;var p=location.pathname||"/";var home=p==="/"||p==="";var full=home&&sessionStorage.getItem("tm_splash_seen_v6")!=="1";if(full){r.style.backgroundColor="#0f766e";r.classList.add("tm-boot-splash","tm-splash-lock");}}catch(e){}})();`;
 
 const SITE_JSON_LD = generateSiteJsonLd();
 
@@ -73,7 +76,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       suppressHydrationWarning
       className={`light ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      style={{ backgroundColor: "#0f766e" }}
     >
       <head>
         <meta name="theme-color" content="#0f766e" />
@@ -134,6 +136,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </ErrorBoundary>
               <MerchantQuickAddHost />
               <OnboardingWizard />
+              <PolicyNotice />
               <PwaRegister />
               </AppNotifications>
               </MerchantQuickAddProvider>

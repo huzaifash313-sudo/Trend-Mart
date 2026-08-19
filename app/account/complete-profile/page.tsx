@@ -87,6 +87,21 @@ export default function CompleteProfilePage() {
           .maybeSingle();
 
         if (!cancelled && profile) {
+          const nameOk =
+            typeof profile.full_name === "string" && profile.full_name.trim().length >= 2;
+          const phoneOk =
+            typeof profile.phone === "string" && profile.phone.trim().length >= 7;
+          const locationOk =
+            typeof profile.latitude === "number" ||
+            (typeof profile.address === "string" && profile.address.trim().length > 0);
+
+          // Already onboarded — never show the form twice (refresh, sign-out,
+          // re-login). The delivery profile is a one-time step.
+          if (nameOk && phoneOk && locationOk) {
+            router.replace("/account");
+            return;
+          }
+
           if (profile.full_name) setFullName(profile.full_name);
           if (profile.phone) setPhone(formatPkPhoneInput(profile.phone));
           if (profile.address) setAddress(profile.address);

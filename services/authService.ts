@@ -483,10 +483,13 @@ export async function verifyPassword(
 /**
  * Sign out the current user.
  *
- * After the Supabase session is closed, this ALSO wipes the React Query cache
- * (`queryClient.resetQueries()`) and clears localStorage so a previous user's
- * cached storefront/order data and local state can never surface for the next
- * user on the same device.
+ * After the Supabase session is closed, this wipes the React Query cache so a
+ * previous user's cached storefront/order data can never surface for the next
+ * user on the same device. Device-local buyer data (cart, order history,
+ * wishlist) is scrubbed by AccountScopeGuard on identity change; we must NOT
+ * call localStorage.clear() here because that would also erase user
+ * preferences (theme, font scale) and the one-time onboarding "seen" flags,
+ * making the welcome flow and dark mode reset after every sign-out.
  */
 export async function signOut(): Promise<{ success: boolean; error?: string }> {
   try {
@@ -495,9 +498,6 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
       return { success: false, error: error.message };
     }
     clearQueryCache();
-    if (typeof window !== "undefined") {
-      localStorage.clear();
-    }
     return { success: true };
   } catch (err) {
     return {

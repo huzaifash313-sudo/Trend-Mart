@@ -21,6 +21,7 @@ export default function InteractionUnlock() {
       if (cleared) return;
       cleared = true;
       root.classList.remove("tm-first-paint", "tm-boot-splash");
+      root.style.removeProperty("background-color");
     };
 
     let cancelled = false;
@@ -64,6 +65,7 @@ export default function InteractionUnlock() {
         "tm-splash-handoff",
         "tm-splash-settle",
       );
+      root.style.removeProperty("background-color");
     };
 
     const splashStillPlaying = () => Boolean(document.querySelector(".tm-splash"));

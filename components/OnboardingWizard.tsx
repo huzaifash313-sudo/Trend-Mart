@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { detectUserRole } from "@/services/authService";
+import { fetchMyShop } from "@/services/shopService";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -99,8 +100,33 @@ const MERCHANT_STEPS: OnboardingStep[] = [
 
 const STORAGE_PREFIX = "tm_onboarding_v1";
 
-/** Dedicated onboarding pages already guide the user — never stack the wizard on top. */
-const ONBOARDING_PAGES = new Set(["/account/become-merchant", "/account/complete-profile"]);
+/**
+ * The dedicated onboarding pages already guide the user — never stack the
+ * full-screen welcome on top of them. Auth pages, the admin panel, and the
+ * verify-notice screen are also excluded so the flow only ever appears in
+ * the normal storefront.
+ */
+const BLOCKED_PATHS = [
+  "/account/become-merchant",
+  "/account/complete-profile",
+  "/login",
+  "/signup",
+  "/auth",
+  "/forgot-password",
+  "/admin",
+] as const;
+
+function isBlockedPath(pathname: string): boolean {
+  return BLOCKED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+function markSeen(storageKey: string): void {
+  try {
+    localStorage.setItem(storageKey, "1");
+  } catch {
+    /* ignore */
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Component                                                                  */
@@ -116,6 +142,16 @@ export default function OnboardingWizard() {
   const [stepIndex, setStepIndex] = useState(0);
   const [ready, setReady] = useState(false);
 
+  /* Lock body scroll while the full-screen flow is visible. */
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -123,8 +159,7 @@ export default function OnboardingWizard() {
       let key = `${STORAGE_PREFIX}:guest`;
 
       try {
-        // The onboarding pages ARE the onboarding — no wizard overlay needed.
-        if (ONBOARDING_PAGES.has(pathname)) {
+        if (isBlockedPath(pathname)) {
           if (!cancelled) setVariant(null);
           return;
         }
@@ -151,14 +186,35 @@ export default function OnboardingWizard() {
               /* ignore */
             }
           }
-          if (!cancelled) {
-            setVariant(role === "merchant" ? "merchant" : "customer");
+
+          if (role === "merchant") {
+            // Merchants: only welcome them until their first store exists.
+            const shopResult = await fetchMyShop();
+            if (cancelled) return;
+            if (shopResult.success && shopResult.data) {
+              // Already running a store → never show merchant onboarding.
+              markSeen(key);
+              if (!cancelled) setVariant(null);
+              return;
+            }
+            if (!cancelled) setVariant("merchant");
+          } else {
+            // Customers: only welcome them while the delivery profile is
+            // incomplete. A completed profile never replays the wizard.
+            const complete = await isProfileComplete(supabase, user.id);
+            if (cancelled) return;
+            if (complete) {
+              markSeen(key);
+              if (!cancelled) setVariant(null);
+              return;
+            }
+            if (!cancelled) setVariant("customer");
           }
         } else {
-          // Guest welcome: homepage only, once ever.
+          // Guest welcome: homepage only, once ever per device.
           if (typeof window !== "undefined") {
             try {
-              if (localStorage.getItem(key) === "1" || pathname !== "/") {
+              if (localStorage.getItem(key) === "1") {
                 if (!cancelled) setVariant(null);
                 return;
               }
@@ -203,29 +259,34 @@ export default function OnboardingWizard() {
   }, [supabase, pathname]);
 
   useEffect(() => {
-    if (variant && ready) setOpen(true);
+    if (variant && ready) {
+      setStepIndex(0);
+      setOpen(true);
+    }
   }, [variant, ready]);
 
-  const steps = variant === "guest"
-    ? GUEST_STEPS
-    : variant === "merchant"
-      ? MERCHANT_STEPS
-      : variant === "customer"
-        ? CUSTOMER_STEPS
-        : [];
+  const steps =
+    variant === "guest"
+      ? GUEST_STEPS
+      : variant === "merchant"
+        ? MERCHANT_STEPS
+        : variant === "customer"
+          ? CUSTOMER_STEPS
+          : [];
 
   const isLast = stepIndex >= steps.length - 1;
+  const step = steps[stepIndex];
 
   const dismiss = () => {
     setOpen(false);
-    // Persist "seen" for guest or current user.
+    // Persist "seen" for guest or current user so refresh / sign-out never replays.
     try {
       if (variant === "guest") {
-        localStorage.setItem(`${STORAGE_PREFIX}:guest`, "1");
+        markSeen(`${STORAGE_PREFIX}:guest`);
       } else {
         supabase.auth.getSession().then(({ data }) => {
           const id = data.session?.user?.id;
-          if (id) localStorage.setItem(`${STORAGE_PREFIX}:${id}`, "1");
+          if (id) markSeen(`${STORAGE_PREFIX}:${id}`);
         });
       }
     } catch {
@@ -248,113 +309,167 @@ export default function OnboardingWizard() {
 
   if (!open || steps.length === 0) return null;
 
-  const step = steps[stepIndex];
+  const dismissLabel =
+    variant === "guest"
+      ? "Continue browsing"
+      : variant === "customer"
+        ? "Skip for now"
+        : "Skip for now";
 
   return (
     <div
-      className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="tm-onboarding-layer fixed inset-0 z-[9000] flex flex-col overflow-hidden"
       role="dialog"
       aria-modal="true"
       aria-label="Welcome to TrendMart"
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="relative w-full max-w-md overflow-hidden rounded-3xl border border-zinc-200/70 bg-white shadow-2xl dark:border-zinc-700/50 dark:bg-zinc-900"
-      >
-        {/* Top gradient accent */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 opacity-95" />
-        <div className="absolute inset-x-0 top-0 h-28">
-          <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -top-6 left-1/3 h-24 w-24 rounded-full bg-white/10 blur-xl" />
-        </div>
+      {/* Full-screen brand backdrop */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% -10%, rgba(45, 212, 191, 0.35), transparent 55%), radial-gradient(90% 70% at 100% 100%, rgba(13, 148, 136, 0.5), transparent 50%), linear-gradient(165deg, #0f766e 0%, #0d9488 42%, #134e4a 100%)",
+        }}
+      />
+      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-teal-300/20 blur-3xl" />
 
-        {/* Skip */}
-        <button
-          type="button"
-          onClick={dismiss}
-          className="absolute right-4 top-4 z-10 rounded-full bg-black/20 px-3 py-1 text-xs font-semibold text-white transition hover:bg-black/30"
-        >
-          Skip
-        </button>
-
-        <div className="relative px-7 pb-7 pt-24 text-center">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={stepIndex}
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-            >
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-3xl shadow-lg shadow-emerald-900/10 ring-1 ring-black/5">
-                <span aria-hidden="true">{step.icon}</span>
-              </div>
-
-              <h2 className="mt-5 text-xl font-bold text-zinc-900 dark:text-zinc-100">
-                {step.title}
-              </h2>
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-                {step.subtitle}
-              </p>
-
-              {step.actions && step.actions.length > 0 && (
-                <div className="mt-5 flex flex-col gap-2">
-                  {step.actions.map((action) => (
-                    <button
-                      key={action.href}
-                      type="button"
-                      onClick={() => handleAction(action.href)}
-                      className={
-                        action.primary
-                          ? "w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-700"
-                          : "w-full rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                      }
-                    >
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Progress dots */}
-          <div className="mt-6 flex items-center justify-center gap-1.5">
+      {/* Top brand */}
+      <header className="relative z-10 mx-auto w-full max-w-md px-6 pt-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/trendmart-mark.png?v=8"
+              alt=""
+              width={36}
+              height={36}
+              className="rounded-xl bg-white/95 object-contain p-1 shadow-lg shadow-black/20"
+            />
+            <span className="text-lg font-bold tracking-tight text-white">
+              TrendMart
+            </span>
+          </div>
+          {/* Progress */}
+          <div className="flex items-center gap-1.5">
             {steps.map((_, i) => (
               <span
                 key={i}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
                   i === stepIndex
-                    ? "w-6 bg-emerald-500"
+                    ? "w-7 bg-white"
                     : i < stepIndex
-                      ? "w-1.5 bg-emerald-300"
-                      : "w-1.5 bg-zinc-200 dark:bg-zinc-700"
+                      ? "w-2 bg-white/70"
+                      : "w-2 bg-white/25"
                 }`}
               />
             ))}
           </div>
+        </div>
+      </header>
 
-          {/* Controls */}
-          <div className="mt-5 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={dismiss}
-              className="px-3 py-2 text-sm font-medium text-zinc-400 transition hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
-            >
-              {variant === "guest" ? "Browse as guest" : "Skip for now"}
-            </button>
+      {/* Step content — fills the screen */}
+      <main className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-6">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={stepIndex}
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className="flex w-full flex-col items-center text-center"
+          >
+            <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/15 text-5xl shadow-xl shadow-black/20 ring-1 ring-white/25 backdrop-blur-sm">
+              <span aria-hidden="true">{step.icon}</span>
+            </div>
+
+            <h2 className="mt-7 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              {step.title}
+            </h2>
+            <p className="mx-auto mt-3 max-w-sm text-base leading-relaxed text-emerald-50/90">
+              {step.subtitle}
+            </p>
+
+            {step.actions && step.actions.length > 0 && (
+              <div className="mt-8 flex w-full max-w-xs flex-col gap-3">
+                {step.actions.map((action) => (
+                  <button
+                    key={action.href}
+                    type="button"
+                    onClick={() => handleAction(action.href)}
+                    className={
+                      action.primary
+                        ? "w-full rounded-2xl bg-white py-3.5 text-sm font-bold text-emerald-800 shadow-lg shadow-black/20 transition hover:bg-emerald-50 active:scale-[0.98]"
+                        : "w-full rounded-2xl border border-white/30 bg-white/10 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 active:scale-[0.98]"
+                    }
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* Bottom controls */}
+      <footer className="relative z-10 mx-auto w-full max-w-md px-6 pb-10">
+        <div className="flex flex-col items-center gap-4">
+          {!isLast ? (
             <button
               type="button"
               onClick={handleNext}
-              className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
+              className="w-full max-w-xs rounded-2xl bg-white/10 py-3.5 text-sm font-bold text-white ring-1 ring-white/30 backdrop-blur-sm transition hover:bg-white/20 active:scale-[0.98]"
             >
-              {isLast ? "Done" : "Next →"}
+              Next →
             </button>
-          </div>
+          ) : step.actions ? (
+            <button
+              type="button"
+              onClick={dismiss}
+              className="text-sm font-medium text-emerald-50/70 underline underline-offset-4 transition hover:text-white"
+            >
+              {dismissLabel}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="w-full max-w-xs rounded-2xl bg-white py-3.5 text-sm font-bold text-emerald-800 shadow-lg shadow-black/20 transition hover:bg-emerald-50 active:scale-[0.98]"
+            >
+              Get started
+            </button>
+          )}
         </div>
-      </motion.div>
+      </footer>
     </div>
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+async function isProfileComplete(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<boolean> {
+  try {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("full_name, phone, address, latitude, longitude")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!profile) return false;
+    const nameOk =
+      typeof profile.full_name === "string" && profile.full_name.trim().length >= 2;
+    const phoneOk =
+      typeof profile.phone === "string" && profile.phone.trim().length >= 7;
+    const locationOk =
+      typeof profile.latitude === "number" ||
+      (typeof profile.address === "string" && profile.address.trim().length > 0);
+    return nameOk && phoneOk && locationOk;
+  } catch {
+    return false;
+  }
 }
