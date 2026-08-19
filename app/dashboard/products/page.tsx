@@ -472,9 +472,9 @@ export default function ProductsDashboardPage() {
         addToast("Please upload an image file (PNG, JPG, WebP, etc.)", "error");
         return;
       }
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        addToast("Image size must be under 5MB.", "error");
+      // Validate file size (max 20MB — photos get compressed on upload)
+      if (file.size > 20 * 1024 * 1024) {
+        addToast("Image size must be under 20MB.", "error");
         return;
       }
       // The ImageUpload component handles the actual upload

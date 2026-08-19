@@ -588,11 +588,11 @@ export type WishlistItemValues = z.infer<typeof wishlistItemSchema>;
 
 // ─── Image Upload Validation (Complements storageService) ─────────────────═══
 
-/** Max file size in bytes (2 MB). */
-export const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+/** Max file size in bytes (20 MB — iPhone/DSLR photos can be 10–20 MB; they are compressed on upload). */
+export const MAX_IMAGE_SIZE = 20 * 1024 * 1024;
 
-/** Max file size in bytes for banners (5 MB). */
-export const MAX_BANNER_SIZE = 5 * 1024 * 1024;
+/** Max file size in bytes for banners (20 MB). */
+export const MAX_BANNER_SIZE = 20 * 1024 * 1024;
 
 /** Allowed MIME types. */
 export const ALLOWED_IMAGE_TYPES = [

@@ -134,9 +134,9 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate: max 5MB images
-    if (file.size > 5 * 1024 * 1024) {
-      addToast("Image must be under 5 MB.", "error");
+    // Validate: max 20MB images (compressed automatically on upload)
+    if (file.size > 20 * 1024 * 1024) {
+      addToast("Image must be under 20 MB.", "error");
       return;
     }
 

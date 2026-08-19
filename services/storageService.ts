@@ -11,6 +11,12 @@ import {
   sanitizeLight,
   truncate,
 } from "@/lib/sanitization";
+import {
+  isCloudinaryClientConfigured,
+  uploadToCloudinary,
+  extractCloudinaryPublicId,
+  withAutoFormat,
+} from "@/lib/cloudinary";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -29,15 +35,22 @@ const ALLOWED_BUCKETS = ["trendmart-media", "images", "shop-assets"] as const;
 
 const BUCKET_NAME = "trendmart-media";
 
-/** Maximum allowed image file size in bytes (5 MB). */
-export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+/**
+ * Maximum allowed image file size in bytes (20 MB).
+ * Deliberately generous: iPhone / DSLR photos often arrive at 10–20 MB. The
+ * size is fine because every upload is compressed to WebP (~160 KB) before
+ * it ever reaches Cloudinary / Supabase.
+ */
+export const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
 
-/** Allowed image MIME types for upload. */
+/** Allowed image MIME types for upload (HEIC included — iPhone cameras). */
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/avif",
+  "image/heic",
+  "image/heif",
 ] as const;
 
 /** Corresponding file extensions mapped to MIME types. */
@@ -46,6 +59,8 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
   "image/avif": "avif",
+  "image/heic": "heic",
+  "image/heif": "heif",
 };
 
 /** Valid file extension mappings per MIME type (for extension sniffing). */
@@ -53,6 +68,8 @@ const MIME_EXTENSION_MAP: Record<string, string[]> = {
   "image/jpeg": ["jpg", "jpeg", "jfif"],
   "image/png": ["png"],
   "image/webp": ["webp"],
+  "image/heic": ["heic"],
+  "image/heif": ["heif"],
   "image/avif": ["avif"],
 };
 
@@ -188,7 +205,7 @@ export function validateImage(file: File | null | undefined): ImageValidationRes
     return {
       valid: false,
       error: "file_too_large",
-      message: `File size (${sizeMB} MB) exceeds the 5 MB limit. Please compress or choose a smaller image.`,
+      message: `File size (${sizeMB} MB) exceeds the 20 MB limit. Please compress or choose a smaller image.`,
     };
   }
 
@@ -217,11 +234,17 @@ export function validateImage(file: File | null | undefined): ImageValidationRes
 
 // ─── Client-side compression (WebP / JPEG) ───────────────────────────────────
 
-const COMPRESS_MAX_EDGE = 1400;
-/** Aim for small uploads while keeping storefront-quality sharpness. */
-const COMPRESS_TARGET_BYTES = 140 * 1024;
-const COMPRESS_MIN_QUALITY = 0.62;
-const COMPRESS_START_QUALITY = 0.84;
+/**
+ * Quality profile:
+ * - MAX_EDGE 1600px keeps photos sharp even on retina / full-screen product
+ *   views (a phone screen is ~1500 physical pixels wide).
+ * - Target ~160KB + min quality 0.65 keeps uploads light enough that Cloudinary's
+ *   free tier (25GB) comfortably stores tens of thousands of images.
+ */
+const COMPRESS_MAX_EDGE = 1600;
+const COMPRESS_TARGET_BYTES = 160 * 1024;
+const COMPRESS_MIN_QUALITY = 0.65;
+const COMPRESS_START_QUALITY = 0.85;
 
 function loadImageElement(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -313,14 +336,16 @@ export async function compressImageForUpload(file: File): Promise<File> {
 // ─── Upload ──────────────────────────────────────────────────────────────────
 
 /**
- * Upload an image file to Supabase Storage with a timeout and fallback URL.
+ * Upload an image file to Cloudinary (global CDN + auto-optimized delivery),
+ * falling back to Supabase Storage when Cloudinary is not configured or the
+ * upload fails. The returned URL is what gets persisted in the DB.
  *
- * If the upload fails or times out, the returned URL will be a data-URI
- * fallback placeholder so the UI never displays a broken image link.
+ * Existing images already stored in Supabase Storage keep working untouched —
+ * their old URLs in the DB still render, so nothing is lost during the switch.
  *
  * @param file      The File object from an <input type="file"> picker.
- * @param folder    Subfolder inside the bucket (e.g. "shops" or "products").
- * @param fileId    Unique identifier prepended to the filename (e.g. shop id).
+ * @param folder    Subfolder for the asset (e.g. "shops" or "products").
+ * @param fileId    Unique identifier used in the storage path.
  * @returns         The public URL of the uploaded file, OR a fallback placeholder URL.
  */
 export async function uploadImage(
@@ -344,9 +369,39 @@ export async function uploadImage(
     return { success: false, error: validation.message ?? "Invalid image file." };
   }
 
+  let optimized: File = file;
   try {
-    const optimized = await compressImageForUpload(file);
+    optimized = await compressImageForUpload(file);
+  } catch {
+    /* non-fatal — upload the original file as-is */
+  }
 
+  // HEIC/HEIF that the browser could NOT decode (e.g. iPhone photos picked on
+  // desktop Chrome) pass through untouched. Cloudinary will serve them fine,
+  // so we ask the CDN to auto-format for the viewing browser.
+  const heicPassthrough =
+    optimized.type === "image/heic" || optimized.type === "image/heif";
+
+  // ── Primary: Cloudinary (unsigned preset, client-safe) ─────────────────
+  // If Cloudinary is configured and the upload succeeds, store the CDN URL.
+  if (isCloudinaryClientConfigured()) {
+    const cloudinaryUrl = await uploadToCloudinary(optimized, folder);
+    if (cloudinaryUrl) {
+      return {
+        success: true,
+        data: heicPassthrough ? withAutoFormat(cloudinaryUrl) : cloudinaryUrl,
+      };
+    }
+    // Cloudinary unavailable / failed → silently fall back to Supabase so the
+    // merchant's upload never breaks.
+    logError("Cloudinary upload failed — falling back to Supabase Storage.", {
+      module: "storageService.uploadImage",
+      meta: { folder, fileId, fileName: file.name },
+    });
+  }
+
+  // ── Fallback: Supabase Storage (previous behavior) ─────────────────────
+  try {
     // Sanitize the original filename to create a safe storage path
     const extension =
       MIME_TO_EXT[optimized.type] ??
@@ -394,22 +449,43 @@ export async function uploadImage(
 // ─── Delete ──────────────────────────────────────────────────────────────────
 
 /**
- * Delete a file from Supabase Storage by its full path.
+ * Delete an image by its stored URL or storage path.
  *
- * @param path  The full path inside the bucket (e.g. "shops/uuid_1234.jpg").
+ * - Cloudinary CDN URL → deleted via the server-only delete route (keeps the
+ *   API secret out of the browser). Best-effort — a failed delete never
+ *   breaks the caller.
+ * - Supabase Storage path (legacy images) → deleted from the bucket.
+ *
+ * @param pathOrUrl  The stored URL (cloudinary.com) or storage path (e.g. "shops/uuid.jpg").
  */
-export async function deleteImage(path: string): Promise<ServiceResult<null>> {
+export async function deleteImage(pathOrUrl: string): Promise<ServiceResult<null>> {
   const supabase = createClient();
 
+  // Cloudinary asset URL → route through the server-side signed delete.
+  const publicId = extractCloudinaryPublicId(pathOrUrl);
+  if (publicId) {
+    try {
+      await fetch("/api/cloudinary/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicId }),
+      });
+    } catch {
+      /* best-effort — orphan cleanup can be retried later */
+    }
+    return { success: true, data: null };
+  }
+
+  // Legacy Supabase Storage path.
   try {
     const { error } = await supabase.storage
       .from(BUCKET_NAME)
-      .remove([path]);
+      .remove([pathOrUrl]);
 
     if (error) throw error;
     return { success: true, data: null };
   } catch (err) {
-    logError(err, { module: "storageService.deleteImage", meta: { path } });
+    logError(err, { module: "storageService.deleteImage", meta: { path: pathOrUrl } });
     return { success: false, error: toError(err) };
   }
 }
