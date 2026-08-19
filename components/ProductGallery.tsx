@@ -107,14 +107,14 @@ function LightboxModal({
       <button
         type="button"
         onClick={onClose}
-        className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+        className="absolute right-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15 p-0 text-white ring-1 ring-white/30 transition-colors hover:bg-white/25 active:scale-95"
         aria-label="Close lightbox"
       >
         <XIcon />
       </button>
 
       {/* Counter badge */}
-      <div className="absolute left-4 top-4 z-10 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">
+      <div className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-10 inline-flex h-10 items-center rounded-full bg-white/10 px-3 py-0 text-xs font-semibold text-white">
         {currentIndex + 1} / {images.length}
       </div>
 
@@ -123,7 +123,7 @@ function LightboxModal({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onPrev(); }}
-          className="absolute left-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+          className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15 p-0 text-white ring-1 ring-white/30 transition-colors hover:bg-white/25 active:scale-95"
           aria-label="Previous image"
         >
           <ChevronLeftIcon />
@@ -145,7 +145,7 @@ function LightboxModal({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onNext(); }}
-          className="absolute right-4 z-10 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+          className="absolute right-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15 p-0 text-white ring-1 ring-white/30 transition-colors hover:bg-white/25 active:scale-95"
           aria-label="Next image"
         >
           <ChevronRightIcon />
@@ -154,7 +154,7 @@ function LightboxModal({
 
       {/* Thumbnail strip at bottom */}
       {images.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2 rounded-full bg-white/10 px-3 py-2 backdrop-blur-sm">
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] left-1/2 -translate-x-1/2 z-10 flex gap-2 rounded-full bg-white/10 px-3 py-2 backdrop-blur-sm">
           {images.map((img, idx) => (
             <button
               key={img.id}

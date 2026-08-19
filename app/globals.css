@@ -194,6 +194,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: clip;
+  /* dvh with vh fallback — iOS < 15.4 ignores 100dvh entirely */
+  min-height: 100vh;
   min-height: 100dvh;
   /* Fixed navbar occupies this offset so scroll never shows a gap above the bar */
   padding-top: var(--tm-navbar-sticky-offset, calc(62px + env(safe-area-inset-top, 0px)));
@@ -236,6 +238,9 @@ body {
 }
 .tm-page-loading {
   min-height: calc(
+    100vh - var(--tm-navbar-sticky-offset, 62px) - 5.5rem
+  );
+  min-height: calc(
     100dvh - var(--tm-navbar-sticky-offset, 62px) - 5.5rem
   );
 }
@@ -258,6 +263,18 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(113, 113, 122, 0.6);
+}
+
+/* Hide scrollbars on horizontal scrollers (categories / stories / pills /
+   thumbnails) while keeping them fully scrollable — `scrollbar-none`. */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* ── Horizontal Overflow Guard ──────────────────────────────────────────────── */
@@ -528,6 +545,56 @@ html.dark .text-emerald-900 {
   .pb-safe-nav {
     padding-bottom: calc(1.5rem + var(--safe-area-inset-bottom));
   }
+}
+
+/* ── Mobile Modal Sheet & Scroll Fixes ────────────────────────────────────
+   On phones the on-screen keyboard takes up to ~40% of the screen. Modal
+   sheets capped with `max-h-[90/92vh]` ignore the keyboard (vh = full
+   viewport), so the Save / Done / Checkout row stays trapped behind it and
+   the panel can't scroll far enough. `dvh` is the DYNAMIC viewport — it
+   shrinks when the keyboard opens — so sheets re-cap to the visible area and
+   every field + action becomes reachable. Also fixes the iOS "centered modal
+   clips its top" flex bug and stops scroll chaining into the page behind. */
+@media (max-width: 767px) {
+  /* vh-capped sheet panels → cap to the visible (keyboard-aware) viewport */
+  .max-h-\[90vh\],
+  .max-h-\[92vh\] {
+    max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Bottom-anchored sheets without their own height cap (booking / portfolio
+     modals) — cap + scroll so the action row is never cut off. */
+  .fixed.inset-0.items-end > div:not([class*="max-h"]) {
+    max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Centered modals: let the overlay scroll so a tall card-style panel is
+     scrollable to BOTH ends (iOS top-clip flex bug). Full-screen players
+     (story/gallery lightboxes, drawers) are exempt via the card selector. */
+  .fixed.inset-0.items-center:not(.justify-start) {
+    overflow-y: auto;
+    align-items: flex-start;
+  }
+
+  /* Centered modals: let the overlay scroll + center via auto-margin so a
+     tall panel is scrollable to BOTH ends (top-clip flex bug). Only card-style
+     overlays — full-screen players (story/gallery lightboxes) stay centered. */
+  .fixed.inset-0.items-center:not(.justify-start) > .max-w-sm,
+  .fixed.inset-0.items-center:not(.justify-start) > .max-w-md,
+  .fixed.inset-0.items-center:not(.justify-start) > .max-w-lg {
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+}
+
+/* Modal panels never leak their scroll to the page behind. */
+.fixed.inset-0 > div {
+  overscroll-behavior: contain;
 }
 
 /* ── Marquee Animation (AnnouncementBanner) ─────────────────────────────────── */
@@ -2149,8 +2216,6 @@ html.dark .tm-product-add-text:hover {
 
 /* Shop discovery cards — same green/sea-green frame as product cards */
 .shop-card {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 260px;
   border-radius: 0.9rem;
   border: 1px solid color-mix(in srgb, var(--tm-sea) 34%, var(--tm-border)) !important;
   box-shadow:
@@ -2160,6 +2225,16 @@ html.dark .tm-product-add-text:hover {
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.2s ease,
     border-color 0.2s ease;
+}
+/* Same iOS Safari clip guard as .tm-product-card: contain-intrinsic-size is
+   treated as a used height there, which clips the overflow-hidden card body
+   (title/rating/offers/CTA vanish; only banner + badge remain). Desktop grids
+   only — mobile cards must always paint full height. */
+@media (min-width: 1024px) {
+  .shop-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 280px;
+  }
 }
 html.dark .shop-card {
   border-color: color-mix(in srgb, var(--tm-sea) 38%, var(--tm-border)) !important;

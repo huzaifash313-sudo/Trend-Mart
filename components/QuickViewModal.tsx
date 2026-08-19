@@ -213,7 +213,7 @@ export default function QuickViewModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-zinc-900 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-zinc-900 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Image carousel (thumbs below — no top dots) ──────────────── */}
@@ -309,7 +309,7 @@ export default function QuickViewModal({
         )}
 
         {/* ── Details ──────────────────────────────────────────────────── */}
-        <div className="space-y-2.5 p-3.5 sm:p-4">
+        <div className="space-y-2.5 p-3.5 sm:p-4 sm:pb-6">
           <div>
             <h3 className="text-base font-bold leading-snug text-zinc-900 dark:text-zinc-100">{product.name}</h3>
             {product.description && (
@@ -446,14 +446,16 @@ export default function QuickViewModal({
           aria-modal="true"
           aria-label="Product gallery"
         >
-          <div className="flex items-center justify-between px-4 py-3 text-white">
+          <div
+            className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 text-white"
+          >
             <p className="text-sm font-semibold">
               {safeIndex + 1} / {images.length}
             </p>
             <button
               type="button"
               onClick={() => setGalleryOpen(false)}
-              className="rounded-full bg-white/10 p-2 hover:bg-white/20"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 p-0 text-white ring-1 ring-white/30 transition-colors hover:bg-white/25 active:scale-95"
               aria-label="Close gallery"
             >
               <CloseIcon />
