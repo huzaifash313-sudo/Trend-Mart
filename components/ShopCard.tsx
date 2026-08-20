@@ -10,7 +10,8 @@ import {
   buildShopOfferSlides,
   type ShopOfferSlide,
 } from "@/lib/shopOfferTicker";
-import CompactRating from "@/components/CompactRating";
+import CompactRating, { hasShopRating } from "@/components/CompactRating";
+import { useShopReviews } from "@/context/ShopReviewsContext";
 
 export interface ShopCardData {
   id: string;
@@ -108,8 +109,10 @@ function ShopCard({
   priority = false,
 }: ShopCardProps) {
   const href = getShopPath(shop);
+  const { openShopReviews } = useShopReviews();
   const isLive = !!shop.is_live;
   const isVerified = isLive && (shop.verification_status ?? "approved") === "approved";
+  const hasRating = hasShopRating(shop.avg_rating, shop.review_count);
   const distance =
     showDistance && shop.distance_km != null
       ? formatDistance(shop.distance_km)
@@ -204,10 +207,34 @@ function ShopCard({
         </div>
 
         <div className="mt-1.5">
-          <CompactRating
-            average={shop.avg_rating}
-            count={shop.review_count}
-          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openShopReviews({ id: shop.id, name: shop.name });
+            }}
+            className={`group/rating flex items-center rounded-lg text-left transition-opacity ${
+              hasRating ? "hover:opacity-80" : ""
+            }`}
+            title={
+              hasRating
+                ? `See ${shop.review_count} review${Number(shop.review_count) === 1 ? "" : "s"} or add yours`
+                : "No reviews yet — be the first to rate"
+            }
+            aria-label={
+              hasRating
+                ? `View reviews and rating for ${shop.name}`
+                : `Add the first review for ${shop.name}`
+            }
+          >
+            <CompactRating average={shop.avg_rating} count={shop.review_count} />
+            {!hasRating ? (
+              <span className="text-[11px] font-medium text-zinc-400 underline decoration-dotted underline-offset-2 transition-colors group-hover/rating:text-emerald-600 dark:text-zinc-500 dark:group-hover/rating:text-emerald-400">
+                No reviews yet · Add one
+              </span>
+            ) : null}
+          </button>
         </div>
 
         {offerSlides.length > 0 ? (

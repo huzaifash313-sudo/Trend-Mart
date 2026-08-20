@@ -27,6 +27,7 @@ import ShopMediaHeader, { ShopLogoAvatar } from "@/components/ShopMediaHeader";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import StoreReviews from "@/components/StoreReviews";
 import CompactRating from "@/components/CompactRating";
+import { useShopReviews } from "@/context/ShopReviewsContext";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { buildShopOfferSlides, formatOfferRemaining } from "@/lib/shopOfferTicker";
 import { type Coupon } from "@/services/couponService";
@@ -220,6 +221,7 @@ function ShopDetailInner({ id }: { id: string }) {
   const { addItem } = useCart();
   const { confirm } = useConfirm();
   const { openQuickAdd } = useMerchantQuickAdd();
+  const { openShopReviews } = useShopReviews();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
   // Owner-only deal manager state (all deals, incl. paused).
@@ -970,12 +972,19 @@ function ShopDetailInner({ id }: { id: string }) {
                     </button>
                   ) : null}
                 </div>
-                <CompactRating
-                  average={shop.avg_rating}
-                  count={shop.review_count}
-                  size="md"
-                  className="mt-0.5"
-                />
+                <button
+                  type="button"
+                  onClick={() => openShopReviews({ id: shop.id, name: shop.name })}
+                  className="mt-0.5 inline-flex items-center text-left transition-opacity hover:opacity-80"
+                  title="View all reviews or add yours"
+                  aria-label={`View reviews for ${shop.name}`}
+                >
+                  <CompactRating
+                    average={shop.avg_rating}
+                    count={shop.review_count}
+                    size="md"
+                  />
+                </button>
                 <div className="flex min-w-0 items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                   <PinIcon />
                   <span className="truncate">

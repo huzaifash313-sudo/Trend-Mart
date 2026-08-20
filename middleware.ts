@@ -354,6 +354,7 @@ const VERIFY_EXEMPT_PATHS = [
   "/search",
   "/products",
   "/wishlist", // guest local wishlist; purchase still gated at checkout
+  "/banned",
 ];
 
 function isVerifyExempt(pathname: string): boolean {
@@ -377,6 +378,7 @@ function isPublicBrowsePath(pathname: string): boolean {
   if (pathname === "/faq" || pathname.startsWith("/faq/")) return true;
   if (pathname.startsWith("/legal")) return true;
   if (pathname === "/support" || pathname.startsWith("/support/")) return true;
+  if (pathname === "/banned") return true;
   if (pathname === "/offline") return true;
   if (pathname === "/shop" || /^\/shop\/[^/]+/.test(pathname)) {
     return !pathname.startsWith("/shop/manage");
@@ -484,6 +486,40 @@ async function resolveUserRole(
     });
     // Fail closed: never infer a privileged role from an exception.
     return null;
+  }
+}
+
+/**
+ * Check whether the signed-in user's account has been banned by a Super-Admin
+ * (user moderation). Fails OPEN on transient errors so an auth outage never
+ * locks everyone out — a ban is only enforced when we positively know it.
+ */
+async function isAccountBanned(request: NextRequest): Promise<boolean> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return false;
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() {
+          /* no-op */
+        },
+      },
+    });
+    const { data, error } = await supabase.rpc("is_account_banned");
+    if (error) {
+      authDebug("isAccountBanned: RPC error", { message: error.message });
+      return false;
+    }
+    return data === true;
+  } catch (err) {
+    authDebug("isAccountBanned: EXCEPTION", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
   }
 }
 
@@ -785,6 +821,20 @@ export async function middleware(request: NextRequest) {
       role: userRole,
       requiredRole,
     });
+  }
+
+  // ── 6.5 Ban enforcement ────────────────────────────────────────────────
+  //    Banned accounts are sent to /banned for every page except /banned
+  //    itself (public storefront browsing still works via the fast-path).
+  if (authenticatedAfterRefresh && userRole && pathname !== "/banned") {
+    const banned = await isAccountBanned(request);
+    if (banned) {
+      authDebug("BANNED ACCOUNT — redirecting to /banned", { pathname });
+      return buildRedirectWithLoopTracking(
+        new URL("/banned", request.url),
+        request,
+      );
+    }
   }
 
   // ── 7. Role-based route protection (with redirect-loop tracking) ───────

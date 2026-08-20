@@ -31,7 +31,6 @@ import type {
   AdminMerchantRecord,
   OrderStatusNotification,
   OrderStatus,
-  ShopCategory,
   ShopVerificationStatus,
   Order,
 } from "@/types";
@@ -55,6 +54,16 @@ import {
 } from "@/services/adsService";
 import { useConfirm } from "@/components/ConfirmProvider";
 import CustomSelect from "@/components/CustomSelect";
+import RevenueTrendChart, {
+  type RevenueTrendPoint,
+} from "@/app/admin/components/RevenueTrendChart";
+import ShopDrillDownModal from "@/app/admin/components/ShopDrillDownModal";
+import AdPlansManager from "@/app/admin/components/AdPlansManager";
+import {
+  fetchAdminUsers,
+  setAdminUserBan,
+} from "@/services/adminService";
+import type { AdminUserRecord } from "@/types";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -65,7 +74,8 @@ interface AdminDashboardState {
   loading: boolean;
   error: string | null;
   realtimeFeed: FeedEntry[];
-  activeTab: "overview" | "approvals" | "merchants" | "transactions" | "categories" | "ads" | "orders";
+  revenueTrend: RevenueTrendPoint[];
+  activeTab: "overview" | "approvals" | "merchants" | "orders" | "transactions" | "categories" | "ads" | "users";
 }
 
 /** A realtime transaction event; `isHistory` marks rows backfilled from the
@@ -93,6 +103,7 @@ const TAB_OPTIONS = [
   { key: "overview", label: "Overview", icon: "📊" },
   { key: "approvals", label: "Approval Queue", icon: "⏳" },
   { key: "merchants", label: "Merchants", icon: "🏪" },
+  { key: "users", label: "Users", icon: "👥" },
   { key: "orders", label: "Orders", icon: "📦" },
   { key: "transactions", label: "Live Transactions", icon: "💳" },
   { key: "categories", label: "Categories", icon: "📂" },
@@ -123,6 +134,7 @@ export default function AdminDashboardPage() {
     loading: true,
     error: null,
     realtimeFeed: [],
+    revenueTrend: [],
     activeTab: "overview",
   });
 
@@ -149,7 +161,6 @@ export default function AdminDashboardPage() {
   const [platformAdError, setPlatformAdError] = useState<string | null>(null);
 
   // ─── Global Orders Browser ─────────────────────────────────────────
-  const [orders, setOrders] = useState<Order[]>([]);
   const [ordersSearch, setOrdersSearch] = useState("");
   const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>("all");
   const [ordersPage, setOrdersPage] = useState(1);
@@ -159,6 +170,17 @@ export default function AdminDashboardPage() {
   // ─── Merchant table pagination ─────────────────────────────────────
   const [merchantPage, setMerchantPage] = useState(1);
   const MERCHANT_PAGE_SIZE = 25;
+
+  // ─── Per-shop drill-down ───────────────────────────────────────────
+  const [drillDownShop, setDrillDownShop] = useState<AdminMerchantRecord | null>(null);
+
+  // ─── User moderation ───────────────────────────────────────────────
+  const [users, setUsers] = useState<AdminUserRecord[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersSearch, setUsersSearch] = useState("");
+  const [usersRoleFilter, setUsersRoleFilter] = useState<string>("all");
+  const [bannedOnly, setBannedOnly] = useState(false);
+  const [banProcessingId, setBanProcessingId] = useState<string | null>(null);
 
   // ─── Fetch All Data ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -303,6 +325,30 @@ export default function AdminDashboardPage() {
           ).length,
         };
 
+        // 14-day revenue/order trend (from the FULL dataset).
+        const TREND_DAYS = 14;
+        const revenueTrend: RevenueTrendPoint[] = [];
+        for (let i = TREND_DAYS - 1; i >= 0; i--) {
+          const dayStart = new Date();
+          dayStart.setHours(0, 0, 0, 0);
+          dayStart.setDate(dayStart.getDate() - i);
+          const dayEnd = new Date(dayStart);
+          dayEnd.setDate(dayStart.getDate() + 1);
+          const dayStartMs = dayStart.getTime();
+          const dayEndMs = dayEnd.getTime();
+          const dayOrders = allCountsArr.filter((o) => {
+            const t = new Date(o.created_at as string).getTime();
+            return t >= dayStartMs && t < dayEndMs;
+          });
+          revenueTrend.push({
+            label: dayStart.toLocaleDateString("en-PK", { month: "short", day: "numeric" }),
+            revenue: dayOrders
+              .filter((o) => (o.status as string) !== "Cancelled")
+              .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0),
+            orders: dayOrders.length,
+          });
+        }
+
         // Backfill the live feed with recent history so it isn't empty on load.
         const feedSeed: FeedEntry[] = recentOrders.slice(0, 20).map((o) => ({
           orderId: (o.id as string) ?? "",
@@ -336,6 +382,7 @@ export default function AdminDashboardPage() {
           merchants,
           orders: mappedOrders,
           realtimeFeed: feedSeed,
+          revenueTrend,
           loading: false,
         }));
       } catch (err) {
@@ -760,6 +807,51 @@ export default function AdminDashboardPage() {
     safeOrdersPage * ORDERS_PAGE_SIZE,
   );
 
+  // ─── User moderation: load & ban ─────────────────────────────────────
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    const result = await fetchAdminUsers({
+      search: usersSearch.trim() || undefined,
+      role: usersRoleFilter !== "all" ? usersRoleFilter : undefined,
+      bannedOnly: bannedOnly || undefined,
+    });
+    if (result.success) setUsers(result.data);
+    else setActionMessage(result.error);
+    setUsersLoading(false);
+  }, [usersSearch, usersRoleFilter, bannedOnly]);
+
+  useEffect(() => {
+    if (state.activeTab === "users") {
+      loadUsers();
+    }
+  }, [state.activeTab, loadUsers]);
+
+  async function handleToggleBan(user: AdminUserRecord) {
+    setBanProcessingId(user.user_id);
+    const nextBanned = !user.is_banned;
+    const ok = await confirm(
+      nextBanned
+        ? `Ban ${user.full_name || user.email || "this user"}? They won't be able to sign in or place orders.`
+        : `Unban ${user.full_name || user.email || "this user"}?`,
+    );
+    if (!ok) {
+      setBanProcessingId(null);
+      return;
+    }
+    const result = await setAdminUserBan(user.user_id, nextBanned);
+    if (result.success) {
+      setUsers((prev) =>
+        prev.map((u) => (u.user_id === user.user_id ? { ...u, is_banned: nextBanned } : u)),
+      );
+      setActionMessage(nextBanned ? "User banned." : "User unbanned.");
+      setTimeout(() => setActionMessage(null), 3000);
+    } else {
+      setActionMessage(result.error);
+      setTimeout(() => setActionMessage(null), 4000);
+    }
+    setBanProcessingId(null);
+  }
+
   // ─── Render ─────────────────────────────────────────────────────────────
   if (state.loading) {
     return (
@@ -998,6 +1090,29 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
+
+            {/* Revenue & order trend */}
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div>
+                  <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    📈 Revenue & Orders — last 14 days
+                  </h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Daily totals across the whole marketplace (cancelled orders excluded from revenue).
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Revenue
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-0.5 w-4 rounded bg-indigo-500" /> Orders
+                  </span>
+                </div>
+              </div>
+              <RevenueTrendChart data={state.revenueTrend} />
+            </div>
           </>
         )}
 
@@ -1203,6 +1318,13 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex gap-1.5 justify-end">
+                              <button
+                                onClick={() => setDrillDownShop(merchant)}
+                                title="Products, orders & QR code"
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 transition-colors"
+                              >
+                                View
+                              </button>
                               {merchant.verification_status === "pending" ? (
                                 <>
                                   <button
@@ -1292,6 +1414,146 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             )}
+          </>
+        )}
+
+        {/* ── Users Tab ─────────────────────────────────────────────── */}
+        {activeTab === "users" && (
+          <>
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 flex flex-wrap gap-3 items-center">
+              <input
+                type="text"
+                placeholder="Search name, phone, or user ID..."
+                value={usersSearch}
+                onChange={(e) => setUsersSearch(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm flex-grow max-w-xs"
+              />
+              <CustomSelect
+                value={usersRoleFilter}
+                onChange={(val) => setUsersRoleFilter(val)}
+                options={[
+                  { value: "all", label: "All Roles" },
+                  { value: "customer", label: "Customers" },
+                  { value: "merchant", label: "Merchants" },
+                  { value: "admin", label: "Admins" },
+                ]}
+                fullWidth={false}
+              />
+              <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={bannedOnly}
+                  onChange={(e) => setBannedOnly(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-zinc-300 text-red-600"
+                />
+                Banned only
+              </label>
+              <button
+                type="button"
+                onClick={loadUsers}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                Refresh
+              </button>
+              <span className="text-xs text-zinc-400 ml-auto">
+                {users.length} user{users.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left">User</th>
+                      <th className="px-4 py-3 text-center">Role</th>
+                      <th className="px-4 py-3 text-center">Orders</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Joined</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {usersLoading ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-12 text-center text-zinc-400">
+                          Loading users…
+                        </td>
+                      </tr>
+                    ) : users.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-12 text-center text-zinc-400">
+                          No users found matching your filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      users.map((user) => (
+                        <tr key={user.user_id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-zinc-900 dark:text-zinc-100">
+                              {user.full_name || "Unnamed user"}
+                            </div>
+                            <div className="text-xs text-zinc-500">
+                              {user.phone || "No phone"} · <span className="font-mono">{user.user_id.slice(0, 8)}…</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                user.role === "admin"
+                                  ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                                  : user.role === "merchant"
+                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                              }`}
+                            >
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-medium">{user.orders_count}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                user.is_banned
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                              }`}
+                            >
+                              {user.is_banned ? "Banned" : "Active"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-xs text-zinc-500">
+                            {user.created_at ? timeAgo(user.created_at) : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => handleToggleBan(user)}
+                              disabled={banProcessingId === user.user_id || user.role === "admin"}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${
+                                user.is_banned
+                                  ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                  : "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
+                              }`}
+                            >
+                              {banProcessingId === user.user_id
+                                ? "..."
+                                : user.role === "admin"
+                                  ? "—"
+                                  : user.is_banned
+                                    ? "Unban"
+                                    : "Ban"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Banned customers can&apos;t sign in or place orders. Their order history is kept for the audit trail.
+            </p>
           </>
         )}
 
@@ -1814,6 +2076,7 @@ export default function AdminDashboardPage() {
                       <th className="px-4 py-3 text-left">Ad</th>
                       <th className="px-4 py-3 text-left">Shop</th>
                       <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-center">Price</th>
                       <th className="px-4 py-3 text-center">Views</th>
                       <th className="px-4 py-3 text-center">Clicks</th>
                       <th className="px-4 py-3 text-center">Live</th>
@@ -1822,7 +2085,7 @@ export default function AdminDashboardPage() {
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {ads.length === 0 ? (
-                      <tr><td colSpan={7} className="px-4 py-12 text-center text-zinc-400">No ads yet.</td></tr>
+                      <tr><td colSpan={8} className="px-4 py-12 text-center text-zinc-400">No ads yet.</td></tr>
                     ) : (
                       ads.map((ad) => (
                         <tr key={ad.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
@@ -1836,6 +2099,15 @@ export default function AdminDashboardPage() {
                             }`}>
                               {ad.status}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {ad.price_paid != null ? (
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                {formatCurrency(ad.price_paid)}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-300 dark:text-zinc-600">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-center">{ad.impression_count.toLocaleString()}</td>
                           <td className="px-4 py-3 text-center">{ad.click_count.toLocaleString()}</td>
@@ -1872,9 +2144,19 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             </div>
+
+            {/* Ad Pricing Plans (monetization) */}
+            <AdPlansManager />
           </div>
         )}
       </div>
+
+      {drillDownShop && (
+        <ShopDrillDownModal
+          merchant={drillDownShop}
+          onClose={() => setDrillDownShop(null)}
+        />
+      )}
 
       {/* ── Footer Bar ──────────────────────────────────────────────── */}
       <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">

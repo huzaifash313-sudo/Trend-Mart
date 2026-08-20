@@ -10,7 +10,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { sanitizeText } from "@/lib/validations";
-import type { PromoAdPlacement, PromoAdStatus, PromotionalAd, PromotionalAdFormData } from "@/types";
+import type { PromoAdPlacement, PromoAdStatus, PromotionalAd, PromotionalAdFormData, AdPlan } from "@/types";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -116,9 +116,31 @@ export async function fetchShopAds(shopId: string): Promise<ServiceResult<Promot
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Ad pricing plans (public — merchant picker)                               */
+/* -------------------------------------------------------------------------- */
+
+export async function fetchActiveAdPlans(): Promise<ServiceResult<AdPlan[]>> {
+  const supabase = createClient();
+  try {
+    const { data, error } = await supabase
+      .from("ad_plans")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("price", { ascending: true });
+    if (error) throw error;
+    return { success: true, data: (data as AdPlan[]) ?? [] };
+  } catch (err) {
+    logError(err, { module: "adsService.fetchActiveAdPlans" });
+    return { success: false, error: toError(err) };
+  }
+}
+
 export async function createAdRequest(
   shopId: string,
   form: PromotionalAdFormData,
+  planId?: string | null,
 ): Promise<ServiceResult<PromotionalAd>> {
   const supabase = createClient();
   try {
@@ -126,9 +148,29 @@ export async function createAdRequest(
     if (!sanitized.title) return { success: false, error: "Please enter a title for your ad." };
     if (!sanitized.image_url) return { success: false, error: "Please upload a banner image." };
 
+    const insertPayload: Record<string, unknown> = {
+      shop_id: shopId,
+      ...sanitized,
+    };
+
+    // Record which paid plan was selected + the price quoted at request time.
+    if (planId) {
+      const { data: plan, error: planErr } = await supabase
+        .from("ad_plans")
+        .select("id, price")
+        .eq("id", planId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!planErr && plan) {
+        insertPayload.ad_plan_id = plan.id;
+        insertPayload.price_paid = Number(plan.price) || 0;
+        insertPayload.paid_at = new Date().toISOString();
+      }
+    }
+
     const { data, error } = await supabase
       .from("promotional_ads")
-      .insert({ shop_id: shopId, ...sanitized })
+      .insert(insertPayload)
       .select()
       .single();
 

@@ -17,6 +17,7 @@ import QueryProvider from "@/components/QueryProvider";
 import { LocationProvider } from "@/context/LocationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { MerchantQuickAddProvider } from "@/context/MerchantQuickAddContext";
+import { ShopReviewsProvider } from "@/context/ShopReviewsContext";
 import { ToastProvider } from "@/components/Toast";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -111,6 +112,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <ToastProvider>
               <ConfirmProvider>
               <MerchantQuickAddProvider>
+              <ShopReviewsProvider>
               <AppNotifications>
               <ErrorBoundary name="AppSplash" autoResetMs={2500}>
                 <AppSplash />
@@ -143,6 +145,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <PwaRegister />
               <ReviewReminderPopup />
               </AppNotifications>
+              </ShopReviewsProvider>
               </MerchantQuickAddProvider>
               </ConfirmProvider>
             </ToastProvider>

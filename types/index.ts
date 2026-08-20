@@ -842,10 +842,51 @@ export interface PromotionalAd {
   rejection_reason?: string | null;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
+  /** Ad pricing plan chosen by the merchant (NULL for platform/house ads). */
+  ad_plan_id?: string | null;
+  /** Price charged for this placement (recorded at request time). */
+  price_paid?: number | null;
+  /** When the merchant submitted the paid placement request. */
+  paid_at?: string | null;
   created_at: string;
   updated_at?: string;
   /** Populated client-side for merchant/admin management views. */
   shop_name?: string;
+}
+
+/** A purchasable sponsored-banner plan shown to merchants and managed by admins. */
+export interface AdPlan {
+  id: string;
+  name: string;
+  placement: PromoAdPlacement;
+  duration_days: number;
+  price: number;
+  description?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AdPlanFormData {
+  name: string;
+  placement: PromoAdPlacement;
+  duration_days: string;
+  price: string;
+  description: string;
+  is_active: boolean;
+}
+
+/** Customer record for the admin user-moderation tab. */
+export interface AdminUserRecord {
+  user_id: string;
+  full_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  role: string;
+  is_banned: boolean;
+  created_at?: string | null;
+  orders_count: number;
 }
 
 export interface PromotionalAdFormData {

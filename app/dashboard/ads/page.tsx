@@ -22,8 +22,9 @@ import {
   updateAdCreative,
   setAdActive,
   deleteAd,
+  fetchActiveAdPlans,
 } from "@/services/adsService";
-import type { PromotionalAd, PromotionalAdFormData } from "@/types";
+import type { PromotionalAd, PromotionalAdFormData, AdPlan } from "@/types";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,19 @@ export default function MerchantAdsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [plans, setPlans] = useState<AdPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+
+  // ── Load pricing plans ───────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    fetchActiveAdPlans().then((res) => {
+      if (!cancelled && res.success) setPlans(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Resolve merchant's shop ──────────────────────────────────────────────
   useEffect(() => {
@@ -138,6 +152,7 @@ export default function MerchantAdsPage() {
   const handleCancel = useCallback(() => {
     setShowForm(false);
     setEditingId(null);
+    setSelectedPlanId("");
     setForm(EMPTY_FORM);
     setError(null);
   }, []);
@@ -154,7 +169,7 @@ export default function MerchantAdsPage() {
 
     const result = editingId
       ? await updateAdCreative(editingId, form)
-      : await createAdRequest(shopId, form);
+      : await createAdRequest(shopId, form, selectedPlanId || null);
 
     if (result.success) {
       addToast(
@@ -169,7 +184,7 @@ export default function MerchantAdsPage() {
       setError(result.error);
     }
     setSaving(false);
-  }, [shopId, editingId, form, addToast, loadAds, handleCancel]);
+  }, [shopId, editingId, form, selectedPlanId, addToast, loadAds, handleCancel]);
 
   const handleToggleActive = useCallback(async (ad: PromotionalAd) => {
     const result = await setAdActive(ad.id, !ad.is_active);
@@ -236,9 +251,37 @@ export default function MerchantAdsPage() {
         </div>
 
         <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-          Every ad request is reviewed by the TrendMart team (paid placement is coordinated separately)
-          before it goes live — this usually takes less than 24 hours.
+          Pick a pricing plan below, submit your creative, and the TrendMart team will review it
+          before it goes live — usually within 24 hours. Payment is coordinated separately.
         </div>
+
+        {/* ── Pricing plans ──────────────────────────────────────────────── */}
+        {plans.length > 0 && !showForm && (
+          <section>
+            <h2 className="mb-2 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+              💰 Sponsored Banner Pricing
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {plans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                    {plan.duration_days} day{plan.duration_days !== 1 ? "s" : ""}
+                  </p>
+                  <p className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                    Rs. {plan.price.toLocaleString("en-PK")}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{plan.name}</p>
+                  {plan.description && (
+                    <p className="mt-2 text-xs text-zinc-400">{plan.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── Form ──────────────────────────────────────────────────────── */}
         {showForm && (
@@ -246,6 +289,41 @@ export default function MerchantAdsPage() {
             <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
               {editingId ? "Edit Ad Request" : "New Ad Request"}
             </h2>
+
+            {!editingId && plans.length > 0 && (
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  Pricing plan *
+                </label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {plans.map((plan) => (
+                    <label
+                      key={plan.id}
+                      className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 transition-colors ${
+                        selectedPlanId === plan.id
+                          ? "border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-900/20"
+                          : "border-zinc-200 hover:border-emerald-300 dark:border-zinc-700"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ad-plan"
+                        value={plan.id}
+                        checked={selectedPlanId === plan.id}
+                        onChange={() => setSelectedPlanId(plan.id)}
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-emerald-600"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {plan.duration_days}d — Rs. {plan.price.toLocaleString("en-PK")}
+                        </span>
+                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">{plan.name}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Live storefront preview — exact copy of the homepage card */}
             <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
@@ -406,6 +484,11 @@ export default function MerchantAdsPage() {
                       </p>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+                      {ad.price_paid != null && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                          Rs. {ad.price_paid.toLocaleString("en-PK")} plan
+                        </span>
+                      )}
                       <span className="inline-flex items-center gap-1"><EyeIcon /> {ad.impression_count.toLocaleString()} views</span>
                       <span className="inline-flex items-center gap-1"><CursorClickIcon /> {ad.click_count.toLocaleString()} clicks</span>
                       {ad.status === "approved" && (
