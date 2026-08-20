@@ -187,7 +187,8 @@ export default function BottomNav() {
   }, []);
 
   const isMerchant = role === "merchant" || role === "admin" || !!merchantShop;
-  if (pathname === "/offline") return null;
+  // The admin console has its own layout — never render storefront chrome there.
+  if (pathname === "/offline" || pathname.startsWith("/admin")) return null;
   const accountHref = session === false
     ? "/login"
     : role === "admin"

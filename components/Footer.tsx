@@ -46,7 +46,8 @@ const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] 
 
 export default function Footer() {
   const pathname = usePathname();
-  if (pathname === "/offline") return null;
+  // The admin console has its own layout — never render storefront chrome there.
+  if (pathname === "/offline" || pathname.startsWith("/admin")) return null;
 
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
   const mobilePad = isAuthRoute

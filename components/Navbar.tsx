@@ -120,7 +120,8 @@ export default function Navbar() {
 
   const navigateToSearch = useCallback(() => router.push("/products"), [router]);
 
-  if (pathname === "/offline") return null;
+  // The admin console has its own layout — never render storefront chrome there.
+  if (pathname === "/offline" || pathname.startsWith("/admin")) return null;
 
   return (
     <header className="tm-navbar-wrap">

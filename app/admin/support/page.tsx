@@ -8,8 +8,10 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fetchSupportTickets, updateSupportTicket } from "@/services/supportService";
 import { subscribeToSupportTickets } from "@/lib/supabase/realtime";
+import { createClient } from "@/lib/supabase/client";
 import type { SupportTicket, SupportTicketStatus } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 
@@ -30,12 +32,49 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function AdminSupportPage() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | SupportTicketStatus>("open");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+
+  // ── Client-side admin gate (same pattern as audit-logs) ──────────────────
+  useEffect(() => {
+    let cancelled = false;
+    async function init() {
+      const { data: userData } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!userData.user) {
+        router.replace("/auth");
+        return;
+      }
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userData.user.id)
+        .single();
+      if (cancelled) return;
+      if (roleData?.role !== "admin") {
+        router.replace("/dashboard");
+        return;
+      }
+      setIsAdmin(true);
+      setAuthLoading(false);
+    }
+    init();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, router]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -60,6 +99,8 @@ export default function AdminSupportPage() {
         subject: row.subject,
         message: row.message,
         status: row.status as SupportTicketStatus,
+        admin_notes:
+          ((row as Record<string, unknown>).admin_notes as string | undefined) ?? "",
         created_at: row.created_at,
       };
       setTickets((prev) => {
@@ -72,7 +113,7 @@ export default function AdminSupportPage() {
       cancelled = true;
       unsub();
     };
-  }, []);
+  }, [isAdmin, supabase]);
 
   const filtered = useMemo(
     () => (filterStatus === "all" ? tickets : tickets.filter((t) => t.status === filterStatus)),
@@ -87,6 +128,27 @@ export default function AdminSupportPage() {
     }
     setUpdatingId(null);
   }, []);
+
+  const handleSaveNotes = useCallback(async (ticket: SupportTicket) => {
+    const notes = (notesDraft[ticket.id] ?? ticket.admin_notes ?? "").trim();
+    if (updatingId) return;
+    setUpdatingId(ticket.id);
+    const result = await updateSupportTicket(ticket.id, {
+      admin_notes: notes,
+    });
+    if (result.success) {
+      setTickets((prev) => prev.map((t) => (t.id === ticket.id ? result.data : t)));
+    }
+    setUpdatingId(null);
+  }, [notesDraft, updatingId]);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
@@ -160,6 +222,41 @@ export default function AdminSupportPage() {
                     />
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">{ticket.message}</p>
+
+                  {/* Admin reply / notes — visible to the customer on their
+                      "My Requests" view when they check their ticket status. */}
+                  {(ticket.admin_notes || notesDraft[ticket.id]) && (
+                    <div className="mt-3 rounded-lg bg-emerald-50 p-3 dark:bg-emerald-900/10">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        Admin reply
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">
+                        {notesDraft[ticket.id] ?? ticket.admin_notes}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex flex-col gap-2">
+                    <textarea
+                      rows={2}
+                      placeholder="Reply to the customer — saved as admin notes on this ticket…"
+                      value={notesDraft[ticket.id] ?? ticket.admin_notes ?? ""}
+                      onChange={(e) =>
+                        setNotesDraft((d) => ({ ...d, [ticket.id]: e.target.value }))
+                      }
+                      className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveNotes(ticket)}
+                        disabled={updatingId === ticket.id}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {updatingId === ticket.id ? "Saving…" : "Save reply"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               );
             })}

@@ -17,6 +17,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  Fragment,
   type ChangeEvent,
   type KeyboardEvent,
   type FormEvent,
@@ -29,6 +30,7 @@ import type {
   PlatformMetrics,
   AdminMerchantRecord,
   OrderStatusNotification,
+  OrderStatus,
   ShopCategory,
   ShopVerificationStatus,
   Order,
@@ -59,11 +61,16 @@ import CustomSelect from "@/components/CustomSelect";
 interface AdminDashboardState {
   metrics: PlatformMetrics | null;
   merchants: AdminMerchantRecord[];
+  orders: Order[];
   loading: boolean;
   error: string | null;
-  realtimeFeed: OrderStatusNotification[];
-  activeTab: "overview" | "approvals" | "merchants" | "transactions" | "categories" | "ads";
+  realtimeFeed: FeedEntry[];
+  activeTab: "overview" | "approvals" | "merchants" | "transactions" | "categories" | "ads" | "orders";
 }
+
+/** A realtime transaction event; `isHistory` marks rows backfilled from the
+ *  existing order history so the feed isn't empty on first load. */
+type FeedEntry = OrderStatusNotification & { isHistory?: boolean };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -86,6 +93,7 @@ const TAB_OPTIONS = [
   { key: "overview", label: "Overview", icon: "📊" },
   { key: "approvals", label: "Approval Queue", icon: "⏳" },
   { key: "merchants", label: "Merchants", icon: "🏪" },
+  { key: "orders", label: "Orders", icon: "📦" },
   { key: "transactions", label: "Live Transactions", icon: "💳" },
   { key: "categories", label: "Categories", icon: "📂" },
   { key: "ads", label: "Ads", icon: "📢" },
@@ -111,6 +119,7 @@ export default function AdminDashboardPage() {
   const [state, setState] = useState<AdminDashboardState>({
     metrics: null,
     merchants: [],
+    orders: [],
     loading: true,
     error: null,
     realtimeFeed: [],
@@ -139,6 +148,18 @@ export default function AdminDashboardPage() {
   const [platformAdSaving, setPlatformAdSaving] = useState(false);
   const [platformAdError, setPlatformAdError] = useState<string | null>(null);
 
+  // ─── Global Orders Browser ─────────────────────────────────────────
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersSearch, setOrdersSearch] = useState("");
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>("all");
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const ORDERS_PAGE_SIZE = 20;
+
+  // ─── Merchant table pagination ─────────────────────────────────────
+  const [merchantPage, setMerchantPage] = useState(1);
+  const MERCHANT_PAGE_SIZE = 25;
+
   // ─── Fetch All Data ─────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchAllData() {
@@ -153,25 +174,62 @@ export default function AdminDashboardPage() {
 
         if (shopsErr) throw shopsErr;
 
-        // Fetch all orders for aggregate metrics
-        const { data: orders, error: ordersErr } = await supabase
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(500);
-
-        if (ordersErr) throw ordersErr;
-
-        // Fetch order counts per shop
+        // Full order dataset (unlimited) — powers per-shop stats and the
+        // platform totals so metrics never silently undercount as the
+        // platform grows past 500 orders.
         const { data: orderCountsRaw, error: countsErr } = await supabase
           .from("orders")
-          .select("shop_id, total_amount, status");
+          .select("shop_id, total_amount, status, created_at");
 
         if (countsErr) throw countsErr;
 
+        // Recent-order snapshot — powers the Orders tab and backfills the
+        // realtime feed so it isn't empty on first load.
+        let recentOrdersData: Record<string, unknown>[] | null = null;
+        let recentOrdersErr: { message?: string } | null = null;
+
+        const recentQuery = await supabase
+          .from("orders")
+          .select(
+            "id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, tracking_number, customer_user_id",
+          )
+          .order("created_at", { ascending: false })
+          .limit(500);
+        recentOrdersData = recentQuery.data as Record<string, unknown>[] | null;
+        recentOrdersErr = recentQuery.error;
+
+        if (recentOrdersErr && /customer_user_id|tracking_number/i.test(recentOrdersErr.message || "")) {
+          // Legacy schemas may lack the newer columns — retry with core fields.
+          const fallback = await supabase
+            .from("orders")
+            .select(
+              "id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at",
+            )
+            .order("created_at", { ascending: false })
+            .limit(500);
+          recentOrdersData = fallback.data as Record<string, unknown>[] | null;
+          recentOrdersErr = fallback.error;
+        }
+
+        if (recentOrdersErr) throw recentOrdersErr;
+        const recentOrders = recentOrdersData ?? [];
+
+        // Product counts per shop — populates the merchant table column that
+        // was previously hardcoded to 0.
+        const { data: productRows, error: productsErr } = await supabase
+          .from("products")
+          .select("shop_id");
+        if (productsErr) throw productsErr;
+        const productCountByShop = new Map<string, number>();
+        for (const p of (productRows as Record<string, unknown>[]) ?? []) {
+          const sid = p.shop_id as string;
+          if (sid) {
+            productCountByShop.set(sid, (productCountByShop.get(sid) ?? 0) + 1);
+          }
+        }
+
         // Aggregate
         const allShopsArr = (shops as Record<string, unknown>[]) ?? [];
-        const allOrdersArr = (orders as Record<string, unknown>[]) ?? [];
         const allCountsArr = (orderCountsRaw as Record<string, unknown>[]) ?? [];
 
         // Build order stats by shop
@@ -189,12 +247,15 @@ export default function AdminDashboardPage() {
         }
 
         // Build merchant records
+        const shopNameMap = new Map<string, string>();
         const merchants: AdminMerchantRecord[] = allShopsArr.map((shop) => {
-          const stats = shopOrderMap.get(shop.id as string);
+          const shopId = shop.id as string;
+          shopNameMap.set(shopId, (shop.name as string) ?? "Unknown");
+          const stats = shopOrderMap.get(shopId);
           const verificationStatus =
             (shop.verification_status as ShopVerificationStatus) ?? "approved";
           return {
-            shop_id: shop.id as string,
+            shop_id: shopId,
             owner_id: (shop.owner_id as string) ?? null,
             shop_name: (shop.name as string) ?? "Unknown",
             category: (shop.category as string) ?? "Boutique",
@@ -205,25 +266,25 @@ export default function AdminDashboardPage() {
             verification_status: verificationStatus,
             order_count: stats?.count ?? 0,
             total_revenue: stats?.revenue ?? 0,
-            product_count: 0, // Will be populated separately if needed
+            product_count: productCountByShop.get(shopId) ?? 0,
             created_at: (shop.created_at as string) ?? "",
             whatsapp_number: (shop.whatsapp_number as string) ?? "",
           };
         });
 
-        // Calculate platform metrics
+        // Calculate platform metrics from the FULL dataset (no row cap).
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayISO = today.toISOString();
 
-        const todayOrders = allOrdersArr.filter(
+        const todayOrders = allCountsArr.filter(
           (o) => (o.created_at as string) >= todayISO,
         );
         const todayRevenue = todayOrders
           .filter((o) => (o.status as string) !== "Cancelled")
           .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
 
-        const totalRevenue = allOrdersArr
+        const totalRevenue = allCountsArr
           .filter((o) => (o.status as string) !== "Cancelled")
           .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
 
@@ -233,7 +294,7 @@ export default function AdminDashboardPage() {
           suspended_merchants: allShopsArr.filter(
             (s) => !(s.is_live as boolean),
           ).length,
-          total_orders: allOrdersArr.length,
+          total_orders: allCountsArr.length,
           total_revenue: totalRevenue,
           orders_today: todayOrders.length,
           revenue_today: todayRevenue,
@@ -242,10 +303,39 @@ export default function AdminDashboardPage() {
           ).length,
         };
 
+        // Backfill the live feed with recent history so it isn't empty on load.
+        const feedSeed: FeedEntry[] = recentOrders.slice(0, 20).map((o) => ({
+          orderId: (o.id as string) ?? "",
+          shopId: (o.shop_id as string) ?? "",
+          shopName: shopNameMap.get(o.shop_id as string) ?? "",
+          previousStatus: (o.status as OrderStatus) ?? "Pending",
+          newStatus: (o.status as OrderStatus) ?? "Pending",
+          customerName: (o.customer_name as string) ?? "",
+          customerPhone: (o.customer_phone as string) ?? "",
+          totalAmount: Number(o.total_amount) || 0,
+          timestamp: (o.created_at as string) ?? new Date().toISOString(),
+          isHistory: true,
+        }));
+
+        const mappedOrders: Order[] = recentOrders.map((o) => ({
+          id: (o.id as string) ?? "",
+          shop_id: (o.shop_id as string) ?? "",
+          customer_name: (o.customer_name as string) ?? "",
+          customer_phone: (o.customer_phone as string) ?? "",
+          items_json: (o.items_json as Order["items_json"]) ?? [],
+          total_amount: Number(o.total_amount) || 0,
+          status: (o.status as OrderStatus) ?? "Pending",
+          created_at: (o.created_at as string) ?? "",
+          tracking_number: (o.tracking_number as string) ?? null,
+          customer_user_id: (o.customer_user_id as string) ?? null,
+        }));
+
         setState((s) => ({
           ...s,
           metrics,
           merchants,
+          orders: mappedOrders,
+          realtimeFeed: feedSeed,
           loading: false,
         }));
       } catch (err) {
@@ -470,8 +560,9 @@ export default function AdminDashboardPage() {
         .update({
           verification_status: decision,
           // Approving a brand-new store also flips it live so it appears
-          // immediately; rejecting keeps it hidden regardless of is_live.
-          ...(decision === "approved" ? { is_live: true } : {}),
+          // immediately; rejecting hides it from the storefront regardless
+          // of the merchant's is_live flag (visibility = is_live AND approved).
+          is_live: decision === "approved",
         })
         .eq("id", shopId);
 
@@ -498,8 +589,8 @@ export default function AdminDashboardPage() {
                 ...m,
                 verification_status: decision,
                 verified: decision === "approved",
-                is_live: decision === "approved" ? true : m.is_live,
-                suspended: decision === "approved" ? false : m.suspended,
+                is_live: decision === "approved",
+                suspended: decision !== "approved",
               }
             : m,
         ),
@@ -510,7 +601,11 @@ export default function AdminDashboardPage() {
               active_merchants:
                 decision === "approved"
                   ? s.metrics.active_merchants + 1
-                  : s.metrics.active_merchants,
+                  : Math.max(0, s.metrics.active_merchants - 1),
+              suspended_merchants:
+                decision === "approved"
+                  ? Math.max(0, s.metrics.suspended_merchants - 1)
+                  : s.metrics.suspended_merchants + 1,
             }
           : null,
       }));
@@ -625,6 +720,46 @@ export default function AdminDashboardPage() {
     [state.merchants],
   );
 
+  // ─── Merchant table pagination ────────────────────────────────────────
+  const merchantPageCount = Math.max(
+    1,
+    Math.ceil(filteredMerchants.length / MERCHANT_PAGE_SIZE),
+  );
+  const safeMerchantPage = Math.min(merchantPage, merchantPageCount);
+  const pagedMerchants = filteredMerchants.slice(
+    (safeMerchantPage - 1) * MERCHANT_PAGE_SIZE,
+    safeMerchantPage * MERCHANT_PAGE_SIZE,
+  );
+
+  // ─── Orders tab filtering ─────────────────────────────────────────────
+  const filteredOrders = useMemo(() => {
+    let result = [...state.orders];
+    if (ordersStatusFilter !== "all") {
+      result = result.filter((o) => o.status === ordersStatusFilter);
+    }
+    if (ordersSearch.trim()) {
+      const q = ordersSearch.toLowerCase();
+      result = result.filter(
+        (o) =>
+          o.customer_name.toLowerCase().includes(q) ||
+          o.customer_phone.toLowerCase().includes(q) ||
+          o.id.toLowerCase().includes(q) ||
+          (o.tracking_number ?? "").toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [state.orders, ordersStatusFilter, ordersSearch]);
+
+  const orderPageCount = Math.max(
+    1,
+    Math.ceil(filteredOrders.length / ORDERS_PAGE_SIZE),
+  );
+  const safeOrdersPage = Math.min(ordersPage, orderPageCount);
+  const pagedOrders = filteredOrders.slice(
+    (safeOrdersPage - 1) * ORDERS_PAGE_SIZE,
+    safeOrdersPage * ORDERS_PAGE_SIZE,
+  );
+
   // ─── Render ─────────────────────────────────────────────────────────────
   if (state.loading) {
     return (
@@ -677,18 +812,6 @@ export default function AdminDashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/admin/support"
-                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
-              >
-                Support Inbox
-              </Link>
-              <Link
-                href="/admin/audit-logs"
-                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-              >
-                Audit Logs
-              </Link>
               <Link
                 href="/"
                 className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
@@ -858,7 +981,9 @@ export default function AdminDashboardPage() {
                                 : "text-blue-500"
                           }`}
                         >
-                          {event.previousStatus}→{event.newStatus}
+                          {event.isHistory
+                            ? "New order"
+                            : `${event.previousStatus}→${event.newStatus}`}
                         </span>
                         <span className="text-zinc-600 dark:text-zinc-400 truncate">
                           #{event.orderId.slice(0, 8)} —{" "}
@@ -951,14 +1076,18 @@ export default function AdminDashboardPage() {
                 type="text"
                 placeholder="Search merchants..."
                 value={searchMerchant}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setSearchMerchant(e.target.value)
-                }
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  setSearchMerchant(e.target.value);
+                  setMerchantPage(1);
+                }}
                 className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm flex-grow max-w-xs"
               />
               <CustomSelect
                 value={filterCategory}
-                onChange={(val) => setFilterCategory(val)}
+                onChange={(val) => {
+                  setFilterCategory(val);
+                  setMerchantPage(1);
+                }}
                 options={[
                   { value: "All", label: "All Categories" },
                   ...SHOP_CATEGORIES.filter((c) => c !== "All").map((cat) => ({
@@ -970,7 +1099,10 @@ export default function AdminDashboardPage() {
               />
               <CustomSelect
                 value={filterStatus}
-                onChange={(val) => setFilterStatus(val)}
+                onChange={(val) => {
+                  setFilterStatus(val);
+                  setMerchantPage(1);
+                }}
                 options={[
                   { value: "all", label: "All Status" },
                   { value: "active", label: "Active" },
@@ -981,6 +1113,9 @@ export default function AdminDashboardPage() {
               <span className="text-xs text-zinc-400 ml-auto">
                 {filteredMerchants.length} merchant
                 {filteredMerchants.length !== 1 ? "s" : ""}
+                {merchantPageCount > 1
+                  ? ` · page ${safeMerchantPage}/${merchantPageCount}`
+                  : ""}
               </span>
             </div>
 
@@ -993,6 +1128,7 @@ export default function AdminDashboardPage() {
                       <th className="px-4 py-3 text-left">Shop</th>
                       <th className="px-4 py-3 text-left">Category</th>
                       <th className="px-4 py-3 text-center">Orders</th>
+                      <th className="px-4 py-3 text-center">Products</th>
                       <th className="px-4 py-3 text-right">Revenue</th>
                       <th className="px-4 py-3 text-center">Verification</th>
                       <th className="px-4 py-3 text-center">Status</th>
@@ -1003,14 +1139,14 @@ export default function AdminDashboardPage() {
                     {filteredMerchants.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={8}
                           className="px-4 py-12 text-center text-zinc-400"
                         >
                           No merchants found matching your filters.
                         </td>
                       </tr>
                     ) : (
-                      filteredMerchants.map((merchant) => (
+                      pagedMerchants.map((merchant) => (
                         <tr
                           key={merchant.shop_id}
                           className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
@@ -1030,6 +1166,9 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="px-4 py-3 text-center font-medium">
                             {merchant.order_count}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {merchant.product_count}
                           </td>
                           <td className="px-4 py-3 text-right font-medium">
                             {formatCurrency(merchant.total_revenue)}
@@ -1081,6 +1220,15 @@ export default function AdminDashboardPage() {
                                     Reject
                                   </button>
                                 </>
+                              ) : merchant.verification_status === "rejected" ? (
+                                <button
+                                  onClick={() => reviewShop(merchant.shop_id, "approved")}
+                                  disabled={processingId === merchant.shop_id}
+                                  title="Approve and make this store publicly visible again"
+                                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                >
+                                  {processingId === merchant.shop_id ? "..." : "Re-approve"}
+                                </button>
                               ) : (
                                 <button
                                   onClick={() =>
@@ -1120,6 +1268,199 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             </div>
+
+            {merchantPageCount > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMerchantPage((p) => Math.max(1, p - 1))}
+                  disabled={safeMerchantPage <= 1}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Page {safeMerchantPage} of {merchantPageCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMerchantPage((p) => Math.min(merchantPageCount, p + 1))}
+                  disabled={safeMerchantPage >= merchantPageCount}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Orders Tab ──────────────────────────────────────────────── */}
+        {activeTab === "orders" && (
+          <>
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 flex flex-wrap gap-3 items-center">
+              <input
+                type="text"
+                placeholder="Search by customer, phone, or order ID..."
+                value={ordersSearch}
+                onChange={(e) => {
+                  setOrdersSearch(e.target.value);
+                  setOrdersPage(1);
+                }}
+                className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm flex-grow max-w-xs"
+              />
+              <CustomSelect
+                value={ordersStatusFilter}
+                onChange={(val) => {
+                  setOrdersStatusFilter(val);
+                  setOrdersPage(1);
+                }}
+                options={[
+                  { value: "all", label: "All Statuses" },
+                  { value: "Pending", label: "Pending" },
+                  { value: "Processing", label: "Processing" },
+                  { value: "Dispatched", label: "Dispatched" },
+                  { value: "Delivered", label: "Delivered" },
+                  { value: "Cancelled", label: "Cancelled" },
+                ]}
+                fullWidth={false}
+              />
+              <span className="text-xs text-zinc-400 ml-auto">
+                {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+                {orderPageCount > 1 ? ` · page ${safeOrdersPage}/${orderPageCount}` : ""}
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left">Order</th>
+                      <th className="px-4 py-3 text-left">Shop</th>
+                      <th className="px-4 py-3 text-left">Customer</th>
+                      <th className="px-4 py-3 text-right">Amount</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3 text-right">Placed</th>
+                      <th className="px-4 py-3 text-center">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {pagedOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-12 text-center text-zinc-400">
+                          No orders found{state.orders.length === 0 ? " yet — place an order to see it here." : " matching your filters."}
+                        </td>
+                      </tr>
+                    ) : (
+                      pagedOrders.map((order) => {
+                        const shopName =
+                          state.merchants.find((m) => m.shop_id === order.shop_id)
+                            ?.shop_name ?? "Unknown Shop";
+                        const isExpanded = expandedOrderId === order.id;
+                        return (
+                          <Fragment key={order.id}>
+                            <tr
+                              onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                              className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors cursor-pointer"
+                            >
+                              <td className="px-4 py-3 font-mono text-xs text-zinc-500">
+                                #{order.id.slice(0, 8)}
+                                {order.tracking_number && (
+                                  <div className="text-[0.65rem] text-zinc-400">#{order.tracking_number}</div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
+                                {shopName}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-zinc-900 dark:text-zinc-100">{order.customer_name || "—"}</div>
+                                <div className="text-xs text-zinc-500">{order.customer_phone || "—"}</div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-medium">
+                                {formatCurrency(order.total_amount)}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <OrderStatusBadge status={order.status} />
+                              </td>
+                              <td className="px-4 py-3 text-right text-xs text-zinc-500">
+                                {new Date(order.created_at).toLocaleString("en-PK", {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </td>
+                              <td className="px-4 py-3 text-center text-zinc-400">
+                                {isExpanded ? "▲" : "▼"}
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr className="bg-zinc-50 dark:bg-zinc-800/30">
+                                <td colSpan={7} className="px-5 py-4">
+                                  <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+                                    Items
+                                  </div>
+                                  {(order.items_json ?? []).length === 0 ? (
+                                    <p className="text-xs text-zinc-400">No item breakdown stored.</p>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      {(order.items_json as Array<{ name?: string; quantity?: number; price?: number }>).map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-sm">
+                                          <span className="text-zinc-700 dark:text-zinc-300">
+                                            {item.name ?? "Item"}
+                                            {item.quantity ? ` × ${item.quantity}` : ""}
+                                          </span>
+                                          <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                                            {formatCurrency(Number(item.price) || 0)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-zinc-500">
+                                    <span>Order ID: <span className="font-mono">{order.id}</span></span>
+                                    <span>Status: {order.status}</span>
+                                    {order.customer_user_id && <span>Linked account</span>}
+                                    <span>
+                                      Placed: {new Date(order.created_at).toLocaleString("en-PK")}
+                                    </span>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {orderPageCount > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                  disabled={safeOrdersPage <= 1}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Page {safeOrdersPage} of {orderPageCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOrdersPage((p) => Math.min(orderPageCount, p + 1))}
+                  disabled={safeOrdersPage >= orderPageCount}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         )}
 
@@ -1165,8 +1506,14 @@ export default function AdminDashboardPage() {
                         Order #{event.orderId.slice(0, 8)}
                       </div>
                       <div className="text-xs text-zinc-500">
-                        {event.previousStatus} →{" "}
-                        <span className="font-semibold">{event.newStatus}</span>
+                        {event.isHistory ? (
+                          <span className="font-semibold">{event.newStatus}</span>
+                        ) : (
+                          <>
+                            {event.previousStatus} →{" "}
+                            <span className="font-semibold">{event.newStatus}</span>
+                          </>
+                        )}
                         {" — "}
                         {event.shopName || "Unknown Shop"}
                       </div>
@@ -1381,6 +1728,30 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setPlatformAdForm((f) => ({ ...f, link_url: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
                   />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="mb-1 block text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                        Starts at <span className="font-normal">(optional)</span>
+                      </span>
+                      <input
+                        type="datetime-local"
+                        value={platformAdForm.starts_at}
+                        onChange={(e) => setPlatformAdForm((f) => ({ ...f, starts_at: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                        Ends at <span className="font-normal">(optional)</span>
+                      </span>
+                      <input
+                        type="datetime-local"
+                        value={platformAdForm.ends_at}
+                        onChange={(e) => setPlatformAdForm((f) => ({ ...f, ends_at: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+                      />
+                    </label>
+                  </div>
                   {platformAdError && <p className="text-xs text-red-500">{platformAdError}</p>}
                   <button
                     type="submit"
@@ -1517,6 +1888,21 @@ export default function AdminDashboardPage() {
 }
 
 // ─── Metric Card Sub-Component ──────────────────────────────────────────────
+
+function OrderStatusBadge({ status }: { status: OrderStatus }) {
+  const map: Record<OrderStatus, string> = {
+    Pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    Processing: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    Dispatched: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    Delivered: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    Cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+  return (
+    <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${map[status] ?? map.Pending}`}>
+      {status}
+    </span>
+  );
+}
 
 function MetricCard({
   icon,
