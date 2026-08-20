@@ -431,13 +431,11 @@ export default function WhatsAppCheckoutModal({
 
   // Idempotency token: one per checkout session. Reused across retries so a
   // double-submit can't create duplicate orders; regenerated only on success.
-  const idempotencyKeyRef = useRef<string>("");
-  if (!idempotencyKeyRef.current) {
-    idempotencyKeyRef.current =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `ord_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  }
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `ord_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   // Editable quantities (initialized from items via lazy state initializer)
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
@@ -946,7 +944,7 @@ export default function WhatsAppCheckoutModal({
           customerLat: pinLat,
           customerLng: pinLng,
           customerCity: location?.city ?? undefined,
-          idempotencyKey: idempotencyKeyRef.current,
+          idempotencyKey,
         }),
         15_000,
         "Order request timed out. Please check your connection and try again.",
@@ -960,7 +958,7 @@ export default function WhatsAppCheckoutModal({
       }
 
       // Success — reset the idempotency token so a future order gets a fresh one.
-      idempotencyKeyRef.current = "";
+      setIdempotencyKey("");
 
       const ref = orderResult.data.id;
       setOrderRef(ref);
@@ -1051,6 +1049,8 @@ export default function WhatsAppCheckoutModal({
     detectLocationDetailed,
     addToast,
     onOrderPlaced,
+    coverageMode,
+    idempotencyKey,
   ]);
 
   const finishOrder = useCallback(() => {
