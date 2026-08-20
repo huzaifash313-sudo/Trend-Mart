@@ -222,10 +222,16 @@ body {
    remounts on every client navigation. A short opacity fade turns that
    remount into a smooth transition instead of a hard swap. Opacity-only
    (no transform) to avoid layout jank; skipped during the boot splash and
-   for users who prefer reduced motion. */
+   for users who prefer reduced motion.
+
+   NOTE: no animation-fill-mode here. A filled opacity animation keeps
+   `main` inside a stacking context, which traps the z-index of every fixed
+   overlay rendered in the page (product quick-view, checkout, …) so they
+   paint UNDER the root-level floating cart bar / bottom nav. Dropping the
+   fill keeps the fade while letting overlays escape to the root context. */
 @media (prefers-reduced-motion: no-preference) {
   html:not(.tm-splash-lock):not(.tm-splash-handoff) .tm-route-fade {
-    animation: tm-route-fade-in 160ms ease-out both;
+    animation: tm-route-fade-in 160ms ease-out;
   }
 }
 @keyframes tm-route-fade-in {
@@ -243,6 +249,18 @@ body {
   min-height: calc(
     100dvh - var(--tm-navbar-sticky-offset, 62px) - 5.5rem
   );
+}
+
+/* ── Floating cart vs. full-screen overlays ────────────────────────────────
+   The floating cart bar must never collide with a modal's own action buttons
+   (e.g. the product quick-view "Add to Cart" / "Order"). Hide it whenever a
+   modal / sheet / drawer overlay is actually on screen — the overlay already
+   provides its own cart controls, so the floating bar is redundant while it
+   is open. Opacity-toggled overlays (the nav-drawer backdrop stays mounted
+   at opacity-0 while closed) only count while they are visible. */
+body:has(.fixed.inset-0[class*="opacity-"]:not(.opacity-0)) .tm-cartbar-root,
+body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
+  display: none !important;
 }
 
 /* ── Scrollbar Styling ──────────────────────────────────────────────────────── */

@@ -21,6 +21,7 @@ import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCartStore } from "@/store/cartStore";
 import { clearOrderHistory } from "@/services/orderHistoryService";
+import { migrateLocalFavoritesToDb } from "@/services/wishlistService";
 
 /** Tracks which account the device-local buyer data currently belongs to. */
 const ACTIVE_UID_KEY = "trendmart_active_uid";
@@ -103,8 +104,16 @@ export default function AccountScopeGuard() {
 
     // `onAuthStateChange` fires an INITIAL_SESSION event immediately, which
     // seeds the current identity for us (no separate getUser() call needed).
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
       reconcile(session?.user?.id ?? null);
+
+      // Guest → signed-in hand-off: copy the device-local wishlist into the
+      // DB so items saved while browsing as a guest survive on this and any
+      // other device. Non-fatal — the merged wishlist view already surfaces
+      // them even if this sync fails.
+      if (event === "SIGNED_IN" && session?.user?.id) {
+        void migrateLocalFavoritesToDb();
+      }
     });
 
     return () => {

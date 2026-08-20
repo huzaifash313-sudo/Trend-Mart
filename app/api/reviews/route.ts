@@ -134,15 +134,18 @@ export async function POST(request: NextRequest) {
 
   // Primary: exact account match (orders store customer_user_id). Targeted and
   // index-friendly — no `.limit(80)` sweep that could miss heavy buyers.
+  // REVIEW RULE: only DELIVERED orders earn the right to review — a merchant
+  // must have marked the order delivered in the app first.
   const { data: userOrders } = await supabase
     .from("orders")
     .select("id, status")
     .eq("shop_id", shopId)
     .eq("customer_user_id", user.id)
+    .eq("status", "Delivered")
     .limit(1);
 
   let purchased = (userOrders ?? []).some(
-    (row) => String(row.status ?? "").toLowerCase() !== "cancelled",
+    (row) => String(row.status ?? "").toLowerCase() === "delivered",
   );
 
   // Secondary: phone fallback for orders placed before sign-up (guest checkout).
@@ -154,9 +157,10 @@ export async function POST(request: NextRequest) {
         .select("id, customer_phone, status")
         .eq("shop_id", shopId)
         .like("customer_phone", `%${last10}`)
+        .eq("status", "Delivered")
         .limit(5);
       purchased = (phoneOrders ?? []).some((row) => {
-        if (String(row.status ?? "").toLowerCase() === "cancelled") return false;
+        if (String(row.status ?? "").toLowerCase() !== "delivered") return false;
         return phonesMatch(row.customer_phone, profile.phone);
       });
     }
@@ -164,7 +168,7 @@ export async function POST(request: NextRequest) {
 
   if (!purchased) {
     return NextResponse.json(
-      { success: false, error: "Only customers who ordered from this store can leave a review." },
+      { success: false, error: "Only customers who received a delivered order from this store can leave a review." },
       { status: 403 },
     );
   }

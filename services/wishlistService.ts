@@ -239,6 +239,28 @@ function deduplicateLocalItems(items: FavoriteItem[]): FavoriteItem[] {
   return Array.from(seen.values()).sort((a, b) => b.addedAt - a.addedAt);
 }
 
+/**
+ * Merge database favorites with device-local favorites.
+ *
+ * The wishlist is hybrid: guests save to localStorage, signed-in users save
+ * to the DB. Items saved as a guest are NOT automatically copied to the DB on
+ * sign-in, so a pure DB read would show an empty wishlist for those items.
+ * DB rows win on conflicts (they are the source of truth); local-only items
+ * are included so nothing the user saved ever disappears.
+ */
+function mergeLocalWithDb(
+  dbItems: FavoriteItem[],
+  localItems: FavoriteItem[],
+): FavoriteItem[] {
+  const byKey = new Map<string, FavoriteItem>();
+  for (const item of dbItems) byKey.set(`${item.type}::${item.id}`, item);
+  for (const item of localItems) {
+    const key = `${item.type}::${item.id}`;
+    if (!byKey.has(key)) byKey.set(key, item);
+  }
+  return Array.from(byKey.values());
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Supabase CRUD helpers (authenticated users)                                */
 /* -------------------------------------------------------------------------- */
@@ -314,7 +336,11 @@ export async function isFavorited(id: string): Promise<boolean> {
       .or(`product_id.eq.${sanitizedId},shop_id.eq.${sanitizedId}`);
 
     if (error) throw error;
-    return (count ?? 0) > 0;
+    if ((count ?? 0) > 0) return true;
+    // Device-local copy may hold the item (guest hand-off or a DB write that
+    // fell back to localStorage) — treat it as favorited so hearts stay in
+    // sync with the merged wishlist.
+    return getLocalAll().some((item) => item.id === sanitizedId);
   } catch (err) {
     logError(err, { module: "wishlistService.isFavorited", meta: { id: sanitizedId } });
     // Fallback to localStorage on DB error
@@ -500,6 +526,11 @@ export async function toggleFavorite(
  * Works for both anonymous and authenticated users.
  *
  * PROMPT 2: Ensures deduplication of returned data.
+ *
+ * HYBRID FIX: For signed-in users the DB rows are merged with any
+ * device-local favorites (guest hand-off / DB-write fallback) so the
+ * wishlist is never silently empty. Local-only items are also pushed to
+ * the DB in the background so they sync across devices.
  */
 export async function getAllFavorites(): Promise<FavoriteItem[]> {
   const userId = await getUserId();
@@ -520,9 +551,21 @@ export async function getAllFavorites(): Promise<FavoriteItem[]> {
     if (error) throw error;
 
     const rows = (data as WishlistRow[]) ?? [];
-    // PROMPT 2: Map and deduplicate based on (id, type) composite key
-    const mapped = rows.map(rowToFavorite);
-    return deduplicateLocalItems(mapped);
+    const dbItems = deduplicateLocalItems(rows.map(rowToFavorite));
+
+    // Merge device-local favorites that were never migrated (or whose DB
+    // write fell back to localStorage) so the saved list always shows them.
+    const local = getLocalAll();
+    const hasLocalOnly = local.some(
+      (item) => !dbItems.some((d) => d.type === item.type && d.id === item.id),
+    );
+    if (hasLocalOnly) {
+      // Non-fatal background sync — the merge above already surfaces them.
+      void migrateLocalFavoritesToDb();
+    }
+
+    const merged = mergeLocalWithDb(dbItems, local);
+    return deduplicateLocalItems(merged).sort((a, b) => b.addedAt - a.addedAt);
   } catch (err) {
     logError(err, { module: "wishlistService.getAllFavorites" });
     // Fallback to localStorage
@@ -565,15 +608,11 @@ export async function getFavoriteCount(): Promise<number> {
     return getLocalAll().length;
   }
 
-  const supabase = createClient();
+  // Use the merged view so device-local favorites (guest hand-off or a DB
+  // write that fell back to localStorage) are counted too.
   try {
-    const { count, error } = await supabase
-      .from("customer_wishlists")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
-
-    if (error) throw error;
-    return count ?? 0;
+    const all = await getAllFavorites();
+    return all.length;
   } catch (err) {
     logError(err, { module: "wishlistService.getFavoriteCount" });
     return getLocalAll().length;
@@ -636,6 +675,9 @@ export async function getUnseenFavoriteCount(): Promise<number> {
  * Remove a specific item by id.
  *
  * PROMPT 2: Validates ID before operation.
+ *
+ * HYBRID FIX: Signed-in removal also drops the item from localStorage so a
+ * local-only copy (guest hand-off / DB-write fallback) can't resurrect it.
  */
 export async function removeFavorite(id: string): Promise<WishlistResult> {
   const sanitizedId = sanitizeItemId(id);
@@ -650,6 +692,14 @@ export async function removeFavorite(id: string): Promise<WishlistResult> {
     saveLocalAll(deduplicateLocalItems(items));
     notifyFavoritesChanged();
     return { success: true };
+  }
+
+  // Drop the device-local copy too (best-effort) so the merged view can't
+  // re-add an item that only existed locally.
+  const localBefore = getLocalAll();
+  const localAfter = localBefore.filter((item) => item.id !== sanitizedId);
+  if (localAfter.length !== localBefore.length) {
+    saveLocalAll(localAfter);
   }
 
   const supabase = createClient();
@@ -680,6 +730,9 @@ export async function clearAllFavorites(): Promise<WishlistResult> {
     notifyFavoritesChanged();
     return { success: true };
   }
+
+  // Clear the device-local copy too so local-only items don't reappear.
+  saveLocalAll([]);
 
   const supabase = createClient();
   try {
@@ -813,6 +866,11 @@ export async function getFavoriteStores(): Promise<
  * given user. Call this after sign-up / sign-in.
  *
  * PROMPT 2: Validates each local item before migration.
+ *
+ * SAFETY: Only the items that actually landed in the DB are removed from
+ * localStorage. A row that fails to migrate (e.g. its product/shop was
+ * deleted) stays on the device so it is never silently lost and the
+ * merged wishlist keeps showing it.
  */
 export async function migrateLocalFavoritesToDb(): Promise<void> {
   const userId = await getUserId();
@@ -825,6 +883,7 @@ export async function migrateLocalFavoritesToDb(): Promise<void> {
   const dedupedItems = deduplicateLocalItems(localItems);
 
   const supabase = createClient();
+  const migratedKeys = new Set<string>();
 
   for (const item of dedupedItems) {
     // PROMPT 2: Validate each item before migration
@@ -833,26 +892,36 @@ export async function migrateLocalFavoritesToDb(): Promise<void> {
     if (!validId || !validType) continue;
 
     try {
-      await supabase.rpc("migrate_wishlist_item", {
+      const { error } = await supabase.rpc("migrate_wishlist_item", {
         p_user_id: userId,
         p_product_id: validType === "product" ? validId : undefined,
         p_type: validType,
         p_name: sanitizeItemName(item.name),
         p_image_url: sanitizeItemUrl(item.imageUrl) ?? null,
-        p_shop_id: item.shopId && validType === "product"
-          ? sanitizeItemId(item.shopId)
-          : validType === "shop"
-            ? validId
-            : undefined,
-        p_shop_name: item.shopName ? sanitizeLight(item.shopName).slice(0, 100) : null,
+        p_shop_id:
+          item.shopId && validType === "product"
+            ? sanitizeItemId(item.shopId)
+            : validType === "shop"
+              ? validId
+              : undefined,
+        p_shop_name: item.shopName
+          ? sanitizeLight(item.shopName).slice(0, 100)
+          : null,
       });
+      if (!error) migratedKeys.add(`${validType}::${validId}`);
     } catch {
-      // Silently skip duplicates / errors
+      // Keep the item in localStorage — a later attempt (or the merged
+      // wishlist view) will still surface it.
     }
   }
 
-  // Clear localStorage after successful migration
-  saveLocalAll([]);
+  // Remove only the items that successfully synced.
+  if (migratedKeys.size > 0) {
+    const remaining = getLocalAll().filter(
+      (item) => !migratedKeys.has(`${item.type}::${item.id}`),
+    );
+    saveLocalAll(remaining);
+  }
 }
 
 /**

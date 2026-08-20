@@ -4,7 +4,7 @@ import { useState, useEffect, use, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@/types";
-import { logShopView } from "@/services/analyticsService";
+import { logShopView, logProductClick } from "@/services/analyticsService";
 import { trackCategoryInterest, trackProductView } from "@/lib/behavior";
 import { useLocation } from "@/context/LocationContext";
 import { isCustomerWithinCoverage } from "@/services/geoRadiusService";
@@ -533,6 +533,8 @@ function ShopDetailInner({ id }: { id: string }) {
       shopName: shop?.name,
       category: shop?.category ?? product.category_id ?? null,
     });
+    // Real click tally → feeds the popularity-based search/feed ranking.
+    if (shop?.id) void logProductClick(shop.id, product.id);
   }, [shop]);
 
   const handleAddToCart = useCallback((product: Product) => {

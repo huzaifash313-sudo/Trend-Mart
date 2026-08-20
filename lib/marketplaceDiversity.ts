@@ -66,14 +66,44 @@ function freshnessSignal(p: MarketplaceProduct, newestMs: number, oldestMs: numb
   return ((t - oldestMs) / (newestMs - oldestMs)) * 100;
 }
 
+/** Log-scale volume (0–100) with diminishing returns for large counts. */
+function logVolume(n: number): number {
+  if (n <= 0) return 0;
+  // *25 (not *40) keeps real differentiation up to ~10k units — 316 units
+  // shouldn't already saturate the signal.
+  return Math.min(100, Math.log10(n + 1) * 25);
+}
+
+/**
+ * 0–100 popularity score from REAL engagement signals on the product row:
+ *   - parent shop rating + review volume (review quality proxy)
+ *   - total units ordered (orders_count)
+ *   - total real product clicks (click_count)
+ * Orders and clicks weigh most — they prove demand. Rating/reviews support them.
+ */
+export function scoreProductPopularity(p: MarketplaceProduct): number {
+  const rating = Number(p.shop_avg_rating) || 0;
+  const reviews = Number(p.shop_review_count) || 0;
+  const orders = Number(p.orders_count) || 0;
+  const clicks = Number(p.click_count) || 0;
+  const ratingSignal = rating > 0 ? Math.min(100, (rating / 5) * 100) : 0;
+  return (
+    logVolume(orders) * 0.4 +
+    logVolume(clicks) * 0.3 +
+    ratingSignal * 0.2 +
+    logVolume(reviews) * 0.1
+  );
+}
+
 function popularitySignal(p: MarketplaceProduct, popularity?: PopularityMap): number {
   const raw = popularity?.[p.id] ?? 0;
-  if (raw <= 0) {
-    // Soft proxy until real click/order tallies exist on the public feed
-    return hasImage(p) ? 35 : 10;
-  }
-  // log-ish scale so one viral item does not erase everyone else
-  return Math.min(100, Math.log10(raw + 1) * 40);
+  if (raw > 0) return Math.min(100, Math.log10(raw + 1) * 25);
+  // Real product signals when no external popularity map is supplied
+  // (e.g. marketplace feed). Falls back to an image-quality proxy when the
+  // popularity columns have no data yet.
+  const real = scoreProductPopularity(p);
+  if (real > 0) return real;
+  return hasImage(p) ? 35 : 10;
 }
 
 /**
@@ -114,13 +144,18 @@ export function scoreProductForSort(
     case "price_desc":
       return imgBoost + p.price;
     case "popular": {
-      // Popularity proxy: shop rating + review volume, then discount + recency.
+      // Real popularity: orders + clicks lead, shop rating & review volume
+      // support them. Kept on a weighted scale so the strongest sellers surface.
       const rating = Number(p.shop_avg_rating) || 0;
       const reviews = Number(p.shop_review_count) || 0;
+      const orders = Number(p.orders_count) || 0;
+      const clicks = Number(p.click_count) || 0;
       return (
         imgBoost +
         rating * 100_000 +
         Math.log10(reviews + 1) * 50_000 +
+        Math.log10(orders + 1) * 300_000 +
+        Math.log10(clicks + 1) * 150_000 +
         disc * 100 +
         created / 1_000
       );

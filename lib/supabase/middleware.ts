@@ -18,32 +18,61 @@ function requireEnv(key: string): string {
   return value;
 }
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+export interface RefreshedSessionUser {
+  id: string;
+  email_confirmed_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+  app_metadata?: Record<string, unknown> | null;
+}
 
-  const supabase = createServerClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
+export async function updateSession(request: NextRequest): Promise<{
+  response: NextResponse;
+  user: RefreshedSessionUser | null;
+}> {
+  let supabaseResponse = NextResponse.next({ request });
+  let sessionUser: RefreshedSessionUser | null = null;
+
+  // Fast path: no auth cookies means a guest with nothing to refresh — skip
+  // the Supabase getUser() call entirely (saves an edge round-trip per page).
+  const hasAuthCookie = request.cookies.getAll().some(
+    (c) => c.name.startsWith("sb-") && c.value.length > 0,
+  );
+  if (hasAuthCookie) {
+    const supabase = createServerClient(
+      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value),
+            );
+            supabaseResponse = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options),
+            );
+          },
         },
       },
-    },
-  );
+    );
 
-  // Refresh session — important! Do not remove.
-  await supabase.auth.getUser();
+    // Refresh session — important! Do not remove.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+    if (user) {
+      sessionUser = {
+        id: user.id,
+        email_confirmed_at: user.email_confirmed_at,
+        user_metadata: user.user_metadata ?? null,
+        app_metadata: user.app_metadata ?? null,
+      };
+    }
+  }
+
+  return { response: supabaseResponse, user: sessionUser };
 }

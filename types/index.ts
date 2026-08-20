@@ -261,6 +261,18 @@ export interface Product {
   /** Merchant pin-to-top flag — pinned items sort first in the storefront. */
   is_pinned?: boolean | null;
   /**
+   * Total units ordered for this product across non-cancelled orders.
+   * Denormalized by a DB trigger (see product_popularity_signals migration).
+   * Used as a popularity signal in search / feed ranking.
+   */
+  orders_count?: number;
+  /**
+   * Total `product_click` events logged in analytics_logs for this product.
+   * Denormalized by a DB trigger (see product_popularity_signals migration).
+   * Used as a popularity signal in search / feed ranking.
+   */
+  click_count?: number;
+  /**
    * Compact, URL-safe code for the direct product page `/p/{short_code}`.
    * Used in WhatsApp order links so each item deep-links straight to the
    * product photo instead of the store. Null for rows created before the

@@ -13,6 +13,7 @@ import {
   type PlaceSearchResult,
 } from "@/services/geoRadiusService";
 import { SUPPORTED_CITIES, type SupportedCity } from "@/types";
+import { getCityAreas } from "@/lib/cityAreas";
 import CustomSelect from "@/components/CustomSelect";
 
 const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
@@ -93,6 +94,7 @@ export default function LocationPicker() {
     detectLocationDetailed,
     setManualPin,
     setManualCity,
+    setManualArea,
   } = useLocation();
 
   const [open, setOpen] = useState(false);
@@ -216,6 +218,8 @@ export default function LocationPicker() {
       longitude: c.longitude,
       accuracyMeters: c.accuracyMeters ?? null,
     });
+    // Location found — close the picker right away (no extra tap needed).
+    setOpen(false);
     return true;
   }, [detectLocationDetailed]);
 
@@ -272,6 +276,8 @@ export default function LocationPicker() {
       try {
         await setManualPin(place.latitude, place.longitude);
         searchInputRef.current?.blur();
+        // Exact area picked — close the picker so the shop list refreshes.
+        setOpen(false);
       } catch {
         setDetectError("Could not open that place on the map. Try again.");
       } finally {
@@ -289,9 +295,26 @@ export default function LocationPicker() {
     (city: SupportedCity) => {
       setManualCity(city);
       setDetectError(null);
-      setShowCities(false);
+      if (getCityAreas(city).length > 0) {
+        // Keep the sheet open so the user can pick an exact area (colony).
+        setShowCities(true);
+      } else {
+        // No curated areas — the city pick itself is final.
+        setShowCities(false);
+        setOpen(false);
+      }
     },
     [setManualCity],
+  );
+
+  const handleSelectArea = useCallback(
+    (city: SupportedCity, areaName: string) => {
+      setManualArea(city, areaName);
+      setDetectError(null);
+      // Area picked — close the picker immediately.
+      setOpen(false);
+    },
+    [setManualArea],
   );
 
   const hasLocation = !!location;
@@ -529,6 +552,32 @@ export default function LocationPicker() {
                     ]}
                     size="sm"
                   />
+                </div>
+              )}
+
+              {location?.city && getCityAreas(location.city).length > 0 && (
+                <div className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+                  <p className="mb-1.5 text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                    Nearby areas in {location.city}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {getCityAreas(location.city).map((area) => (
+                      <button
+                        key={area.name}
+                        type="button"
+                        onClick={() =>
+                          handleSelectArea(location.city as SupportedCity, area.name)
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                          location?.deliveryZone === area.name
+                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:bg-emerald-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/40"
+                        }`}
+                      >
+                        {area.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

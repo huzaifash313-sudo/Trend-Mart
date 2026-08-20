@@ -16,7 +16,7 @@ import { useToast } from "@/components/Toast";
 import ProductOrderModal, { type ProductOrderIntent } from "@/components/ProductOrderModal";
 import { fetchShopById } from "@/services/shopService";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
-import { filterShopsByProximity, haversineDistance } from "@/services/geoRadiusService";
+import { filterShopsByProximity, haversineDistance, getCustomerArea } from "@/services/geoRadiusService";
 import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMarketplaceProductsInfinite, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
@@ -41,6 +41,7 @@ import {
   trackSearch,
   trackCategoryInterest,
 } from "@/lib/behavior";
+import { logProductClick } from "@/services/analyticsService";
 
 const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
   ssr: false,
@@ -389,6 +390,7 @@ function ProductsPageInner() {
           scope,
           deliveryZone: globalLocation?.deliveryZone ?? undefined,
           customerCity: globalLocation?.city ?? undefined,
+          customerArea: getCustomerArea(globalLocation),
         });
         if (!cancelled) {
           setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
@@ -463,6 +465,7 @@ function ProductsPageInner() {
     (category: ShopCategory) => {
       setActiveCategory(category);
       setActiveSubCategoryId(null);
+      setAreaOpen(false);
       syncUrl({ category, sub: null });
     },
     [syncUrl],
@@ -471,6 +474,7 @@ function ProductsPageInner() {
   const handleSubCategoryChange = useCallback(
     (subId: string | null) => {
       setActiveSubCategoryId(subId);
+      setAreaOpen(false);
       syncUrl({ sub: subId });
     },
     [syncUrl],
@@ -479,6 +483,7 @@ function ProductsPageInner() {
   const handleSortChange = useCallback(
     (value: MarketplaceSort) => {
       setSort(value);
+      setAreaOpen(false);
       syncUrl({ sort: value });
     },
     [syncUrl],
@@ -511,6 +516,8 @@ function ProductsPageInner() {
         category: full.shop_category ?? full.category_id ?? null,
       });
       trackCategoryInterest(full.shop_category ?? full.category_id, "click");
+      // Real click tally → feeds the popularity-based search/feed ranking.
+      void logProductClick(full.shop_id, full.id);
     },
     [],
   );
@@ -772,7 +779,7 @@ function ProductsPageInner() {
             type="button"
             onClick={() => setAreaOpen((v) => !v)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-              areaOpen || (geoFilter.scope === "radius" && geoFilter.maxDistanceKm > 0)
+              areaOpen || geoFilter.locationAvailable
                 ? "bg-teal-600 text-white"
                 : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
             }`}
@@ -782,12 +789,15 @@ function ProductsPageInner() {
           </button>
         </div>
         {areaOpen && (
-          <div className="mt-2 rounded-2xl border border-zinc-100 bg-zinc-50/80 p-2 dark:border-zinc-800 dark:bg-zinc-900/60">
+          <div className="mt-2">
             <GeoRadiusFilter
               onFilterChange={setGeoFilter}
               isDetecting={geoDetecting}
               onDetectStart={() => setGeoDetecting(true)}
               onDetectEnd={() => setGeoDetecting(false)}
+              open={areaOpen}
+              onDismiss={() => setAreaOpen(false)}
+              inline
             />
           </div>
         )}

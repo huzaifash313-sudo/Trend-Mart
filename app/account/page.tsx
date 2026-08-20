@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { detectUserRole } from "@/services/authService";
 import { getOrderHistory } from "@/services/orderHistoryService";
+import ProfileReviewsCard from "@/components/ProfileReviewsCard";
 
 function StatCard({
   label,
@@ -195,6 +196,9 @@ export default function CustomerAccountPage() {
       )}
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+        {/* Give your review — rate shops you ordered from + view all your reviews */}
+        <ProfileReviewsCard />
+
         {/* Verification status */}
         <section className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Verification</h2>

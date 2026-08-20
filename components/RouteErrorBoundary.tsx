@@ -21,14 +21,17 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function RouteErrorBoundary({
   name,
+  autoResetMs,
   children,
 }: {
   name?: string;
+  /** Auto-retry once after this many ms so transient errors self-heal. */
+  autoResetMs?: number;
   children: ReactNode;
 }) {
   const pathname = usePathname();
   return (
-    <ErrorBoundary key={pathname ?? "root"} name={name}>
+    <ErrorBoundary key={pathname ?? "root"} name={name} autoResetMs={autoResetMs}>
       {children}
     </ErrorBoundary>
   );

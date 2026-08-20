@@ -101,9 +101,10 @@ function LoginPageInner() {
   const [showOtpModal, setShowOtpModal] = useState(false);
 
   const finishLogin = useCallback(
-    async (role?: "customer" | "merchant" | "admin") => {
-      const user = await getCurrentUser();
-      const resolved = role ?? (await detectUserRole(user));
+    async (role?: "customer" | "merchant" | "admin", user?: Awaited<ReturnType<typeof getCurrentUser>>) => {
+      // Use the user already returned by sign-in — no extra round-trip.
+      const currentUser = user ?? (await getCurrentUser());
+      const resolved = role ?? (await detectUserRole(currentUser));
       const fallback = getDashboardPath(resolved);
       const target =
         redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
@@ -124,8 +125,7 @@ function LoginPageInner() {
 
         if (result.success && result.role) {
           addToast("Welcome back!", "success");
-          await new Promise((r) => setTimeout(r, 300));
-          await finishLogin(result.role);
+          await finishLogin(result.role, result.user);
           return;
         }
 

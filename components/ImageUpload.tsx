@@ -25,6 +25,8 @@ export interface ImageUploadProps {
   showPreview?: boolean;
   fallbackType?: "shop" | "product" | "generic";
   variant?: "default" | "compact";
+  /** "video" renders the preview box in a wide 16:9 banner shape (ads). */
+  aspect?: "square" | "video";
 }
 
 function PlusIcon() {
@@ -64,6 +66,7 @@ export default function ImageUpload({
   showPreview = true,
   fallbackType = "generic",
   variant = "default",
+  aspect = "square",
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -175,6 +178,9 @@ export default function ImageUpload({
   }
 
   /* ── Default: one clean clickable box ──────────────────────────────────── */
+  const boxShape =
+    aspect === "video" ? "aspect-video w-full" : "h-40 w-full";
+
   return (
     <div className="space-y-1.5">
       <span className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
@@ -187,7 +193,7 @@ export default function ImageUpload({
         type="button"
         onClick={openPicker}
         disabled={disabled || uploading}
-        className="group relative block h-40 w-full overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50 transition-colors hover:border-emerald-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+        className={`group relative block ${boxShape} overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50 transition-colors hover:border-emerald-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800`}
         aria-label={hasImage ? `Change ${label.toLowerCase()}` : `Upload ${label.toLowerCase()}`}
       >
         {uploading && !showImage ? (

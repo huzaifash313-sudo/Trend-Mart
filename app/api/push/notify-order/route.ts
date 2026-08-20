@@ -108,15 +108,26 @@ export async function POST(request: NextRequest) {
     }
 
     if (order.customer_user_id) {
-      await sendPushToUser(order.customer_user_id, {
-        title: event === "new" ? "Order placed on TrendMart" : `Order update: ${status}`,
-        body:
-          event === "new"
-            ? `Your order at ${shop?.name || "the shop"} was received${amount ? ` (${amount})` : ""}.`
-            : `Your order at ${shop?.name || "the shop"} is now ${status}.`,
-        url: `/orders/tracking?orderId=${encodeURIComponent(body.orderId)}`,
-        tag: `order-${body.orderId}-customer`,
-      });
+      if (status === "Delivered") {
+        // REVIEW REMINDER: a delivered order earns a review — point the customer
+        // straight at the review popup/card instead of the generic status update.
+        await sendPushToUser(order.customer_user_id, {
+          title: "Order delivered — rate your experience!",
+          body: `Your order at ${shop?.name || "the shop"} was delivered. Tap to rate the shop.`,
+          url: "/account",
+          tag: `order-${body.orderId}-review`,
+        });
+      } else {
+        await sendPushToUser(order.customer_user_id, {
+          title: event === "new" ? "Order placed on TrendMart" : `Order update: ${status}`,
+          body:
+            event === "new"
+              ? `Your order at ${shop?.name || "the shop"} was received${amount ? ` (${amount})` : ""}.`
+              : `Your order at ${shop?.name || "the shop"} is now ${status}.`,
+          url: `/orders/tracking?orderId=${encodeURIComponent(body.orderId)}`,
+          tag: `order-${body.orderId}-customer`,
+        });
+      }
     }
 
     return NextResponse.json({ success: true });

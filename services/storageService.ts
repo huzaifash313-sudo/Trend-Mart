@@ -246,6 +246,28 @@ const COMPRESS_TARGET_BYTES = 160 * 1024;
 const COMPRESS_MIN_QUALITY = 0.65;
 const COMPRESS_START_QUALITY = 0.85;
 
+/**
+ * Overridable compression knobs for `compressImageForUpload` / `uploadImage`.
+ * Defaults keep product photos ~160 KB for the Cloudinary free tier, but
+ * promotional ad banners are few in number and get shown LARGE on the
+ * homepage — so they deliberately skip the aggressive compression that
+ * makes small cards look soft/blurry.
+ */
+export interface CompressionOptions {
+  maxEdge?: number;
+  targetBytes?: number;
+  minQuality?: number;
+  startQuality?: number;
+}
+
+/** Banner-grade profile: up to 2560px wide, ~640 KB budget, floor q0.82. */
+export const BANNER_UPLOAD_OPTIONS: CompressionOptions = {
+  maxEdge: 2560,
+  targetBytes: 640 * 1024,
+  minQuality: 0.82,
+  startQuality: 0.92,
+};
+
 function loadImageElement(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -276,10 +298,18 @@ function canvasToBlob(
  * Compress + convert to WebP (JPEG fallback) before upload.
  * Keeps visual quality high while shrinking typical phone photos to ~80–140 KB.
  */
-export async function compressImageForUpload(file: File): Promise<File> {
+export async function compressImageForUpload(
+  file: File,
+  options: CompressionOptions = {},
+): Promise<File> {
   if (typeof window === "undefined") return file;
   // Already tiny — skip work
   if (file.size > 0 && file.size <= 48 * 1024) return file;
+
+  const maxEdge = options.maxEdge ?? COMPRESS_MAX_EDGE;
+  const targetBytes = options.targetBytes ?? COMPRESS_TARGET_BYTES;
+  const minQuality = options.minQuality ?? COMPRESS_MIN_QUALITY;
+  const startQuality = options.startQuality ?? COMPRESS_START_QUALITY;
 
   try {
     const img = await loadImageElement(file);
@@ -287,7 +317,7 @@ export async function compressImageForUpload(file: File): Promise<File> {
     const h = img.naturalHeight || img.height;
     if (!w || !h) return file;
 
-    const scale = Math.min(1, COMPRESS_MAX_EDGE / Math.max(w, h));
+    const scale = Math.min(1, maxEdge / Math.max(w, h));
     const tw = Math.max(1, Math.round(w * scale));
     const th = Math.max(1, Math.round(h * scale));
 
@@ -304,15 +334,15 @@ export async function compressImageForUpload(file: File): Promise<File> {
     const mime = preferWebp ? "image/webp" : "image/jpeg";
     const ext = preferWebp ? "webp" : "jpg";
 
-    let quality = COMPRESS_START_QUALITY;
+    let quality = startQuality;
     let best: Blob | null = await canvasToBlob(canvas, mime, quality);
 
     while (
       best &&
-      best.size > COMPRESS_TARGET_BYTES &&
-      quality > COMPRESS_MIN_QUALITY
+      best.size > targetBytes &&
+      quality > minQuality
     ) {
-      quality = Math.max(COMPRESS_MIN_QUALITY, quality - 0.08);
+      quality = Math.max(minQuality, quality - 0.08);
       const next = await canvasToBlob(canvas, mime, quality);
       if (!next) break;
       best = next;
@@ -346,12 +376,15 @@ export async function compressImageForUpload(file: File): Promise<File> {
  * @param file      The File object from an <input type="file"> picker.
  * @param folder    Subfolder for the asset (e.g. "shops" or "products").
  * @param fileId    Unique identifier used in the storage path.
+ * @param options   Optional compression overrides. Defaults to banner-grade
+ *                  compression when `folder === "ads"`.
  * @returns         The public URL of the uploaded file, OR a fallback placeholder URL.
  */
 export async function uploadImage(
   file: File,
   folder: string,
   fileId: string,
+  options?: CompressionOptions,
 ): Promise<ServiceResult<string>> {
   const supabase = createClient();
 
@@ -371,7 +404,11 @@ export async function uploadImage(
 
   let optimized: File = file;
   try {
-    optimized = await compressImageForUpload(file);
+    // Ad banners are shown large on the homepage, so they always skip the
+    // aggressive product-photo compression (unless the caller overrides).
+    const compressionOptions =
+      options ?? (folder === "ads" ? BANNER_UPLOAD_OPTIONS : undefined);
+    optimized = await compressImageForUpload(file, compressionOptions);
   } catch {
     /* non-fatal — upload the original file as-is */
   }

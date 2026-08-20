@@ -18,12 +18,14 @@ import {
   detectAndSaveLocation,
   detectAndSaveLocationDetailed,
   buildLocationFromCity,
+  buildLocationFromArea,
   buildLocationFromCoords,
   resolveCoordinates,
   storeUserLocation,
   type GeoCoordinates,
   type LocationDetectErrorCode,
 } from "@/services/geoRadiusService";
+import { getCityAreas } from "@/lib/cityAreas";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -56,6 +58,8 @@ interface LocationContextValue {
   setManualPin: (lat: number, lng: number) => Promise<UserLocation | null>;
   /** Set location from a manually selected city. */
   setManualCity: (city: SupportedCity) => void;
+  /** Set location to a curated area (colony / town) inside a city. */
+  setManualArea: (city: SupportedCity, areaName: string) => void;
   /** Seed a saved location (e.g. from account profile) without re-geocoding. */
   seedLocation: (loc: UserLocation) => void;
   /** Clear the saved location (reset to no location). */
@@ -206,6 +210,18 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     if (loc.coordinates) storeUserLocation(loc.coordinates);
   }, []);
 
+  const setManualArea = useCallback((city: SupportedCity, areaName: string) => {
+    const area = getCityAreas(city).find((a) => a.name === areaName);
+    if (!area) {
+      setManualCity(city);
+      return;
+    }
+    const loc = buildLocationFromArea(city, area);
+    saveLocation(loc);
+    setLocation(loc);
+    if (loc.coordinates) storeUserLocation(loc.coordinates);
+  }, [setManualCity]);
+
   const seedLocation = useCallback((loc: UserLocation) => {
     saveLocation(loc);
     setLocation(loc);
@@ -227,6 +243,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       detectLocationDetailed,
       setManualPin,
       setManualCity,
+      setManualArea,
       seedLocation,
       clearLocation,
     }),
@@ -239,6 +256,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       detectLocationDetailed,
       setManualPin,
       setManualCity,
+      setManualArea,
       seedLocation,
       clearLocation,
     ],

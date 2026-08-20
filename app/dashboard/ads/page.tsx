@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import ImageUpload from "@/components/ImageUpload";
+import AdCreativePreview from "@/components/AdCreativePreview";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import {
   fetchShopAds,
@@ -246,13 +247,24 @@ export default function MerchantAdsPage() {
               {editingId ? "Edit Ad Request" : "New Ad Request"}
             </h2>
 
+            {/* Live storefront preview — exact copy of the homepage card */}
+            <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                Storefront preview
+              </p>
+              <div className="mx-auto w-full max-w-md">
+                <AdCreativePreview form={form} />
+              </div>
+            </div>
+
             <ImageUpload
-              label="Banner Image (wide, e.g. 1200×500)"
+              label="Banner Image (wide, e.g. 1600×900)"
               currentUrl={form.image_url}
               onUploaded={(url) => setForm((f) => ({ ...f, image_url: url }))}
               folder="ads"
               fileId={editingId ?? "new-ad"}
               showPreview
+              aspect="video"
               fallbackType="generic"
             />
 

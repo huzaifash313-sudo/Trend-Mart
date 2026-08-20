@@ -421,6 +421,45 @@ export async function fetchReviewSessionContext(
   }
 }
 
+// ─── My Reviews (account portal) ─────────────────────────────────────────────
+
+export interface MyReview extends Review {
+  shop_name: string;
+}
+
+export interface MyReviewsPayload {
+  reviews: MyReview[];
+  /** Delivered-but-unreviewed shops, each with the latest delivered orderId so
+   *  dismissal is per-order (a later order from the same shop re-triggers). */
+  reviewableShops: { id: string; name: string; orderId?: string }[];
+  stats: { total: number; average: number };
+}
+
+/**
+ * Fetch the signed-in customer's own reviews plus the shops they can still
+ * review (ordered from but not yet reviewed). Backed by GET /api/reviews/my-reviews.
+ */
+export async function fetchMyReviews(): Promise<ServiceResult<MyReviewsPayload>> {
+  try {
+    const res = await fetch("/api/reviews/my-reviews", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    const payload = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      data?: MyReviewsPayload;
+    };
+    if (!res.ok || !payload.success || !payload.data) {
+      return { success: false, error: payload.error || "Could not load your reviews." };
+    }
+    return { success: true, data: payload.data };
+  } catch (err) {
+    logError(err, { module: "reviewService.fetchMyReviews" });
+    return { success: false, error: toError(err) };
+  }
+}
+
 // ─── Compute Rating Stats ────────────────────────────────────────────────────
 
 /**

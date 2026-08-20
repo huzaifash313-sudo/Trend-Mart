@@ -110,7 +110,7 @@ function SponsoredCard({
             sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 24vw"
             priority={priority}
             loading={priority ? "eager" : "lazy"}
-            quality={82}
+            quality={90}
             onError={() => setImgError(true)}
           />
         ) : (

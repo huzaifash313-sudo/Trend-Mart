@@ -1,14 +1,18 @@
 "use client";
 
-/* -------------------------------------------------------------------------- */
-/*  TrendMart — Route-level error boundary                                    */
-/*  Catches runtime errors in the app router segment and shows a branded,     */
-/*  retryable fallback instead of a blank crash.                              */
-/* -------------------------------------------------------------------------- */
-
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ErrorState } from "@/components/ErrorState";
+import { logError } from "@/services/errorService";
 
+/**
+ * Route-segment error boundary (App Router convention).
+ *
+ * Next.js automatically resets this boundary when the user navigates to a
+ * different route, so a single broken page can never wedge every subsequent
+ * client-side navigation until a hard refresh — the old "stuck until refresh"
+ * symptom. The one-shot auto-retry below additionally lets transient failures
+ * (network blips, race conditions) recover by themselves after ~2s.
+ */
 export default function RouteError({
   error,
   reset,
@@ -16,18 +20,27 @@ export default function RouteError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const autoRetried = useRef(false);
+
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[TrendMart] Route error:", error);
-  }, [error]);
+    logError(error, {
+      module: "app/error.tsx",
+      meta: { digest: error.digest },
+    });
+
+    if (autoRetried.current) return;
+    autoRetried.current = true;
+
+    const t = window.setTimeout(() => reset(), 1800);
+    return () => window.clearTimeout(t);
+  }, [error, reset]);
 
   return (
-    <div className="mx-auto flex min-h-[60vh] w-full max-w-2xl items-center justify-center px-4 py-10">
-      <ErrorState
-        title="Something went wrong"
-        message="This page hit an unexpected error. Try again — it's usually temporary."
-        onRetry={() => reset()}
-      />
-    </div>
+    <ErrorState
+      title="This page hit a snag"
+      message="Something went wrong loading this page. Try again — or keep browsing, it won't block you."
+      onRetry={reset}
+      errorStack={error.stack}
+    />
   );
 }

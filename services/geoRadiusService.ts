@@ -14,6 +14,10 @@ import type { Shop, UserLocation, SupportedCity } from "@/types";
 import { SUPPORTED_CITIES } from "@/types";
 import { logError } from "@/services/errorService";
 import {
+  normalizeAreaName,
+  getCityAreas,
+} from "@/lib/cityAreas";
+import {
   isValidLatitude,
   isValidLongitude,
   isValidCoordinate,
@@ -33,6 +37,8 @@ export interface GeoCoordinates {
 export interface ShopWithDistance extends Shop {
   distance_km?: number;
   within_radius?: boolean;
+  /** True when the shop textually mentions the customer's selected area. */
+  matches_area?: boolean;
 }
 
 export interface GeoFilterOptions {
@@ -44,6 +50,12 @@ export interface GeoFilterOptions {
   deliveryZone?: string;
   /** Customer city (from GPS or manual picker) — used for merchant city-only coverage. */
   customerCity?: string;
+  /**
+   * Customer's selected area / mohalla / colony (e.g. "Peoples Colony").
+   * Shops whose location / address / delivery_zones mention this area are kept
+   * even when their pin is missing or outside the numeric radius.
+   */
+  customerArea?: string;
   /**
    * Browse scope:
    * - radius: within maxDistanceKm of pin
@@ -381,6 +393,53 @@ export function storeUserLocation(coordinates: GeoCoordinates): void {
 
 // ─── Geo-Radius Filtering ───────────────────────────────────────────────────
 
+/**
+ * Does a shop's location text (location / address / service_area / zones)
+ * mention the given area (mohalla / colony)? Normalized so "Peoples Colony"
+ * matches "People's Colony, Gujranwala" in a shop's address.
+ */
+export function shopMentionsArea(
+  shop: Pick<
+    Shop,
+    "location" | "address_display" | "service_area" | "delivery_zones"
+  >,
+  area: string,
+): boolean {
+  const target = normalizeAreaName(area);
+  if (!target) return false;
+
+  const haystack = [
+    shop.location,
+    shop.address_display,
+    shop.service_area,
+    ...(shop.delivery_zones ?? []),
+  ]
+    .filter(Boolean)
+    .map((s) => normalizeAreaName(String(s)))
+    .join(" | ");
+
+  if (!haystack) return false;
+  return haystack.includes(target);
+}
+
+/**
+ * Extract the customer's selected area (mohalla/colony) from their location.
+ * Returns undefined when only a city is selected — the city-level match already
+ * runs via `customerCity`, so text-matching the whole city would weaken the
+ * numeric radius cap.
+ */
+export function getCustomerArea(
+  location?: Pick<UserLocation, "city" | "deliveryZone"> | null,
+): string | undefined {
+  const city = location?.city?.trim();
+  const zone = location?.deliveryZone?.trim();
+  if (!zone || !city) return undefined;
+  if (zone === city) return undefined;
+  // The zone is a real curated area only if it exists in the city's area list.
+  if (getCityAreas(city).some((a) => a.name === zone)) return zone;
+  return undefined;
+}
+
 export async function filterShopsByProximity(
   shops?: Shop[],
   opts?: GeoFilterOptions,
@@ -392,6 +451,7 @@ export async function filterShopsByProximity(
     sortByProximity = true,
     deliveryZone,
     customerCity,
+    customerArea,
     scope = "radius",
   } = opts ?? {};
 
@@ -507,18 +567,26 @@ export async function filterShopsByProximity(
       within_radius = true;
     }
 
+    // Textual area match: shop's location / address / zones name the area the
+    // customer picked. This keeps pin-less shops visible for their ilaqa.
+    const matchesAreaText =
+      !!customerArea && shopMentionsArea(shop, customerArea);
+
     return {
       ...shop,
       distance_km: distance_km != null ? Math.round(distance_km * 10) / 10 : undefined,
       within_radius,
+      matches_area: matchesAreaText || undefined,
     };
   });
 
   // Merchant coverage is ALWAYS enforced — regardless of the customer's browse
   // scope (Near me / This city / All Pakistan). A shop set to "5 km only" must
   // never be visible to a customer outside that radius, even in "All Pakistan".
+  // A shop that explicitly lists the customer's area in its zones/address is
+  // treated as covered for that area.
   if (enforceServiceRadius) {
-    enriched = enriched.filter((s) => s.within_radius === true);
+    enriched = enriched.filter((s) => s.within_radius === true || s.matches_area === true);
   }
 
   // City scope: keep shops that serve / sit in the customer's city
@@ -544,9 +612,12 @@ export async function filterShopsByProximity(
   // Near me + explicit km (5/10/20/50): HARD cut — only shops with a pin inside range.
   // "Any" (maxDistanceKm <= 0) keeps sorting by proximity without cutting the list.
   // City / All Pakistan browse ignore this km cap (they use city/nationwide rules above).
+  // Shops that textually name the selected area are kept even if their pin is far.
   if (browseScope === "radius" && !unlimitedBrowse) {
     enriched = enriched.filter(
-      (s) => s.distance_km != null && s.distance_km <= maxDistanceKm,
+      (s) =>
+        (s.distance_km != null && s.distance_km <= maxDistanceKm) ||
+        s.matches_area === true,
     );
   } else if (browseScope === "radius") {
     // "Any" — still drop shops that fail merchant service-radius when enforced
@@ -1179,6 +1250,25 @@ export function buildLocationFromCity(city: SupportedCity): UserLocation {
       : null,
     city,
     deliveryZone: city,
+    updatedAt: Date.now(),
+    source: "manual",
+  };
+}
+
+/**
+ * Build a UserLocation from a manually selected area (colony / town) inside a
+ * city. The area pin becomes the customer location so the proximity engine
+ * filters shops, products, and deals around that exact ilaqa.
+ */
+export function buildLocationFromArea(
+  city: SupportedCity,
+  area: { name: string; lat: number; lng: number },
+): UserLocation {
+  return {
+    coordinates: { latitude: area.lat, longitude: area.lng },
+    city,
+    deliveryZone: area.name,
+    address: `${area.name}, ${city}`,
     updatedAt: Date.now(),
     source: "manual",
   };

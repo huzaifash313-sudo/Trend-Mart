@@ -2,6 +2,7 @@ import {
   diversifyMarketplaceFeed,
   scoreForYouBalanced,
   scoreProductForSort,
+  scoreProductPopularity,
   type MarketplaceFeedSort,
 } from "@/lib/marketplaceDiversity";
 import type { MarketplaceProduct } from "@/types";
@@ -145,5 +146,67 @@ describe("diversifyMarketplaceFeed", () => {
     expect(scoreProductForSort(deal, "for_you")).toBeGreaterThan(
       scoreProductForSort(plain, "for_you"),
     );
+  });
+});
+
+describe("product popularity signals (reviews / orders / clicks)", () => {
+  it("scores real demand signals higher than a cold product", () => {
+    const hot = product({
+      id: "hot",
+      shop_id: "s1",
+      name: "Hot",
+      shop_avg_rating: 4.8,
+      shop_review_count: 120,
+      orders_count: 500,
+      click_count: 3000,
+    });
+    const cold = product({
+      id: "cold",
+      shop_id: "s1",
+      name: "Cold",
+      shop_avg_rating: null,
+      shop_review_count: 0,
+      orders_count: 0,
+      click_count: 0,
+    });
+
+    expect(scoreProductPopularity(hot)).toBeGreaterThan(scoreProductPopularity(cold));
+    expect(scoreProductPopularity(cold)).toBe(0);
+  });
+
+  it("gives orders the heaviest weight", () => {
+    const manyOrders = product({ id: "a", shop_id: "s1", name: "A", orders_count: 400, click_count: 10 });
+    const manyClicks = product({ id: "b", shop_id: "s1", name: "B", orders_count: 10, click_count: 400 });
+    expect(scoreProductPopularity(manyOrders)).toBeGreaterThan(
+      scoreProductPopularity(manyClicks),
+    );
+  });
+
+  it("uses log-scale so one viral item does not crush the feed", () => {
+    const viral = scoreProductPopularity(
+      product({ id: "viral", shop_id: "s1", name: "Viral", orders_count: 1_000_000, click_count: 5_000_000 }),
+    );
+    const medium = scoreProductPopularity(
+      product({ id: "medium", shop_id: "s1", name: "Medium", orders_count: 2_000, click_count: 5_000 }),
+    );
+    // Both inside 0–100, viral only modestly above medium (no runaway).
+    expect(viral).toBeLessThanOrEqual(100);
+    expect(viral).toBeGreaterThan(medium);
+    expect(viral / medium).toBeLessThan(3);
+  });
+
+  it("surfaces in-demand products first in a single-shop For You feed", () => {
+    // Same freshness so the popularity signal (orders + clicks) decides.
+    const popular = product({ id: "pop", shop_id: "s1", name: "Pop", orders_count: 300, click_count: 900, created_at: "2026-01-01T00:00:00Z" });
+    const fresh = product({
+      id: "fresh",
+      shop_id: "s1",
+      name: "Fresh",
+      orders_count: 0,
+      click_count: 0,
+      created_at: "2026-01-01T00:00:00Z",
+    });
+    const feed = diversifyMarketplaceFeed([fresh, popular], "for_you");
+    expect(feed[0]?.id).toBe("pop");
   });
 });

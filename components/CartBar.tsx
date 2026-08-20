@@ -215,7 +215,7 @@ export default function CartBar() {
 
   return (
     <>
-      <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 md:bottom-0 md:z-50">
+      <div className="tm-cartbar-root fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 md:bottom-0 md:z-50">
         <div className="mx-auto max-w-lg px-3">
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg transition-all dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
             {expanded && (

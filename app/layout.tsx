@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import PwaRegister from "@/components/PwaRegister";
 import AppSplash from "@/components/AppSplash";
 import ChunkReloadGuard from "@/components/ChunkReloadGuard";
+import NavigationRecovery from "@/components/NavigationRecovery";
 import InteractionUnlock from "@/components/InteractionUnlock";
 import AccountScopeGuard from "@/components/AccountScopeGuard";
 import RouteErrorBoundary from "@/components/RouteErrorBoundary";
@@ -20,6 +21,7 @@ import { ToastProvider } from "@/components/Toast";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
+import ReviewReminderPopup from "@/components/ReviewReminderPopup";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import PolicyNotice from "@/components/PolicyNotice";
@@ -110,34 +112,36 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <ConfirmProvider>
               <MerchantQuickAddProvider>
               <AppNotifications>
-              <ErrorBoundary name="AppSplash">
+              <ErrorBoundary name="AppSplash" autoResetMs={2500}>
                 <AppSplash />
               </ErrorBoundary>
               <ChunkReloadGuard />
+              <NavigationRecovery />
               <InteractionUnlock />
               <AccountScopeGuard />
-              <ErrorBoundary name="Navbar">
+              <ErrorBoundary name="Navbar" autoResetMs={2500}>
                 <Navbar />
               </ErrorBoundary>
               <ScrollToTopSuspense>
                 <ScrollToTop />
               </ScrollToTopSuspense>
-              <RouteErrorBoundary name="MainContent">
+              <RouteErrorBoundary name="MainContent" autoResetMs={1500}>
                 <main className="tm-main tm-route-fade flex-1">{children}</main>
               </RouteErrorBoundary>
-              <ErrorBoundary name="Footer">
+              <ErrorBoundary name="Footer" autoResetMs={2500}>
                 <Footer />
               </ErrorBoundary>
-              <ErrorBoundary name="BottomNav">
+              <ErrorBoundary name="BottomNav" autoResetMs={2500}>
                 <BottomNav />
               </ErrorBoundary>
-              <ErrorBoundary name="CartBar">
+              <ErrorBoundary name="CartBar" autoResetMs={2500}>
                 <CartBar />
               </ErrorBoundary>
               <MerchantQuickAddHost />
               <OnboardingWizard />
               <PolicyNotice />
               <PwaRegister />
+              <ReviewReminderPopup />
               </AppNotifications>
               </MerchantQuickAddProvider>
               </ConfirmProvider>

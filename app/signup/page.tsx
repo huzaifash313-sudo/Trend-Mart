@@ -190,8 +190,11 @@ function SignupPageInner() {
       const signIn = await signInWithEmail(email, password);
       if (signIn.success && signIn.user?.id) {
         recordLegalAcceptance(signIn.user.id, ["terms", "privacy"]);
-        await claimSignupRole(pendingRole);
-        await syncContactProfileFromMetadata(signIn.user);
+        // Independent writes run in parallel — one round-trip instead of two.
+        await Promise.all([
+          claimSignupRole(pendingRole),
+          syncContactProfileFromMetadata(signIn.user),
+        ]);
         addToast(
           pendingRole === "merchant"
             ? "Email verified! Set up your store next."

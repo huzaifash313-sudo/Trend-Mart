@@ -8,7 +8,7 @@ import type { MarketplaceProduct, Product, ProductFormData } from "@/types";
 import { logError, toErrorMessage, toServiceError } from "@/services/errorService";
 import { isValidUUID } from "@/lib/sanitization";
 import { generateProductShortCode } from "@/lib/shortCode";
-import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
+import { diversifyMarketplaceFeed, scoreProductPopularity } from "@/lib/marketplaceDiversity";
 import {
   buildFuzzyIlikeOr,
   fuzzyFilterAndRank,
@@ -316,6 +316,8 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     is_available: row.is_available !== false,
     stock_status: (row.stock_status as string | undefined) ?? undefined,
     variants: (row.variants as Product["variants"]) ?? null,
+    orders_count: Number(row.orders_count) || 0,
+    click_count: Number(row.click_count) || 0,
     category_id: (row.category_id as string | null) ?? null,
     sub_category_id: (row.sub_category_id as string | null) ?? null,
     created_at: (row.created_at as string | undefined) ?? undefined,
@@ -367,6 +369,7 @@ const MARKETPLACE_SELECT = `
   id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
   category_id, sub_category_id, created_at, short_code,
+  orders_count, click_count,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude, location,
@@ -483,6 +486,107 @@ async function topUpMarketplaceDiversity(
   return [...items, ...extra];
 }
 
+/** How many rows to pull per search so popularity-aware ranking is stable across pages. */
+const SEARCH_POOL_SIZE = 250;
+
+/** Dedupe marketplace rows keeping order (first list wins). */
+function mergeMarketplaceRows(
+  first: Record<string, unknown>[] | null,
+  second: Record<string, unknown>[] | null,
+): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const out: Record<string, unknown>[] = [];
+  for (const list of [first, second]) {
+    for (const row of list ?? []) {
+      const id = String(row.id ?? "");
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(row);
+    }
+  }
+  return out;
+}
+
+interface MarketplaceRowsQuery {
+  orderBy?: Array<[string, boolean]>;
+  limit?: number;
+  range?: [number, number];
+  availableOnly: boolean;
+  q: string;
+  subCategoryId?: string | null;
+}
+
+/**
+ * Run a marketplace products query with the standard live/approved + filter
+ * stack. Retries with the legacy select when the ratings/popularity columns
+ * are missing (migration not applied yet).
+ */
+async function runMarketplaceRows(
+  supabase: ReturnType<typeof createClient>,
+  opts: MarketplaceRowsQuery,
+): Promise<{ rows: Record<string, unknown>[] | null; error: unknown }> {
+  const build = (
+    select: string,
+    overrides?: { orderBy?: Array<[string, boolean]> },
+  ) => {
+    let b = supabase
+      .from("products")
+      .select(select)
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved");
+    if (opts.availableOnly) b = b.eq("is_available", true);
+    if (opts.q) {
+      const fuzzyOr = buildFuzzyIlikeOr(opts.q, ["name", "title"], 10);
+      if (fuzzyOr) {
+        b = b.or(fuzzyOr);
+      } else {
+        const safe = opts.q.replace(/[%_,.()']/g, " ").trim();
+        if (safe) {
+          const pattern = `%${safe}%`;
+          b = b.or(`name.ilike.${pattern},title.ilike.${pattern}`);
+        }
+      }
+    }
+    if (opts.subCategoryId) b = b.eq("sub_category_id", opts.subCategoryId);
+    for (const [col, ascending] of overrides?.orderBy ?? opts.orderBy ?? []) {
+      b = b.order(col, { ascending });
+    }
+    if (opts.range) b = b.range(opts.range[0], opts.range[1]);
+    else if (opts.limit != null) b = b.limit(opts.limit);
+    return b;
+  };
+
+  const primary = await build(MARKETPLACE_SELECT);
+  if (primary.error && isMissingRatingColumnError(primary.error)) {
+    // Popularity columns don't exist yet — retry without them (and without
+    // ordering on missing columns).
+    const legacy = await build(MARKETPLACE_SELECT_LEGACY, {
+      orderBy: opts.orderBy?.filter(
+        ([col]) => col !== "orders_count" && col !== "click_count",
+      ),
+    });
+    return {
+      rows: (legacy.data as Record<string, unknown>[] | null) ?? null,
+      error: legacy.error,
+    };
+  }
+  return {
+    rows: (primary.data as Record<string, unknown>[] | null) ?? null,
+    error: primary.error,
+  };
+}
+
+/**
+ * Blend fuzzy relevance (0–100) with real popularity signals — parent shop
+ * reviews/rating, total orders and real clicks — into one search score.
+ * Relevance still leads: a cold exact match outranks a weak fuzzy one, but
+ * strong demand can lift a near match above an ignored exact match.
+ */
+export function blendSearchScore(relevance: number, product: MarketplaceProduct): number {
+  const popularity = scoreProductPopularity(product);
+  return relevance * 0.62 + popularity * 0.38;
+}
+
 /**
  * Cross-store marketplace catalogue for /products.
  * Only products from live + approved shops.
@@ -505,71 +609,49 @@ export async function fetchMarketplaceProducts(
   const start = Math.max(0, Math.round(offset) || 0);
 
   try {
-    let builder = supabase
-      .from("products")
-      .select(MARKETPLACE_SELECT)
-      .eq("shops.is_live", true)
-      .eq("shops.verification_status", "approved")
-      .order("created_at", { ascending: false })
-      .range(start, start + pageSize - 1);
-
-    if (availableOnly) {
-      builder = builder.eq("is_available", true);
-    }
-
     const q = query.trim();
-    if (q) {
-      const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 10);
-      if (fuzzyOr) {
-        builder = builder.or(fuzzyOr);
-      } else {
-        const safe = q.replace(/[%_,.()']/g, " ").trim();
-        if (safe) {
-          const pattern = `%${safe}%`;
-          builder = builder.or(
-            `name.ilike.${pattern},title.ilike.${pattern}`,
-          );
-        }
-      }
-    }
+    const searchMode = q.length > 0;
 
-    if (subCategoryId) {
-      builder = builder.eq("sub_category_id", subCategoryId);
-    }
+    let rows: Record<string, unknown>[] | null = null;
+    let error: unknown = null;
 
-    const primary = await builder;
-    let rows: Record<string, unknown>[] | null =
-      (primary.data as Record<string, unknown>[] | null) ?? null;
-    let error = primary.error;
-
-    if (error && isMissingRatingColumnError(error)) {
-      // Migration not applied yet — degrade gracefully without ratings.
-      let legacy = supabase
-        .from("products")
-        .select(MARKETPLACE_SELECT_LEGACY)
-        .eq("shops.is_live", true)
-        .eq("shops.verification_status", "approved")
-        .order("created_at", { ascending: false })
-        .range(start, start + pageSize - 1);
-      if (availableOnly) legacy = legacy.eq("is_available", true);
-      if (q) {
-        const fuzzyOr = buildFuzzyIlikeOr(q, ["name", "title"], 10);
-        if (fuzzyOr) {
-          legacy = legacy.or(fuzzyOr);
-        } else {
-          const safe = q.replace(/[%_,.()']/g, " ").trim();
-          if (safe) {
-            const pattern = `%${safe}%`;
-            legacy = legacy.or(
-              `name.ilike.${pattern},title.ilike.${pattern}`,
-            );
-          }
-        }
-      }
-      if (subCategoryId) legacy = legacy.eq("sub_category_id", subCategoryId);
-      const legacyRes = await legacy;
-      rows = (legacyRes.data as Record<string, unknown>[] | null) ?? null;
-      error = legacyRes.error;
+    if (searchMode) {
+      // Broader pool so popularity-aware ranking stays consistent across
+      // infinite-scroll pages. Two slices merged: newest matches (so a brand
+      // new exact match is never buried) + most-ordered/clicks (so demand
+      // leaders always surface). Deduped, then rank-blended client-side.
+      const [fresh, popular] = await Promise.all([
+        runMarketplaceRows(supabase, {
+          orderBy: [["created_at", false]],
+          limit: SEARCH_POOL_SIZE,
+          availableOnly,
+          q,
+          subCategoryId,
+        }),
+        runMarketplaceRows(supabase, {
+          orderBy: [
+            ["orders_count", false],
+            ["click_count", false],
+            ["created_at", false],
+          ],
+          limit: SEARCH_POOL_SIZE,
+          availableOnly,
+          q,
+          subCategoryId,
+        }),
+      ]);
+      error = fresh.error || popular.error;
+      rows = mergeMarketplaceRows(fresh.rows, popular.rows);
+    } else {
+      const res = await runMarketplaceRows(supabase, {
+        orderBy: [["created_at", false]],
+        range: [start, start + pageSize - 1],
+        availableOnly,
+        q,
+        subCategoryId,
+      });
+      error = res.error;
+      rows = res.rows;
     }
     if (error) throw error;
 
@@ -640,8 +722,13 @@ export async function fetchMarketplaceProducts(
         (p) => [p.name, p.title, p.shop_name, p.shop_category],
         { minScore: FUZZY_MIN_SCORE, weights: [1, 0.95, 0.7, 0.55] },
       );
-      // Relevance first (exact → similar). Skip For You mix so typos still surface best hits.
-      return { success: true, data: ranked.map((r) => r.item) };
+      // Blended ranking: relevance leads, then reviews/orders/clicks lift the
+      // best-loved products. Skip the For You mix so typos still surface hits.
+      const blended = ranked
+        .map((r) => ({ item: r.item, score: blendSearchScore(r.score, r.item) }))
+        .sort((a, b) => b.score - a.score)
+        .map((r) => r.item);
+      return { success: true, data: blended.slice(start, start + pageSize) };
     }
 
     items = await topUpMarketplaceDiversity(supabase, items, {

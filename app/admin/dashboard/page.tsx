@@ -36,6 +36,7 @@ import type {
 import { SHOP_CATEGORIES } from "@/types";
 import { deleteShop } from "@/services/shopService";
 import ImageUpload from "@/components/ImageUpload";
+import AdCreativePreview from "@/components/AdCreativePreview";
 import type { SubCategoryWithMeta } from "@/services/subCategoryService";
 import {
   fetchAllSubCategoriesGrouped,
@@ -1329,13 +1330,25 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Platform ads are published immediately (no review needed) and aren&apos;t tied to any single shop.
                   </p>
+
+                  {/* Live storefront preview — exact copy of the homepage card */}
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                      Storefront preview
+                    </p>
+                    <div className="mx-auto w-full max-w-md">
+                      <AdCreativePreview form={platformAdForm} />
+                    </div>
+                  </div>
+
                   <ImageUpload
-                    label="Banner Image"
+                    label="Banner Image (wide, e.g. 1600×900)"
                     currentUrl={platformAdForm.image_url}
                     onUploaded={(url) => setPlatformAdForm((f) => ({ ...f, image_url: url }))}
                     folder="ads"
                     fileId="platform-ad"
                     showPreview
+                    aspect="video"
                     fallbackType="generic"
                   />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -24,6 +24,13 @@ interface ErrorBoundaryProps {
   onError?: (error: Error, info: ErrorInfo) => void;
   /** Optional component name for better error grouping in logs. */
   name?: string;
+  /**
+   * If set, the boundary automatically retries ONCE after this many ms while
+   * in the error state. Transient errors then self-heal without a refresh;
+   * persistent errors re-render the fallback and stop auto-retrying (one
+   * auto-retry per distinct error message, so there is never a retry loop).
+   */
+  autoResetMs?: number;
 }
 
 interface ErrorBoundaryState {
@@ -124,6 +131,9 @@ export class ErrorBoundary extends Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
 > {
+  private autoResetTimer: number | null = null;
+  private lastAutoResetMessage: string | null = null;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -168,6 +178,28 @@ export class ErrorBoundary extends Component<
 
     // 4. Optional external callback (e.g. LogRocket, custom analytics)
     this.props.onError?.(error, info);
+
+    // 5. Self-healing: transient errors auto-retry once (never a loop — one
+    //    auto-retry per distinct error message).
+    const resetMs = this.props.autoResetMs;
+    if (
+      resetMs &&
+      resetMs > 0 &&
+      this.state.errorMessage !== this.lastAutoResetMessage
+    ) {
+      this.lastAutoResetMessage = this.state.errorMessage;
+      this.autoResetTimer = window.setTimeout(() => {
+        this.autoResetTimer = null;
+        this.handleRetry();
+      }, resetMs);
+    }
+  }
+
+  componentWillUnmount(): void {
+    if (this.autoResetTimer !== null) {
+      window.clearTimeout(this.autoResetTimer);
+      this.autoResetTimer = null;
+    }
   }
 
   /** Reset the boundary and increment the key so children remount cleanly. */

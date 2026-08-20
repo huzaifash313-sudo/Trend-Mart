@@ -20,11 +20,11 @@ import {
   isStoryViewed,
   sortStoriesUnseenFirst,
 } from "@/lib/storyViewed";
-import { toggleFavorite as toggleFav } from "@/services/wishlistService";
+import { toggleFavorite as toggleFav, getAllFavorites } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { getSafeImageUrl } from "@/services/storageService";
-import { filterShopsByProximity } from "@/services/geoRadiusService";
+import { filterShopsByProximity, getCustomerArea } from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
@@ -221,6 +221,26 @@ function HomeInner() {
     return new Set();
   });
 
+  // Keep the shop hearts in sync with the real wishlist (DB for signed-in
+  // users, localStorage for guests) and refresh whenever it changes.
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      getAllFavorites()
+        .then((items) => {
+          if (cancelled) return;
+          setFavorites(new Set(items.filter((i) => i.type === "shop").map((i) => i.id)));
+        })
+        .catch(() => undefined);
+    };
+    refresh();
+    window.addEventListener("favoritesUpdated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("favoritesUpdated", refresh);
+    };
+  }, []);
+
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const s of shops) {
@@ -335,6 +355,7 @@ function HomeInner() {
           scope,
           deliveryZone: globalLocation?.deliveryZone ?? undefined,
           customerCity: globalLocation?.city ?? undefined,
+          customerArea: getCustomerArea(globalLocation),
         });
         if (!cancelled) {
           setGeoFilteredShops(result.shops);
@@ -388,6 +409,7 @@ function HomeInner() {
           scope,
           deliveryZone: globalLocation?.deliveryZone ?? undefined,
           customerCity: globalLocation?.city ?? undefined,
+          customerArea: getCustomerArea(globalLocation),
         });
         if (!cancelled) {
           setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
@@ -408,6 +430,7 @@ function HomeInner() {
     (geoFilter.scope === "radius"
       ? !!globalCoords || !!geoFilter.coordinates
       : geoFilter.scope === "city" || geoFilter.scope === "pakistan");
+  const pickedArea = getCustomerArea(globalLocation);
   const areaBadgeLabel =
     geoFilter.scope === "pakistan"
       ? "All Pakistan"
@@ -415,9 +438,11 @@ function HomeInner() {
         ? globalLocation?.city
           ? `${globalLocation.city}`
           : "This city"
-        : geoFilter.maxDistanceKm > 0
-          ? `Within ${geoFilter.maxDistanceKm} km`
-          : "Near you first";
+        : pickedArea
+          ? `${pickedArea} · ${geoFilter.maxDistanceKm || 10} km`
+          : geoFilter.maxDistanceKm > 0
+            ? `Within ${geoFilter.maxDistanceKm} km`
+            : "Near you first";
 
   const handleCategoryChange = useCallback((category: ShopCategory) => {
     setActiveCategory(category);

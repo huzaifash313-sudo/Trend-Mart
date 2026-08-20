@@ -155,7 +155,11 @@ function getRequiredRole(pathname: string): AppRole | "public" {
 }
 
 function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.some((route) => pathname.startsWith(route));
+  // Exact match only. Sub-routes under /auth/* (settings, verify-notice,
+  // callback, reset-password) are functional pages that logged-in users
+  // must be able to reach — only the bare entry points below are "auth
+  // pages" that a signed-in user should be redirected away from.
+  return AUTH_ROUTES.some((route) => pathname === route);
 }
 
 function canAccessRoute(role: AppRole | null, pathname: string): boolean {
@@ -425,49 +429,8 @@ async function resolveUserRole(
       },
     });
 
-    // 1) Prefer SECURITY DEFINER RPC (avoids recursive user_roles RLS 500)
-    const VALID_ROLES: readonly string[] = ["customer", "merchant", "admin"];
-    const { data: rpcRole, error: rpcError } = await supabase.rpc("get_my_role");
-    if (!rpcError && typeof rpcRole === "string" && VALID_ROLES.includes(rpcRole)) {
-      // A DB row that says "admin" is authoritative.
-      if (rpcRole === "admin") {
-        authDebug("resolveUserRole: admin via get_my_role");
-        return "admin";
-      }
-      // app_metadata is written ONLY by the service role (never by the user).
-      // It must be consulted even when get_my_role returns a valid non-admin
-      // role, because an admin promoted via app_metadata (or whose user_roles
-      // row lags behind) would otherwise be locked out of /admin with a 403.
-      const appMeta =
-        typeof user.app_metadata?.role === "string" ? user.app_metadata.role : "";
-      if (appMeta === "admin") {
-        authDebug("resolveUserRole: admin via app_metadata");
-        return "admin";
-      }
-      if (appMeta === "merchant" || rpcRole === "merchant") {
-        authDebug("resolveUserRole: merchant", { rpcRole, appMeta });
-        return "merchant";
-      }
-      // rpcRole === "customer" — still check shop ownership.
-      const { data: shop } = await supabase
-        .from("shops")
-        .select("id")
-        .eq("owner_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      if (shop?.id) {
-        authDebug("resolveUserRole: customer row but owns shop → merchant");
-        return "merchant";
-      }
-      authDebug("resolveUserRole: customer via get_my_role");
-      return "customer";
-    }
-
-    // 2) app_metadata.role — written only by the service role.
-    //    SECURITY: user_metadata.role is user-editable via
-    //    supabase.auth.updateUser({ data: { role: "admin" } }), so it must NEVER
-    //    confer admin or merchant. Only app_metadata may grant a privileged role;
-    //    customers fall through to the shop-ownership check below.
+    // app_metadata is written ONLY by the service role (never by the user) —
+    // fast and fully trusted, so no extra network calls are needed for it.
     const appMeta =
       typeof user.app_metadata?.role === "string" ? user.app_metadata.role : "";
     if (appMeta === "admin") {
@@ -479,17 +442,38 @@ async function resolveUserRole(
       return "merchant";
     }
 
-    // 3) Shop ownership — authoritative merchant signal (un-fakeable; legacy
-    //    merchants before user_roles existed, and customers who own a shop).
-    const { data: shop } = await supabase
-      .from("shops")
-      .select("id")
-      .eq("owner_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    if (shop?.id) {
+    // Authoritative check: get_my_role() RPC and the shop-ownership probe run
+    // IN PARALLEL so role resolution costs one max() round-trip instead of two
+    // sequential waits. Shop ownership is the un-fakeable merchant signal
+    // (legacy merchants who predate user_roles).
+    const [rpcResult, shopResult] = await Promise.all([
+      supabase.rpc("get_my_role"),
+      supabase
+        .from("shops")
+        .select("id")
+        .eq("owner_id", user.id)
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    const rpcRole =
+      !rpcResult.error && typeof rpcResult.data === "string" ? rpcResult.data : "";
+
+    if (rpcRole === "admin") {
+      authDebug("resolveUserRole: admin via get_my_role");
+      return "admin";
+    }
+    if (rpcRole === "merchant") {
+      authDebug("resolveUserRole: merchant via get_my_role");
+      return "merchant";
+    }
+    if (shopResult?.data?.id) {
       authDebug("resolveUserRole: shop owner → merchant");
       return "merchant";
+    }
+    if (rpcRole === "customer") {
+      authDebug("resolveUserRole: customer via get_my_role");
+      return "customer";
     }
 
     authDebug("resolveUserRole: default customer");
@@ -694,6 +678,29 @@ export async function middleware(request: NextRequest) {
     isPublicBrowse: browseFast,
   });
 
+  // ── 2.5 Guest fast-path: auth entry pages & auth API routes ────────────
+  //    Guests (no session cookies) hitting /login, /signup, /forgot-password
+  //    or /api/auth/* only need the form / endpoint handler. Skipping the
+  //    session refresh, email gate, and role RPC makes these pages render
+  //    instantly — exactly what a signing-in user wants. Signed-in users still
+  //    go through the full gate below so they're redirected to their dashboard.
+  const isGuestAuthFastPath =
+    !authenticated &&
+    (pathname === "/login" ||
+      pathname === "/signup" ||
+      pathname === "/forgot-password" ||
+      pathname.startsWith("/api/auth/"));
+
+  if (isGuestAuthFastPath) {
+    authDebug("GUEST AUTH fast path — serving without session work", { pathname });
+    const response = NextResponse.next({
+      request: { headers: request.headers },
+    });
+    applySecurityHeaders(response);
+    stripSensitiveHeaders(response);
+    return response;
+  }
+
   // ── 3. PUBLIC browse: fast-path (no session refresh / role RPC) ────────
   if (
     browseFast ||
@@ -712,11 +719,9 @@ export async function middleware(request: NextRequest) {
   //    Previously, isEmailConfirmed() was called before updateSession(),
   //    causing a stale null user to be cached. The cache would then poison
   //    resolveUserRole() even after tokens were refreshed.
-  //    Now we refresh FIRST, then clear the cache, then do all checks.
-  const supabaseResponse = await updateSession(request);
-
-  // Invalidate the user cache so subsequent calls use fresh tokens
-  invalidateUserCache();
+  //    Now we refresh FIRST, then seed the cache with the freshly refreshed
+  //    session so the email gate + role RPC never re-fetch the user.
+  const { response: supabaseResponse, user: refreshedUser } = await updateSession(request);
 
   // Re-check auth cookies AFTER session refresh (tokens may have been
   // refreshed by updateSession)
@@ -724,7 +729,27 @@ export async function middleware(request: NextRequest) {
   authDebug("After session refresh", {
     hadSessionCookiesBefore: authenticated,
     hasSessionCookiesAfter: authenticatedAfterRefresh,
+    sessionUserResolved: !!refreshedUser,
   });
+
+  if (refreshedUser) {
+    // Seed the short-lived cache — subsequent getAuthenticatedUser() calls in
+    // this request (email gate + role resolution) hit it and skip a 2nd getUser().
+    const accessToken = sanitizeSessionToken(
+      request.cookies.get("sb-access-token")?.value,
+    );
+    const cacheKey = accessToken
+      ? accessToken.slice(0, 32)
+      : `anon_${request.headers.get("x-forwarded-for") ?? "unknown"}`;
+    userCache.set(cacheKey, { user: refreshedUser, timestamp: Date.now() });
+    authDebug("User cache seeded from session refresh", {
+      userId: refreshedUser.id.slice(0, 8),
+    });
+  } else {
+    // No active session after refresh — clear stale entries so a previous
+    // user's cached identity can never leak into this request.
+    invalidateUserCache();
+  }
 
   // ── 5. Email verification gate (AFTER session refresh) ────────────────
   //    Authenticated but unverified users cannot enter account/dashboard/admin

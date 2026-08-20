@@ -64,6 +64,17 @@ export async function signInWithEmail(
 
     const role = await detectUserRole(data.user);
 
+    // Best-effort authoritative correction in the background — never blocks the
+    // sign-in. Covers rare cases where metadata is stale (an admin promoted via
+    // user_roles only, or a merchant whose metadata update was missed). The
+    // corrected role is cached and picked up by the landing page's own checks.
+    const signedInUser = data.user;
+    void resolveRoleFromDb(signedInUser).then((authoritative) => {
+      if (authoritative !== role) {
+        roleCache.set(signedInUser.id, { role: authoritative, at: Date.now() });
+      }
+    });
+
     return {
       success: true,
       user: data.user,
@@ -189,6 +200,11 @@ export async function claimSignupRole(
     });
     if (!rpcError) {
       // Keep auth metadata in sync for client-side role detection fallbacks
+      const user = await getCurrentUser();
+      if (user) {
+        clearRoleCache(user.id);
+        roleCache.set(user.id, { role, at: Date.now() });
+      }
       await supabase.auth.updateUser({ data: { role } }).catch(() => undefined);
       return { success: true };
     }
@@ -210,6 +226,8 @@ export async function claimSignupRole(
     if (error) {
       return { success: false, error: error.message || "Could not update account role." };
     }
+    clearRoleCache(user.id);
+    roleCache.set(user.id, { role, at: Date.now() });
     await supabase.auth.updateUser({ data: { role } }).catch(() => undefined);
     return { success: true };
   } catch (err) {
@@ -497,6 +515,7 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
     if (error) {
       return { success: false, error: error.message };
     }
+    clearRoleCache();
     clearQueryCache();
     return { success: true };
   } catch (err) {
@@ -542,13 +561,65 @@ export function redirectToDashboard(role: AuthRole | "admin"): void {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Detect the user's role.
- * Prefers get_my_role() RPC (avoids recursive user_roles RLS 500), then metadata,
- * then shop ownership. Direct user_roles table reads are last-resort only.
+ * Detect the user's role as fast as possible.
+ *
+ * Fast path (zero network calls): the signed-in `User` object already carries
+ * the role in its metadata, so sign-in / page load resolves the role instantly.
+ *   - app_metadata.role  — written ONLY by the service role, fully trusted.
+ *   - user_metadata.role — user-editable, so it is only ever a harmless
+ *     customer/merchant hint (never admin).
+ *
+ * Slow path (only for accounts created before metadata roles existed): runs
+ * get_my_role() RPC and the shop-ownership check IN PARALLEL so the whole
+ * lookup costs one max() round-trip instead of two sequential waits.
+ *
+ * Results are memoized per user so components on the same page never repeat
+ * the database work (BottomNav, account pages, sign-in redirect all share it).
  */
 export async function detectUserRole(user: User | null): Promise<AuthRole | "admin"> {
   if (!user) return "customer";
 
+  const cached = roleCache.get(user.id);
+  if (cached && Date.now() - cached.at < ROLE_CACHE_TTL_MS) {
+    return cached.role;
+  }
+
+  const fromMetadata = roleFromUserObject(user);
+  if (fromMetadata) {
+    roleCache.set(user.id, { role: fromMetadata, at: Date.now() });
+    return fromMetadata;
+  }
+
+  const role = await resolveRoleFromDb(user);
+  roleCache.set(user.id, { role, at: Date.now() });
+  return role;
+}
+
+/** Invalidate the role cache — call after the role actually changes. */
+export function clearRoleCache(userId?: string): void {
+  if (userId) {
+    roleCache.delete(userId);
+  } else {
+    roleCache.clear();
+  }
+}
+
+const roleCache = new Map<string, { role: AuthRole | "admin"; at: number }>();
+const ROLE_CACHE_TTL_MS = 60_000;
+
+/** Resolve a role from the already-loaded user object — no network. */
+function roleFromUserObject(user: User): AuthRole | "admin" | null {
+  const appRole = user.app_metadata?.role as string | undefined;
+  if (appRole === "admin" || appRole === "merchant" || appRole === "customer") {
+    return appRole;
+  }
+  const metaRole = user.user_metadata?.role as string | undefined;
+  if (metaRole === "merchant" || metaRole === "customer") return metaRole;
+  return null;
+}
+
+/** Authoritative fallback — parallel RPC + shop-ownership lookups. Never throws. */
+async function resolveRoleFromDb(user: User): Promise<AuthRole | "admin"> {
   const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T | null> =>
     Promise.race([
       Promise.resolve(p),
@@ -574,46 +645,31 @@ export async function detectUserRole(user: User | null): Promise<AuthRole | "adm
     }
   };
 
-  const normalizeRole = async (raw: string | null | undefined): Promise<AuthRole | "admin" | null> => {
-    if (!raw) return null;
-    const validRoles: string[] = ["customer", "merchant", "admin"];
-    if (!validRoles.includes(raw)) return null;
-    if (raw === "customer" && (await ownsShop())) return "merchant";
-    return raw as AuthRole | "admin";
-  };
-
-  // 1. SECURITY DEFINER RPC — bypasses recursive RLS on user_roles
+  let rpcRole: string | null = null;
+  let hasShop = false;
   try {
-    const result = await withTimeout(
-      supabase.rpc("get_my_role").then((r) => r),
-      4000,
-    );
-    const rpcRole =
-      result && "data" in result && typeof result.data === "string" ? result.data : null;
-    const normalized = await normalizeRole(rpcRole);
-    if (normalized) return normalized;
+    const [rpcResult, shop] = await Promise.all([
+      withTimeout(supabase.rpc("get_my_role").then((r) => r), 4000),
+      ownsShop(),
+    ]);
+    rpcRole =
+      rpcResult && "data" in rpcResult && typeof rpcResult.data === "string"
+        ? rpcResult.data
+        : null;
+    hasShop = shop;
   } catch {
-    /* fall through — run supabase/FIX_USER_ROLES_500.sql if RPC is missing */
+    /* transient network failure — fall through to metadata hints */
   }
 
-  // 2. user metadata — user-editable via supabase.auth.updateUser(), so it can
-  //    never confer a privileged role by itself. It only acts as a hint:
-  //    owning a shop makes you a merchant, otherwise you remain a customer.
-  const metadataRole = user.user_metadata?.role as AuthRole | undefined;
-  if (metadataRole === "merchant" || metadataRole === "customer") {
-    return (await ownsShop()) ? "merchant" : "customer";
-  }
+  if (rpcRole === "admin") return "admin";
+  if (rpcRole === "merchant") return "merchant";
+  if (hasShop) return "merchant";
+  if (rpcRole === "customer") return "customer";
 
-  // 3. app_metadata — set only by the service role, safe to trust.
-  const appRole = user.app_metadata?.role as (AuthRole | "admin") | undefined;
-  if (appRole === "admin") return "admin";
-  if (appRole === "merchant" || appRole === "customer") {
-    if (appRole === "customer" && (await ownsShop())) return "merchant";
-    return appRole;
-  }
+  const appRole = user.app_metadata?.role as string | undefined;
+  if (appRole === "admin" || appRole === "merchant") return appRole;
 
-  // 4. Shop ownership (older accounts without user_roles)
-  return (await ownsShop()) ? "merchant" : "customer";
+  return "customer";
 }
 
 /**
