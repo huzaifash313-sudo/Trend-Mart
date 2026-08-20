@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
+import {
+  subscribeToCustomerOrders,
+  type OrderPayload,
+} from "@/lib/supabase/realtime";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { fetchMyReviews, submitReview } from "@/services/reviewService";
 
 /* -------------------------------------------------------------------------- */
@@ -122,9 +127,9 @@ export default function ReviewReminderPopup() {
   }, []);
 
   /** Look for a delivered-but-unreviewed order that wasn't dismissed yet and
-   *  surface it once per session. */
-  const maybeAutoOpen = useCallback(async () => {
-    if (autoShownRef.current) return;
+   *  surface it. Shared by the initial/visibility check AND the realtime
+   *  "order flips to Delivered while the app is open" path. */
+  const checkForReviewable = useCallback(async () => {
     if (checkBusyRef.current) return;
 
     const supabase = createClient();
@@ -142,10 +147,6 @@ export default function ReviewReminderPopup() {
     checkBusyRef.current = true;
     try {
       const result = await fetchMyReviews();
-      // Once we've checked this session, don't re-poll on every visibility
-      // change — the realtime "order-update" event still re-opens the popup
-      // instantly when a live order flips to Delivered.
-      autoShownRef.current = true;
       if (result.success) {
         const shop = result.data.reviewableShops.find(
           (s) => !s.orderId || !isOrderDismissed(s.orderId),
@@ -156,6 +157,13 @@ export default function ReviewReminderPopup() {
       checkBusyRef.current = false;
     }
   }, [openFor]);
+
+  /** Once per session on mount / tab-return. */
+  const maybeAutoOpen = useCallback(async () => {
+    if (autoShownRef.current) return;
+    autoShownRef.current = true;
+    await checkForReviewable();
+  }, [checkForReviewable]);
 
   useEffect(() => {
     void maybeAutoOpen();
@@ -182,6 +190,52 @@ export default function ReviewReminderPopup() {
       window.removeEventListener("trendmart:order-update", onOrderUpdate);
     };
   }, [maybeAutoOpen, openFor]);
+
+  // Realtime (app open on ANY page): a merchant marks one of the customer's
+  // orders Delivered → re-check reviewable shops and surface the popup right
+  // away, even if the customer isn't on the tracking page. Also covers a
+  // mid-session sign-in, so pending delivered orders appear right after login.
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+
+    const supabase = createClient();
+
+    const setup = (userId: string) => {
+      unsub?.();
+      unsub = subscribeToCustomerOrders(userId, (payload) => {
+        const record = (payload as RealtimePostgresChangesPayload<OrderPayload>).new;
+        if (!record || !("status" in record)) return;
+        if (String(record.status ?? "").toLowerCase() === "delivered") {
+          void checkForReviewable();
+        }
+      });
+    };
+
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled || !session?.user) return;
+      setup(session.user.id);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      if (event === "SIGNED_IN") {
+        if (session?.user) {
+          setup(session.user.id);
+          void checkForReviewable();
+        }
+      } else if (event === "SIGNED_OUT") {
+        unsub?.();
+        unsub = undefined;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+      authListener.subscription.unsubscribe();
+    };
+  }, [checkForReviewable]);
 
   const handleSubmit = async () => {
     if (!target) return;

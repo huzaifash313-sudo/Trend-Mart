@@ -14,6 +14,8 @@ import type { Review } from "@/types";
 import { formatRelativeTime } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
 import { paginateReviews, REVIEW_PAGE_SIZE } from "@/lib/reviewRules";
+import { subscribeToReviews, type ReviewPayload } from "@/lib/supabase/realtime";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 /* -------------------------------------------------------------------------- */
 /*  Star Rating                                                                */
@@ -408,6 +410,35 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
       cancelled = true;
     };
   }, [shopId, ownerId]);
+
+  // Live social proof: reviews posted by other customers while this page is
+  // open show up instantly (no refresh needed).
+  useEffect(() => {
+    let cancelled = false;
+
+    const unsub = subscribeToReviews(shopId, (payload) => {
+      const row = (payload as RealtimePostgresChangesPayload<ReviewPayload>).new;
+      if (cancelled || !row || !("id" in row)) return;
+      const incoming: Review = {
+        id: String(row.id),
+        shop_id: String(row.shop_id ?? shopId),
+        customer_name: String(row.customer_name ?? "Anonymous"),
+        rating: Math.min(5, Math.max(1, Number(row.rating) || 0)),
+        comment: String(row.comment ?? ""),
+        created_at: String(row.created_at ?? new Date().toISOString()),
+        user_id: null,
+        merchant_reply: "",
+        merchant_reply_at: null,
+        verified_purchase: false,
+      };
+      setReviews((prev) => (prev.some((r) => r.id === incoming.id) ? prev : [incoming, ...prev]));
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [shopId]);
 
   const stats = useMemo(() => computeRatingStats(reviews), [reviews]);
   const paged = useMemo(() => paginateReviews(reviews, page, REVIEW_PAGE_SIZE), [reviews, page]);
