@@ -33,6 +33,11 @@ import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@/lib/fuzzySearch";
 import { trackProductView } from "@/lib/behavior";
 import DealDayDateFilter from "@/components/DealDayDateFilter";
+import {
+  fetchAllSubCategoriesGrouped,
+  fetchSubCategories,
+  type SubCategoryWithMeta,
+} from "@/services/subCategoryService";
 
 const DealQuickView = dynamic(() => import("@/components/DealQuickView"), {
   ssr: false,
@@ -62,6 +67,7 @@ function DealsInner() {
   const filterParam = (searchParams.get("filter") as FilterMode | null) ?? "today";
   const dayParam = searchParams.get("day");
   const categoryParam = (searchParams.get("category") as ShopCategory | null) ?? "All";
+  const subParam = searchParams.get("sub");
 
   const [query, setQuery] = useState(qParam);
   const [filter, setFilter] = useState<FilterMode>(
@@ -73,6 +79,14 @@ function DealsInner() {
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(
     SHOP_CATEGORIES.includes(categoryParam) ? categoryParam : "All",
   );
+  const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(
+    subParam && subParam.length <= 64 ? subParam : null,
+  );
+  const [subs, setSubs] = useState<SubCategoryWithMeta[]>([]);
+  const [subsLoading, setSubsLoading] = useState(false);
+  // Full taxonomy (grouped by main category) so the global search box can match
+  // sub-category names even before a specific category is selected.
+  const [allSubGroups, setAllSubGroups] = useState<Record<string, SubCategoryWithMeta[]>>({});
   const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
 
   const queryClient = useQueryClient();
@@ -151,6 +165,88 @@ function DealsInner() {
     return SHOP_CATEGORIES.filter((c) => c !== "All" && present.has(c));
   }, [deals, shopCategoryById]);
 
+  // Sub-category drill-down — fetch the taxonomy for the selected main category,
+  // then derive which sub-categories actually have deals. Deals without a linked
+  // product sub-category roll into that category's "Others" entry so nothing is
+  // ever hidden by the drill-down.
+  useEffect(() => {
+    let cancelled = false;
+    setSubs([]);
+    if (!activeCategory || activeCategory === "All") {
+      setSubsLoading(false);
+      return;
+    }
+    setSubsLoading(true);
+    fetchSubCategories(activeCategory)
+      .then((res) => {
+        if (cancelled) return;
+        const next = res.success ? res.data : [];
+        setSubs(next);
+        setSubsLoading(false);
+        const ids = new Set(next.map((s) => s.id));
+        setActiveSubCategoryId((prev) => (prev && ids.has(prev) ? prev : null));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSubs([]);
+          setSubsLoading(false);
+          setActiveSubCategoryId(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategory]);
+
+  const knownSubIds = useMemo(() => new Set(subs.map((s) => s.id)), [subs]);
+  const othersSub = useMemo(() => subs.find((s) => s.is_others) ?? null, [subs]);
+  const othersSubId = othersSub?.id ?? null;
+  const subNameById = useMemo(() => new Map(subs.map((s) => [s.id, s.name])), [subs]);
+
+  // One-time fetch of the full taxonomy for global search-by-sub-category.
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllSubCategoriesGrouped()
+      .then((res) => {
+        if (!cancelled && res.success) setAllSubGroups(res.data);
+      })
+      .catch(() => {
+        /* taxonomy is optional for search — deals still work without it */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const allSubNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const list of Object.values(allSubGroups)) {
+      for (const s of list) m.set(s.id, s.name);
+    }
+    return m;
+  }, [allSubGroups]);
+
+  // Which sub-categories (by id) have deals inside the selected main category.
+  const subCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const d of deals) {
+      const cat = shopCategoryById.get(d.shop_id) ?? "Others / Universal";
+      if (cat !== activeCategory) continue;
+      const subId =
+        d.sub_category_id && knownSubIds.has(d.sub_category_id)
+          ? d.sub_category_id
+          : othersSubId;
+      if (!subId) continue;
+      counts.set(subId, (counts.get(subId) ?? 0) + 1);
+    }
+    return counts;
+  }, [deals, activeCategory, shopCategoryById, knownSubIds, othersSubId]);
+
+  const visibleSubs = useMemo(
+    () => subs.filter((s) => (subCounts.get(s.id) ?? 0) > 0),
+    [subs, subCounts],
+  );
+
   // Geo filter — hide deals from shops outside the selected area / radius.
   useEffect(() => {
     let cancelled = false;
@@ -203,7 +299,8 @@ function DealsInner() {
     );
     setDayKey(dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null);
     setActiveCategory(SHOP_CATEGORIES.includes(categoryParam) ? categoryParam : "All");
-  }, [qParam, filterParam, dayParam, categoryParam]);
+    setActiveSubCategoryId(subParam && subParam.length <= 64 ? subParam : null);
+  }, [qParam, filterParam, dayParam, categoryParam, subParam]);
 
   // Invalidate cached queries when merchants publish/update in other tabs.
   useEffect(() => {
@@ -225,20 +322,23 @@ function DealsInner() {
       filter?: FilterMode;
       day?: string | null;
       category?: ShopCategory;
+      sub?: string | null;
     }) => {
       const params = new URLSearchParams();
       const q = next.q !== undefined ? next.q : query;
       const f = next.filter !== undefined ? next.filter : filter;
       const day = next.day !== undefined ? next.day : dayKey;
       const cat = next.category !== undefined ? next.category : activeCategory;
+      const sub = next.sub !== undefined ? next.sub : activeSubCategoryId;
       if (q.trim()) params.set("q", q.trim());
       if (f && f !== "today") params.set("filter", f);
       if (day) params.set("day", day);
       if (cat && cat !== "All") params.set("category", cat);
+      if (sub) params.set("sub", sub);
       const qs = params.toString();
       router.replace(qs ? `/deals?${qs}` : "/deals", { scroll: false });
     },
-    [router, query, filter, dayKey, activeCategory],
+    [router, query, filter, dayKey, activeCategory, activeSubCategoryId],
   );
 
   const selectDay = useCallback(
@@ -258,7 +358,16 @@ function DealsInner() {
   const handleCategoryChange = useCallback(
     (category: ShopCategory) => {
       setActiveCategory(category);
-      syncUrl({ category });
+      setActiveSubCategoryId(null);
+      syncUrl({ category, sub: null });
+    },
+    [syncUrl],
+  );
+
+  const handleSubCategoryChange = useCallback(
+    (subId: string | null) => {
+      setActiveSubCategoryId(subId);
+      syncUrl({ sub: subId });
     },
     [syncUrl],
   );
@@ -290,13 +399,49 @@ function DealsInner() {
       );
     }
 
+    // Sub-category drill-down — deals without a linked product sub-category roll
+    // into this category's "Others" entry so no deal is ever missed.
+    if (activeCategory !== "All" && activeSubCategoryId && subs.length > 0) {
+      const target = activeSubCategoryId;
+      list = list.filter((d) => {
+        const cat = shopCategoryById.get(d.shop_id) ?? "Others / Universal";
+        if (cat !== activeCategory) return false;
+        const subId =
+          d.sub_category_id && knownSubIds.has(d.sub_category_id)
+            ? d.sub_category_id
+            : othersSubId;
+        return subId === target;
+      });
+    }
+
     const q = query.trim();
     if (q) {
+      const subNameOf = (d: ShopDeal): string => {
+        if (d.sub_category_id) {
+          return (
+            subNameById.get(d.sub_category_id) ??
+            allSubNameById.get(d.sub_category_id) ??
+            ""
+          );
+        }
+        if (othersSub && (shopCategoryById.get(d.shop_id) ?? "") === activeCategory) {
+          return othersSub.name;
+        }
+        return "";
+      };
       list = fuzzyFilterAndRank(
         list,
         q,
-        (d) => [dealSearchHaystack(d), formatDealWhenTag(d), d.title, d.badge_text, d.shop_name],
-        { minScore: FUZZY_MIN_SCORE, weights: [1, 1, 0.95, 0.9, 0.75] },
+        (d) => [
+          dealSearchHaystack(d),
+          formatDealWhenTag(d),
+          d.title,
+          d.badge_text,
+          d.shop_name,
+          shopCategoryById.get(d.shop_id) ?? "",
+          subNameOf(d),
+        ],
+        { minScore: FUZZY_MIN_SCORE, weights: [1, 1, 0.95, 0.9, 0.75, 0.6, 0.6] },
       ).map((r) => r.item);
     } else {
       list = list.slice().sort((a, b) => {
@@ -325,6 +470,13 @@ function DealsInner() {
     offerDays,
     geoVisibleShopIds,
     activeCategory,
+    activeSubCategoryId,
+    subs,
+    knownSubIds,
+    othersSub,
+    othersSubId,
+    subNameById,
+    allSubNameById,
     shopCategoryById,
   ]);
 
@@ -358,6 +510,10 @@ function DealsInner() {
     { value: "all", label: "All active" },
   ];
 
+  const subLabel = activeSubCategoryId
+    ? (subNameById.get(activeSubCategoryId) ?? "selected sub-category")
+    : null;
+
   const resultHint = [
     dayKey
       ? `on ${formatOfferDayLabel(dayKey, todayKey)}`
@@ -369,6 +525,7 @@ function DealsInner() {
             ? "upcoming"
             : "active",
     activeCategory !== "All" ? `in ${activeCategory}` : null,
+    subLabel ? `· ${subLabel}` : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -385,7 +542,8 @@ function DealsInner() {
               Deals for you
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Filter by weekday or date — see which stores have deals that day.
+              Filter by category, sub-category, weekday or date — see which stores
+              have deals that day.
             </p>
           </div>
           <Link
@@ -447,6 +605,48 @@ function DealsInner() {
                 </button>
               );
             })}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Sub-category drill-down for the selected main category. */}
+      {activeCategory !== "All" && (subsLoading || visibleSubs.length > 0) ? (
+        <section
+          aria-label={`Filter deals by sub-category in ${activeCategory}`}
+          className="tm-cat-bar tm-cat-bar--sub -mx-3 sm:-mx-4"
+        >
+          <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
+            <button
+              type="button"
+              onClick={() => handleSubCategoryChange(null)}
+              className={`tm-cat-tab${!activeSubCategoryId ? " is-active" : ""}`}
+              aria-pressed={!activeSubCategoryId}
+            >
+              <span className="tm-cat-tab-label">All</span>
+              <span className="tm-cat-tab-line" aria-hidden="true" />
+            </button>
+            {visibleSubs.map((sub) => {
+              const count = subCounts.get(sub.id) ?? 0;
+              const active = activeSubCategoryId === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => handleSubCategoryChange(active ? null : sub.id)}
+                  className={`tm-cat-tab${active ? " is-active" : ""}`}
+                  aria-pressed={active}
+                >
+                  <span className="tm-cat-tab-label">{sub.is_others ? "Others" : sub.name}</span>
+                  {count > 0 ? <span className="tm-cat-tab-count">{count}</span> : null}
+                  <span className="tm-cat-tab-line" aria-hidden="true" />
+                </button>
+              );
+            })}
+            {subsLoading ? (
+              <span className="shrink-0 self-center px-2 text-[0.65rem] text-zinc-400 animate-pulse">
+                Loading…
+              </span>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -524,9 +724,9 @@ function DealsInner() {
           <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">No matching deals</h3>
           <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
             {dayKey
-              ? `No ${activeCategory !== "All" ? `${activeCategory.toLowerCase()} ` : ""}deals on ${formatOfferDayLabel(dayKey, todayKey)}. Try another day or date.`
+              ? `No ${activeCategory !== "All" ? `${activeCategory.toLowerCase()} ` : ""}${subLabel ? `${subLabel.toLowerCase()} ` : ""}deals on ${formatOfferDayLabel(dayKey, todayKey)}. Try another day or date.`
               : activeCategory !== "All"
-                ? `No ${activeCategory.toLowerCase()} deals right now. Try another category or browse products instead.`
+                ? `No ${activeCategory.toLowerCase()}${subLabel ? ` ${subLabel.toLowerCase()}` : ""} deals right now. Try another sub-category or browse products instead.`
                 : "Try another day, date, filter, or browse products instead."}
           </p>
           {searchSuggestions.length > 0 ? (
@@ -555,7 +755,8 @@ function DealsInner() {
                 setFilter("today");
                 setDayKey(null);
                 setActiveCategory("All");
-                syncUrl({ q: "", filter: "today", day: null, category: "All" });
+                setActiveSubCategoryId(null);
+                syncUrl({ q: "", filter: "today", day: null, category: "All", sub: null });
               }}
               className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
             >

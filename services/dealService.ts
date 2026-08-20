@@ -31,7 +31,7 @@ const DEAL_VISUAL = "image_url, images, badge_text, is_featured";
 const DEAL_COMMERCE = "product_id, price, original_price";
 
 const PRODUCT_JOIN =
-  "products:product_id ( id, name, image_url, images, price, original_price )";
+  "products:product_id ( id, name, image_url, images, price, original_price, sub_category_id )";
 
 const SHOP_JOIN = "shops:shop_id ( name, logo_url, slug, whatsapp_number )";
 
@@ -137,6 +137,8 @@ function parseDeal(row: Record<string, unknown>): ShopDeal {
     price: parseMoney(row.price) ?? (product ? parseMoney(product.price) : null),
     original_price:
       parseMoney(row.original_price) ?? (product ? parseMoney(product.original_price) : null),
+    sub_category_id:
+      product && product.sub_category_id ? String(product.sub_category_id) : null,
     created_at: String(row.created_at ?? ""),
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
     shop_name: shops ? String(shops.name ?? "") || null : null,
