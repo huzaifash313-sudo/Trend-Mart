@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, type ComponentType } from "react";
 import { useLocation } from "@/context/LocationContext";
 import { getCityAreas } from "@/lib/cityAreas";
 import {
@@ -23,9 +23,27 @@ function LocateIcon() {
   );
 }
 
+function BuildingIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M9 22v-4h6v4" /><path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
 function CrosshairIcon() {
   return (
-    <svg className="h-3.5 w-3.5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
       <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
     </svg>
@@ -34,15 +52,23 @@ function CrosshairIcon() {
 
 function PinIcon() {
   return (
-    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" />
     </svg>
   );
 }
 
 function XIcon() {
   return (
-    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
@@ -56,16 +82,20 @@ function CheckIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
 const RADIUS_OPTIONS = [
   { value: 5, label: "5 km" },
   { value: 10, label: "10 km" },
-  { value: 20, label: "20 km" },
-  { value: 50, label: "50 km" },
+  { value: 15, label: "15 km" },
   { value: 0, label: "Any" },
 ] as const;
-
-/** Default radius when a specific area / colony is picked. */
-const AREA_PICK_DEFAULT_KM = 10;
 
 export type GeoScope = "radius" | "city" | "pakistan";
 
@@ -92,6 +122,45 @@ interface GeoRadiusFilterProps {
   inline?: boolean;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Persistence (scope + radius survive refresh)                               */
+/* -------------------------------------------------------------------------- */
+
+const PREFS_KEY = "trendmart_geo_filter_prefs_v1";
+
+interface GeoFilterPrefs {
+  scope: GeoScope;
+  maxDistanceKm: number;
+}
+
+function loadPrefs(): GeoFilterPrefs | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Partial<GeoFilterPrefs>;
+    if (!p || !["radius", "city", "pakistan"].includes(p.scope as string)) return null;
+    return {
+      scope: p.scope as GeoScope,
+      maxDistanceKm:
+        typeof p.maxDistanceKm === "number" && Number.isFinite(p.maxDistanceKm)
+          ? p.maxDistanceKm
+          : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePrefs(prefs: GeoFilterPrefs): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function GeoRadiusFilter({
   onFilterChange,
   isDetecting,
@@ -107,6 +176,7 @@ export default function GeoRadiusFilter({
     detectLocationDetailed,
     setManualCity,
     setManualArea,
+    clearLocation,
   } = useLocation();
 
   const [maxDistanceKm, setMaxDistanceKm] = useState<number>(0);
@@ -114,7 +184,7 @@ export default function GeoRadiusFilter({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [cityQuery, setCityQuery] = useState("");
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : expanded;
@@ -124,12 +194,8 @@ export default function GeoRadiusFilter({
     else setExpanded(false);
   }, [isControlled, onDismiss]);
 
-  /*
-   * Deliberately NO outside-tap / page-scroll close here. The area picker is a
-   * multi-step flow (scope → city → area → radius) and closing on a stray tap
-   * or scroll discards the user's selection. The panel only closes via the X,
-   * Escape, a successful GPS fix, or the Done button below.
-   */
+  // Close on Escape. No outside-tap close: the picker is a multi-step flow and
+  // a stray tap/scroll shouldn't discard the selection.
   useEffect(() => {
     if (!isOpen) return;
     function onKey(e: KeyboardEvent) {
@@ -144,18 +210,44 @@ export default function GeoRadiusFilter({
       onFilterChange({
         coordinates: coords,
         maxDistanceKm: km,
-        locationAvailable: !!coords || nextScope === "pakistan" || nextScope === "city",
+        locationAvailable:
+          !!coords || nextScope === "pakistan" || nextScope === "city",
         scope: nextScope,
       });
     },
     [onFilterChange],
   );
 
-  // Keep filter synced with global LocationContext pin
+  // Restore the last-used scope + radius once on mount (client-only).
   useEffect(() => {
+    const saved = loadPrefs();
+    if (saved) {
+      setScope(saved.scope);
+      setMaxDistanceKm(saved.maxDistanceKm);
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist scope + radius so a refresh keeps the same filtering.
+  useEffect(() => {
+    if (!hydrated) return;
+    savePrefs({ scope, maxDistanceKm });
+  }, [hydrated, scope, maxDistanceKm]);
+
+  // Keep the parent filter in sync with the global pin + local scope/radius.
+  useEffect(() => {
+    if (!hydrated) return;
     emit(globalCoords, maxDistanceKm, scope);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalCoords, location?.city, location?.address, location?.deliveryZone]);
+  }, [
+    hydrated,
+    globalCoords,
+    maxDistanceKm,
+    scope,
+    location?.city,
+    location?.address,
+    location?.deliveryZone,
+  ]);
 
   const handleDetectLocation = useCallback(async () => {
     setLocationError(null);
@@ -163,58 +255,33 @@ export default function GeoRadiusFilter({
     try {
       const { location: detected, error } = await detectLocationDetailed();
       if (detected?.coordinates) {
-        emit(detected.coordinates, maxDistanceKm || 10, scope === "pakistan" ? "radius" : scope);
-        if (scope === "pakistan") setScope("radius");
-        if (maxDistanceKm === 0) setMaxDistanceKm(10);
         // GPS fix is a complete action — apply and close.
+        if (scope === "pakistan") setScope("radius");
         closePanel();
       } else {
-        const code = (error ?? "unavailable") as LocationDetectErrorCode;
-        setLocationError(locationErrorMessage(code));
+        setLocationError(locationErrorMessage((error ?? "unavailable") as LocationDetectErrorCode));
       }
     } catch {
       setLocationError("Location detection failed. Try again.");
     }
     onDetectEnd();
-  }, [
-    detectLocationDetailed,
-    emit,
-    maxDistanceKm,
-    onDetectEnd,
-    onDetectStart,
-    scope,
-    closePanel,
-  ]);
+  }, [detectLocationDetailed, scope, closePanel, onDetectEnd, onDetectStart]);
 
   const handleRadiusChange = useCallback(
     (km: number) => {
       setMaxDistanceKm(km);
-      setScope("radius");
-      // Real-time: emit immediately so the shop list refilters to shops within `km`
-      emit(globalCoords, km, "radius");
-      if (km > 0 && !globalCoords) {
-        setLocationError("Turn on location (or refresh GPS) to filter by km.");
-      } else {
-        setLocationError(null);
-      }
-      // Panel stays open — user can fine-tune and press Done.
+      setLocationError(
+        km > 0 && !globalCoords ? "Turn on location to filter by km." : null,
+      );
     },
-    [emit, globalCoords],
+    [globalCoords],
   );
 
-  const handleScopeChange = useCallback(
-    (next: GeoScope) => {
-      setScope(next);
-      setCityQuery("");
-      if (next === "radius" && maxDistanceKm === 0) {
-        setMaxDistanceKm(10);
-        emit(globalCoords, 10, "radius");
-      } else {
-        emit(globalCoords, maxDistanceKm, next);
-      }
-    },
-    [emit, globalCoords, maxDistanceKm],
-  );
+  const handleScopeChange = useCallback((next: GeoScope) => {
+    setScope(next);
+    setCityQuery("");
+    setLocationError(null);
+  }, []);
 
   const handleCityPick = useCallback(
     (city: SupportedCity) => {
@@ -222,22 +289,18 @@ export default function GeoRadiusFilter({
       setScope("city");
       setCityQuery("");
       setLocationError(null);
-      // City centroid coords arrive via context → sync effect re-emits
-      emit(null, 0, "city");
     },
-    [emit, setManualCity],
+    [setManualCity],
   );
 
   const handleAreaPick = useCallback(
     (city: SupportedCity, areaName: string) => {
       setManualArea(city, areaName);
-      setScope("radius");
-      setMaxDistanceKm(AREA_PICK_DEFAULT_KM);
+      setScope("city");
+      setCityQuery("");
       setLocationError(null);
-      // Area pin coordinates arrive via context → sync effect re-emits
-      emit(null, AREA_PICK_DEFAULT_KM, "radius");
     },
-    [emit, setManualArea],
+    [setManualArea],
   );
 
   const handleClearLocation = useCallback(() => {
@@ -245,10 +308,9 @@ export default function GeoRadiusFilter({
     setScope("radius");
     setCityQuery("");
     setLocationError(null);
-    emit(null, 0, "radius");
-  }, [emit]);
+    clearLocation();
+  }, [clearLocation]);
 
-  const isActive = !!globalCoords || scope === "city" || scope === "pakistan";
   const activeAreas = location?.city ? getCityAreas(location.city) : [];
   const isAreaPicked =
     !!location?.deliveryZone &&
@@ -260,17 +322,18 @@ export default function GeoRadiusFilter({
     location?.deliveryZone ||
     location?.city ||
     (globalCoords
-      ? `Lat ${globalCoords.latitude.toFixed(4)}, Lng ${globalCoords.longitude.toFixed(4)}`
+      ? `${globalCoords.latitude.toFixed(4)}, ${globalCoords.longitude.toFixed(4)}`
       : null);
+
+  const isActive =
+    !!globalCoords || scope === "city" || scope === "pakistan";
 
   const triggerText = (() => {
     if (scope === "pakistan") return "All Pakistan";
-    if (scope === "city") return location?.city ? `City: ${location.city}` : "This city";
-    if (globalCoords) {
-      if (isAreaPicked && location.deliveryZone) return location.deliveryZone;
-      return maxDistanceKm > 0 ? `Within ${maxDistanceKm} km` : "Nearest first";
-    }
-    return "Nearby";
+    if (scope === "city") return location?.city ?? "This city";
+    if (isAreaPicked && location.deliveryZone) return location.deliveryZone;
+    if (globalCoords && maxDistanceKm > 0) return `Within ${maxDistanceKm} km`;
+    return "Nearest";
   })();
 
   const trimmedCityQuery = cityQuery.trim().toLowerCase();
@@ -278,22 +341,14 @@ export default function GeoRadiusFilter({
     ? SUPPORTED_CITIES.filter((c) => c.toLowerCase().includes(trimmedCityQuery))
     : SUPPORTED_CITIES;
 
-  const hintText = (() => {
-    if (scope === "pakistan")
-      return "Showing shops across Pakistan — closest to your pin first when GPS is on.";
-    if (scope === "city")
-      return location?.city
-        ? `Selected ${location.city}. Tap an area below for that exact ilaqa, then press Done.`
-        : "Pick a city, then choose your exact area below. Press Done when ready.";
-    if (isAreaPicked)
-      return `Filtering around ${location?.deliveryZone ?? "your area"} — shops within ${maxDistanceKm || AREA_PICK_DEFAULT_KM} km show first. Press Done to close.`;
-    if (maxDistanceKm > 0)
-      return `Filtering live: stores farther than ${maxDistanceKm} km are hidden. Press Done when ready.`;
-    return "“Any” shows all nearby shops sorted by distance (no km cut-off).";
-  })();
+  const scopeTabs: { id: GeoScope; label: string; Icon: ComponentType }[] = [
+    { id: "radius", label: "Nearest", Icon: LocateIcon },
+    { id: "city", label: "This city", Icon: BuildingIcon },
+    { id: "pakistan", label: "All Pakistan", Icon: GlobeIcon },
+  ];
 
   return (
-    <div ref={rootRef} className="relative w-full sm:w-auto">
+    <div className="relative w-full sm:w-auto">
       {!isControlled && (
         <button
           type="button"
@@ -301,20 +356,13 @@ export default function GeoRadiusFilter({
           className={`inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 sm:w-auto ${
             isActive
               ? "border-teal-300 bg-gradient-to-r from-emerald-50 to-teal-50 text-teal-800 shadow-sm shadow-teal-600/10 dark:border-teal-700 dark:from-emerald-900/30 dark:to-teal-900/30 dark:text-teal-300"
-              : "border-zinc-200 bg-white text-zinc-500 hover:border-teal-200 hover:bg-teal-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              : "border-zinc-200 bg-white text-zinc-600 hover:border-teal-200 hover:bg-teal-50/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           }`}
-          aria-label="Filter by location distance"
+          aria-label="Filter by location"
           aria-expanded={expanded}
         >
-          <LocateIcon />
-          {isActive ? (
-            <span className="inline-flex items-center gap-1">
-              <PinIcon />
-              {triggerText}
-            </span>
-          ) : (
-            "Nearby"
-          )}
+          <PinIcon />
+          <span className="truncate">{triggerText}</span>
         </button>
       )}
 
@@ -322,46 +370,76 @@ export default function GeoRadiusFilter({
         <div
           className={
             inline
-              ? "w-full rounded-2xl border border-teal-200/80 bg-white p-4 shadow-xl shadow-teal-900/10 dark:border-teal-900/50 dark:bg-zinc-900"
-              : "absolute right-0 top-full z-50 mt-2 w-[min(88vw,320px)] rounded-2xl border border-teal-200/80 bg-white p-4 shadow-xl shadow-teal-900/10 dark:border-teal-900/50 dark:bg-zinc-900 sm:left-auto sm:right-0 sm:w-[320px] sm:max-w-[92vw]"
+              ? "w-full rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-xl shadow-teal-900/10 dark:border-zinc-700/80 dark:bg-zinc-900"
+              : "absolute right-0 top-full z-50 mt-2 w-[min(92vw,340px)] rounded-2xl border border-zinc-200/90 bg-white p-4 shadow-xl shadow-teal-900/10 dark:border-zinc-700/80 dark:bg-zinc-900 sm:left-auto sm:right-0 sm:w-[340px] sm:max-w-[92vw]"
           }
         >
-          <div className="flex max-h-[min(72vh,520px)] flex-col">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                Filter by area
+          {/* Header */}
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-600/30">
+                <PinIcon />
+              </span>
+              <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100">
+                Location
               </h3>
-              <button
-                type="button"
-                onClick={closePanel}
-                className="rounded-full p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                aria-label="Close filter"
-              >
-                <XIcon />
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={closePanel}
+              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              aria-label="Close filter"
+            >
+              <XIcon />
+            </button>
+          </div>
 
-            <div className="-mr-1 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1">
-              {/* Current selection / detection card */}
-              <div>
-                {addressLabel ? (
-                  <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-900/20">
-                    <span className="text-base">📍</span>
+          {/* Scope tabs */}
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+            {scopeTabs.map(({ id, label, Icon }) => {
+              const active = scope === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleScopeChange(id)}
+                  aria-pressed={active}
+                  className={`flex flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[11px] font-semibold leading-tight transition-all ${
+                    active
+                      ? "bg-white text-emerald-700 shadow-sm dark:bg-zinc-900 dark:text-emerald-400"
+                      : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  <Icon />
+                  <span className="text-center">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Content */}
+          <div className="mt-3 min-h-0 space-y-3">
+            {scope === "radius" && (
+              <div className="space-y-3">
+                {globalCoords ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+                    <PinIcon />
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
-                        {isAreaPicked ? "Selected area" : "Location Active"}
+                      <p className="truncate text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                        {addressLabel ?? "Current location"}
                       </p>
-                      <p className="mt-0.5 text-[0.65rem] leading-relaxed text-emerald-700 dark:text-emerald-400">
-                        {addressLabel}
+                      <p className="text-[0.65rem] text-emerald-600 dark:text-emerald-400">
+                        Live pin
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={handleClearLocation}
-                      className="shrink-0 rounded-full p-1 text-emerald-600 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
-                      aria-label="Reset distance filter"
+                      onClick={handleDetectLocation}
+                      disabled={isDetecting}
+                      className="shrink-0 rounded-full p-1.5 text-emerald-600 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+                      aria-label="Refresh live GPS pin"
                     >
-                      <XIcon />
+                      <RefreshIcon />
                     </button>
                   </div>
                 ) : (
@@ -369,111 +447,67 @@ export default function GeoRadiusFilter({
                     type="button"
                     onClick={handleDetectLocation}
                     disabled={isDetecting}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-zinc-300 px-4 py-2.5 text-xs font-semibold text-zinc-600 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-emerald-300 px-4 py-2.5 text-xs font-semibold text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
                   >
-                    {isDetecting ? (
-                      <><CrosshairIcon /> Detecting location...</>
-                    ) : (
-                      <><CrosshairIcon /> Detect My Location</>
-                    )}
+                    <CrosshairIcon />
+                    {isDetecting ? "Detecting location…" : "Detect my location"}
                   </button>
                 )}
-                {locationError && (
-                  <p className="mt-1 text-[0.6rem] leading-relaxed text-red-500">{locationError}</p>
-                )}
-                {addressLabel && (
-                  <button
-                    type="button"
-                    onClick={handleDetectLocation}
-                    disabled={isDetecting}
-                    className="mt-2 w-full rounded-lg border border-emerald-200 py-1.5 text-[0.65rem] font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-400"
-                  >
-                    {isDetecting ? "Updating…" : "Refresh live GPS pin"}
-                  </button>
-                )}
-              </div>
 
-              {/* Browse scope */}
-              <div>
-                <p className="mb-1.5 text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
-                  Browse scope
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(
-                    [
-                      { id: "radius" as const, label: "Near me" },
-                      { id: "city" as const, label: "This city" },
-                      { id: "pakistan" as const, label: "All Pakistan" },
-                    ]
-                  ).map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => handleScopeChange(opt.id)}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
-                        scope === opt.id
-                          ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/25"
-                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Radius options */}
-              {scope === "radius" && (
                 <div>
-                  <label className="mb-2 block text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
-                    Show shops within:
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {RADIUS_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => handleRadiusChange(option.value)}
-                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
-                          maxDistanceKm === option.value
-                            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/25"
-                            : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                  <p className="mb-2 text-[0.7rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                    Show shops within
+                  </p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {RADIUS_OPTIONS.map((option) => {
+                      const active = maxDistanceKm === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => handleRadiusChange(option.value)}
+                          className={`rounded-lg py-2 text-xs font-semibold transition-all ${
+                            active
+                              ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                  {maxDistanceKm > 0 && (
-                    <p className="mt-1.5 text-[0.6rem] font-medium text-teal-700 dark:text-teal-300">
-                      Only shops within {maxDistanceKm} km of your pin (live).
+                  {locationError && (
+                    <p className="mt-1.5 text-[0.65rem] leading-relaxed text-red-500">
+                      {locationError}
                     </p>
                   )}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* City picker */}
-              {scope === "city" && (
+            {scope === "city" && (
+              <div className="space-y-3">
                 <div>
-                  <p className="mb-1.5 text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
-                    Pick a city
+                  <p className="mb-1.5 text-[0.7rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                    Select your city
                   </p>
-                  <div className="relative mb-1.5">
-                    <label htmlFor="tm-city-search" className="sr-only">
-                      Search cities
-                    </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400">
+                      <SearchIcon />
+                    </span>
                     <input
-                      id="tm-city-search"
                       type="search"
                       value={cityQuery}
                       onChange={(e) => setCityQuery(e.target.value)}
                       placeholder="Search city…"
                       autoComplete="off"
-                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-emerald-500 dark:focus:bg-zinc-900"
+                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2 pl-8 pr-3 text-xs text-zinc-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-emerald-500 dark:focus:bg-zinc-900"
+                      aria-label="Search cities"
                     />
                   </div>
                   {visibleCities.length > 0 ? (
-                    <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
+                    <div className="mt-1.5 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
                       {visibleCities.map((city) => (
                         <button
                           key={city}
@@ -490,66 +524,72 @@ export default function GeoRadiusFilter({
                       ))}
                     </div>
                   ) : (
-                    <p className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-[0.65rem] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                    <p className="mt-1.5 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-[0.65rem] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
                       No city matches “{cityQuery.trim()}”.
                     </p>
                   )}
                 </div>
-              )}
 
-              {/* Areas for the selected city */}
-              {location?.city && activeAreas.length > 0 && (
-                <div>
-                  <p className="mb-1.5 text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
-                    {scope === "city"
-                      ? `Areas in ${location.city}`
-                      : `Areas in ${location.city}`}
-                  </p>
-                  <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
-                    {activeAreas.map((area) => (
-                      <button
-                        key={area.name}
-                        type="button"
-                        onClick={() => handleAreaPick(location.city as SupportedCity, area.name)}
-                        className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium transition-all ${
-                          location.deliveryZone === area.name
-                            ? "border-teal-600 bg-teal-600 text-white shadow-sm shadow-teal-600/25"
-                            : "border-zinc-200 text-zinc-600 hover:border-teal-300 hover:bg-teal-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
-                        }`}
-                      >
-                        {area.name}
-                      </button>
-                    ))}
+                {location?.city && activeAreas.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-[0.7rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                      Areas in {location.city}
+                    </p>
+                    <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
+                      {activeAreas.map((area) => (
+                        <button
+                          key={area.name}
+                          type="button"
+                          onClick={() =>
+                            handleAreaPick(location.city as SupportedCity, area.name)
+                          }
+                          className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium transition-all ${
+                            location.deliveryZone === area.name
+                              ? "border-teal-600 bg-teal-600 text-white shadow-sm shadow-teal-600/25"
+                              : "border-zinc-200 text-zinc-600 hover:border-teal-300 hover:bg-teal-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+                          }`}
+                        >
+                          {area.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            )}
 
-              {/* Hint */}
-              <p className="text-[0.6rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
-                {hintText}
-              </p>
-            </div>
+            {scope === "pakistan" && (
+              <div className="rounded-xl border border-teal-200 bg-teal-50/60 p-3 dark:border-teal-900/50 dark:bg-teal-950/30">
+                <p className="text-xs font-semibold text-teal-800 dark:text-teal-200">
+                  All of Pakistan
+                </p>
+                <p className="mt-1 text-[0.7rem] leading-relaxed text-teal-700 dark:text-teal-400">
+                  Showing shops across the country. Nearest stores rank first when
+                  your location is on.
+                </p>
+              </div>
+            )}
+          </div>
 
-            {/* Footer: Done + Reset */}
-            <div className="mt-3 flex items-center gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+          {/* Footer */}
+          <div className="mt-3 flex items-center gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={closePanel}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/30 transition-colors hover:bg-emerald-700"
+            >
+              <CheckIcon />
+              Done
+            </button>
+            {isActive && (
               <button
                 type="button"
-                onClick={closePanel}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/30 transition-colors hover:bg-emerald-700"
+                onClick={handleClearLocation}
+                className="rounded-xl border border-zinc-200 px-3 py-2.5 text-xs font-semibold text-zinc-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-800 dark:hover:bg-red-950/30 dark:hover:text-red-400"
               >
-                <CheckIcon />
-                Done
+                Reset
               </button>
-              {isActive && (
-                <button
-                  type="button"
-                  onClick={handleClearLocation}
-                  className="rounded-xl border border-zinc-200 px-3 py-2.5 text-xs font-semibold text-zinc-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-red-800 dark:hover:bg-red-950/30 dark:hover:text-red-400"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}

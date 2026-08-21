@@ -788,19 +788,17 @@ function ProductsPageInner() {
             Area
           </button>
         </div>
-        {areaOpen && (
-          <div className="mt-2">
-            <GeoRadiusFilter
-              onFilterChange={setGeoFilter}
-              isDetecting={geoDetecting}
-              onDetectStart={() => setGeoDetecting(true)}
-              onDetectEnd={() => setGeoDetecting(false)}
-              open={areaOpen}
-              onDismiss={() => setAreaOpen(false)}
-              inline
-            />
-          </div>
-        )}
+        <div className={areaOpen ? "mt-2" : ""}>
+          <GeoRadiusFilter
+            onFilterChange={setGeoFilter}
+            isDetecting={geoDetecting}
+            onDetectStart={() => setGeoDetecting(true)}
+            onDetectEnd={() => setGeoDetecting(false)}
+            open={areaOpen}
+            onDismiss={() => setAreaOpen(false)}
+            inline
+          />
+        </div>
       </div>
 
       <p className="mb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
