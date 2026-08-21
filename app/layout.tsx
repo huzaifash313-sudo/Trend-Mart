@@ -102,7 +102,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div id="tm-boot-splash" className="tm-boot-splash" aria-hidden="true">
           <div className="tm-boot-splash-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/trendmart-mark.png?v=8" alt="" width={88} height={88} />
+            <img src="/trendmart-mark.png?v=10" alt="" width={88} height={88} />
           </div>
         </div>
         <QueryProvider>

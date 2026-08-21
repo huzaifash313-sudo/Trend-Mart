@@ -36,8 +36,8 @@ self.addEventListener("push", (event) => {
   const title = (data && data.title) || "TrendMart";
   const options = {
     body: (data && data.body) || "",
-    icon: (data && data.icon) || "/trendmart-mark.png",
-    badge: (data && data.badge) || "/trendmart-mark.png",
+    icon: (data && data.icon) || "/trendmart-mark.png?v=10",
+    badge: (data && data.badge) || "/trendmart-mark.png?v=10",
     tag: (data && data.tag) || undefined,
     data: {
       url: (data && data.url) || "/",

@@ -32,7 +32,7 @@ function BrowserNotifyBridge() {
     try {
       const n = new Notification(latest.title, {
         body: latest.body,
-        icon: "/icon-192.png?v=8",
+        icon: "/icon-192.png?v=10",
         tag: latest.id,
       });
       n.onclick = () => {

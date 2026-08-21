@@ -268,7 +268,7 @@ ON CONFLICT (user_id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCL
 INSERT INTO public.customer_addresses (user_id, label, full_name, phone_number, address_line1, address_line2, city, postal_code, delivery_notes, is_default)
 VALUES (
   'e5555555-5555-4555-8555-555555555555'::uuid, 'Home', 'Abdullah', '03001234567',
-  'House 12, Street 5, Model Town', '', 'Lahore', '54000', 'Call before delivery', true
+  'House 12, Street 5, Model Town', '', 'Gujranwala', '52250', 'Call before delivery', true
 );
 
 COMMIT;
@@ -295,17 +295,17 @@ BEGIN
     business_hours, operating_status, created_at
   ) VALUES (
     'b2222222-2222-4222-8222-222222222222', 'Huzaiffa Fresh Mart', 'huzaiffa-fresh-mart',
-    'Grocery & Kiryana', 'Model Town, Lahore', '923001234501',
+    'Grocery & Kiryana', 'Model Town, Gujranwala', '923001234501',
     public.seed_img('logo-huzaiffa'), public.seed_img('banner-huzaiffa'),
-    true, 'approved', 31.4837, 74.3445, 10, ARRAY['__pk_city__:Lahore'],
-    'Main Market, Model Town, Lahore', 0, 1500, 0, 0, 4.6, 12,
+    true, 'approved', 32.168, 74.177, 10, ARRAY['__pk_city__:Gujranwala'],
+    'Main Market, Model Town, Gujranwala', 0, 1500, 0, 0, 4.6, 12,
     'Fresh groceries and daily essentials delivered fast across Model Town.',
     'Eid offers live now — free delivery over Rs. 1500!', 'retail', '#10b981',
     'Mon-Sat: 9 AM - 11 PM', 'Open now', now()
   ) RETURNING id INTO v_shop1;
 
   INSERT INTO public.products (shop_id, name, title, description, price, original_price, currency, image_url, images, is_available, is_pinned, stock_status, category_id, created_at, short_code)
-  SELECT v_shop1, n.name, n.name, 'Fresh ' || n.name || ' — order on WhatsApp: 0300 1234501. Fast delivery across Lahore.',
+  SELECT v_shop1, n.name, n.name, 'Fresh ' || n.name || ' — order on WhatsApp: 0300 1234501. Fast delivery across Gujranwala.',
          n.price, n.orig, 'PKR',
          public.seed_img('s1p' || n.i),
          jsonb_build_array(public.seed_img('s1p' || n.i)),
@@ -353,10 +353,10 @@ BEGIN
     business_hours, operating_status, created_at
   ) VALUES (
     'c3333333-3333-4333-8333-333333333333', 'Huzzi Fashion House', 'huzzi-fashion-house',
-    'Fashion & Apparel', 'Gulberg, Lahore', '923001234502',
+    'Fashion & Apparel', 'Gulberg, Gujranwala', '923001234502',
     public.seed_img('logo-huzzi-fashion'), public.seed_img('banner-huzzi-fashion'),
-    true, 'approved', 31.5204, 74.3587, 12, ARRAY['__pk_city__:Lahore'],
-    'Liberty Market, Gulberg III, Lahore', 0, 2000, 0, 0, 4.8, 25,
+    true, 'approved', 32.15, 74.183, 12, ARRAY['__pk_city__:Gujranwala'],
+    'Liberty Market, Gulberg III, Gujranwala', 0, 2000, 0, 0, 4.8, 25,
     'Latest Pakistani fashion — kurtas, shalwar kameez, sneakers and more.',
     'New winter collection just landed!', 'retail', '#ec4899',
     'Mon-Sun: 10 AM - 10 PM', 'Open now', now()
@@ -411,12 +411,12 @@ BEGIN
     business_hours, operating_status, created_at
   ) VALUES (
     'd4444444-4444-4444-8444-444444444444', 'Huzzi Gadget Zone', 'huzzi-gadget-zone',
-    'Electronics & Gadgets', 'DHA Phase 5, Lahore', '923001234503',
+    'Electronics & Gadgets', 'DHA Phase 5, Gujranwala', '923001234503',
     public.seed_img('logo-gadget'), public.seed_img('banner-gadget'),
-    true, 'approved', 31.4720, 74.3977, 10, ARRAY['__pk_city__:Lahore'],
-    'Y-Block, DHA Phase 5, Lahore', 0, 3000, 0, 0, 4.4, 18,
+    true, 'approved', 32.167, 74.228, 10, ARRAY['__pk_city__:Gujranwala'],
+    'Y-Block, DHA Phase 5, Gujranwala', 0, 3000, 0, 0, 4.4, 18,
     'Genuine electronics, accessories and gadgets with warranty.',
-    'Cash on delivery available across Lahore.', 'retail', '#3b82f6',
+    'Cash on delivery available across Gujranwala.', 'retail', '#3b82f6',
     'Mon-Sun: 11 AM - 11 PM', 'Open now', now()
   ) RETURNING id INTO v_shop3;
 
@@ -469,10 +469,10 @@ BEGIN
     business_hours, operating_status, created_at
   ) VALUES (
     'f6666666-6666-4666-8666-666666666666', 'TestMart Grocers', 'testmart-grocers',
-    'Grocery & Kiryana', 'Faisal Town, Lahore', '923001234505',
+    'Grocery & Kiryana', 'Faisal Town, Gujranwala', '923001234505',
     public.seed_img('logo-testgrocers'), public.seed_img('banner-testgrocers'),
-    true, 'approved', 31.4699, 74.2738, 8, ARRAY['__pk_city__:Lahore'],
-    'Main Boulevard, Faisal Town, Lahore', 0, 1000, 0, 0, 4.2, 9,
+    true, 'approved', 32.195, 74.185, 8, ARRAY['__pk_city__:Gujranwala'],
+    'Main Boulevard, Faisal Town, Gujranwala', 0, 1000, 0, 0, 4.2, 9,
     'Everyday groceries at the best prices.',
     'Free delivery on orders above Rs. 1000.', 'retail', '#f59e0b',
     'Mon-Sat: 8 AM - 10 PM', 'Open now', now()
@@ -527,10 +527,10 @@ BEGIN
     business_hours, operating_status, created_at
   ) VALUES (
     '7a777777-7777-4777-8777-777777777777', 'TestMart Bakers', 'testmart-bakers',
-    'Bakery & Sweets', 'Johar Town, Lahore', '923001234506',
+    'Bakery & Sweets', 'Johar Town, Gujranwala', '923001234506',
     public.seed_img('logo-bakers'), public.seed_img('banner-bakers'),
-    true, 'approved', 31.4667, 74.2555, 8, ARRAY['__pk_city__:Lahore'],
-    'Sector C, Johar Town, Lahore', 0, 1200, 0, 0, 4.7, 21,
+    true, 'approved', 32.176, 74.187, 8, ARRAY['__pk_city__:Gujranwala'],
+    'Sector C, Johar Town, Gujranwala', 0, 1200, 0, 0, 4.7, 21,
     'Freshly baked cakes, pastries and sweets every day.',
     'Order birthday cakes 24 hours in advance!', 'retail', '#f97316',
     'Mon-Sun: 8 AM - 11 PM', 'Open now', now()
@@ -585,10 +585,10 @@ BEGIN
     business_hours, operating_status, created_at
   ) VALUES (
     '88888888-8888-4888-8888-888888888888', 'TestMart Care', 'testmart-care',
-    'Pharmacy & Medical', 'Wapda Town, Lahore', '923001234507',
+    'Pharmacy & Medical', 'Wapda Town, Gujranwala', '923001234507',
     public.seed_img('logo-care'), public.seed_img('banner-care'),
-    true, 'approved', 31.4521, 74.2667, 8, ARRAY['__pk_city__:Lahore'],
-    'Main Wapda Town Road, Lahore', 0, 1500, 0, 0, 4.3, 14,
+    true, 'approved', 32.148, 74.213, 8, ARRAY['__pk_city__:Gujranwala'],
+    'Main Wapda Town Road, Gujranwala', 0, 1500, 0, 0, 4.3, 14,
     'Medicines and healthcare essentials with authentic products.',
     '24/7 order support on WhatsApp.', 'retail', '#14b8a6',
     'Mon-Sun: 24 hours', 'Open now', now()
