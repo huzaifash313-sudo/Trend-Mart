@@ -382,8 +382,14 @@ export function migrateGuestCartToUserBucket(userId: string): void {
       return;
     }
 
-    const guestState = JSON.parse(guestRaw) as { state?: { items?: unknown } };
-    const userState = JSON.parse(userRaw) as { state?: { items?: unknown } };
+    const guestState = JSON.parse(guestRaw) as {
+      state?: { items?: unknown };
+      version?: number;
+    };
+    const userState = JSON.parse(userRaw) as {
+      state?: { items?: unknown };
+      version?: number;
+    };
     const guestItems = sanitizeCartItems(guestState?.state?.items);
     const userItems = sanitizeCartItems(userState?.state?.items);
     if (guestItems.length === 0) return;
