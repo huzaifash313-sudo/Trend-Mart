@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart - FULL DATABASE INITIALIZATION (single file, run once in Supabase)
+-- TrendMart - FULL DATABASE INITIALIZATION (single master file, run once in Supabase)
 -- =============================================================================
 -- COMBINED on 2026-08-20 from:
 --   1. RUN_THIS_IN_SUPABASE_SQL_EDITOR.sql            (comprehensive base)
@@ -7,6 +7,31 @@
 --      including today's two migrations:
 --        - 20260820000000_review_reminder_notifications.sql
 --        - 20260820010000_product_popularity_signals.sql
+--
+-- FIXED + EXTENDED on 2026-08-21 (this is the ONE file you need):
+--   * CRITICAL ORDERING BUG FIXED — the ownership helper functions
+--     (is_shop_owner / get_shop_owner_id / get_product_shop_id /
+--     is_wishlist_owner / is_favorite_store_owner) are now declared BEFORE the
+--     RLS policies that call them. Previously they were declared after the
+--     policies, so the entire PART 1 transaction rolled back on a fresh or
+--     partially-migrated database — that is why shops / shop_deals /
+--     promotional_ads / legal_acceptances failed with 400/404 on page load.
+--   * Dynamic trigger blocks now skip missing tables instead of aborting.
+--   * Unique indexes (reviews, shop slug, product short codes) now clean
+--     legacy duplicates first so they can never fail on existing data.
+--   * ON CONFLICT guards added: pre-existing tables that lack the unique
+--     constraints the seeds/app-upserts rely on (sub_categories (category,slug),
+--     service_availability (shop_id,day_of_week), user_roles (user_id),
+--     customer_wishlists, favorite_stores, daily_revenue_snapshots,
+--     merchant_theme_preferences, push_subscriptions (endpoint), coupons,
+--     user_profiles PK, email_verification_otps PK) now get them added
+--     automatically after legacy duplicates are cleaned — so the script never
+--     dies with "42P10: no unique constraint matching the ON CONFLICT".
+--   * PART 10 added: ad_plans + ad pricing columns, user_profiles
+--     (is_banned / avatar_url / onboarding_seen_at), coupons.min_order_amount,
+--     wishlist (user_id, shop_id, type) unique constraint, a safe backfill that
+--     marks existing shops live + approved, and a final PostgREST schema-cache
+--     reload so the 400 / 404 errors disappear on the next page load.
 --
 -- HOW TO USE
 -- ----------
@@ -147,6 +172,83 @@ AS $$
     WHERE user_id = p_user_id AND role = 'admin'
   );
 $$;
+
+-- =============================================================================
+-- SECTION 2b: OWNERSHIP HELPER FUNCTIONS
+-- -----------------------------------------------------------------------------
+-- CRITICAL: these MUST be defined BEFORE any RLS policy that references them.
+-- The tables they read (shops / products / customer_wishlists / favorite_stores)
+-- do not need to exist yet — PostgreSQL only validates function bodies when the
+-- function is actually called, so defining them up front is safe and makes the
+-- whole script runnable on a fresh / partially-migrated database.
+-- (They are re-declared later in SECTION 25 — re-running CREATE OR REPLACE is
+--  harmless.)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_shop_owner_id(p_shop_id uuid)
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT owner_id FROM public.shops WHERE id = p_shop_id;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_shop_owner(p_shop_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.shops
+    WHERE id = p_shop_id AND owner_id = auth.uid()
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_product_shop_id(p_product_id uuid)
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT shop_id FROM public.products WHERE id = p_product_id;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_wishlist_owner(p_wishlist_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.customer_wishlists
+    WHERE id = p_wishlist_id AND user_id = auth.uid()
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_favorite_store_owner(p_favorite_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.favorite_stores
+    WHERE id = p_favorite_id AND user_id = auth.uid()
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_shop_owner(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_shop_owner_id(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_product_shop_id(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_wishlist_owner(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_favorite_store_owner(uuid) TO anon, authenticated;
 
 -- =============================================================================
 -- SECTION 3: SHOPS TABLE (Core marketplace entity — retail & service)
@@ -469,6 +571,28 @@ ALTER TABLE public.service_availability ADD COLUMN IF NOT EXISTS end_time time D
 ALTER TABLE public.service_availability ADD COLUMN IF NOT EXISTS emergency_available boolean DEFAULT false;
 ALTER TABLE public.service_availability ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.service_availability ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+-- CRITICAL for ON CONFLICT (shop_id, day_of_week): a pre-existing table may be
+-- missing the unique constraint the seed block (SECTION 34) requires. Clean
+-- legacy duplicates first, then add the constraint if it is not already present.
+DO $$
+BEGIN
+  IF to_regclass('public.service_availability') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.service_availability'::regclass
+         AND conname = 'uq_service_availability_shop_day'
+     ) THEN
+    DELETE FROM public.service_availability r
+    USING public.service_availability r2
+    WHERE r.shop_id = r2.shop_id
+      AND r.day_of_week = r2.day_of_week
+      AND r.id > r2.id;
+
+    ALTER TABLE public.service_availability
+      ADD CONSTRAINT uq_service_availability_shop_day UNIQUE (shop_id, day_of_week);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_service_availability_shop_id ON public.service_availability(shop_id);
 
@@ -1610,12 +1734,15 @@ BEGIN
       'merchant_subscriptions','user_roles'
     ])
   LOOP
-    EXECUTE format('
-      DROP TRIGGER IF EXISTS trg_%s_updated_at ON public.%I;
-      CREATE TRIGGER trg_%s_updated_at
-        BEFORE UPDATE ON public.%I
-        FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-    ', tbl, tbl, tbl, tbl);
+    -- Skip tables that don't exist yet (partial migration) instead of aborting.
+    IF to_regclass(format('public.%I', tbl)) IS NOT NULL THEN
+      EXECUTE format('
+        DROP TRIGGER IF EXISTS trg_%s_updated_at ON public.%I;
+        CREATE TRIGGER trg_%s_updated_at
+          BEFORE UPDATE ON public.%I
+          FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+      ', tbl, tbl, tbl, tbl);
+    END IF;
   END LOOP;
 END $$;
 
@@ -1634,12 +1761,14 @@ BEGIN
       'customer_inquiries','analytics_logs','customer_wishlists','favorite_stores'
     ])
   LOOP
-    trigger_name := 'trg_prevent_mass_delete_' || tbl;
-    EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I;', trigger_name, tbl);
-    EXECUTE format(
-      'CREATE TRIGGER %I AFTER DELETE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.prevent_mass_delete();',
-      trigger_name, tbl
-    );
+    IF to_regclass(format('public.%I', tbl)) IS NOT NULL THEN
+      trigger_name := 'trg_prevent_mass_delete_' || tbl;
+      EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I;', trigger_name, tbl);
+      EXECUTE format(
+        'CREATE TRIGGER %I AFTER DELETE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.prevent_mass_delete();',
+        trigger_name, tbl
+      );
+    END IF;
   END LOOP;
 END $$;
 
@@ -1657,12 +1786,14 @@ BEGIN
       'products','orders','inventory_variants','reviews','coupons','customer_inquiries'
     ])
   LOOP
-    trigger_name := 'trg_audit_' || tbl;
-    EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I;', trigger_name, tbl);
-    EXECUTE format(
-      'CREATE TRIGGER %I AFTER INSERT OR UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.audit_sensitive_operation();',
-      trigger_name, tbl
-    );
+    IF to_regclass(format('public.%I', tbl)) IS NOT NULL THEN
+      trigger_name := 'trg_audit_' || tbl;
+      EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I;', trigger_name, tbl);
+      EXECUTE format(
+        'CREATE TRIGGER %I AFTER INSERT OR UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.audit_sensitive_operation();',
+        trigger_name, tbl
+      );
+    END IF;
   END LOOP;
 END $$;
 
@@ -1801,6 +1932,28 @@ ALTER TABLE public.sub_categories ADD COLUMN IF NOT EXISTS is_others boolean DEF
 ALTER TABLE public.sub_categories ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.sub_categories ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
+-- CRITICAL for ON CONFLICT (category, slug): a pre-existing sub_categories
+-- table may be missing the unique constraint every seed block below requires
+-- (the "Others / General" seed is what throws 42P10 on old tables). Clean
+-- legacy duplicates first, then add the constraint if it is not already present.
+DO $$
+BEGIN
+  IF to_regclass('public.sub_categories') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.sub_categories'::regclass
+         AND conname = 'sub_categories_category_slug_unique'
+     ) THEN
+    DELETE FROM public.sub_categories r
+    USING public.sub_categories r2
+    WHERE r.category = r2.category
+      AND r.slug = r2.slug
+      AND r.id > r2.id;
+
+    ALTER TABLE public.sub_categories
+      ADD CONSTRAINT sub_categories_category_slug_unique UNIQUE (category, slug);
+  END IF;
+END $$;
 
 -- Index for fast lookup by category
 CREATE INDEX IF NOT EXISTS idx_sub_categories_category ON public.sub_categories(category, sort_order);
@@ -3685,6 +3838,20 @@ ALTER TABLE public.reviews
 
 CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON public.reviews (user_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_ip_hash ON public.reviews (visitor_ip_hash);
+
+-- One review per (shop, user): drop older duplicates (keep the lowest id) so the
+-- unique index below never fails on data left by a legacy schema.
+DO $$
+BEGIN
+  DELETE FROM public.reviews r
+  USING public.reviews r2
+  WHERE r.user_id IS NOT NULL
+    AND r.shop_id = r2.shop_id
+    AND r.user_id = r2.user_id
+    AND r.id <> r2.id
+    AND r.id > r2.id;
+END $$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_reviews_shop_user
   ON public.reviews (shop_id, user_id)
   WHERE user_id IS NOT NULL;
@@ -3971,6 +4138,20 @@ COMMIT;
 
 ALTER TABLE public.shops
   ADD COLUMN IF NOT EXISTS slug text;
+
+-- Drop duplicate non-empty slugs (keep the lowest id) before enforcing the
+-- unique partial index, so this never fails on legacy data.
+DO $$
+BEGIN
+  UPDATE public.shops s
+  SET slug = NULL
+  WHERE s.slug IS NOT NULL
+    AND length(trim(s.slug)) > 0
+    AND EXISTS (
+      SELECT 1 FROM public.shops s2
+      WHERE s2.slug = s.slug AND s2.id < s.id
+    );
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS shops_slug_unique
   ON public.shops (slug)
@@ -4723,6 +4904,19 @@ ALTER TABLE public.shops
 -- 1) Column + unique index ------------------------------------------------
 ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS short_code text;
+
+-- Drop duplicate short codes (keep the lowest id) before enforcing the unique
+-- partial index, so this never fails on legacy data.
+DO $$
+BEGIN
+  UPDATE public.products p
+  SET short_code = NULL
+  WHERE p.short_code IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM public.products p2
+      WHERE p2.short_code = p.short_code AND p2.id < p.id
+    );
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS products_short_code_key
   ON public.products (short_code)
@@ -5534,6 +5728,358 @@ CREATE INDEX IF NOT EXISTS idx_products_popularity_feed ON public.products(order
 
 
 -- =============================================================================
+-- PART 10 — LATEST SCHEMA + SAFETY BACKFILLS (2026-08-21)
+-- -----------------------------------------------------------------------------
+-- Everything the app reads/writes that was NOT yet in this script:
+--   1. ad_plans catalog + promotional_ads pricing columns
+--   2. user_profiles: is_banned, avatar_url, onboarding_seen_at (+ ban RPC)
+--   3. coupons.min_order_amount (delivery/order slab support)
+--   4. customer_wishlists unique (user_id, shop_id, type) — required by the
+--      shop-favorite upsert (onConflict: "user_id,shop_id,type")
+--   5. Backfill existing shops to live + approved (approval queue is DISABLED)
+--   6. Force PostgREST to reload its schema cache NOW so the new tables and
+--      columns answer immediately (kills the 400 / 404 errors on next load).
+-- 100% idempotent. Safe to re-run any number of times.
+-- =============================================================================
+
+-- ── 1) Ad pricing plans (merchant picker + admin catalog) ──────────────────
+CREATE TABLE IF NOT EXISTS public.ad_plans (
+  id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name          text NOT NULL,
+  placement     text NOT NULL DEFAULT 'homepage_top'
+                CHECK (placement IN ('homepage_top', 'homepage_feed')),
+  duration_days integer NOT NULL DEFAULT 7 CHECK (duration_days > 0),
+  price         numeric(10,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
+  description   text,
+  is_active     boolean NOT NULL DEFAULT true,
+  sort_order    integer NOT NULL DEFAULT 0,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.ad_plans ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT ON public.ad_plans TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ad_plans TO authenticated;
+
+DROP POLICY IF EXISTS "ad_plans_public_read" ON public.ad_plans;
+CREATE POLICY "ad_plans_public_read"
+  ON public.ad_plans FOR SELECT
+  USING (is_active = true);
+
+DROP POLICY IF EXISTS "ad_plans_admin_all" ON public.ad_plans;
+CREATE POLICY "ad_plans_admin_all"
+  ON public.ad_plans FOR ALL
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+-- Promotional ads: record which plan + price were chosen at request time.
+DO $$
+BEGIN
+  IF to_regclass('public.promotional_ads') IS NOT NULL THEN
+    EXECUTE '
+      ALTER TABLE public.promotional_ads
+        ADD COLUMN IF NOT EXISTS ad_plan_id uuid REFERENCES public.ad_plans(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS price_paid numeric(10,2),
+        ADD COLUMN IF NOT EXISTS paid_at timestamptz;
+    ';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_promotional_ads_plan ON public.promotional_ads(ad_plan_id);';
+  END IF;
+END $$;
+
+-- ── 2) user_profiles: ban flag + avatar + onboarding + location extras ──────
+DO $$
+BEGIN
+  IF to_regclass('public.user_profiles') IS NOT NULL THEN
+    EXECUTE '
+      ALTER TABLE public.user_profiles
+        ADD COLUMN IF NOT EXISTS is_banned boolean NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS avatar_url text,
+        ADD COLUMN IF NOT EXISTS onboarding_seen_at timestamptz;
+    ';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_user_profiles_banned ON public.user_profiles(is_banned) WHERE is_banned = true;';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_user_profiles_onboarding ON public.user_profiles(onboarding_seen_at) WHERE onboarding_seen_at IS NOT NULL;';
+  END IF;
+END $$;
+
+-- Fast ban lookup for middleware + checkout gating.
+CREATE OR REPLACE FUNCTION public.is_account_banned(p_user_id uuid DEFAULT auth.uid())
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(
+    (SELECT is_banned FROM public.user_profiles WHERE user_id = p_user_id),
+    false
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_account_banned(uuid) TO anon, authenticated;
+
+-- Admins can ban/unban any profile (SELECT is already granted via admin read).
+DO $$
+BEGIN
+  IF to_regclass('public.user_profiles') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "user_profiles_admin_update" ON public.user_profiles;';
+    EXECUTE '
+      CREATE POLICY "user_profiles_admin_update"
+        ON public.user_profiles FOR UPDATE
+        USING (public.is_admin())
+        WITH CHECK (public.is_admin());
+    ';
+  END IF;
+END $$;
+
+-- ── 3) coupons: minimum order amount (slab) ─────────────────────────────────
+DO $$
+BEGIN
+  IF to_regclass('public.coupons') IS NOT NULL THEN
+    EXECUTE '
+      ALTER TABLE public.coupons
+        ADD COLUMN IF NOT EXISTS min_order_amount numeric(10, 2) DEFAULT NULL
+          CHECK (min_order_amount IS NULL OR min_order_amount >= 0);
+    ';
+  END IF;
+END $$;
+
+-- ── 4) wishlist: shop-type favorites upsert needs (user_id, shop_id, type) ──
+DO $$
+BEGIN
+  IF to_regclass('public.customer_wishlists') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.customer_wishlists'::regclass
+         AND conname = 'uq_wishlist_user_shop'
+     ) THEN
+    -- Drop any duplicate shop-favorites first (keep the lowest id).
+    DELETE FROM public.customer_wishlists r
+    USING public.customer_wishlists r2
+    WHERE r.type = 'shop' AND r.shop_id IS NOT NULL
+      AND r.user_id = r2.user_id
+      AND r.shop_id = r2.shop_id
+      AND r.type = r2.type
+      AND r.id > r2.id;
+
+    ALTER TABLE public.customer_wishlists
+      ADD CONSTRAINT uq_wishlist_user_shop UNIQUE (user_id, shop_id, type);
+  END IF;
+END $$;
+
+-- ── 4b) Ensure every other unique constraint the app's upserts rely on ──────
+-- `ON CONFLICT` throws 42P10 when the matching unique constraint/index is
+-- missing. These guards make every onConflict in the codebase safe even when
+-- the table pre-dates this script (CREATE TABLE IF NOT EXISTS cannot add a
+-- constraint to an existing table). Each block dedupes legacy rows first so
+-- the constraint can never fail on existing data. Idempotent.
+
+-- user_roles: signup trigger + set_my_signup_role use ON CONFLICT (user_id)
+DO $$
+BEGIN
+  IF to_regclass('public.user_roles') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.user_roles'::regclass
+         AND conname = 'uq_user_role'
+     ) THEN
+    DELETE FROM public.user_roles r
+    USING public.user_roles r2
+    WHERE r.user_id = r2.user_id AND r.id > r2.id;
+
+    ALTER TABLE public.user_roles
+      ADD CONSTRAINT uq_user_role UNIQUE (user_id);
+  END IF;
+END $$;
+
+-- customer_wishlists: product wishlist upsert uses ON CONFLICT (user_id, product_id, type)
+DO $$
+BEGIN
+  IF to_regclass('public.customer_wishlists') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.customer_wishlists'::regclass
+         AND conname = 'uq_wishlist_user_item'
+     ) THEN
+    -- Dedupe PRODUCT rows only (product_id NOT NULL). Shop-favorite rows keep
+    -- NULL product_id — a UNIQUE constraint treats NULLs as distinct, so they
+    -- must not be merged here; uq_wishlist_user_shop governs them instead.
+    DELETE FROM public.customer_wishlists r
+    USING public.customer_wishlists r2
+    WHERE r.type = 'product'
+      AND r.product_id IS NOT NULL
+      AND r.user_id = r2.user_id
+      AND r.product_id = r2.product_id
+      AND r.type = r2.type
+      AND r.id > r2.id;
+
+    ALTER TABLE public.customer_wishlists
+      ADD CONSTRAINT uq_wishlist_user_item UNIQUE (user_id, product_id, type);
+  END IF;
+END $$;
+
+-- favorite_stores: shop-favorite upsert uses ON CONFLICT (user_id, shop_id)
+DO $$
+BEGIN
+  IF to_regclass('public.favorite_stores') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.favorite_stores'::regclass
+         AND conname = 'uq_favorite_user_shop'
+     ) THEN
+    DELETE FROM public.favorite_stores r
+    USING public.favorite_stores r2
+    WHERE r.user_id = r2.user_id AND r.shop_id = r2.shop_id AND r.id > r2.id;
+
+    ALTER TABLE public.favorite_stores
+      ADD CONSTRAINT uq_favorite_user_shop UNIQUE (user_id, shop_id);
+  END IF;
+END $$;
+
+-- daily_revenue_snapshots: generate_daily_revenue_snapshot uses ON CONFLICT (shop_id, snapshot_date)
+DO $$
+BEGIN
+  IF to_regclass('public.daily_revenue_snapshots') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.daily_revenue_snapshots'::regclass
+         AND conname = 'uq_daily_revenue_snapshots_shop_date'
+     ) THEN
+    DELETE FROM public.daily_revenue_snapshots r
+    USING public.daily_revenue_snapshots r2
+    WHERE r.shop_id = r2.shop_id AND r.snapshot_date = r2.snapshot_date AND r.id > r2.id;
+
+    ALTER TABLE public.daily_revenue_snapshots
+      ADD CONSTRAINT uq_daily_revenue_snapshots_shop_date UNIQUE (shop_id, snapshot_date);
+  END IF;
+END $$;
+
+-- merchant_theme_preferences: themePrefs upsert uses ON CONFLICT (shop_id)
+DO $$
+BEGIN
+  IF to_regclass('public.merchant_theme_preferences') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.merchant_theme_preferences'::regclass
+         AND contype IN ('u', 'p')
+         AND pg_get_constraintdef(oid) ILIKE '%(shop_id)%'
+     ) THEN
+    DELETE FROM public.merchant_theme_preferences r
+    USING public.merchant_theme_preferences r2
+    WHERE r.shop_id = r2.shop_id AND r.id > r2.id;
+
+    ALTER TABLE public.merchant_theme_preferences
+      ADD CONSTRAINT merchant_theme_preferences_shop_id_key UNIQUE (shop_id);
+  END IF;
+END $$;
+
+-- push_subscriptions: subscribe route upserts on endpoint
+DO $$
+BEGIN
+  IF to_regclass('public.push_subscriptions') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.push_subscriptions'::regclass
+         AND contype IN ('u', 'p')
+         AND pg_get_constraintdef(oid) ILIKE '%(endpoint)%'
+     ) THEN
+    DELETE FROM public.push_subscriptions r
+    USING public.push_subscriptions r2
+    WHERE r.endpoint = r2.endpoint AND r.id > r2.id;
+
+    ALTER TABLE public.push_subscriptions
+      ADD CONSTRAINT push_subscriptions_endpoint_key UNIQUE (endpoint);
+  END IF;
+END $$;
+
+-- coupons: merchant coupon save relies on (shop_id, code) uniqueness
+DO $$
+BEGIN
+  IF to_regclass('public.coupons') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.coupons'::regclass
+         AND conname = 'coupons_code_shop_unique'
+     ) THEN
+    DELETE FROM public.coupons r
+    USING public.coupons r2
+    WHERE r.shop_id = r2.shop_id AND r.code = r2.code AND r.id > r2.id;
+
+    ALTER TABLE public.coupons
+      ADD CONSTRAINT coupons_code_shop_unique UNIQUE (shop_id, code);
+  END IF;
+END $$;
+
+-- user_profiles: authService/checkout upserts on user_id (needs a PK)
+DO $$
+BEGIN
+  IF to_regclass('public.user_profiles') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.user_profiles'::regclass
+         AND contype = 'p'
+     ) THEN
+    -- Purge NULL/empty keys (a PK implies NOT NULL) and legacy duplicates.
+    DELETE FROM public.user_profiles WHERE user_id IS NULL OR user_id = '';
+    DELETE FROM public.user_profiles r
+    USING public.user_profiles r2
+    WHERE r.user_id = r2.user_id
+      AND (r.created_at IS NULL OR r2.created_at IS NULL OR r.created_at > r2.created_at
+           OR (r.created_at = r2.created_at AND r.ctid > r2.ctid));
+
+    ALTER TABLE public.user_profiles
+      ADD PRIMARY KEY (user_id);
+  END IF;
+END $$;
+
+-- email_verification_otps: authOtpServer upserts on email (needs a PK)
+DO $$
+BEGIN
+  IF to_regclass('public.email_verification_otps') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.email_verification_otps'::regclass
+         AND contype = 'p'
+     ) THEN
+    DELETE FROM public.email_verification_otps WHERE email IS NULL OR email = '';
+    DELETE FROM public.email_verification_otps r
+    USING public.email_verification_otps r2
+    WHERE r.email = r2.email
+      AND (r.created_at IS NULL OR r2.created_at IS NULL OR r.created_at > r2.created_at
+           OR (r.created_at = r2.created_at AND r.ctid > r2.ctid));
+
+    ALTER TABLE public.email_verification_otps
+      ADD PRIMARY KEY (email);
+  END IF;
+END $$;
+
+-- ── 5) Backfill: approval queue is DISABLED → every shop is live + approved ─
+DO $$
+BEGIN
+  IF to_regclass('public.shops') IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'shops'
+         AND column_name IN ('verification_status', 'is_live')
+     ) THEN
+    EXECUTE '
+      UPDATE public.shops
+      SET verification_status = ''approved''
+      WHERE verification_status IS NULL OR verification_status = ''pending'';
+    ';
+    EXECUTE '
+      UPDATE public.shops
+      SET is_live = true
+      WHERE is_live IS NOT TRUE;
+    ';
+  END IF;
+END $$;
+
+-- ── 6) Force PostgREST to reload its schema cache NOW ───────────────────────
+NOTIFY pgrst, 'reload schema';
+
+
+-- =============================================================================
 -- [OK] FINAL VERIFICATION (read-only, safe to run any time)
 -- =============================================================================
 DO $$
@@ -5548,7 +6094,7 @@ DECLARE
     'sub_categories','sales_events','daily_revenue_snapshots','chat_logs',
     'merchant_theme_preferences','support_tickets','legal_acceptances',
     'promotional_ads','user_profiles','push_subscriptions','shop_deals',
-    'email_verification_otps','notifications'
+    'email_verification_otps','notifications','ad_plans'
   ];
   missing text;
   found_count integer;
