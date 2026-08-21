@@ -1039,10 +1039,56 @@ html.dark .trend-card:hover {
   flex-shrink: 0;
 }
 .tm-navbar-wordmark {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  animation: tm-wordmark-glow 4.5s ease-in-out infinite;
+}
+
+/* Premium shine sweep across the "TrendMart" text */
+.tm-navbar-wordmark::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: -70%;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: skewX(-16deg);
+  animation: tm-wordmark-sweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes tm-wordmark-sweep {
+  0% {
+    left: -70%;
+  }
+  55%,
+  100% {
+    left: 135%;
+  }
+}
+
+@keyframes tm-wordmark-glow {
+  0%,
+  100% {
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12), 0 0 0 rgba(153, 246, 228, 0);
+  }
+  50% {
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12), 0 0 16px rgba(153, 246, 228, 0.6);
+  }
+}
+
+/* Logo plate micro-interaction on brand hover */
+.tm-navbar-logo {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s ease;
+}
+.tm-navbar-brand:hover .tm-navbar-logo {
+  transform: rotate(-5deg) scale(1.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 @media (min-width: 640px) {
   .tm-navbar-brand {
@@ -1056,6 +1102,7 @@ html.dark .trend-card:hover {
 }
 
 .tm-navbar-icon-btn {
+  position: relative;
   display: inline-flex;
   height: 40px;
   width: 40px;
@@ -1065,6 +1112,71 @@ html.dark .trend-card:hover {
   border-radius: 10px;
   color: #fff;
   transition: background-color 0.15s ease, transform 0.12s ease;
+}
+/* Soft expanding ring pulse */
+.tm-navbar-icon-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  opacity: 0;
+  animation: tm-menu-ring 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes tm-menu-ring {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  30% {
+    opacity: 0;
+    transform: scale(1.22);
+  }
+}
+/* Gentle icon breathe */
+.tm-navbar-icon-btn svg {
+  animation: tm-menu-breathe 4s ease-in-out infinite;
+}
+@keyframes tm-menu-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+/* Hover micro-interaction on the three lines */
+.tm-hamburger-line {
+  transform-box: view-box;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tm-hamburger-line--top {
+  transform-origin: 12px 6px;
+}
+.tm-hamburger-line--mid {
+  transform-origin: 20px 12px;
+}
+.tm-hamburger-line--bot {
+  transform-origin: 12px 18px;
+}
+.tm-navbar-icon-btn:hover .tm-hamburger-line--top {
+  transform: translateY(-1.5px);
+}
+.tm-navbar-icon-btn:hover .tm-hamburger-line--mid {
+  transform: scaleX(0.82);
+}
+.tm-navbar-icon-btn:hover .tm-hamburger-line--bot {
+  transform: translateY(1.5px);
+}
+.tm-navbar-icon-btn:active .tm-hamburger-line--mid {
+  transform: scaleX(1);
 }
 .tm-navbar-icon-btn:hover {
   background: rgba(255, 255, 255, 0.14);
@@ -1116,8 +1228,14 @@ html.dark .trend-card:hover {
   .tm-navbar-bg-shift,
   .tm-navbar-soft-glow,
   .tm-navbar-trend-line,
-  .tm-navbar-trend-arrow {
+  .tm-navbar-trend-arrow,
+  .tm-navbar-wordmark,
+  .tm-navbar-wordmark::after,
+  .tm-navbar-icon-btn::before,
+  .tm-navbar-icon-btn svg,
+  .tm-hamburger-line {
     animation: none !important;
+    transition: none !important;
   }
 }
 

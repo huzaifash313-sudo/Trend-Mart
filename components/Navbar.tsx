@@ -14,7 +14,9 @@ import NavbarNotificationButton from "@/components/NavbarNotificationButton";
 function HamburgerIcon() {
   return (
     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
-      <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
+      <line x1="4" y1="6" x2="20" y2="6" className="tm-hamburger-line tm-hamburger-line--top" />
+      <line x1="4" y1="12" x2="20" y2="12" className="tm-hamburger-line tm-hamburger-line--mid" />
+      <line x1="4" y1="18" x2="20" y2="18" className="tm-hamburger-line tm-hamburger-line--bot" />
     </svg>
   );
 }
