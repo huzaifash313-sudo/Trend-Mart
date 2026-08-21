@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queries";
@@ -16,34 +16,38 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  * the session-scoped `SPLASH_KEY`.
  *
  * Beat (deliberately slow + smooth so it never feels rushed):
- *   1) Logo alone
- *   2) Logo rises + "TrendMart" wordmark slides in
- *   3) A short value introduction (what TrendMart is), not page mockups
- *   4) Hold so it's readable while home data prefetches in the background
- *   5) Slow fade into the (already-warm) homepage
+ *   1) Logo pops in centered on the green/seagreen stage
+ *   2) Logo rises + shrinks while "TrendMart" reveals letter-by-letter
+ *   3) Three value lines slide in one by one
+ *   4) Hold for reading while home data prefetches — if it's not ready yet a
+ *      small loading pill appears instead of a dead wait
+ *   5) Slow cross-fade into the (already-warm) homepage — no green→white snap
  *
  * `SPLASH_KEY` is written only when the intro finishes — never at start — so
  * Strict Mode remounts and mid-animation tab switches cannot strand the teal
  * boot cover or abort a first-run play.
  */
 const STAGE_MS = {
-  logoHold: 650,
-  brand: 700,
-  details: 750,
-  holdMin: 1000,
+  logoHold: 750,
+  brand: 950,
+  details: 1250,
+  holdMin: 800,
   /** Keep in sync with `.tm-splash--exit` animation duration in globals.css */
   exit: 520,
   /** Never block home forever if network is slow. */
-  maxWaitForData: 1400,
+  maxWaitForData: 1500,
+  /** Hard cap for the whole hold phase before we bail out to home. */
+  hardCapWait: 5500,
 };
 
 const REDUCED_MS = {
   logoHold: 160,
   brand: 200,
-  details: 240,
+  details: 300,
   holdMin: 300,
   exit: 260,
-  maxWaitForData: 320,
+  maxWaitForData: 400,
+  hardCapWait: 900,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -91,19 +95,15 @@ function clearSplashChrome() {
 /** Hold brand green under the UI, then ease into the app surface (no white snap). */
 function releaseSplashBackground() {
   const root = document.documentElement;
-  root.classList.add("tm-splash-handoff");
+  // The page is already white underneath (settle was armed at exit start), so
+  // we only need to clear the splash lock / boot classes + inline teal.
   clearSplashChrome();
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      root.classList.add("tm-splash-settle");
-      window.setTimeout(() => {
-        root.classList.remove("tm-splash-handoff", "tm-splash-settle");
-        // Drop any inline teal the boot script painted onto <html> so the app
-        // surface's own background shows — no green residue after the intro.
-        root.style.removeProperty("background-color");
-      }, 480);
-    });
-  });
+  window.setTimeout(() => {
+    root.classList.remove("tm-splash-settle");
+    // Drop any inline teal the boot script painted onto <html> so the app
+    // surface's own background shows — no green residue after the intro.
+    root.style.removeProperty("background-color");
+  }, 520);
 }
 
 async function unwrap<T>(
@@ -137,10 +137,12 @@ export default function AppSplash() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("off");
+  const [dataReady, setDataReady] = useState(false);
   const timersRef = useRef<number[]>([]);
   const unmountedRef = useRef(false);
   const exitingRef = useRef(false);
   const finishedRef = useRef(false);
+  const dataReadyRef = useRef(false);
 
   const clearTimers = () => {
     timersRef.current.forEach((id) => window.clearTimeout(id));
@@ -166,6 +168,11 @@ export default function AppSplash() {
   const beginExit = (exitMs: number) => {
     if (isStopped() || exitingRef.current) return;
     exitingRef.current = true;
+    // Arm the app surface BEFORE fading so the teal overlay fades into a
+    // ready white page — no green→white snap when the overlay unmounts.
+    const root = document.documentElement;
+    root.classList.add("tm-splash-settle");
+    root.style.removeProperty("background-color");
     setPhase("exit");
     trackTimeout(() => {
       if (unmountedRef.current) return;
@@ -192,6 +199,8 @@ export default function AppSplash() {
     document.documentElement.classList.remove("tm-first-paint");
     document.documentElement.classList.add("tm-splash-lock");
     setPhase("logo");
+    dataReadyRef.current = false;
+    setDataReady(false);
 
     const ms = stageTiming();
 
@@ -212,7 +221,10 @@ export default function AppSplash() {
         queryFn: () => unwrap(fetchActiveDeals(48)),
         staleTime: 2 * 60_000,
       }),
-    ]);
+    ]).then(() => {
+      dataReadyRef.current = true;
+      if (!unmountedRef.current && !exitingRef.current) setDataReady(true);
+    });
 
     trackTimeout(() => {
       requestAnimationFrame(() => {
@@ -240,6 +252,7 @@ export default function AppSplash() {
       setPhase("hold");
       const holdStarted = Date.now();
       void (async () => {
+        // Wait for data to be ready OR the max wait window.
         await Promise.race([
           prefetch,
           new Promise<void>((resolve) => {
@@ -247,6 +260,17 @@ export default function AppSplash() {
           }),
         ]);
         if (isStopped() || exitingRef.current) return;
+        // If data still isn't ready, show the loading pill and keep waiting
+        // up to the hard cap so home is never blank.
+        if (!dataReadyRef.current) {
+          await Promise.race([
+            prefetch,
+            new Promise<void>((resolve) => {
+              trackTimeout(resolve, ms.hardCapWait);
+            }),
+          ]);
+          if (isStopped() || exitingRef.current) return;
+        }
         const elapsed = Date.now() - holdStarted;
         const waitMore = Math.max(0, ms.holdMin - elapsed);
         await new Promise<void>((resolve) => {
@@ -271,7 +295,7 @@ export default function AppSplash() {
 
   return (
     <div
-      className={`tm-splash tm-splash--${phase} tm-splash--seamless`}
+      className={`tm-splash tm-splash--${phase}`}
       data-phase={phase}
       role="dialog"
       aria-label="Welcome to TrendMart"
@@ -294,7 +318,17 @@ export default function AppSplash() {
               fetchPriority="high"
             />
           </span>
-          <h1 className="tm-splash-title">TrendMart</h1>
+          <h1 className="tm-splash-title">
+            {"TrendMart".split("").map((ch, i) => (
+              <span
+                key={i}
+                className="tm-splash-title-letter"
+                style={{ "--letter-i": i } as CSSProperties}
+              >
+                {ch}
+              </span>
+            ))}
+          </h1>
         </div>
 
         <div className="tm-splash-copy">
@@ -315,6 +349,13 @@ export default function AppSplash() {
               </li>
             ))}
           </ul>
+
+          {phase === "hold" && !dataReady && (
+            <div className="tm-splash-loading" role="status" aria-live="polite">
+              <span className="tm-splash-spinner" aria-hidden="true" />
+              <span>Warming up your local shops…</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

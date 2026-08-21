@@ -801,59 +801,6 @@ html.dark .trend-card:hover {
   }
 }
 
-@keyframes tm-navbar-gradient-drift {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@keyframes tm-navbar-glow-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.55;
-  }
-  50% {
-    transform: translate3d(12%, 4%, 0) scale(1.08);
-    opacity: 0.85;
-  }
-}
-
-@keyframes tm-navbar-line-draw {
-  0% {
-    stroke-dashoffset: 420;
-    opacity: 0.35;
-  }
-  35% {
-    stroke-dashoffset: 0;
-    opacity: 0.95;
-  }
-  70% {
-    stroke-dashoffset: 0;
-    opacity: 0.85;
-  }
-  100% {
-    stroke-dashoffset: -40;
-    opacity: 0.55;
-  }
-}
-
-@keyframes tm-navbar-arrow-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: translateX(0);
-  }
-  50% {
-    opacity: 0.85;
-    transform: translateX(3px);
-  }
-}
-
 .tm-navbar-wrap {
   position: fixed;
   top: 0;
@@ -900,8 +847,6 @@ html.dark .trend-card:hover {
     rgba(255, 255, 255, 0.14) 45%,
     transparent 100%
   );
-  background-size: 220% 100%;
-  animation: tm-navbar-gradient-drift 10s ease-in-out infinite;
   opacity: 0.55;
 }
 
@@ -926,11 +871,7 @@ html.dark .trend-card:hover {
     #0d9488 74%,
     #0f766e 100%
   );
-  background-size: 220% 220%;
-  animation: tm-navbar-gradient-drift 14s ease-in-out infinite;
-  /* No will-change here — forcing a persistent layer for a background-position
-     (repaint) animation doubles memory + repaint cost on mobile. The browser
-     promotes the element automatically during the animation when beneficial. */
+  /* Static — the gradient stays put for a calm, professional header. */
 }
 
 .tm-navbar-soft-glow {
@@ -943,7 +884,6 @@ html.dark .trend-card:hover {
     transparent 58%
   );
   opacity: 0.7;
-  animation: tm-navbar-glow-drift 9s ease-in-out infinite;
 }
 
 .tm-navbar-trend-svg {
@@ -961,15 +901,11 @@ html.dark .trend-card:hover {
 .tm-navbar-trend-line {
   stroke-dasharray: 420;
   stroke-dashoffset: 0;
-  opacity: 0.95;
-  animation: tm-navbar-line-draw 7.5s ease-in-out infinite;
+  opacity: 0.6;
 }
 
 .tm-navbar-trend-arrow {
-  opacity: 0.55;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: tm-navbar-arrow-pulse 3.2s ease-in-out infinite;
+  opacity: 0.5;
 }
 
 .tm-navbar-inner {
@@ -1043,47 +979,21 @@ html.dark .trend-card:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* Fallback: solid white text */
+  /* Clean, professional: solid white text with a subtle depth shadow. */
   color: #fff;
-  /* Premium color-fill: a heavy green/sea-green stripe sweeps THROUGH the
-     letters themselves (background-clip: text), not just over them. */
-  background-image: linear-gradient(
-    100deg,
-    #ffffff 0%,
-    #ffffff 30%,
-    #b9f6e8 38%,
-    #6ee7b7 46%,
-    #34d399 54%,
-    #2dd4bf 62%,
-    #b9f6e8 70%,
-    #ffffff 78%,
-    #ffffff 100%
-  );
-  background-size: 300% 100%;
-  background-repeat: repeat-x;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: tm-wordmark-fill 5s linear infinite;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 
-@keyframes tm-wordmark-fill {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 300% 50%;
-  }
-}
-
-/* Logo plate micro-interaction on brand hover */
+/* Logo plate — subtle lift on brand hover, no rotation */
 .tm-navbar-logo {
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.3s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 .tm-navbar-brand:hover .tm-navbar-logo {
-  transform: rotate(-5deg) scale(1.06);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  transform: scale(1.05);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+}
+.tm-navbar-brand:active .tm-navbar-logo {
+  transform: scale(0.98);
 }
 @media (min-width: 640px) {
   .tm-navbar-brand {
@@ -1108,71 +1018,7 @@ html.dark .trend-card:hover {
   color: #fff;
   transition: background-color 0.15s ease, transform 0.12s ease;
 }
-/* Soft expanding ring pulse */
-.tm-navbar-icon-btn::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  opacity: 0;
-  animation: tm-menu-ring 4s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes tm-menu-ring {
-  0%,
-  100% {
-    opacity: 0;
-    transform: scale(1);
-  }
-  12% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  30% {
-    opacity: 0;
-    transform: scale(1.22);
-  }
-}
-/* Gentle icon breathe */
-.tm-navbar-icon-btn svg {
-  animation: tm-menu-breathe 4s ease-in-out infinite;
-}
-@keyframes tm-menu-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.07);
-  }
-}
-/* Hover micro-interaction on the three lines */
-.tm-hamburger-line {
-  transform-box: view-box;
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.tm-hamburger-line--top {
-  transform-origin: 12px 6px;
-}
-.tm-hamburger-line--mid {
-  transform-origin: 20px 12px;
-}
-.tm-hamburger-line--bot {
-  transform-origin: 12px 18px;
-}
-.tm-navbar-icon-btn:hover .tm-hamburger-line--top {
-  transform: translateY(-1.5px);
-}
-.tm-navbar-icon-btn:hover .tm-hamburger-line--mid {
-  transform: scaleX(0.82);
-}
-.tm-navbar-icon-btn:hover .tm-hamburger-line--bot {
-  transform: translateY(1.5px);
-}
-.tm-navbar-icon-btn:active .tm-hamburger-line--mid {
-  transform: scaleX(1);
-}
+/* Clean, subtle button — no idle animation, just hover/press feedback */
 .tm-navbar-icon-btn:hover {
   background: rgba(255, 255, 255, 0.14);
 }
@@ -1223,12 +1069,7 @@ html.dark .trend-card:hover {
   .tm-navbar-bg-shift,
   .tm-navbar-soft-glow,
   .tm-navbar-trend-line,
-  .tm-navbar-trend-arrow,
-  .tm-navbar-wordmark,
-  .tm-navbar-wordmark::after,
-  .tm-navbar-icon-btn::before,
-  .tm-navbar-icon-btn svg,
-  .tm-hamburger-line {
+  .tm-navbar-trend-arrow {
     animation: none !important;
     transition: none !important;
   }
@@ -3091,29 +2932,6 @@ html.tm-first-paint .tm-boot-splash {
   display: flex;
 }
 
-.tm-boot-splash-logo {
-  display: inline-flex;
-  height: 5.5rem;
-  width: 5.5rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 1.25rem;
-  background: #fff;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
-  padding: 0.55rem;
-  /* Match the React splash's initial "logo" phase position (`.tm-splash-stage`
-     is translateY(18vh)) so the boot → React handoff is pixel-perfect with no
-     logo jump / double-logo flash. */
-  transform: translateY(18vh);
-}
-
-.tm-boot-splash-logo img {
-  display: block;
-  height: 100%;
-  width: 100%;
-  object-fit: contain;
-}
-
 .tm-splash {
   position: fixed;
   inset: 0;
@@ -3203,7 +3021,9 @@ html.tm-first-paint .tm-boot-splash {
   display: flex;
   flex-direction: column;
   align-items: center;
-  transform: translateY(18vh);
+  /* Logo starts dead-center, then the whole stage rises once "TrendMart"
+     reveals — matches the requested "logo center → rise + shrink" beat. */
+  transform: translateY(0);
   transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -3242,10 +3062,8 @@ html.tm-first-paint .tm-boot-splash {
   animation: tm-splash-logo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Boot → React handoff: do not pop the logo again */
-.tm-splash--seamless .tm-splash-logo {
-  animation: none;
-}
+/* Boot cover is green-only; the React splash logo pops in exactly once.
+   No extra class toggling needed — animation runs on mount and fills both. */
 
 .tm-splash--brand .tm-splash-logo,
 .tm-splash--details .tm-splash-logo,
@@ -3268,18 +3086,24 @@ html.tm-first-paint .tm-boot-splash {
   margin: 0;
   max-width: 0;
   overflow: hidden;
-  opacity: 0;
   white-space: nowrap;
   font-size: clamp(1.85rem, 7vw, 2.35rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.05;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-  transform: translateX(-0.5rem);
+  transition: max-width 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Letter-by-letter reveal: each letter pops up with a slight stagger */
+.tm-splash-title-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.6em);
   transition:
-    max-width 0.65s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.45s ease 0.12s,
-    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.08s;
+    opacity 0.4s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--letter-i, 0) * 60ms);
 }
 
 .tm-splash--brand .tm-splash-title,
@@ -3287,8 +3111,14 @@ html.tm-first-paint .tm-boot-splash {
 .tm-splash--hold .tm-splash-title,
 .tm-splash--exit .tm-splash-title {
   max-width: 12rem;
+}
+
+.tm-splash--brand .tm-splash-title-letter,
+.tm-splash--details .tm-splash-title-letter,
+.tm-splash--hold .tm-splash-title-letter,
+.tm-splash--exit .tm-splash-title-letter {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(0);
 }
 
 .tm-splash-copy {
@@ -3338,14 +3168,14 @@ html.tm-first-paint .tm-boot-splash {
 
 .tm-splash--details .tm-splash-feature,
 .tm-splash--hold .tm-splash-feature {
-  animation: tm-splash-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: tm-splash-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 .tm-splash--details .tm-splash-feature:nth-child(1),
-.tm-splash--hold .tm-splash-feature:nth-child(1) { animation-delay: 0.08s; }
+.tm-splash--hold .tm-splash-feature:nth-child(1) { animation-delay: 0.15s; }
 .tm-splash--details .tm-splash-feature:nth-child(2),
-.tm-splash--hold .tm-splash-feature:nth-child(2) { animation-delay: 0.18s; }
+.tm-splash--hold .tm-splash-feature:nth-child(2) { animation-delay: 0.3s; }
 .tm-splash--details .tm-splash-feature:nth-child(3),
-.tm-splash--hold .tm-splash-feature:nth-child(3) { animation-delay: 0.28s; }
+.tm-splash--hold .tm-splash-feature:nth-child(3) { animation-delay: 0.45s; }
 
 .tm-splash-feature-icon {
   display: inline-flex;
@@ -3377,6 +3207,34 @@ html.tm-first-paint .tm-boot-splash {
   font-size: 0.74rem;
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.78);
+}
+
+/* Loading pill — shown only when home data isn't ready yet during hold */
+.tm-splash-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  animation: tm-splash-rise 0.4s ease both;
+}
+.tm-splash-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: tm-splash-spin 0.7s linear infinite;
+}
+@keyframes tm-splash-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Lightweight CSS phone previews (not heavy screenshots) */
@@ -3550,11 +3408,21 @@ html.tm-first-paint .tm-boot-splash {
     opacity: 1;
     transform: none;
   }
-  .tm-splash-copy,
-  .tm-splash-phone,
-  .tm-splash-feature {
+  .tm-splash-title-letter {
     opacity: 1;
     transform: none;
+    transition: none !important;
+  }
+  .tm-splash-copy,
+  .tm-splash-phone,
+  .tm-splash-feature,
+  .tm-splash-loading {
+    opacity: 1;
+    transform: none;
+  }
+  .tm-splash-loading,
+  .tm-splash-spinner {
+    animation: none !important;
   }
 }
 
