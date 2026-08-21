@@ -176,40 +176,58 @@ export default function OnboardingWizard() {
             return;
           }
           key = `${STORAGE_PREFIX}:${user.id}`;
-          if (typeof window !== "undefined") {
-            try {
-              if (localStorage.getItem(key) === "1") {
-                if (!cancelled) setVariant(null);
-                return;
-              }
-            } catch {
-              /* ignore */
-            }
+
+          // DB is the source of truth: once onboarding_seen_at is set for this
+          // account, the wizard never plays again — on any device/browser, even
+          // if localStorage was cleared. The localStorage key is only a fast
+          // same-device cache.
+          const seen = await isOnboardingSeen(supabase, user.id, key);
+          if (seen) {
+            if (!cancelled) setVariant(null);
+            return;
           }
 
+          let show = false;
           if (role === "merchant") {
-            // Merchants: only welcome them until their first store exists.
+            // Merchants: welcome them until their first store exists.
             const shopResult = await fetchMyShop();
             if (cancelled) return;
-            if (shopResult.success && shopResult.data) {
-              // Already running a store → never show merchant onboarding.
-              markSeen(key);
-              if (!cancelled) setVariant(null);
-              return;
-            }
-            if (!cancelled) setVariant("merchant");
+            show = !(shopResult.success && shopResult.data);
           } else {
-            // Customers: only welcome them while the delivery profile is
-            // incomplete. A completed profile never replays the wizard.
+            // Customers: welcome them while the delivery profile is incomplete.
             const complete = await isProfileComplete(supabase, user.id);
             if (cancelled) return;
-            if (complete) {
-              markSeen(key);
-              if (!cancelled) setVariant(null);
-              return;
-            }
-            if (!cancelled) setVariant("customer");
+            show = !complete;
           }
+
+          if (!show) {
+            // Durable flag for established accounts too — but only once per
+            // device (localStorage cache), so we don't write on every nav.
+            try {
+              if (typeof window !== "undefined" && localStorage.getItem(key) !== "1") {
+                markSeen(key);
+                void persistOnboardingSeen(supabase, user.id);
+              }
+            } catch {
+              markSeen(key);
+            }
+            if (!cancelled) setVariant(null);
+            return;
+          }
+
+          // ONE-TIME flow: persist the flag right now — before the wizard even
+          // opens — so a refresh, navigation, sign-out or re-login can never
+          // replay it for this account.
+          markSeen(key);
+          if (!cancelled) {
+            try {
+              await persistOnboardingSeen(supabase, user.id);
+            } catch {
+              /* non-fatal — localStorage cache still blocks same-device replays */
+            }
+          }
+          if (cancelled) return;
+          setVariant(role === "merchant" ? "merchant" : "customer");
         } else {
           // Guest welcome: homepage only, once ever per device.
           if (typeof window !== "undefined") {
@@ -449,6 +467,42 @@ export default function OnboardingWizard() {
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
+
+async function isOnboardingSeen(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  storageKey: string,
+): Promise<boolean> {
+  // Fast path — same device already played it.
+  try {
+    if (typeof window !== "undefined" && localStorage.getItem(storageKey) === "1") {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  // Durable source of truth — per account, survives device changes & cache clears.
+  try {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("onboarding_seen_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return Boolean(profile?.onboarding_seen_at);
+  } catch {
+    return false;
+  }
+}
+
+async function persistOnboardingSeen(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<void> {
+  await supabase.from("user_profiles").upsert(
+    { user_id: userId, onboarding_seen_at: new Date().toISOString() },
+    { onConflict: "user_id" },
+  );
+}
 
 async function isProfileComplete(
   supabase: ReturnType<typeof createClient>,

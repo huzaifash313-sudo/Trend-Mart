@@ -512,10 +512,18 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
       ) : (
         <p className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
           Reviews are for customers who received a delivered order from this store.{" "}
-          <Link href="/login" className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400">
-            Sign in
-          </Link>{" "}
-          with the same account you used at checkout.
+          {session?.signedIn ? (
+            <span className="font-medium">
+              Only the account that placed the order can review it.
+            </span>
+          ) : (
+            <>
+              <Link href="/login" className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400">
+                Sign in
+              </Link>{" "}
+              with the same account you used at checkout.
+            </>
+          )}
         </p>
       )}
 

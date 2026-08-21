@@ -70,16 +70,21 @@ interface ReviewTarget {
   orderId?: string;
 }
 
-/** Dismissed orders (per ORDER, not per shop). Cross kiya → woh order dobara
- *  nahi dikhega, lekin usi dukaan ka naya order (naya orderId) phir popup
- *  laayega. Professional: koi shop kabhi permanently block nahi hoti. */
-const DISMISS_KEY = "tm_review_dismissed_orders_v1";
+/** Dismissed orders (per ORDER, per ACCOUNT — never per device). Cross kiya →
+ *  woh order usi account ko dobara nahi dikhega, lekin usi dukaan ka naya
+ *  order (naya orderId) phir popup laayega. Kisi doosre account ke orders ko
+ *  yeh list kabhi block nahi karti, kyunki key account-scoped hai. */
+const DISMISS_KEY_PREFIX = "tm_review_dismissed_orders_v1";
 const MAX_DISMISSED = 300;
 
-function getDismissedOrders(): string[] {
+function reviewDismissKey(userId: string): string {
+  return `${DISMISS_KEY_PREFIX}:${userId || "guest"}`;
+}
+
+function getDismissedOrders(userId: string): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(DISMISS_KEY);
+    const raw = localStorage.getItem(reviewDismissKey(userId));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
@@ -88,21 +93,22 @@ function getDismissedOrders(): string[] {
   }
 }
 
-function markOrderDismissed(orderId: string): void {
+function markOrderDismissed(userId: string, orderId: string): void {
   if (typeof window === "undefined" || !orderId) return;
   try {
-    const list = getDismissedOrders();
+    const list = getDismissedOrders(userId);
     if (!list.includes(orderId)) {
       // Keep the list bounded — old dismissals fall off naturally.
-      localStorage.setItem(DISMISS_KEY, JSON.stringify([...list, orderId].slice(-MAX_DISMISSED)));
+      localStorage.setItem(reviewDismissKey(userId), JSON.stringify([...list, orderId].slice(-MAX_DISMISSED)));
     }
   } catch {
     // Storage full or disabled — dismissal simply won't persist.
   }
 }
 
-function isOrderDismissed(orderId: string): boolean {
-  return getDismissedOrders().includes(orderId);
+function isOrderDismissed(userId: string, orderId: string): boolean {
+  if (!orderId) return false;
+  return getDismissedOrders(userId).includes(orderId);
 }
 
 export default function ReviewReminderPopup() {
@@ -114,6 +120,10 @@ export default function ReviewReminderPopup() {
 
   const autoShownRef = useRef(false);
   const checkBusyRef = useRef(false);
+  /** Which account is signed in on this device right now. Review prompts are
+   *  strictly scoped to the account that placed the order — on a shared device
+   *  with multiple accounts, only the ordering account may be prompted. */
+  const currentUserIdRef = useRef<string>("");
   /** Orders the popup already surfaced this session — never re-show the same
    *  order twice in one session, but new orders always get their chance. */
   const shownOrderIdsRef = useRef<Set<string>>(new Set());
@@ -143,13 +153,14 @@ export default function ReviewReminderPopup() {
       return;
     }
     if (!session?.user) return;
+    currentUserIdRef.current = session.user.id;
 
     checkBusyRef.current = true;
     try {
       const result = await fetchMyReviews();
       if (result.success) {
         const shop = result.data.reviewableShops.find(
-          (s) => !s.orderId || !isOrderDismissed(s.orderId),
+          (s) => !s.orderId || !isOrderDismissed(session.user.id, s.orderId),
         );
         if (shop) openFor({ id: shop.id, name: shop.name, orderId: shop.orderId });
       }
@@ -175,12 +186,24 @@ export default function ReviewReminderPopup() {
 
     // Realtime: an order flips to Delivered while the app is open — show the
     // review popup immediately (transitionOrderStatus dispatches this event).
+    // STRICT ACCOUNT SCOPE: the event carries the ordering account's id
+    // (customerUserId). Only that exact account on this device may be prompted —
+    // another account logged into the same phone must never see this prompt.
     // Dismissal is per ORDER — cross kiya order skip, magar usi shop ka naya
     // order (naya orderId) popup phir laayega.
     const onOrderUpdate = (e: Event) => {
-      const detail = (e as CustomEvent<{ newStatus?: string; shopId?: string; shopName?: string; orderId?: string }>).detail;
+      const detail = (e as CustomEvent<{
+        newStatus?: string;
+        shopId?: string;
+        shopName?: string;
+        orderId?: string;
+        customerUserId?: string | null;
+      }>).detail;
       if (!detail || detail.newStatus !== "Delivered" || !detail.shopId) return;
-      if (detail.orderId && isOrderDismissed(detail.orderId)) return;
+      // Guest orders (no linked account) are not reviewable by anyone — and an
+      // event without a matching account id must never prompt this device.
+      if (!detail.customerUserId || detail.customerUserId !== currentUserIdRef.current) return;
+      if (detail.orderId && isOrderDismissed(currentUserIdRef.current, detail.orderId)) return;
       openFor({ id: detail.shopId, name: detail.shopName || "the shop", orderId: detail.orderId });
     };
     window.addEventListener("trendmart:order-update", onOrderUpdate);
@@ -202,6 +225,7 @@ export default function ReviewReminderPopup() {
     const supabase = createClient();
 
     const setup = (userId: string) => {
+      currentUserIdRef.current = userId;
       unsub?.();
       unsub = subscribeToCustomerOrders(userId, (payload) => {
         const record = (payload as RealtimePostgresChangesPayload<OrderPayload>).new;
@@ -225,6 +249,7 @@ export default function ReviewReminderPopup() {
           void checkForReviewable();
         }
       } else if (event === "SIGNED_OUT") {
+        currentUserIdRef.current = "";
         unsub?.();
         unsub = undefined;
       }
@@ -255,9 +280,9 @@ export default function ReviewReminderPopup() {
   };
 
   const dismiss = () => {
-    // Per-order dismiss: sirf yeh order block hota hai, shop nahi. Naya order
-    // usi shop se deliver hua → popup phir aayega.
-    if (target?.orderId) markOrderDismissed(target.orderId);
+    // Per-order, per-account dismiss: sirf yeh order is account ke liye block
+    // hota hai, shop nahi. Naya order usi shop se deliver hua → popup phir aayega.
+    if (target?.orderId) markOrderDismissed(currentUserIdRef.current, target.orderId);
     setTarget(null);
   };
 

@@ -770,6 +770,9 @@ export interface OrderStatusNotification {
   newStatus: OrderStatus;
   customerName: string;
   customerPhone: string;
+  /** The exact account that placed the order — used to scope notifications and
+   *  review prompts to the ordering user, never to the whole device. */
+  customerUserId?: string | null;
   totalAmount: number;
   timestamp: string;
   trackingNumber?: string;

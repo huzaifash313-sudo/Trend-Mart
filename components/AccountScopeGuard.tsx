@@ -60,6 +60,30 @@ function clearBuyerDeviceData(): void {
   } catch {
     /* ignore */
   }
+
+  // Merchant's "currently active shop" — belongs to one merchant account and
+  // must never follow the device into a different merchant account.
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("trendmart_active_shop");
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Legacy shared caches that predate per-account namespacing. If these old
+  // device-wide keys survive, the next account on this phone could briefly see
+  // the previous account's notification bell rows or review dismissals.
+  // Per-account namespaced keys (trendmart_notif_history_v2:<uid>,
+  // tm_review_dismissed_orders_v1:<uid>) are deliberately left untouched.
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("trendmart_notif_history_v2");
+      localStorage.removeItem("tm_review_dismissed_orders_v1");
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export default function AccountScopeGuard() {

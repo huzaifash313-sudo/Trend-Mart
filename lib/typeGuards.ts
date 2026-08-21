@@ -406,6 +406,7 @@ export const orderStatusNotificationSchema = z.object({
   newStatus: orderStatusSchema,
   customerName: safeStringSchema(1, 100),
   customerPhone: phoneSchema,
+  customerUserId: z.string().uuid().nullish(),
   totalAmount: positiveNumberSchema,
   timestamp: z.string().datetime(),
   trackingNumber: z.string().max(100).optional(),

@@ -408,12 +408,24 @@ export async function fetchReviewSessionContext(
       .eq("user_id", user.id)
       .maybeSingle();
 
+    // STRICT ACCOUNT SCOPE: only the exact account that received a delivered
+    // order from this shop (customer_user_id match) may leave a review. No
+    // phone fallback — another account on the same device is never eligible.
+    const { data: deliveredOrder } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("shop_id", sanitizedShopId)
+      .eq("customer_user_id", user.id)
+      .eq("status", "Delivered")
+      .limit(1)
+      .maybeSingle();
+
     return {
       signedIn: true,
       isOwner,
       displayName: displayName.slice(0, 60),
       alreadyReviewed: Boolean(existing),
-      canSubmit: !isOwner && !existing,
+      canSubmit: !isOwner && !existing && Boolean(deliveredOrder),
     };
   } catch (err) {
     logError(err, { module: "reviewService.fetchReviewSessionContext", meta: { shopId } });

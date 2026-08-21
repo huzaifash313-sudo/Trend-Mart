@@ -128,6 +128,7 @@ export async function transitionOrderStatus(
     const shopId = (currentOrder as Record<string, unknown>).shop_id as string;
     const customerName = (currentOrder as Record<string, unknown>).customer_name as string;
     const customerPhone = (currentOrder as Record<string, unknown>).customer_phone as string;
+    const customerUserId = (currentOrder as Record<string, unknown>).customer_user_id as string | null | undefined;
     const totalAmount = Number((currentOrder as Record<string, unknown>).total_amount) || 0;
 
     // 2. Validate the transition
@@ -179,6 +180,7 @@ export async function transitionOrderStatus(
       newStatus,
       customerName,
       customerPhone,
+      customerUserId,
       totalAmount,
       timestamp: new Date().toISOString(),
       trackingNumber: trackingNumber ?? (currentOrder as Record<string, unknown>).tracking_number as string | undefined,
@@ -342,6 +344,7 @@ export function subscribeToOrderUpdates(
             newStatus,
             customerName: (newRecord.customer_name as string) ?? "",
             customerPhone: (newRecord.customer_phone as string) ?? "",
+            customerUserId: (newRecord.customer_user_id as string | null) ?? null,
             totalAmount: Number(newRecord.total_amount) || 0,
             timestamp: new Date().toISOString(),
             trackingNumber: newRecord.tracking_number as string | undefined,
@@ -448,6 +451,7 @@ export function subscribeToShopOrderUpdates(
           newStatus: newRecord.status as OrderStatus,
           customerName: (newRecord.customer_name as string) ?? "",
           customerPhone: (newRecord.customer_phone as string) ?? "",
+          customerUserId: (newRecord.customer_user_id as string | null) ?? null,
           totalAmount: Number(newRecord.total_amount) || 0,
           timestamp: new Date().toISOString(),
           trackingNumber: newRecord.tracking_number as string | undefined,
@@ -483,6 +487,7 @@ export function subscribeToShopOrderUpdates(
           newStatus: (newRecord.status as OrderStatus) ?? "Pending",
           customerName: (newRecord.customer_name as string) ?? "",
           customerPhone: (newRecord.customer_phone as string) ?? "",
+          customerUserId: (newRecord.customer_user_id as string | null) ?? null,
           totalAmount: Number(newRecord.total_amount) || 0,
           timestamp: new Date().toISOString(),
           trackingNumber: newRecord.tracking_number as string | undefined,
@@ -570,6 +575,7 @@ export function subscribeToPlatformTransactions(
           newStatus: (newRecord.status as OrderStatus) ?? "Pending",
           customerName: (newRecord.customer_name as string) ?? "",
           customerPhone: (newRecord.customer_phone as string) ?? "",
+          customerUserId: (newRecord.customer_user_id as string | null) ?? null,
           totalAmount: Number(newRecord.total_amount) || 0,
           timestamp: new Date().toISOString(),
           trackingNumber: newRecord.tracking_number as string | undefined,
@@ -604,6 +610,7 @@ export function subscribeToPlatformTransactions(
           newStatus: newRecord.status as OrderStatus,
           customerName: (newRecord.customer_name as string) ?? "",
           customerPhone: (newRecord.customer_phone as string) ?? "",
+          customerUserId: (newRecord.customer_user_id as string | null) ?? null,
           totalAmount: Number(newRecord.total_amount) || 0,
           timestamp: new Date().toISOString(),
           trackingNumber: newRecord.tracking_number as string | undefined,
@@ -780,9 +787,14 @@ export async function fetchMyNotifications(
 ): Promise<ServiceResult<AppNotification[]>> {
   const supabase = createClient();
   try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { success: true, data: [] };
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -807,9 +819,14 @@ export async function markNotificationRead(id: string): Promise<void> {
 export async function markAllNotificationsRead(): Promise<void> {
   const supabase = createClient();
   try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
     await supabase
       .from("notifications")
       .update({ read: true })
+      .eq("user_id", user.id)
       .eq("read", false);
   } catch (err) {
     logError(err, { module: "notificationService.markAllNotificationsRead" });

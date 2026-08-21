@@ -4,17 +4,17 @@
 /*  Powers the "Give Your Review" entry on the customer account portal.       */
 /*  Returns (for the signed-in customer):                                     */
 /*    - their own reviews, each decorated with the shop name                  */
-/*    - the shops they ordered from (non-cancelled) that they have NOT yet    */
+/*    - the shops they ordered from (delivered) that they have NOT yet        */
 /*      reviewed, so the portal can offer an easy "rate this shop" list       */
 /*    - combined stats (average rating + total) across their reviews          */
 /*                                                                            */
-/*  Guest-checkout fallback: orders placed by phone before sign-up are        */
-/*  matched via the profile phone, mirroring the POST /api/reviews rule.      */
+/*  STRICT ACCOUNT SCOPE: only orders whose customer_user_id matches the      */
+/*  signed-in account count — a second account on the same phone never sees   */
+/*  another account's delivered orders or review prompts.                     */
 /* -------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { phonesMatch, normalizePhoneDigits } from "@/lib/reviewRules";
 
 interface ReviewRow {
   id: string;
@@ -33,7 +33,6 @@ interface OrderRow {
   id: string;
   shop_id: string | null;
   status?: string | null;
-  customer_phone?: string | null;
 }
 
 export async function GET() {
@@ -48,7 +47,7 @@ export async function GET() {
     );
   }
 
-  const [reviewsRes, accountOrdersRes, profileRes] = await Promise.all([
+  const [reviewsRes, accountOrdersRes] = await Promise.all([
     supabase
       .from("reviews")
       .select(
@@ -59,46 +58,25 @@ export async function GET() {
       .limit(200),
     supabase
       .from("orders")
-      .select("id, shop_id, status, customer_phone")
+      .select("id, shop_id, status")
       .eq("customer_user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(300),
-    supabase
-      .from("user_profiles")
-      .select("phone")
-      .eq("user_id", user.id)
-      .maybeSingle(),
   ]);
 
   const reviews = (reviewsRes.data ?? []) as ReviewRow[];
   const accountOrders = (accountOrdersRes.data ?? []) as OrderRow[];
-  const profile = profileRes.data as { phone?: string | null } | null;
 
-  // Guest-checkout fallback: orders placed before sign-up that match the
-  // account's phone number.
-  let phoneOrders: OrderRow[] = [];
-  const profilePhone = profile?.phone;
-  if (profilePhone) {
-    const last10 = normalizePhoneDigits(profilePhone).slice(-10);
-    if (last10.length === 10) {
-      const { data } = await supabase
-        .from("orders")
-        .select("id, shop_id, status, customer_phone")
-        .like("customer_phone", `%${last10}`)
-        .order("created_at", { ascending: false })
-        .limit(200);
-      phoneOrders = ((data ?? []) as OrderRow[]).filter((o) =>
-        phonesMatch(o.customer_phone, profilePhone),
-      );
-    }
-  }
-
-  // Shops the customer genuinely ordered from — ONLY delivered orders earn a
-  // review (merchant must have marked the order delivered in the app first).
-  // Track the latest delivered order per shop so the client can dismiss the
-  // review popup PER ORDER — a later order from the same shop re-triggers it.
+  // Shops the customer genuinely ordered from — ONLY the exact account that
+  // placed the order (customer_user_id match) earns a review entry. No phone
+  // fallback: on a shared device, a different account with the same phone must
+  // never see another account's delivered orders here.
+  // ONLY delivered orders earn a review (merchant must have marked the order
+  // delivered in the app first). Track the latest delivered order per shop so
+  // the client can dismiss the review popup PER ORDER — a later order from the
+  // same shop re-triggers it.
   const latestDeliveredOrderByShop = new Map<string, string>();
-  for (const row of [...accountOrders, ...phoneOrders]) {
+  for (const row of accountOrders) {
     if (String(row.status ?? "").toLowerCase() !== "delivered") continue;
     if (!row.shop_id) continue;
     const shopId = String(row.shop_id);

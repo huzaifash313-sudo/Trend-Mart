@@ -12,7 +12,7 @@ import {
   buildRateLimitResponse,
 } from "@/lib/rateLimiter";
 import { sanitizeHtml, sanitizeLight, sanitizeNumeric, truncate } from "@/lib/sanitization";
-import { lockedDisplayName, phonesMatch, normalizePhoneDigits, MAX_REVIEWS_PER_IP_PER_DAY } from "@/lib/reviewRules";
+import { lockedDisplayName, MAX_REVIEWS_PER_IP_PER_DAY } from "@/lib/reviewRules";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("full_name, phone")
+    .select("full_name")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -132,8 +132,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Primary: exact account match (orders store customer_user_id). Targeted and
-  // index-friendly — no `.limit(80)` sweep that could miss heavy buyers.
+  // Strict account-scoped purchase check: ONLY the exact account that placed
+  // the order (orders.customer_user_id) earns the right to review. No phone
+  // fallback — on a shared device, a second account with the same phone number
+  // must NEVER see this order's review prompt or be allowed to rate it.
   // REVIEW RULE: only DELIVERED orders earn the right to review — a merchant
   // must have marked the order delivered in the app first.
   const { data: userOrders } = await supabase
@@ -144,27 +146,9 @@ export async function POST(request: NextRequest) {
     .eq("status", "Delivered")
     .limit(1);
 
-  let purchased = (userOrders ?? []).some(
+  const purchased = (userOrders ?? []).some(
     (row) => String(row.status ?? "").toLowerCase() === "delivered",
   );
-
-  // Secondary: phone fallback for orders placed before sign-up (guest checkout).
-  if (!purchased && profile?.phone) {
-    const last10 = normalizePhoneDigits(profile.phone).slice(-10);
-    if (last10.length === 10) {
-      const { data: phoneOrders } = await supabase
-        .from("orders")
-        .select("id, customer_phone, status")
-        .eq("shop_id", shopId)
-        .like("customer_phone", `%${last10}`)
-        .eq("status", "Delivered")
-        .limit(5);
-      purchased = (phoneOrders ?? []).some((row) => {
-        if (String(row.status ?? "").toLowerCase() !== "delivered") return false;
-        return phonesMatch(row.customer_phone, profile.phone);
-      });
-    }
-  }
 
   if (!purchased) {
     return NextResponse.json(

@@ -35,13 +35,23 @@ import {
   type AppNotification,
 } from "@/services/notificationService";
 
-const HISTORY_KEY = "trendmart_notif_history_v2";
+const HISTORY_KEY_PREFIX = "trendmart_notif_history_v2";
 const PREFS_KEY = "trendmart_notifications";
 
-function loadHistory(): Notification[] {
+/**
+ * Notification history is cached per ACCOUNT, never per device. On a shared
+ * phone running 2–3 different accounts, account B must never see account A's
+ * cached notification list — even for the brief moment before B's own rows
+ * arrive from the database.
+ */
+function historyKeyFor(userId: string): string {
+  return `${HISTORY_KEY_PREFIX}:${userId || "guest"}`;
+}
+
+function loadHistory(userId: string): Notification[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
+    const raw = localStorage.getItem(historyKeyFor(userId));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Notification[];
     return Array.isArray(parsed) ? parsed.slice(0, 50) : [];
@@ -50,10 +60,10 @@ function loadHistory(): Notification[] {
   }
 }
 
-function saveHistory(items: Notification[]) {
-  if (typeof window === "undefined") return;
+function saveHistory(userId: string, items: Notification[]) {
+  if (typeof window === "undefined" || !userId) return;
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 50)));
+    localStorage.setItem(historyKeyFor(userId), JSON.stringify(items.slice(0, 50)));
   } catch {
     /* ignore */
   }
@@ -204,6 +214,9 @@ export function NotificationListenerProvider({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   // Track which user ids we've already registered to avoid duplicate streams.
   const registeredUsers = useRef<Set<string>>(new Set());
+  // Which account the in-memory list + cache currently belong to. Changing this
+  // resets the list so another account on the same device starts clean.
+  const currentUserIdRef = useRef<string>("");
   // All live unsubscribe closures, so provider unmount actually tears down.
   const cleanupFns = useRef<Set<() => void>>(new Set());
   // Mute is read via a ref so live inserts don't churn callback identities.
@@ -217,15 +230,17 @@ export function NotificationListenerProvider({
   const closePanel = useCallback(() => setIsPanelOpen(false), []);
   const togglePanel = useCallback(() => setIsPanelOpen((v) => !v), []);
 
-  // Hydrate the localStorage cache for instant first paint.
+  // History is hydrated lazily inside registerUser once the account is known —
+  // never on mount, so a stale cached list can't leak across accounts.
   useEffect(() => {
-    setNotifications(loadHistory());
     setHistoryReady(true);
   }, []);
 
   useEffect(() => {
     if (!historyReady) return;
-    saveHistory(notifications);
+    const uid = currentUserIdRef.current;
+    if (!uid) return;
+    saveHistory(uid, notifications);
   }, [notifications, historyReady]);
 
   // ── Mute Toggle ────────────────────────────────────────────────────────────
@@ -258,13 +273,24 @@ export function NotificationListenerProvider({
 
   // Ingest a fresh DB row: dedupe, prepend, cap at 50, chime + toast.
   const addFromDb = useCallback((row: AppNotification) => {
+    // STRICT ACCOUNT SCOPE: only rows addressed to the currently signed-in
+    // account may enter this list. With no active account (signed out) or a
+    // row for another account (e.g. the previous user on a shared device), the
+    // row is dropped outright.
+    if (
+      !currentUserIdRef.current ||
+      (row.user_id && row.user_id !== currentUserIdRef.current)
+    ) {
+      return;
+    }
     const notif = mapRow(row);
     if (!notif.id || !notif.title) return;
 
     setNotifications((prev) => {
       if (prev.some((n) => n.id === notif.id)) return prev;
       const next = [notif, ...prev].slice(0, 50);
-      saveHistory(next);
+      const uid = currentUserIdRef.current;
+      if (uid) saveHistory(uid, next);
       return next;
     });
 
@@ -291,11 +317,20 @@ export function NotificationListenerProvider({
   const registerUser = useCallback(
     (userId: string): (() => void) => {
       if (!userId) return () => {};
+      // Account switch (or first sign-in): point the in-memory list + cache at
+      // THIS account only. Never merge the previous account's rows.
+      if (currentUserIdRef.current !== userId) {
+        currentUserIdRef.current = userId;
+        setNotifications(loadHistory(userId));
+      }
       if (registeredUsers.current.has(userId)) return () => {};
       registeredUsers.current.add(userId);
 
       // Hydrate the bell from the DB (source of truth).
       void fetchMyNotifications().then((result) => {
+        // Guard against the account switching before this fetch resolves — the
+        // previous account's rows must never land in the new account's list.
+        if (currentUserIdRef.current !== userId) return;
         if (result.success) {
           setNotifications((prev) => {
             const byId = new Map(prev.map((n) => [n.id, n]));
@@ -303,7 +338,7 @@ export function NotificationListenerProvider({
             const merged = [...byId.values()]
               .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
               .slice(0, 50);
-            saveHistory(merged);
+            saveHistory(userId, merged);
             return merged;
           });
         }
@@ -324,6 +359,12 @@ export function NotificationListenerProvider({
         unsub();
         registeredUsers.current.delete(userId);
         cleanupFns.current.delete(cleanup);
+        // On sign-out or account switch, drop the previous account's in-memory
+        // list so the next account on this device starts completely clean.
+        if (currentUserIdRef.current === userId) {
+          currentUserIdRef.current = "";
+          setNotifications([]);
+        }
       };
       cleanupFns.current.add(cleanup);
       return cleanup;
@@ -347,7 +388,8 @@ export function NotificationListenerProvider({
 
   const clearNotifications = useCallback(() => {
     setNotifications([]);
-    saveHistory([]);
+    const uid = currentUserIdRef.current;
+    if (uid) saveHistory(uid, []);
     void clearMyNotifications();
   }, []);
 
