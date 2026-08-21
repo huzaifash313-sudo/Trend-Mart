@@ -16,7 +16,6 @@
 10. `08_user_profiles.sql`
 11. `09_performance_indexes.sql`
 12. `10_verify_only.sql` (optional check)
-13. Then: `../RESET_CLEAN_START_4_MERCHANTS.sql`
 
 ## If a part still fails
 

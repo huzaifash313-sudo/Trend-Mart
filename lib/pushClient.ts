@@ -80,7 +80,13 @@ export async function subscribeToPushNotifications(): Promise<
       }),
     });
 
-    if (!res.ok) return { ok: false, reason: "failed" };
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => "");
+      console.warn(
+        `[TrendMart] push subscribe failed (${res.status}): ${bodyText}`,
+      );
+      return { ok: false, reason: "failed" };
+    }
     try {
       localStorage.setItem("trendmart_push_subscribed", "true");
     } catch {

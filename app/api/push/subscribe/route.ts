@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
+import { logError } from "@/services/errorService";
 
 interface SubscribeBody {
   endpoint?: string;
@@ -42,6 +43,11 @@ export async function POST(request: Request) {
     );
 
     if (error) {
+      logError(error, {
+        module: "push.subscribe",
+        userId: user.id,
+        meta: { endpoint },
+      });
       return NextResponse.json(
         buildSafeErrorResponse(500, "Could not save push subscription."),
         { status: 500 },
@@ -49,7 +55,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logError(err, { module: "push.subscribe" });
     return NextResponse.json(buildSafeErrorResponse(500, "Subscribe failed."), {
       status: 500,
     });
@@ -78,6 +85,11 @@ export async function DELETE(request: Request) {
 
     const { error } = await query;
     if (error) {
+      logError(error, {
+        module: "push.unsubscribe",
+        userId: user.id,
+        meta: { endpoint },
+      });
       return NextResponse.json(
         buildSafeErrorResponse(500, "Could not remove push subscription."),
         { status: 500 },
@@ -85,7 +97,8 @@ export async function DELETE(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logError(err, { module: "push.unsubscribe" });
     return NextResponse.json(buildSafeErrorResponse(500, "Unsubscribe failed."), {
       status: 500,
     });

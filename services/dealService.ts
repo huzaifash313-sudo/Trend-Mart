@@ -240,6 +240,14 @@ function isSchemaMismatch(error: PostgrestLikeError): boolean {
   );
 }
 
+/** Table/view itself is missing from PostgREST (404 / PGRST205). Retrying a
+ *  different select shape can't help — bail immediately instead of spamming
+ *  the fallback ladder with requests that are all guaranteed to fail. */
+function isMissingRelation(error: PostgrestLikeError): boolean {
+  const t = errText(error);
+  return error?.code === "404" || error?.code === "PGRST205" || /Could not find the table/i.test(t);
+}
+
 async function selectWithFallback(
   attempts: readonly string[],
   cache: { get: () => string | null; set: (s: string | null) => void },
@@ -258,6 +266,8 @@ async function selectWithFallback(
       return result;
     }
     lastError = result.error;
+    // Table is missing entirely — no other select shape will work.
+    if (isMissingRelation(result.error)) return result;
     // Cached shape went stale (schema changed) — drop it and keep trying
     if (preferred && select === preferred) cache.set(null);
   }
@@ -298,7 +308,7 @@ export async function createShopDeal(
       data = insert.data;
       error = insert.error;
       if (!error && data) break;
-      if (error && !isSchemaMismatch(error)) break;
+      if (error && (isMissingRelation(error) || !isSchemaMismatch(error))) break;
     }
 
     if (error) throw error;
@@ -528,7 +538,7 @@ export async function updateShopDeal(
         break;
       }
 
-      if (error && !isSchemaMismatch(error)) break;
+      if (error && (isMissingRelation(error) || !isSchemaMismatch(error))) break;
     }
 
     if (error) throw error;
