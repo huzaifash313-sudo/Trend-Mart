@@ -90,6 +90,14 @@ function SearchIcon() {
   );
 }
 
+function BackIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
 const RADIUS_OPTIONS = [
   { value: 5, label: "5 km" },
   { value: 10, label: "10 km" },
@@ -184,6 +192,8 @@ export default function GeoRadiusFilter({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [cityQuery, setCityQuery] = useState("");
+  /** Inside "This city": "cities" list first, then the picked city's areas. */
+  const [cityStep, setCityStep] = useState<"cities" | "areas">("cities");
   const [hydrated, setHydrated] = useState(false);
 
   const isControlled = open !== undefined;
@@ -280,6 +290,7 @@ export default function GeoRadiusFilter({
   const handleScopeChange = useCallback((next: GeoScope) => {
     setScope(next);
     setCityQuery("");
+    setCityStep("cities");
     setLocationError(null);
   }, []);
 
@@ -288,6 +299,7 @@ export default function GeoRadiusFilter({
       setManualCity(city);
       setScope("city");
       setCityQuery("");
+      setCityStep("areas");
       setLocationError(null);
     },
     [setManualCity],
@@ -307,6 +319,7 @@ export default function GeoRadiusFilter({
     setMaxDistanceKm(0);
     setScope("radius");
     setCityQuery("");
+    setCityStep("cities");
     setLocationError(null);
     clearLocation();
   }, [clearLocation]);
@@ -488,71 +501,92 @@ export default function GeoRadiusFilter({
 
             {scope === "city" && (
               <div className="space-y-3">
-                <div>
-                  <p className="mb-1.5 text-[0.7rem] font-semibold text-zinc-500 dark:text-zinc-400">
-                    Select your city
-                  </p>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400">
-                      <SearchIcon />
-                    </span>
-                    <input
-                      type="search"
-                      value={cityQuery}
-                      onChange={(e) => setCityQuery(e.target.value)}
-                      placeholder="Search city…"
-                      autoComplete="off"
-                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2 pl-8 pr-3 text-xs text-zinc-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-emerald-500 dark:focus:bg-zinc-900"
-                      aria-label="Search cities"
-                    />
-                  </div>
-                  {visibleCities.length > 0 ? (
-                    <div className="mt-1.5 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
-                      {visibleCities.map((city) => (
-                        <button
-                          key={city}
-                          type="button"
-                          onClick={() => handleCityPick(city as SupportedCity)}
-                          className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium transition-all ${
-                            location?.city === city
-                              ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
-                              : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:bg-emerald-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
-                          }`}
-                        >
-                          {city}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-1.5 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-[0.65rem] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                      No city matches “{cityQuery.trim()}”.
-                    </p>
-                  )}
-                </div>
-
-                {location?.city && activeAreas.length > 0 && (
+                {cityStep === "cities" || !location?.city ? (
                   <div>
                     <p className="mb-1.5 text-[0.7rem] font-semibold text-zinc-500 dark:text-zinc-400">
-                      Areas in {location.city}
+                      Select your city
                     </p>
-                    <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
-                      {activeAreas.map((area) => (
-                        <button
-                          key={area.name}
-                          type="button"
-                          onClick={() =>
-                            handleAreaPick(location.city as SupportedCity, area.name)
-                          }
-                          className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium transition-all ${
-                            location.deliveryZone === area.name
-                              ? "border-teal-600 bg-teal-600 text-white shadow-sm shadow-teal-600/25"
-                              : "border-zinc-200 text-zinc-600 hover:border-teal-300 hover:bg-teal-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
-                          }`}
-                        >
-                          {area.name}
-                        </button>
-                      ))}
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400">
+                        <SearchIcon />
+                      </span>
+                      <input
+                        type="search"
+                        value={cityQuery}
+                        onChange={(e) => setCityQuery(e.target.value)}
+                        placeholder="Search city…"
+                        autoComplete="off"
+                        className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2 pl-8 pr-3 text-xs text-zinc-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-emerald-500 dark:focus:bg-zinc-900"
+                        aria-label="Search cities"
+                      />
                     </div>
+                    {visibleCities.length > 0 ? (
+                      <div className="mt-1.5 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
+                        {visibleCities.map((city) => (
+                          <button
+                            key={city}
+                            type="button"
+                            onClick={() => handleCityPick(city as SupportedCity)}
+                            className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium transition-all ${
+                              location?.city === city
+                                ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
+                                : "border-zinc-200 text-zinc-600 hover:border-emerald-300 hover:bg-emerald-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+                            }`}
+                          >
+                            {city}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1.5 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-[0.65rem] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                        No city matches “{cityQuery.trim()}”.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCityStep("cities")}
+                        className="flex shrink-0 items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1 text-[0.65rem] font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        aria-label="Back to city list"
+                      >
+                        <BackIcon />
+                        Cities
+                      </button>
+                      <p className="truncate text-xs font-bold text-zinc-800 dark:text-zinc-100">
+                        {location?.city ?? "This city"}
+                      </p>
+                    </div>
+                    <p className="mb-1.5 text-[0.7rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                      Areas in {location?.city}
+                    </p>
+                    {activeAreas.length > 0 ? (
+                      <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-zinc-100 p-1.5 dark:border-zinc-800">
+                        {activeAreas.map((area) => (
+                          <button
+                            key={area.name}
+                            type="button"
+                            onClick={() =>
+                              handleAreaPick(location.city as SupportedCity, area.name)
+                            }
+                            className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium transition-all ${
+                              location.deliveryZone === area.name
+                                ? "border-teal-600 bg-teal-600 text-white shadow-sm shadow-teal-600/25"
+                                : "border-zinc-200 text-zinc-600 hover:border-teal-300 hover:bg-teal-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+                            }`}
+                          >
+                            {area.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-[0.65rem] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+                        No areas listed for {location?.city} yet — tap Done to
+                        browse the whole city.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
