@@ -240,22 +240,3 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.service_portfolio TO authenticate
 GRANT SELECT ON public.service_portfolio TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.service_availability TO authenticated;
 GRANT SELECT ON public.service_availability TO anon;
-
--- ============================================================================
--- 7. SEED DEFAULT SERVICE CATEGORY TAXONOMY (via function)
--- ============================================================================
-
--- Insert default availability rows for any existing service shops (7 days)
-DO $$
-DECLARE
-  svc_shop RECORD;
-BEGIN
-  FOR svc_shop IN SELECT id FROM public.shops WHERE shop_type = 'service'
-  LOOP
-    FOR d IN 0..6 LOOP
-      INSERT INTO public.service_availability (shop_id, day_of_week, is_working_day, start_time, end_time)
-      VALUES (svc_shop.id, d, d NOT IN (0), '09:00'::TIME, '18:00'::TIME)
-      ON CONFLICT (shop_id, day_of_week) DO NOTHING;
-    END LOOP;
-  END LOOP;
-END $$;

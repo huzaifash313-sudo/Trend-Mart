@@ -8,10 +8,6 @@ import { logError } from "@/services/errorService";
 import { isValidCategory } from "@/services/categoryService";
 import { sanitizeLight, truncate, isValidUUID } from "@/lib/sanitization";
 import type { SubCategory } from "@/types";
-import {
-  getDefaultSubCategories,
-  seedSubCategoryId,
-} from "@/lib/defaultSubCategories";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,45 +45,9 @@ function sanitizeCategoryParam(category: string): string {
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
-function buildDefaultSubs(safeCategory: string): SubCategory[] {
-  return getDefaultSubCategories(safeCategory).map((def) => ({
-    id: seedSubCategoryId(safeCategory, def.slug),
-    category: safeCategory,
-    name: def.name,
-    slug: def.slug,
-    description: def.description,
-    icon: def.icon,
-    is_active: true,
-    sort_order: def.sort_order,
-    is_others: Boolean(def.is_others),
-  }));
-}
-
-/**
- * Merge DB rows with the built-in catalog so the UI always shows rich
- * sub-categories (Burgers, Shawarma, Laptop Repair, …) even before SQL seed.
- * Prefer real DB UUIDs when a matching slug already exists.
- */
-function mergeWithDefaults(safeCategory: string, dbSubs: SubCategory[]): SubCategory[] {
-  const defaults = buildDefaultSubs(safeCategory);
-  const bySlug = new Map(dbSubs.map((s) => [s.slug, s]));
-  const merged: SubCategory[] = defaults.map((def) => bySlug.get(def.slug) ?? def);
-
-  // Keep any extra custom DB rows not in the built-in catalog
-  for (const row of dbSubs) {
-    if (!merged.some((m) => m.slug === row.slug)) merged.push(row);
-  }
-
-  merged.sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
-  return merged;
-}
-
 /**
  * Fetch all sub-categories for a given main category.
- * Always includes the 'Others / General' fallback entry.
- *
- * Merges live DB rows with the built-in Pakistan retail/services catalog so
- * homepage + Add Product never show only an empty / Others-only list.
+ * Returns DB rows only; no built-in catalog merge.
  */
 export async function fetchSubCategories(
   category: string,
@@ -111,7 +71,7 @@ export async function fetchSubCategories(
 
     if (error) throw error;
 
-    const merged = mergeWithDefaults(safeCategory, (data as SubCategory[]) ?? []);
+        const merged = (data as SubCategory[]) ?? [];
 
     const result: SubCategoryWithMeta[] = merged.map((s) => ({
       ...s,
@@ -124,51 +84,24 @@ export async function fetchSubCategories(
       module: "subCategoryService.fetchSubCategories",
       meta: { category: safeCategory },
     });
-    // Offline / DB down — still return built-in catalog so UI stays usable
-    const fallback = mergeWithDefaults(safeCategory, []);
+        // Offline / DB down — return empty list so UI shows the error state
     return {
       success: true,
-      data: fallback.map((s) => ({ ...s, mainCategory: safeCategory })),
+      data: [],
     };
   }
 }
 
 /**
- * Resolve a seed:/fallback sub-category id to a real DB UUID (via seed API).
- * Returns the original id if it is already a UUID.
+ * Resolve a sub-category id. Returns the original id if it is already a valid UUID.
+ * Synthetic seed IDs are no longer supported; non-UUID ids resolve to null.
  */
 export async function resolveSubCategoryId(
-  category: string,
+  _category: string,
   subCategoryId: string | null | undefined,
 ): Promise<string | null> {
   if (!subCategoryId) return null;
   if (isValidUUID(subCategoryId)) return subCategoryId;
-
-  const safeCategory = sanitizeCategoryParam(category);
-  if (!safeCategory) return null;
-
-  try {
-    const res = await fetch("/api/sub-categories/seed", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: safeCategory, resolveId: subCategoryId }),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { id?: string; data?: SubCategory[] };
-    if (typeof json.id === "string" && isValidUUID(json.id)) return json.id;
-    const match = json.data?.find((s) => s.id === subCategoryId || s.slug);
-    // After seed, re-fetch and match by slug from original seed id
-    const slug = subCategoryId.includes(":")
-      ? subCategoryId.slice(subCategoryId.lastIndexOf(":") + 1)
-      : null;
-    if (slug && json.data) {
-      const row = json.data.find((s) => s.slug === slug);
-      if (row && isValidUUID(row.id)) return row.id;
-    }
-    if (match && isValidUUID(match.id)) return match.id;
-  } catch {
-    /* ignore */
-  }
   return null;
 }
 

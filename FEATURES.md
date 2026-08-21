@@ -576,7 +576,6 @@ Google Places (new text search) → legacy → Photon → Nominatim; Pakistan-bo
 ### Misc
 - `POST /api/notifications/merchant-approval` — admin-only branded email (`requireAdminUser` + Resend).
 - `GET /api/sub-categories` — validated against `SHOP_CATEGORIES`, in-memory TTL cache + ETag/304, "Others/General" fallback.
-- `POST /api/sub-categories/seed` — admin idempotent upsert, resolves seed IDs to real UUIDs.
 - `POST /api/support/notify` — rate-limited, sanitized, admin-client insert + guest fallback, confirmation + team alert emails.
 
 ---

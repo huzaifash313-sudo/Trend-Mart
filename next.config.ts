@@ -79,6 +79,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.cloudinary.com",
       },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
     ],
     // Aggressive caching for optimized images
     formats: ["image/avif", "image/webp"],

@@ -12,8 +12,7 @@
 | # | Feature | Status | Frontend | Backend | Auth | Notes |
 |---|---|---|---|---|---|---|
 | 1 | Database Schema (shops + products) | ✅ DONE | N/A | SQL ready | RLS policies ready | Run `schema.sql` + `auth-schema.sql` in Supabase |
-| 2 | Seed Data (3 shops, 8 products) | ✅ DONE | N/A | Script ready | N/A | `npx tsx scripts/seed-shops.ts` |
-| 3 | Home Page — Browse Shops | ✅ DONE | ✅ | ✅ | ⬚ Public | Sticky header, search, categories, stories, shop cards |
+| 2 | Home Page — Browse Shops | ✅ DONE | ✅ | ✅ | ⬚ Public | Sticky header, search, categories, stories, shop cards |
 | 4 | Home Page — Search Bar | ✅ DONE | ✅ | ✅ | ⬚ Public | Filters by shop name & category |
 | 5 | Home Page — Category Filter Pills | ✅ DONE | ✅ | ✅ | ⬚ Public | All, Food, Grocery, Boutique, Electronics, Cosmetics |
 | 6 | Home Page — Stories Tray | ⚠️ PARTIAL | ✅ UI only | ❌ Hardcoded | ⬚ Public | 6 placeholder stories, NO add/edit/delete |
@@ -198,9 +197,7 @@ trendmart/
 │   └── migrations/
 │       ├── schema.sql                ✅ Shops + Products tables, indexes, RLS (public read)
 │       └── auth-schema.sql           ✅ owner_id column + owner-based write RLS policies
-├── scripts/
-│   └── seed-shops.ts                 ✅ 3 shops + 8 products seeder
-├── public/                           (Next.js boilerplate SVGs)
+├── scripts/                            (removed — seed scripts deleted)
 ├── next.config.ts                    ✅ Image remote patterns
 ├── tsconfig.json                     ✅ Path alias @/ → ./
 ├── package.json                      ✅ Next 16.3, React 19, Supabase, Tailwind v4, @supabase/ssr

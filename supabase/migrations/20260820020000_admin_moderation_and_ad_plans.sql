@@ -80,13 +80,6 @@ CREATE POLICY "ad_plans_admin_all"
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
--- Seed sensible starter pricing (edit anytime from the Admin → Ads tab).
-INSERT INTO public.ad_plans (name, placement, duration_days, price, description, sort_order) VALUES
-  ('Homepage Banner — 7 Days',   'homepage_top', 7,  500,  'Top homepage banner for 7 days', 1),
-  ('Homepage Banner — 14 Days',  'homepage_top', 14, 900,  'Top homepage banner for 14 days (save Rs. 100)', 2),
-  ('Homepage Banner — 30 Days',  'homepage_top', 30, 1500, 'Top homepage banner for a full month (best value)', 3)
-ON CONFLICT DO NOTHING;
-
 -- Record which plan a merchant chose + what was charged when the ad request
 -- was submitted.
 ALTER TABLE public.promotional_ads

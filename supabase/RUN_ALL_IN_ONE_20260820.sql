@@ -70,7 +70,7 @@ DROP FUNCTION IF EXISTS public.track_order_by_id(uuid);
 --   PART 7  Promotional ads carousel
 --   PART 8  Customer checkout profile (name/phone/address autofill)
 --   PART 9  Query performance indexes
---   PART 10 Optional demo seed data (only inserted on an empty database)
+--   (PART 10 Demo seed data — removed from repo)
 -- =============================================================================
 
 

@@ -1578,24 +1578,6 @@ BEGIN
   END IF;
 END $$;
 
--- =============================================================================
--- SECTION 36: SEED DEFAULT SERVICE AVAILABILITY FOR EXISTING SERVICE SHOPS
--- =============================================================================
-
-DO $$
-DECLARE
-  svc_shop RECORD;
-BEGIN
-  FOR svc_shop IN SELECT id FROM public.shops WHERE shop_type = 'service'
-  LOOP
-    FOR d IN 0..6 LOOP
-      INSERT INTO public.service_availability (shop_id, day_of_week, is_working_day, start_time, end_time)
-      VALUES (svc_shop.id, d, d NOT IN (0), '09:00'::TIME, '18:00'::TIME)
-      ON CONFLICT (shop_id, day_of_week) DO NOTHING;
-    END LOOP;
-  END LOOP;
-END $$;
-
 COMMIT;
 
 -- =============================================================================

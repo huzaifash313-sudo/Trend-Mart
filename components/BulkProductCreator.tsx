@@ -144,13 +144,7 @@ export default function BulkProductCreator({
       return;
     }
 
-    setSaving(true);
-
-    await fetch("/api/sub-categories/seed", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: shopCategory }),
-    }).catch(() => undefined);
+        setSaving(true);
 
     const forms: ProductFormData[] = [];
     for (const r of validRows) {
