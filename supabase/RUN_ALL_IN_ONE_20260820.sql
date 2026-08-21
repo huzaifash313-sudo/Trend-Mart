@@ -2644,6 +2644,12 @@ CREATE POLICY "legal_acceptances_admin_read"
     )
   );
 
+-- Table-level grants — REQUIRED for PostgREST. RLS policies alone are not
+-- enough: without grants every REST request to this table is rejected with
+-- 404 before RLS can even run (same bug as promotional_ads/shop_deals).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.legal_acceptances TO authenticated;
+GRANT SELECT ON public.legal_acceptances TO anon;
+
 COMMIT;
 
 
@@ -3775,6 +3781,9 @@ CREATE POLICY "push_subscriptions_delete_own"
   TO authenticated
   USING (auth.uid() = user_id);
 
+-- Table-level grants — REQUIRED for PostgREST (upserts 500 without them).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.push_subscriptions TO authenticated;
+
 
 -- =============================================================================
 -- >>> APPENDED MIGRATION: 20260811020000_shop_rating_aggregates.sql
@@ -4089,6 +4098,10 @@ CREATE POLICY "shop_deals_owner_all"
   WITH CHECK (
     auth.uid() = (SELECT owner_id FROM public.shops WHERE id = shop_id)
   );
+
+-- Table-level grants — REQUIRED for PostgREST (404 without them).
+GRANT SELECT ON public.shop_deals TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.shop_deals TO authenticated;
 
 
 -- =============================================================================

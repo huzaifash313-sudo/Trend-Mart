@@ -113,4 +113,9 @@ CREATE POLICY "legal_acceptances_admin_read"
     )
   );
 
+-- Table-level grants — REQUIRED for PostgREST. RLS policies alone are not
+-- enough: without grants every REST request returns 404 before RLS runs.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.legal_acceptances TO authenticated;
+GRANT SELECT ON public.legal_acceptances TO anon;
+
 COMMIT;

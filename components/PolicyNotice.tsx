@@ -130,14 +130,12 @@ export default function PolicyNotice() {
     setAccepting(true);
     try {
       // Record each document at its own current version so future updates
-      // that bump only one policy still surface correctly.
+      // that bump only one policy still surface correctly. This write is
+      // best-effort — if the audit table is missing or RLS blocks it, the
+      // notice must still dismiss, or the user gets trapped on every reload.
+      // The localStorage marker below keeps this device from re-showing it.
       for (const doc of pendingDocs) {
-        const written = await recordLegalAcceptance(
-          userId,
-          [doc],
-          LEGAL_VERSIONS[doc],
-        );
-        if (!written) return; // keep the notice open so the user can retry
+        await recordLegalAcceptance(userId, [doc], LEGAL_VERSIONS[doc]);
       }
       for (const doc of pendingDocs) {
         try {
