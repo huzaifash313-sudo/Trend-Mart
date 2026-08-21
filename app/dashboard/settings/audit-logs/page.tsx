@@ -104,7 +104,7 @@ export default function MerchantAuditLogsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2.5">
           <Link
             href="/dashboard/settings"
@@ -194,7 +194,7 @@ export default function MerchantAuditLogsPage() {
         )}
 
         {!loading && paged.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <table className="w-full text-left text-sm" role="table" aria-label="Audit logs">
               <thead className="border-b border-zinc-100 dark:border-zinc-800">
                 <tr>
@@ -209,7 +209,7 @@ export default function MerchantAuditLogsPage() {
               <tbody>
                 {paged.map((entry) => (
                   <tr key={entry.id} className="border-t border-zinc-50 dark:border-zinc-800/50">
-                    <td className="px-4 py-2.5">
+                    <td className="min-w-[200px] px-4 py-2.5">
                       <span className="inline-flex items-center gap-1.5">
                         <span
                           className={`h-1.5 w-1.5 shrink-0 rounded-full ${
@@ -217,7 +217,7 @@ export default function MerchantAuditLogsPage() {
                           }`}
                           aria-hidden="true"
                         />
-                        {entry.label}
+                        <span className="break-words">{entry.label}</span>
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right text-xs text-zinc-400 dark:text-zinc-500">

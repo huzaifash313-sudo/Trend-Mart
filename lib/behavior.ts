@@ -16,10 +16,21 @@
 /* -------------------------------------------------------------------------- */
 
 import { sanitizeLight, truncate, sanitizeNumeric } from "@/lib/sanitization";
+import { scopedKey } from "@/lib/clientScope";
 
-const RECENT_VIEWS_KEY = "trendmart_recent_views_v1";
-const SEARCH_HISTORY_KEY = "trendmart_search_history_v1";
-const CATEGORY_AFFINITY_KEY = "trendmart_category_affinity_v1";
+const RECENT_VIEWS_BASE = "trendmart_recent_views_v1";
+const SEARCH_HISTORY_BASE = "trendmart_search_history_v1";
+const CATEGORY_AFFINITY_BASE = "trendmart_category_affinity_v1";
+
+function recentViewsKey(): string {
+  return scopedKey(RECENT_VIEWS_BASE);
+}
+function searchHistoryKey(): string {
+  return scopedKey(SEARCH_HISTORY_BASE);
+}
+function categoryAffinityKey(): string {
+  return scopedKey(CATEGORY_AFFINITY_BASE);
+}
 
 const MAX_RECENT_VIEWS = 24;
 const MAX_SEARCH_HISTORY = 12;
@@ -86,7 +97,7 @@ export function trackProductView(input: {
   const id = sanitizeLight(input.id ?? "").slice(0, 100);
   if (!id) return;
 
-  const items = readJson<RecentlyViewedItem[]>(RECENT_VIEWS_KEY, []);
+  const items = readJson<RecentlyViewedItem[]>(recentViewsKey(), []);
   const next = items.filter((i) => i.id !== id);
   next.unshift({
     id,
@@ -98,11 +109,11 @@ export function trackProductView(input: {
     category: input.category ? truncate(sanitizeLight(input.category), 60) : null,
     viewedAt: Date.now(),
   });
-  writeJson(RECENT_VIEWS_KEY, next.slice(0, MAX_RECENT_VIEWS));
+  writeJson(recentViewsKey(), next.slice(0, MAX_RECENT_VIEWS));
 }
 
 export function getRecentlyViewed(): RecentlyViewedItem[] {
-  const items = readJson<RecentlyViewedItem[]>(RECENT_VIEWS_KEY, []);
+  const items = readJson<RecentlyViewedItem[]>(recentViewsKey(), []);
   if (!Array.isArray(items)) return [];
   return items
     .filter((i) => i && typeof i.id === "string" && i.id.length > 0)
@@ -114,13 +125,13 @@ export function getRecentlyViewed(): RecentlyViewedItem[] {
 export function trackSearch(query: string): void {
   const q = sanitizeLight(query ?? "").trim().slice(0, 100);
   if (!q) return;
-  const history = readJson<string[]>(SEARCH_HISTORY_KEY, []);
+  const history = readJson<string[]>(searchHistoryKey(), []);
   const next = [q, ...history.filter((h) => h.toLowerCase() !== q.toLowerCase())];
-  writeJson(SEARCH_HISTORY_KEY, next.slice(0, MAX_SEARCH_HISTORY));
+  writeJson(searchHistoryKey(), next.slice(0, MAX_SEARCH_HISTORY));
 }
 
 export function getRecentSearches(): string[] {
-  const history = readJson<string[]>(SEARCH_HISTORY_KEY, []);
+  const history = readJson<string[]>(searchHistoryKey(), []);
   return Array.isArray(history) ? history.slice(0, MAX_SEARCH_HISTORY) : [];
 }
 
@@ -133,7 +144,7 @@ export function trackCategoryInterest(
   const cat = sanitizeLight(category ?? "").trim().slice(0, 60);
   if (!cat || cat === "All") return;
 
-  const map = readJson<Record<string, number>>(CATEGORY_AFFINITY_KEY, {});
+  const map = readJson<Record<string, number>>(categoryAffinityKey(), {});
   const add = WEIGHTS[weight] ?? 1;
   map[cat] = (typeof map[cat] === "number" ? map[cat] : 0) + add;
 
@@ -141,11 +152,11 @@ export function trackCategoryInterest(
   const entries = Object.entries(map)
     .sort((a, b) => b[1] - a[1])
     .slice(0, MAX_AFFINITY_ENTRIES);
-  writeJson(CATEGORY_AFFINITY_KEY, Object.fromEntries(entries));
+  writeJson(categoryAffinityKey(), Object.fromEntries(entries));
 }
 
 export function getCategoryAffinity(): CategoryAffinity[] {
-  const map = readJson<Record<string, number>>(CATEGORY_AFFINITY_KEY, {});
+  const map = readJson<Record<string, number>>(categoryAffinityKey(), {});
   return Object.entries(map)
     .filter(([, score]) => typeof score === "number" && score > 0)
     .sort((a, b) => b[1] - a[1])

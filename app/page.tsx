@@ -20,6 +20,7 @@ import {
   isStoryViewed,
   sortStoriesUnseenFirst,
 } from "@/lib/storyViewed";
+import { scopedKey } from "@/lib/clientScope";
 import { toggleFavorite as toggleFav, getAllFavorites } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
@@ -212,7 +213,7 @@ function HomeInner() {
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
       if (typeof window === "undefined") return new Set();
-      const raw = localStorage.getItem("trendmart_favorites");
+      const raw = localStorage.getItem(scopedKey("trendmart_favorites"));
       if (raw) {
         const all = JSON.parse(raw) as { id: string }[];
         return new Set(all.map((f) => f.id));

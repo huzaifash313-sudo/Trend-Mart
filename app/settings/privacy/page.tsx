@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { clearCurrentScopeData } from "@/lib/clientScope";
 
 function ChevronLeftIcon() {
   return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>);
@@ -46,8 +47,15 @@ export default function PrivacyPage() {
 
   const handleClearCache = useCallback(() => {
     try {
+      // Clear the current account's namespaced buyer data (cart, wishlist,
+      // history, orders, behaviour memory) — never another account's.
+      clearCurrentScopeData();
+      // Legacy flat keys + device-level caches from older builds.
       localStorage.removeItem("trendmart_favorites");
       localStorage.removeItem("trendmart_cart");
+      localStorage.removeItem("trendmart_history");
+      localStorage.removeItem("trendmart_orders");
+      localStorage.removeItem("trendmart_active_shop");
       localStorage.removeItem("trendmart_notifications");
       localStorage.removeItem("trendmart_location");
       addToast("Local data cleared successfully!", "success");

@@ -303,18 +303,18 @@ export default function AnalyticsDashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <Link href="/dashboard" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Back to dashboard">
             <ChevronLeftIcon />
           </Link>
           <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Advanced Analytics</h1>
-          <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500">{shop.name}</span>
+          <span className="ml-auto min-w-0 truncate text-xs text-zinc-400 dark:text-zinc-500">{shop.name}</span>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
             {[7, 30, 90].map((d) => (
               <button
@@ -331,7 +331,7 @@ export default function AnalyticsDashboard() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleExportInventoryCSV}
@@ -506,7 +506,15 @@ export default function AnalyticsDashboard() {
                     <BarChart data={data.topProducts.slice(0, 8)} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                       <XAxis type="number" tick={{ fontSize: 11, fill: "#71717a" }} />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "#71717a" }} width={120} />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        tick={{ fontSize: 10, fill: "#71717a" }}
+                        width={80}
+                        tickFormatter={(v: string) =>
+                          typeof v === "string" && v.length > 10 ? `${v.slice(0, 10)}…` : v
+                        }
+                      />
                       <Tooltip content={<BarTooltip />} />
                       <Bar dataKey="revenue" fill="#10b981" radius={[0, 6, 6, 0]} />
                     </BarChart>
@@ -579,7 +587,7 @@ export default function AnalyticsDashboard() {
             {/* Top Clicked Products Table */}
             <section>
               <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">🔥 Top Clicked Products</h3>
-              <div className="trend-card overflow-hidden">
+              <div className="trend-card overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-zinc-100 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
                     <tr>
@@ -612,7 +620,7 @@ export default function AnalyticsDashboard() {
             {/* Lead Conversion Summary */}
             <section>
               <h3 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">📊 Lead Conversion Summary</h3>
-              <div className="trend-card overflow-hidden">
+              <div className="trend-card overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-zinc-100 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
                     <tr>

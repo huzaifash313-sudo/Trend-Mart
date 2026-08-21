@@ -397,7 +397,7 @@ export default function LeadsPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <button
@@ -412,7 +412,7 @@ export default function LeadsPage() {
               Customer Leads
             </h1>
           </div>
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">
+          <span className="min-w-0 truncate text-xs text-zinc-400 dark:text-zinc-500">
             {shop?.name}
           </span>
         </div>

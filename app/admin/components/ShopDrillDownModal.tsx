@@ -108,7 +108,7 @@ export default function ShopDrillDownModal({
     >
       <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-zinc-50 shadow-2xl sm:rounded-2xl dark:bg-[color:var(--tm-surface)]">
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="min-w-0">
             <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400">
               Merchant drill-down
@@ -227,7 +227,7 @@ export default function ShopDrillDownModal({
             ) : (
               <ul className="max-h-72 divide-y divide-zinc-100 overflow-y-auto dark:divide-zinc-800">
                 {orders.map((o) => (
-                  <li key={o.id} className="flex items-center gap-3 py-2 text-sm">
+                  <li key={o.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
                     <span className="font-mono text-xs text-zinc-400">#{o.id.slice(0, 8)}</span>
                     <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
                       {o.customer_name || "Guest"} · {o.customer_phone || "—"}
@@ -236,7 +236,7 @@ export default function ShopDrillDownModal({
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">
                       {formatCurrency(o.total_amount)}
                     </span>
-                    <span className="w-12 text-right text-xs text-zinc-400">{timeAgo(o.created_at)}</span>
+                    <span className="shrink-0 text-right text-xs text-zinc-400">{timeAgo(o.created_at)}</span>
                   </li>
                 ))}
               </ul>

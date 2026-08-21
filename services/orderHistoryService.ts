@@ -5,6 +5,7 @@
 
 import { sanitizeLight, truncate, sanitizeNumeric } from "@/lib/sanitization";
 import type { OrderItem } from "@/types";
+import { scopedKey } from "@/lib/clientScope";
 
 export interface LocalOrderRecord {
   /** Unique reference ID (auto-generated or from Supabase). */
@@ -28,8 +29,14 @@ export interface LocalOrderRecord {
 // The orders page (`app/orders/page.tsx`) reads this key. It previously read
 // `trendmart_orders` while this service wrote `trendmart_order_history` — the
 // two were disconnected. We now write the same key the reader expects.
-const STORAGE_KEY = "trendmart_orders";
+// The key is namespaced per account so one account's order history can never
+// appear for another account on the same device.
+const STORAGE_BASE = "trendmart_orders";
 const LEGACY_STORAGE_KEY = "trendmart_order_history";
+
+function storageKey(): string {
+  return scopedKey(STORAGE_BASE);
+}
 
 // ─── Field length constraints ────────────────────────────────────────────────
 
@@ -45,14 +52,14 @@ const MAX_NOTES = 500;
 function getStoredOrders(): LocalOrderRecord[] {
   if (typeof window === "undefined") return [];
   try {
-    let raw = localStorage.getItem(STORAGE_KEY);
+    let raw = localStorage.getItem(storageKey());
 
     // One-time migration: pull old history key forward so existing users keep
     // their local orders under the unified key.
     if (!raw) {
       const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
       if (legacy) {
-        localStorage.setItem(STORAGE_KEY, legacy);
+        localStorage.setItem(storageKey(), legacy);
         localStorage.removeItem(LEGACY_STORAGE_KEY);
         raw = legacy;
       }
@@ -79,7 +86,7 @@ function persistOrders(orders: LocalOrderRecord[]): void {
   try {
     // Keep last 50 orders
     const trimmed = orders.slice(-50);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    localStorage.setItem(storageKey(), JSON.stringify(trimmed));
   } catch {
     // Storage full or disabled — silently ignore
   }
@@ -182,11 +189,11 @@ export function deleteOrderRecord(orderId: string): boolean {
 }
 
 /**
- * Clear entire order history.
+ * Clear entire order history (current account scope only).
  */
 export function clearOrderHistory(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(storageKey());
 }
 
 /**

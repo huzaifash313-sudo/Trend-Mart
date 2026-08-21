@@ -230,7 +230,7 @@ export default function MerchantAdsPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
               <MegaphoneIcon /> Promotional Ads

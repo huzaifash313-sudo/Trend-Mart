@@ -893,7 +893,7 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="max-w-7xl mx-auto px-6 py-5">
+        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
@@ -948,7 +948,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
         {/* ── Overview Tab ──────────────────────────────────────────── */}
         {activeTab === "overview" && metrics && (
           <>
@@ -1234,8 +1234,8 @@ export default function AdminDashboardPage() {
               </span>
             </div>
 
-            {/* Merchant Table */}
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+            {/* Merchant Table (desktop) */}
+            <div className="hidden overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:block">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1389,6 +1389,137 @@ export default function AdminDashboardPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Merchant Cards (mobile) */}
+            <div className="space-y-3 md:hidden">
+              {pagedMerchants.length === 0 ? (
+                <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-10 text-center text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900">
+                  No merchants found matching your filters.
+                </div>
+              ) : (
+                pagedMerchants.map((merchant) => (
+                  <div
+                    key={merchant.shop_id}
+                    className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-zinc-900 dark:text-zinc-100">
+                          {merchant.shop_name}
+                        </p>
+                        {merchant.location && (
+                          <p className="mt-0.5 truncate text-xs text-zinc-500">{merchant.location}</p>
+                        )}
+                        <span className="mt-1 inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                          {merchant.category}
+                        </span>
+                      </div>
+                      <span
+                        className={`shrink-0 inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          merchant.verification_status === "approved"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            : merchant.verification_status === "rejected"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        }`}
+                      >
+                        {merchant.verification_status === "approved"
+                          ? "Approved"
+                          : merchant.verification_status === "rejected"
+                            ? "Rejected"
+                            : "Pending"}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-zinc-50 px-2 py-2 dark:bg-zinc-800/50">
+                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{merchant.order_count}</p>
+                        <p className="text-[0.65rem] text-zinc-500">Orders</p>
+                      </div>
+                      <div className="rounded-xl bg-zinc-50 px-2 py-2 dark:bg-zinc-800/50">
+                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{merchant.product_count}</p>
+                        <p className="text-[0.65rem] text-zinc-500">Products</p>
+                      </div>
+                      <div className="rounded-xl bg-zinc-50 px-2 py-2 dark:bg-zinc-800/50">
+                        <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(merchant.total_revenue)}
+                        </p>
+                        <p className="text-[0.65rem] text-zinc-500">Revenue</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          merchant.is_live
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        }`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${merchant.is_live ? "bg-emerald-500" : "bg-red-500"}`} />
+                        {merchant.is_live ? "Active" : "Suspended"}
+                      </span>
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        <button
+                          onClick={() => setDrillDownShop(merchant)}
+                          title="Products, orders & QR code"
+                          className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400"
+                        >
+                          View
+                        </button>
+                        {merchant.verification_status === "pending" ? (
+                          <>
+                            <button
+                              onClick={() => reviewShop(merchant.shop_id, "approved")}
+                              disabled={processingId === merchant.shop_id}
+                              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => reviewShop(merchant.shop_id, "rejected")}
+                              disabled={processingId === merchant.shop_id}
+                              className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : merchant.verification_status === "rejected" ? (
+                          <button
+                            onClick={() => reviewShop(merchant.shop_id, "approved")}
+                            disabled={processingId === merchant.shop_id}
+                            title="Approve and make this store publicly visible again"
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {processingId === merchant.shop_id ? "..." : "Re-approve"}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => toggleMerchantStatus(merchant.shop_id, merchant.is_live)}
+                            disabled={processingId === merchant.shop_id}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                              merchant.is_live
+                                ? "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
+                                : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400"
+                            }`}
+                          >
+                            {processingId === merchant.shop_id ? "..." : merchant.is_live ? "Suspend" : "Activate"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteMerchant(merchant.shop_id, merchant.shop_name)}
+                          disabled={processingId === merchant.shop_id}
+                          title="Permanently delete this merchant"
+                          className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-red-600 hover:text-white dark:bg-zinc-800 dark:text-zinc-400 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {merchantPageCount > 1 && (
@@ -1593,7 +1724,7 @@ export default function AdminDashboardPage() {
               </span>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+            <div className="hidden overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:block">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1681,7 +1812,7 @@ export default function AdminDashboardPage() {
                                     </div>
                                   )}
                                   <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-zinc-500">
-                                    <span>Order ID: <span className="font-mono">{order.id}</span></span>
+                                    <span>Order ID: <span className="break-all font-mono">{order.id}</span></span>
                                     <span>Status: {order.status}</span>
                                     {order.customer_user_id && <span>Linked account</span>}
                                     <span>
@@ -1698,6 +1829,96 @@ export default function AdminDashboardPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Order Cards (mobile) */}
+            <div className="space-y-3 md:hidden">
+              {pagedOrders.length === 0 ? (
+                <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-10 text-center text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900">
+                  {state.orders.length === 0
+                    ? "No orders found yet — place an order to see it here."
+                    : "No orders found matching your filters."}
+                </div>
+              ) : (
+                pagedOrders.map((order) => {
+                  const shopName =
+                    state.merchants.find((m) => m.shop_id === order.shop_id)?.shop_name ??
+                    "Unknown Shop";
+                  const isExpanded = expandedOrderId === order.id;
+                  const items = (order.items_json ?? []) as Array<{
+                    name?: string;
+                    quantity?: number;
+                    price?: number;
+                  }>;
+                  return (
+                    <div
+                      key={order.id}
+                      className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs text-zinc-500">#{order.id.slice(0, 8)}</p>
+                          <p className="mt-1 truncate font-semibold text-zinc-900 dark:text-zinc-100">
+                            {order.customer_name || "—"}
+                          </p>
+                          <p className="truncate text-xs text-zinc-500">{shopName}</p>
+                          {order.customer_phone && (
+                            <p className="text-xs text-zinc-400">{order.customer_phone}</p>
+                          )}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                            {formatCurrency(order.total_amount)}
+                          </p>
+                          <OrderStatusBadge status={order.status} />
+                          <p className="mt-1 text-[0.65rem] text-zinc-400">
+                            {new Date(order.created_at).toLocaleString("en-PK", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                        className="mt-3 flex w-full items-center justify-between rounded-xl bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300"
+                      >
+                        <span>
+                          {items.length} item{items.length !== 1 ? "s" : ""}
+                        </span>
+                        <span>{isExpanded ? "▲ Hide items" : "▼ Show items"}</span>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="mt-2 space-y-1.5">
+                          {items.length === 0 ? (
+                            <p className="text-xs text-zinc-400">No item breakdown stored.</p>
+                          ) : (
+                            items.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
+                                  {item.name ?? "Item"}
+                                  {item.quantity ? ` × ${item.quantity}` : ""}
+                                </span>
+                                <span className="ml-3 font-medium text-zinc-700 dark:text-zinc-300">
+                                  {formatCurrency(Number(item.price) || 0)}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                          <div className="mt-2 border-t border-zinc-100 pt-2 text-xs text-zinc-500 dark:border-zinc-800">
+                            Order ID: <span className="break-all font-mono">{order.id}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {orderPageCount > 1 && (
@@ -2160,7 +2381,7 @@ export default function AdminDashboardPage() {
 
       {/* ── Footer Bar ──────────────────────────────────────────────── */}
       <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-        <div className="max-w-7xl mx-auto px-6 py-3 text-xs text-zinc-400 flex justify-between">
+        <div className="mx-auto max-w-7xl px-4 py-3 text-xs text-zinc-400 flex justify-between sm:px-6">
           <span>TrendMart Super Admin v1.0</span>
           <span>Live monitoring active</span>
         </div>
@@ -2223,7 +2444,7 @@ function MetricCard({
       <div className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-medium">
         {label}
       </div>
-      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+      <div className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 sm:text-2xl">
         {value}
       </div>
       <div className="text-xs text-zinc-400 mt-1">{sub}</div>

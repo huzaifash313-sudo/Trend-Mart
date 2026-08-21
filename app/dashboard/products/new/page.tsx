@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { scopedKey } from "@/lib/clientScope";
 import type { Shop } from "@/types";
 import { fetchMyShops } from "@/services/shopService";
 import { useToast } from "@/components/Toast";
@@ -61,7 +62,7 @@ export default function NewProductPage() {
         if (myShops.length > 0) {
           const saved =
             typeof window !== "undefined"
-              ? localStorage.getItem("trendmart_active_shop")
+              ? localStorage.getItem(scopedKey("trendmart_active_shop"))
               : null;
           const match = saved ? myShops.find((s) => s.id === saved) : null;
           setActiveShopId(match?.id ?? myShops[0].id);
@@ -88,7 +89,7 @@ export default function NewProductPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Link
@@ -109,7 +110,7 @@ export default function NewProductPage() {
               onChange={(val) => {
                 setActiveShopId(val);
                 if (val) {
-                  localStorage.setItem("trendmart_active_shop", val);
+                  localStorage.setItem(scopedKey("trendmart_active_shop"), val);
                 }
               }}
               options={shops.map((s) => ({ value: s.id, label: s.name }))}

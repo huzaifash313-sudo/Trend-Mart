@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Product, Shop } from "@/types";
 import { getProductDiscount } from "@/lib/formatters";
+import { scopedKey, scopedKeyFor } from "@/lib/clientScope";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -259,7 +260,11 @@ export const useCartStore = create<CartState>()(
       clearCart: () => {
         set({ items: [] });
         try {
-          if (typeof window !== "undefined") localStorage.removeItem("trendmart_cart");
+          if (typeof window !== "undefined") {
+            useCartStore.persist.clearStorage();
+            // Legacy flat key from pre-namespacing builds.
+            localStorage.removeItem("trendmart_cart");
+          }
         } catch {
           /* ignore */
         }
@@ -276,7 +281,33 @@ export const useCartStore = create<CartState>()(
             removeItem: () => {},
           } as unknown as Storage;
         }
-        return window.localStorage;
+        // Per-account storage: every read/write targets the current account's
+        // namespaced key (`trendmart_cart:u_<id>` or `trendmart_cart:guest`)
+        // so switching accounts never leaks or overwrites another account.
+        const scoped = {
+          getItem: (name: string) => {
+            try {
+              return window.localStorage.getItem(scopedKey(name));
+            } catch {
+              return null;
+            }
+          },
+          setItem: (name: string, value: string) => {
+            try {
+              window.localStorage.setItem(scopedKey(name), value);
+            } catch {
+              /* storage full / unavailable */
+            }
+          },
+          removeItem: (name: string) => {
+            try {
+              window.localStorage.removeItem(scopedKey(name));
+            } catch {
+              /* ignore */
+            }
+          },
+        };
+        return scoped as unknown as Storage;
       }),
       partialize: (state) => ({ items: state.items }),
       merge: (persisted, current) => {
@@ -315,4 +346,56 @@ export function useCart() {
     totalItems,
     totalAmount,
   };
+}
+
+/* ── Per-account scope helpers ─────────────────────────────────────────────── */
+
+/**
+ * Called whenever the owning account changes (sign-in / sign-out / switch).
+ * Re-reads the persisted cart from the new account's namespaced key so the UI
+ * immediately shows the right cart without leaking the previous account's.
+ */
+export function refreshCartForScope(): void {
+  try {
+    void useCartStore.persist.rehydrate();
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Guest → signed-in hand-off: carry the anonymous cart over into the user's
+ * bucket. Existing user items are preserved; guest-only lines are appended.
+ */
+export function migrateGuestCartToUserBucket(userId: string): void {
+  if (typeof window === "undefined" || !userId) return;
+  const guestKey = scopedKeyFor("trendmart_cart", "guest");
+  const userKey = scopedKeyFor("trendmart_cart", `u_${userId}`);
+  try {
+    const guestRaw = window.localStorage.getItem(guestKey);
+    if (guestRaw === null) return;
+
+    const userRaw = window.localStorage.getItem(userKey);
+    if (userRaw === null) {
+      window.localStorage.setItem(userKey, guestRaw);
+      window.localStorage.removeItem(guestKey);
+      return;
+    }
+
+    const guestState = JSON.parse(guestRaw) as { state?: { items?: unknown } };
+    const userState = JSON.parse(userRaw) as { state?: { items?: unknown } };
+    const guestItems = sanitizeCartItems(guestState?.state?.items);
+    const userItems = sanitizeCartItems(userState?.state?.items);
+    if (guestItems.length === 0) return;
+
+    const existingIds = new Set(userItems.map((i) => i.id));
+    const merged = [...userItems, ...guestItems.filter((i) => !existingIds.has(i.id))];
+    window.localStorage.setItem(
+      userKey,
+      JSON.stringify({ state: { items: merged }, version: userState?.version ?? 0 }),
+    );
+    window.localStorage.removeItem(guestKey);
+  } catch {
+    /* ignore */
+  }
 }

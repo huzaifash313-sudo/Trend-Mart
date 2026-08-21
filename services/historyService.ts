@@ -3,8 +3,14 @@
 /*  Automatically tracks up to the last 5 viewed shop profiles and products.   */
 /* -------------------------------------------------------------------------- */
 
-const STORAGE_KEY = "trendmart_history";
+import { scopedKey } from "@/lib/clientScope";
+
+const STORAGE_BASE = "trendmart_history";
 const MAX_ITEMS = 5;
+
+function storageKey(): string {
+  return scopedKey(STORAGE_BASE);
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,7 +32,7 @@ export interface BrowsingHistoryItem {
 function getAll(): BrowsingHistoryItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey());
     return raw ? (JSON.parse(raw) as BrowsingHistoryItem[]) : [];
   } catch {
     return [];
@@ -36,7 +42,7 @@ function getAll(): BrowsingHistoryItem[] {
 function saveAll(items: BrowsingHistoryItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(storageKey(), JSON.stringify(items));
   } catch {
     // Storage full or unavailable — silently fail
   }

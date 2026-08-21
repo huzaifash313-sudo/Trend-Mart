@@ -3,87 +3,64 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Account Scope Guard                                            */
 /*                                                                             */
-/*  Buyer data that lives in the browser (cart, local "recent orders"          */
-/*  history, and the anonymous wishlist) is stored under fixed localStorage    */
-/*  keys that are NOT namespaced per account. Without this guard, using two    */
-/*  different accounts on the same device would leak one account's cart /      */
-/*  order history / wishlist to the next account, because sign-out only        */
-/*  clears the Supabase session — never the device-local buyer data.           */
+/*  Buyer / merchant data that lives in the browser (cart, local "recent       */
+/*  orders" history, anonymous wishlist, browsing history, active shop,        */
+/*  behaviour memory) is stored under PER-ACCOUNT namespaced localStorage      */
+/*  keys (see `lib/clientScope.ts`). This guard keeps the device's account     */
+/*  scope in sync with the live Supabase session:                              */
 /*                                                                             */
-/*  This component watches the auth state and wipes device-local buyer data    */
-/*  whenever the signed-in identity changes to a DIFFERENT established         */
-/*  account, or when the user signs out. A guest (no previous account)         */
-/*  logging in is intentionally NOT wiped, so the guest → checkout cart        */
-/*  hand-off (the hybrid cart) keeps working.                                  */
+/*   • guest → signed-in   : the guest bucket (hybrid cart hand-off) is        */
+/*     adopted into the new user's own bucket, then synced to the DB.          */
+/*   • user → user / sign-out : nothing is wiped — every account's data stays  */
+/*     in its own bucket and is restored when that account signs back in.      */
+/*                                                                             */
+/*  Without per-account namespacing, using two different accounts on the same  */
+/*  device would leak one account's cart / orders / wishlist to the next.      */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useCartStore } from "@/store/cartStore";
-import { clearOrderHistory } from "@/services/orderHistoryService";
-import { migrateLocalFavoritesToDb } from "@/services/wishlistService";
+import {
+  getScopeOwner,
+  setScopeOwner,
+  migrateLegacyLocalData,
+  adoptGuestBucket,
+} from "@/lib/clientScope";
+import {
+  refreshCartForScope,
+  migrateGuestCartToUserBucket,
+} from "@/store/cartStore";
+import { migrateGuestFavoritesToUserBucket } from "@/services/wishlistService";
 
-/** Tracks which account the device-local buyer data currently belongs to. */
-const ACTIVE_UID_KEY = "trendmart_active_uid";
+/** Non-account device keys that predate namespacing and must never survive
+ *  across accounts (notification bell rows, review dismissals). The current
+ *  per-account namespaced versions (…:<uid>) are left untouched. */
+function clearLegacySharedKeys(): void {
+  if (typeof window === "undefined") return;
+  for (const key of ["trendmart_notif_history_v2", "tm_review_dismissed_orders_v1"]) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 /**
- * Remove every piece of buyer data that is persisted on the device under a
- * fixed (non-per-user) key. Each removal is isolated so a single failure
- * (e.g. storage disabled) never prevents the others from running.
+ * Guest → signed-in hand-off. Copies every guest-bucket data slice into the
+ * user's own bucket so nothing the guest saved disappears, then best-effort
+ * syncs the wishlist to the DB. Runs before the scope flips to `userId`.
  */
-function clearBuyerDeviceData(): void {
-  // Cart — clear the in-memory Zustand store too so the UI updates instantly
-  // (clearCart also removes the `trendmart_cart` persisted key).
-  try {
-    useCartStore.getState().clearCart();
-  } catch {
-    /* ignore */
-  }
-
-  // Local "recent orders" history (+ the legacy key it migrates from).
-  try {
-    clearOrderHistory();
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("trendmart_order_history");
-    }
-  } catch {
-    /* ignore */
-  }
-
-  // Anonymous wishlist / favourites (device-local for guests).
-  try {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("trendmart_favorites");
-      localStorage.removeItem("trendmart_favorites_count");
-      localStorage.removeItem("trendmart_wishlist_seen_at");
-    }
-  } catch {
-    /* ignore */
-  }
-
-  // Merchant's "currently active shop" — belongs to one merchant account and
-  // must never follow the device into a different merchant account.
-  try {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("trendmart_active_shop");
-    }
-  } catch {
-    /* ignore */
-  }
-
-  // Legacy shared caches that predate per-account namespacing. If these old
-  // device-wide keys survive, the next account on this phone could briefly see
-  // the previous account's notification bell rows or review dismissals.
-  // Per-account namespaced keys (trendmart_notif_history_v2:<uid>,
-  // tm_review_dismissed_orders_v1:<uid>) are deliberately left untouched.
-  try {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("trendmart_notif_history_v2");
-      localStorage.removeItem("tm_review_dismissed_orders_v1");
-    }
-  } catch {
-    /* ignore */
-  }
+function adoptGuestData(userId: string): void {
+  migrateGuestCartToUserBucket(userId);
+  void migrateGuestFavoritesToUserBucket(userId);
+  // History / orders / active shop / behaviour memory — same hand-off.
+  adoptGuestBucket("trendmart_history", userId);
+  adoptGuestBucket("trendmart_orders", userId);
+  adoptGuestBucket("trendmart_active_shop", userId);
+  adoptGuestBucket("trendmart_recent_views_v1", userId);
+  adoptGuestBucket("trendmart_search_history_v1", userId);
+  adoptGuestBucket("trendmart_category_affinity_v1", userId);
 }
 
 export default function AccountScopeGuard() {
@@ -96,48 +73,33 @@ export default function AccountScopeGuard() {
       return;
     }
 
+    // Migrate any flat keys left by pre-namespacing builds into the current
+    // account's bucket, and clear non-account shared keys that could leak.
+    migrateLegacyLocalData();
+    clearLegacySharedKeys();
+
     /**
      * Reconcile the device's stored account identity with the live session.
-     * Wipes buyer data only when moving AWAY from an established account
-     * (account switch or sign-out), never on a guest's first sign-in.
+     * Switches the account scope (which re-points every localStorage key) and
+     * preserves each account's data in its own bucket — no wiping, no leaks.
      */
     function reconcile(uid: string | null): void {
-      let prev: string | null = null;
-      try {
-        prev = localStorage.getItem(ACTIVE_UID_KEY);
-      } catch {
-        prev = null;
+      const prevOwner = getScopeOwner();
+      if (prevOwner === uid) return;
+
+      // Guest → first signed-in account: adopt the anonymous hand-off data.
+      if (!prevOwner && uid) {
+        adoptGuestData(uid);
       }
 
-      // Same identity (or guest → guest): nothing to do.
-      if (prev === uid) return;
-
-      // A previously signed-in account is being replaced (switch) or left
-      // (sign-out) → the device-local buyer data belonged to `prev`, wipe it.
-      if (prev) {
-        clearBuyerDeviceData();
-      }
-
-      try {
-        if (uid) localStorage.setItem(ACTIVE_UID_KEY, uid);
-        else localStorage.removeItem(ACTIVE_UID_KEY);
-      } catch {
-        /* ignore */
-      }
+      setScopeOwner(uid);
+      refreshCartForScope();
     }
 
     // `onAuthStateChange` fires an INITIAL_SESSION event immediately, which
     // seeds the current identity for us (no separate getUser() call needed).
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       reconcile(session?.user?.id ?? null);
-
-      // Guest → signed-in hand-off: copy the device-local wishlist into the
-      // DB so items saved while browsing as a guest survive on this and any
-      // other device. Non-fatal — the merged wishlist view already surfaces
-      // them even if this sync fails.
-      if (event === "SIGNED_IN" && session?.user?.id) {
-        void migrateLocalFavoritesToDb();
-      }
     });
 
     return () => {

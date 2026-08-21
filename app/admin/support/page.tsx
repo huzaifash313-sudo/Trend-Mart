@@ -153,7 +153,7 @@ export default function AdminSupportPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="max-w-6xl mx-auto px-6 py-5">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
           <Link href="/admin/dashboard" className="text-xs font-medium text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400">
             ← Back to Admin Dashboard
           </Link>
@@ -162,7 +162,7 @@ export default function AdminSupportPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-4">
+      <div className="mx-auto max-w-6xl space-y-4 px-4 py-6 sm:px-6">
         <div className="flex flex-wrap gap-2">
           {(["all", "open", "in_progress", "resolved", "closed"] as const).map((s) => (
             <button
@@ -208,7 +208,7 @@ export default function AdminSupportPage() {
                         </span>
                       </div>
                       <h3 className="mt-1.5 font-semibold text-zinc-900 dark:text-zinc-100">{ticket.subject}</h3>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className="break-words text-xs text-zinc-500 dark:text-zinc-400">
                         {ticket.name} · {ticket.email}{ticket.phone ? ` · ${ticket.phone}` : ""} · {timeAgo(ticket.created_at)}
                       </p>
                     </div>

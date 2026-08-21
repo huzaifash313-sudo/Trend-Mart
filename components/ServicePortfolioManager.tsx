@@ -314,7 +314,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
   return (
     <div className="space-y-6">
       {/* Header & Add Button */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Service Portfolio</h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">

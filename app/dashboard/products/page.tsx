@@ -25,6 +25,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { scopedKey } from "@/lib/clientScope";
 import type {
   Product,
   ProductFormData,
@@ -288,7 +289,7 @@ export default function ProductsDashboardPage() {
         const myShops = result.data.filter((s) => s.owner_id === userId);
         setShops(myShops);
         if (myShops.length > 0 && !activeShopId) {
-          const saved = typeof window !== "undefined" ? localStorage.getItem("trendmart_active_shop") : null;
+          const saved = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendmart_active_shop")) : null;
           const match = saved ? myShops.find(s => s.id === saved) : null;
           setActiveShopId(match?.id ?? myShops[0].id);
         }
@@ -825,13 +826,13 @@ export default function ProductsDashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/dashboard" className="shrink-0 text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
               ← Dashboard
             </Link>
-            <h1 className="text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+            <h1 className="truncate text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
               Product & Inventory Manager
             </h1>
           </div>
@@ -1484,7 +1485,7 @@ export default function ProductsDashboardPage() {
                       >
                         {product.name}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                         <span className="font-medium text-emerald-600 dark:text-emerald-400">
                           Rs. {product.price.toLocaleString()}
                         </span>

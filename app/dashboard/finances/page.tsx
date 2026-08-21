@@ -21,6 +21,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { scopedKey } from "@/lib/clientScope";
 import { fetchShops } from "@/services/shopService";
 import type { Shop, Order } from "@/types";
 import { useToast } from "@/components/Toast";
@@ -195,7 +196,7 @@ export default function FinancesPage() {
       if (result.success) {
         const myShops = result.data.filter((s) => s.owner_id === userId);
         setAllShops(myShops);
-        const savedId = typeof window !== "undefined" ? localStorage.getItem("trendmart_active_shop") : null;
+        const savedId = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendmart_active_shop")) : null;
         if (savedId && myShops.some((s) => s.id === savedId)) {
           setActiveShopId(savedId);
         } else if (myShops.length > 0) {
@@ -374,10 +375,10 @@ export default function FinancesPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <h1 className="truncate text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
               💰 Financial Ledger
             </h1>
             {allShops.length > 1 && (
@@ -418,7 +419,7 @@ export default function FinancesPage() {
               </h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center shadow-sm dark:border-emerald-800 dark:bg-emerald-900/20">
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 sm:text-2xl">
                     {formatCurrency(summary.totalRevenue)}
                   </p>
                   <p className="mt-1 flex items-center justify-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
@@ -426,7 +427,7 @@ export default function FinancesPage() {
                   </p>
                 </div>
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-center shadow-sm dark:border-red-800 dark:bg-red-900/20">
-                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  <p className="text-xl font-bold text-red-600 dark:text-red-400 sm:text-2xl">
                     {formatCurrency(summary.totalExpenses)}
                   </p>
                   <p className="mt-1 flex items-center justify-center gap-1 text-xs text-red-700 dark:text-red-300">
@@ -434,7 +435,7 @@ export default function FinancesPage() {
                   </p>
                 </div>
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center shadow-sm dark:border-amber-800 dark:bg-amber-900/20">
-                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                  <p className="text-xl font-bold text-amber-600 dark:text-amber-400 sm:text-2xl">
                     {formatCurrency(summary.pendingPayments)}
                   </p>
                   <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
@@ -446,7 +447,7 @@ export default function FinancesPage() {
                     ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
                     : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
                 }`}>
-                  <p className={`text-2xl font-bold ${
+                  <p className={`text-xl font-bold sm:text-2xl ${
                     summary.netProfit >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"
                   }`}>
                     {formatCurrency(summary.netProfit)}

@@ -268,8 +268,9 @@ export default function AuditLogsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+      {/* Header — non-sticky on mobile (admin layout already has a sticky top
+          nav there); sticky only on desktop where the sidebar is fixed. */}
+      <header className="z-40 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90 lg:sticky lg:top-0">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <button

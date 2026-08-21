@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  AccountScopeGuard — device-local buyer data isolation between accounts      */
+/*  AccountScopeGuard — per-account local data isolation between accounts       */
 /* -------------------------------------------------------------------------- */
 
 import { render, act } from "@testing-library/react";
@@ -8,32 +8,21 @@ import AccountScopeGuard from "@/components/AccountScopeGuard";
 
 type AuthCallback = (event: string, session: { user: { id: string } } | null) => void;
 
+/** Namespaced keys — each account (and the guest) gets its own bucket. */
 const CART_KEY = "trendmart_cart";
 const ORDERS_KEY = "trendmart_orders";
-const LEGACY_ORDERS_KEY = "trendmart_order_history";
 const FAVORITES_KEY = "trendmart_favorites";
-const FAVORITES_COUNT_KEY = "trendmart_favorites_count";
-const WISHLIST_SEEN_KEY = "trendmart_wishlist_seen_at";
-const ACTIVE_UID_KEY = "trendmart_active_uid";
+const SCOPE_KEY = "trendmart_scope_owner_v1";
 
-/** Seed every device-local buyer key so we can prove which ones get wiped. */
-function seedBuyerData(): void {
-  localStorage.setItem(CART_KEY, JSON.stringify({ state: { items: [{ id: "p1" }] }, version: 0 }));
-  localStorage.setItem(ORDERS_KEY, JSON.stringify([{ id: "o1", shopId: "s1" }]));
-  localStorage.setItem(LEGACY_ORDERS_KEY, JSON.stringify([{ id: "old" }]));
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify([{ id: "f1", type: "product", name: "x", addedAt: 1 }]));
-  localStorage.setItem(FAVORITES_COUNT_KEY, "1");
-  localStorage.setItem(WISHLIST_SEEN_KEY, "123");
-}
+const cartBucket = (uid: string | null) =>
+  uid ? `${CART_KEY}:u_${uid}` : `${CART_KEY}:guest`;
+const ordersBucket = (uid: string | null) =>
+  uid ? `${ORDERS_KEY}:u_${uid}` : `${ORDERS_KEY}:guest`;
 
-function buyerDataExists(): boolean {
-  return (
-    localStorage.getItem(ORDERS_KEY) !== null ||
-    localStorage.getItem(FAVORITES_KEY) !== null ||
-    localStorage.getItem(FAVORITES_COUNT_KEY) !== null ||
-    localStorage.getItem(WISHLIST_SEEN_KEY) !== null ||
-    localStorage.getItem(LEGACY_ORDERS_KEY) !== null
-  );
+function seedGuestData(): void {
+  localStorage.setItem(cartBucket(null), JSON.stringify({ state: { items: [{ id: "p1" }] }, version: 0 }));
+  localStorage.setItem(ordersBucket(null), JSON.stringify([{ id: "guest-order", shopId: "s1" }]));
+  localStorage.setItem(FAVORITES_KEY + ":guest", JSON.stringify([{ id: "f1", type: "product", name: "x", addedAt: 1 }]));
 }
 
 /**
@@ -69,87 +58,88 @@ describe("AccountScopeGuard", () => {
     jest.clearAllMocks();
   });
 
-  it("does NOT wipe buyer data when a guest signs in (hybrid cart hand-off preserved)", () => {
-    seedBuyerData();
+  it("adopts guest data into the new account's bucket on sign-in (hybrid hand-off)", () => {
+    seedGuestData();
 
     const { fire } = renderGuard();
     fire("SIGNED_IN", { user: { id: "user-A" } });
 
-    // Guest → first account: keep the cart/orders/wishlist they built as a guest.
-    expect(localStorage.getItem(ORDERS_KEY)).not.toBeNull();
-    expect(localStorage.getItem(FAVORITES_KEY)).not.toBeNull();
-    expect(localStorage.getItem(CART_KEY)).not.toBeNull();
+    // The guest cart/orders/favorites moved into account A's own bucket.
+    expect(localStorage.getItem(cartBucket("user-A"))).not.toBeNull();
+    expect(localStorage.getItem(ordersBucket("user-A"))).not.toBeNull();
+    expect(localStorage.getItem(FAVORITES_KEY + ":u_user-A")).not.toBeNull();
+    // Guest bucket is drained so it can't leak to a later guest/account.
+    expect(localStorage.getItem(cartBucket(null))).toBeNull();
+    expect(localStorage.getItem(ordersBucket(null))).toBeNull();
     // Device is now scoped to account A.
-    expect(localStorage.getItem(ACTIVE_UID_KEY)).toBe("user-A");
+    expect(localStorage.getItem(SCOPE_KEY)).toBe("user-A");
   });
 
-  it("wipes buyer data when switching to a DIFFERENT account", () => {
-    seedBuyerData();
-    localStorage.setItem(ACTIVE_UID_KEY, "user-A");
+  it("keeps each account's data in its own bucket when switching accounts", () => {
+    localStorage.setItem(cartBucket("user-A"), JSON.stringify({ state: { items: [{ id: "a-item" }] }, version: 0 }));
+    localStorage.setItem(SCOPE_KEY, "user-A");
 
     const { fire } = renderGuard();
     fire("SIGNED_IN", { user: { id: "user-B" } });
 
-    expect(buyerDataExists()).toBe(false);
-    expect(localStorage.getItem(CART_KEY)).toBeNull();
-    expect(localStorage.getItem(ACTIVE_UID_KEY)).toBe("user-B");
+    // Account A's cart is preserved untouched (never leaked, never wiped).
+    expect(localStorage.getItem(cartBucket("user-A"))).not.toBeNull();
+    // Account B starts with its own (empty) bucket — no bleed from A.
+    expect(localStorage.getItem(cartBucket("user-B"))).toBeNull();
+    expect(localStorage.getItem(SCOPE_KEY)).toBe("user-B");
   });
 
-  it("wipes buyer data on sign-out", () => {
-    seedBuyerData();
-    localStorage.setItem(ACTIVE_UID_KEY, "user-A");
+  it("preserves the signed-in account's data on sign-out (restored next login)", () => {
+    localStorage.setItem(cartBucket("user-A"), JSON.stringify({ state: { items: [{ id: "a-item" }] }, version: 0 }));
+    localStorage.setItem(SCOPE_KEY, "user-A");
 
     const { fire } = renderGuard();
     fire("SIGNED_OUT", null);
 
-    expect(buyerDataExists()).toBe(false);
-    expect(localStorage.getItem(CART_KEY)).toBeNull();
-    // Identity marker cleared so the next login starts clean.
-    expect(localStorage.getItem(ACTIVE_UID_KEY)).toBeNull();
+    // Account A's data stays in its own bucket — nothing is wiped.
+    expect(localStorage.getItem(cartBucket("user-A"))).not.toBeNull();
+    // Identity marker cleared; guest scope is active.
+    expect(localStorage.getItem(SCOPE_KEY)).toBeNull();
+    expect(localStorage.getItem(cartBucket(null))).toBeNull();
   });
 
-  it("does NOT wipe buyer data on token refresh for the SAME account", () => {
-    seedBuyerData();
-    localStorage.setItem(ACTIVE_UID_KEY, "user-A");
+  it("does nothing on token refresh for the SAME account", () => {
+    localStorage.setItem(cartBucket("user-A"), JSON.stringify({ state: { items: [{ id: "a-item" }] }, version: 0 }));
+    localStorage.setItem(SCOPE_KEY, "user-A");
 
     const { fire } = renderGuard();
     fire("TOKEN_REFRESHED", { user: { id: "user-A" } });
 
-    expect(localStorage.getItem(ORDERS_KEY)).not.toBeNull();
-    expect(localStorage.getItem(FAVORITES_KEY)).not.toBeNull();
-    expect(localStorage.getItem(ACTIVE_UID_KEY)).toBe("user-A");
+    expect(localStorage.getItem(cartBucket("user-A"))).not.toBeNull();
+    expect(localStorage.getItem(SCOPE_KEY)).toBe("user-A");
   });
 
-  it("keeps 10 sequential accounts fully unlinked (no cross-account bleed)", () => {
+  it("keeps 10 sequential accounts fully isolated (no cross-account bleed)", () => {
     const { fire } = renderGuard();
 
-    let previousOrderId: string | null = null;
+    const previousOrderIds: string[] = [];
 
     for (let n = 1; n <= 10; n++) {
       const uid = `user-${n}`;
 
-      // Each account signs in, then records its own order into device-local history.
-      fire(n === 1 ? "SIGNED_IN" : "SIGNED_IN", { user: { id: uid } });
-
-      // On sign-in of a *different* account, the previous account's order must be gone.
-      if (previousOrderId) {
-        const raw = localStorage.getItem(ORDERS_KEY);
-        const ids = raw ? (JSON.parse(raw) as Array<{ id: string }>).map((o) => o.id) : [];
-        expect(ids).not.toContain(previousOrderId);
-      }
+      // Sign out of the previous account first, then sign into the next.
+      if (previousOrderIds.length > 0) fire("SIGNED_OUT", null);
+      fire("SIGNED_IN", { user: { id: uid } });
 
       // This account is scoped correctly.
-      expect(localStorage.getItem(ACTIVE_UID_KEY)).toBe(uid);
+      expect(localStorage.getItem(SCOPE_KEY)).toBe(uid);
 
-      // Simulate this account placing an order (writes to the shared device key).
+      // Simulate this account placing an order into its OWN bucket.
       const orderId = `order-of-${uid}`;
-      localStorage.setItem(ORDERS_KEY, JSON.stringify([{ id: orderId, shopId: "s1" }]));
-      previousOrderId = orderId;
+      localStorage.setItem(ordersBucket(uid), JSON.stringify([{ id: orderId, shopId: "s1" }]));
+      previousOrderIds.push(orderId);
 
-      // Sign out between accounts — must wipe this account's data too.
-      fire("SIGNED_OUT", null);
-      expect(localStorage.getItem(ORDERS_KEY)).toBeNull();
-      expect(localStorage.getItem(ACTIVE_UID_KEY)).toBeNull();
+      // No other account's bucket may contain this order.
+      for (let m = 1; m < n; m++) {
+        const raw = localStorage.getItem(ordersBucket(`user-${m}`));
+        const ids = raw ? (JSON.parse(raw) as Array<{ id: string }>).map((o) => o.id) : [];
+        expect(ids).not.toContain(orderId);
+      }
     }
   });
 

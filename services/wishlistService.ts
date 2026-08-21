@@ -13,6 +13,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { sanitizeLight, sanitizeNumeric, isValidUUID, truncate } from "@/lib/sanitization";
+import { scopedKey, scopedKeyFor } from "@/lib/clientScope";
 
 /* -------------------------------------------------------------------------- */
 /*  Favorites Changed Notification                                             */
@@ -124,7 +125,19 @@ function sanitizeTimestamp(ts: unknown): number {
 /*  localStorage helpers (anonymous users only)                                */
 /* -------------------------------------------------------------------------- */
 
-const STORAGE_KEY = "trendmart_favorites";
+/** Per-account key — each account (and the guest) keeps its own wishlist. */
+function favoritesKey(): string {
+  return scopedKey("trendmart_favorites");
+}
+
+function favoritesCountKey(): string {
+  return scopedKey("trendmart_favorites_count");
+}
+
+/** Keys used to read/write the "guest" bucket during sign-in hand-off. */
+function guestFavoritesKey(): string {
+  return scopedKeyFor("trendmart_favorites", "guest");
+}
 
 /**
  * PROMPT 2: Safe localStorage read with JSON parsing safeguards.
@@ -134,7 +147,7 @@ const STORAGE_KEY = "trendmart_favorites";
 function getLocalAll(): FavoriteItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(favoritesKey());
     if (!raw) return [];
 
     const parsed: unknown = JSON.parse(raw);
@@ -142,7 +155,7 @@ function getLocalAll(): FavoriteItem[] {
     // PROMPT 2: Validate the parsed data is actually an array
     if (!Array.isArray(parsed)) {
       // Corrupted data — clear it
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(favoritesKey());
       return [];
     }
 
@@ -171,7 +184,7 @@ function getLocalAll(): FavoriteItem[] {
   } catch {
     // JSON parse error — clear corrupted data
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(favoritesKey());
     } catch {
       /* storage unavailable */
     }
@@ -197,14 +210,14 @@ function saveLocalAll(items: FavoriteItem[]): void {
         typeof item.addedAt === "number",
     );
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(validItems));
-    localStorage.setItem("trendmart_favorites_count", String(validItems.length));
+    localStorage.setItem(favoritesKey(), JSON.stringify(validItems));
+    localStorage.setItem(favoritesCountKey(), String(validItems.length));
   } catch {
     // Storage full or unavailable — try to save with fewer items
     try {
       const half = items.slice(0, Math.max(50, Math.floor(items.length / 2)));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(half));
-      localStorage.setItem("trendmart_favorites_count", String(half.length));
+      localStorage.setItem(favoritesKey(), JSON.stringify(half));
+      localStorage.setItem(favoritesCountKey(), String(half.length));
     } catch {
       // Completely failed — silently accept
     }
@@ -597,7 +610,7 @@ export async function getFavoriteCount(): Promise<number> {
   if (!userId) {
     if (typeof window === "undefined") return 0;
     try {
-      const cached = localStorage.getItem("trendmart_favorites_count");
+      const cached = localStorage.getItem(favoritesCountKey());
       if (cached) {
         const num = sanitizeNumeric(Number(cached), 0, 10000, 0);
         return num;
@@ -619,8 +632,12 @@ export async function getFavoriteCount(): Promise<number> {
   }
 }
 
-/** localStorage key — last time user opened the wishlist page (badge cleared). */
+/** Per-account key — last time the user opened the wishlist page (badge cleared). */
 const WISHLIST_SEEN_AT_KEY = "trendmart_wishlist_seen_at";
+
+function wishlistSeenKey(): string {
+  return scopedKey(WISHLIST_SEEN_AT_KEY);
+}
 
 /**
  * Timestamp of last wishlist page visit. First read seeds "now" so old items
@@ -629,13 +646,13 @@ const WISHLIST_SEEN_AT_KEY = "trendmart_wishlist_seen_at";
 export function getWishlistSeenAt(): number {
   if (typeof window === "undefined") return Date.now();
   try {
-    const raw = localStorage.getItem(WISHLIST_SEEN_AT_KEY);
+    const raw = localStorage.getItem(wishlistSeenKey());
     if (raw) {
       const n = Number(raw);
       if (Number.isFinite(n) && n > 0) return n;
     }
     const now = Date.now();
-    localStorage.setItem(WISHLIST_SEEN_AT_KEY, String(now));
+    localStorage.setItem(wishlistSeenKey(), String(now));
     return now;
   } catch {
     return Date.now();
@@ -649,7 +666,7 @@ export function getWishlistSeenAt(): number {
 export function markWishlistSeen(): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(WISHLIST_SEEN_AT_KEY, String(Date.now()));
+    localStorage.setItem(wishlistSeenKey(), String(Date.now()));
   } catch {
     /* no-op */
   }
@@ -879,12 +896,29 @@ export async function migrateLocalFavoritesToDb(): Promise<void> {
   const localItems = getLocalAll();
   if (localItems.length === 0) return;
 
-  // PROMPT 2: Deduplicate before migration
-  const dedupedItems = deduplicateLocalItems(localItems);
+  const migrated = await pushFavoritesToDb(userId, localItems);
+  if (migrated.size > 0) {
+    const remaining = getLocalAll().filter(
+      (item) => !migrated.has(`${item.type}::${item.id}`),
+    );
+    saveLocalAll(remaining);
+  }
+}
+
+/**
+ * Shared migration loop — best-effort insert of a favorite list into the DB
+ * for `userId` via the `migrate_wishlist_item` RPC. Returns the set of
+ * `type::id` keys that actually landed in the database.
+ */
+async function pushFavoritesToDb(
+  userId: string,
+  items: FavoriteItem[],
+): Promise<Set<string>> {
+  const migratedKeys = new Set<string>();
+  const dedupedItems = deduplicateLocalItems(items);
+  if (dedupedItems.length === 0) return migratedKeys;
 
   const supabase = createClient();
-  const migratedKeys = new Set<string>();
-
   for (const item of dedupedItems) {
     // PROMPT 2: Validate each item before migration
     const validId = sanitizeItemId(item.id);
@@ -914,13 +948,76 @@ export async function migrateLocalFavoritesToDb(): Promise<void> {
       // wishlist view) will still surface it.
     }
   }
+  return migratedKeys;
+}
 
-  // Remove only the items that successfully synced.
-  if (migratedKeys.size > 0) {
-    const remaining = getLocalAll().filter(
-      (item) => !migratedKeys.has(`${item.type}::${item.id}`),
+/**
+ * Guest → signed-in hand-off for the wishlist. Moves the anonymous guest
+ * bucket into the user's own bucket (so the merged view keeps showing those
+ * items even if the DB write fails) and best-effort syncs them to the DB.
+ */
+export async function migrateGuestFavoritesToUserBucket(userId: string): Promise<void> {
+  if (typeof window === "undefined" || !userId) return;
+  const guestKey = guestFavoritesKey();
+  const userKey = scopedKeyFor("trendmart_favorites", `u_${userId}`);
+
+  let guestItems: FavoriteItem[] = [];
+  try {
+    const raw = localStorage.getItem(guestKey);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        guestItems = parsed.filter(
+          (item): item is FavoriteItem =>
+            !!item &&
+            typeof item === "object" &&
+            typeof (item as Record<string, unknown>).id === "string" &&
+            typeof (item as Record<string, unknown>).name === "string" &&
+            typeof (item as Record<string, unknown>).addedAt === "number",
+        );
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  if (guestItems.length === 0) return;
+
+  // Copy into the user's bucket (merge, user's own rows win) so nothing is
+  // lost even when the DB sync below fails.
+  try {
+    const existingRaw = localStorage.getItem(userKey);
+    const existing: FavoriteItem[] = existingRaw
+      ? (JSON.parse(existingRaw) as FavoriteItem[])
+      : [];
+    const byKey = new Map<string, FavoriteItem>();
+    for (const item of Array.isArray(existing) ? existing : []) {
+      byKey.set(`${item.type}::${item.id}`, item);
+    }
+    for (const item of guestItems) {
+      const key = `${item.type}::${item.id}`;
+      if (!byKey.has(key)) byKey.set(key, item);
+    }
+    const merged = deduplicateLocalItems(Array.from(byKey.values()));
+    localStorage.setItem(userKey, JSON.stringify(merged));
+    localStorage.setItem(
+      scopedKeyFor("trendmart_favorites_count", `u_${userId}`),
+      String(merged.length),
     );
-    saveLocalAll(remaining);
+    localStorage.removeItem(guestKey);
+    try {
+      localStorage.removeItem(scopedKeyFor("trendmart_favorites_count", "guest"));
+    } catch {
+      /* ignore */
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Best-effort DB sync of the copied items (already in the user bucket now).
+  try {
+    await pushFavoritesToDb(userId, guestItems);
+  } catch {
+    /* ignore */
   }
 }
 
