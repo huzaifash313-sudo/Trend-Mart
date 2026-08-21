@@ -122,6 +122,52 @@ function sanitizeSessionToken(token: string | undefined): string {
   return trimmed;
 }
 
+/**
+ * Decode a base64 / base64url string into a JSON object.
+ * Works in the Edge runtime (no Buffer dependency) — normalizes the URL-safe
+ * alphabet, pads, decodes bytes with `atob`, then UTF-8 decodes.
+ */
+function decodeBase64Json(value: string): Record<string, unknown> | null {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract the raw access token from Supabase's auth cookies.
+ *
+ * COMPATIBILITY: Supabase SSR v0.12+ stores a single combined cookie
+ * (`sb-<project-ref>-auth-token`) whose value is a base64 JSON blob
+ * `{ access_token, refresh_token, ... }`. Older builds used a separate
+ * `sb-access-token` cookie. We resolve BOTH so the middleware's short-lived
+ * user cache is keyed on the real token (per user) instead of the caller's
+ * IP — two different accounts on the same device/IP previously collided in
+ * the cache for up to 5 seconds.
+ */
+function getSessionAccessToken(request: NextRequest): string {
+  const allCookies = request.cookies.getAll();
+  const combined = allCookies.find(
+    (c) => c.name.startsWith("sb-") && c.name.endsWith("-auth-token") && c.value.length > 0,
+  );
+  if (combined) {
+    const parsed = decodeBase64Json(combined.value);
+    if (
+      parsed &&
+      typeof parsed.access_token === "string" &&
+      parsed.access_token.length > 0
+    ) {
+      return parsed.access_token;
+    }
+  }
+  return request.cookies.get("sb-access-token")?.value ?? "";
+}
+
 
 // ─── Role & Route Configuration ────────────────────────────────────────────
 
@@ -241,9 +287,10 @@ function invalidateUserCache(): void {
 async function getAuthenticatedUser(
   request: NextRequest,
 ): Promise<MiddlewareAuthUser | null> {
-  const accessToken = sanitizeSessionToken(
-    request.cookies.get("sb-access-token")?.value,
-  );
+  // Key the cache on the caller's own access token (resolved from either the
+  // combined SSR cookie or the legacy separate cookie) so two different users
+  // behind the same IP / device never share a cached identity.
+  const accessToken = sanitizeSessionToken(getSessionAccessToken(request));
   const cacheKey = accessToken
     ? accessToken.slice(0, 32)
     : `anon_${request.headers.get("x-forwarded-for") ?? "unknown"}`;
@@ -771,9 +818,9 @@ export async function middleware(request: NextRequest) {
   if (refreshedUser) {
     // Seed the short-lived cache — subsequent getAuthenticatedUser() calls in
     // this request (email gate + role resolution) hit it and skip a 2nd getUser().
-    const accessToken = sanitizeSessionToken(
-      request.cookies.get("sb-access-token")?.value,
-    );
+    // Key on the caller's own token (same rule as getAuthenticatedUser) so two
+    // different users on one IP can never share a cached identity.
+    const accessToken = sanitizeSessionToken(getSessionAccessToken(request));
     const cacheKey = accessToken
       ? accessToken.slice(0, 32)
       : `anon_${request.headers.get("x-forwarded-for") ?? "unknown"}`;

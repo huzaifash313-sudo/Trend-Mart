@@ -283,39 +283,40 @@ export async function fetchLeadStats(
   }
   const supabase = createClient();
   try {
-    const { count: total } = await supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("shop_id", shopId);
-
-    const { count: unconverted } = await supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("shop_id", shopId)
-      .eq("is_converted", false);
-
-    const { count: converted } = await supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("shop_id", shopId)
-      .eq("is_converted", true);
-
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const { count: todayCount } = await supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("shop_id", shopId)
-      .gte("created_at", todayStart.toISOString());
+    // Run the four independent COUNT queries in parallel instead of four
+    // sequential round-trips to the database.
+    const [totalRes, unconvertedRes, convertedRes, todayRes] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .eq("shop_id", shopId),
+      supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .eq("shop_id", shopId)
+        .eq("is_converted", false),
+      supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .eq("shop_id", shopId)
+        .eq("is_converted", true),
+      supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .eq("shop_id", shopId)
+        .gte("created_at", todayStart.toISOString()),
+    ]);
 
     return {
       success: true,
       data: {
-        total: total ?? 0,
-        unconverted: unconverted ?? 0,
-        converted: converted ?? 0,
-        todayCount: todayCount ?? 0,
+        total: totalRes.count ?? 0,
+        unconverted: unconvertedRes.count ?? 0,
+        converted: convertedRes.count ?? 0,
+        todayCount: todayRes.count ?? 0,
       },
     };
   } catch (err) {

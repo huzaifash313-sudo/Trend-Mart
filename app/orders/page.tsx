@@ -212,9 +212,12 @@ function OrdersInner() {
   const [shops, setShops] = useState<Map<string, Shop>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
-  // Load shops for shop name display
+  // Load shops for shop name display.
+  // Public-only: the tracking page is customer-facing and only needs shop
+  // names — fetching unapproved/offline shops (which carry owner_id + contact
+  // details) here would leak them to any signed-in customer.
   useEffect(() => {
-    fetchShops().then((r) => {
+    fetchShops({ publicOnly: true }).then((r) => {
       if (r.success) {
         const map = new Map<string, Shop>();
         r.data.forEach((s) => map.set(s.id, s));

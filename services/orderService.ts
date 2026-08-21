@@ -1057,14 +1057,38 @@ export async function fetchMerchantAnalytics(shopId: string): Promise<
 
   try {
     // Fetch orders for revenue + pending count
-    const { data: orders, error: ordersErr } = await supabase
+    const ordersQuery = supabase
       .from("orders")
       .select("total_amount, status")
       .eq("shop_id", shopId);
 
-    if (ordersErr) throw ordersErr;
+    // Active product count
+    const prodQuery = supabase
+      .from("products")
+      .select("*", { count: "exact", head: true })
+      .eq("shop_id", shopId)
+      .eq("is_available", true);
 
-    const allOrders = (orders as Record<string, unknown>[]) ?? [];
+    // Total store views
+    const viewsQuery = supabase
+      .from("analytics_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("shop_id", shopId)
+      .eq("event_type", "shop_view");
+
+    // Run the three independent reads in parallel (one round-trip latency
+    // instead of three sequential waits).
+    const [ordersRes, prodRes, viewsRes] = await Promise.all([
+      ordersQuery,
+      prodQuery,
+      viewsQuery,
+    ]);
+
+    if (ordersRes.error) throw ordersRes.error;
+    if (prodRes.error) throw prodRes.error;
+    if (viewsRes.error) throw viewsRes.error;
+
+    const allOrders = (ordersRes.data as Record<string, unknown>[]) ?? [];
     const total_revenue = allOrders
       .filter((o) => o.status !== "Cancelled")
       .reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
@@ -1072,30 +1096,12 @@ export async function fetchMerchantAnalytics(shopId: string): Promise<
       (o) => o.status === "Pending",
     ).length;
 
-    // Active product count
-    const { count: activeCount, error: prodErr } = await supabase
-      .from("products")
-      .select("*", { count: "exact", head: true })
-      .eq("shop_id", shopId)
-      .eq("is_available", true);
-
-    if (prodErr) throw prodErr;
-
-    // Total store views
-    const { count: viewsCount, error: viewsErr } = await supabase
-      .from("analytics_logs")
-      .select("*", { count: "exact", head: true })
-      .eq("shop_id", shopId)
-      .eq("event_type", "shop_view");
-
-    if (viewsErr) throw viewsErr;
-
     return {
       success: true,
       data: {
         total_revenue,
-        active_product_count: activeCount ?? 0,
-        total_store_views: viewsCount ?? 0,
+        active_product_count: prodRes.count ?? 0,
+        total_store_views: viewsRes.count ?? 0,
         pending_orders_count,
       },
     };

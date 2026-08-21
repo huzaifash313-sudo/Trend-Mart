@@ -105,6 +105,11 @@ export async function fetchShops(opts?: {
 }): Promise<ServiceResult<Shop[]>> {
   const supabase = createClient();
 
+  // `owner_id` is the merchant's internal auth user id — it must never reach
+  // the public storefront payload. Merchant dashboards (which pass no
+  // `publicOnly`) still need it to filter their own shops client-side.
+  const includeOwnerId = !opts?.publicOnly;
+
   const SHOP_LIST_SELECT = [
     "id",
     "name",
@@ -129,9 +134,19 @@ export async function fetchShops(opts?: {
     "announcement",
     "announcement_expires_at",
     "whatsapp_number",
-    "owner_id",
+    ...(includeOwnerId ? ["owner_id" as const] : []),
     "created_at",
   ].join(", ");
+
+  /** Strip `owner_id` from rows when they were fetched for a public list. */
+  const redactOwnerId = (rows: unknown): Shop[] =>
+    ((rows as Shop[]) ?? []).map((shop) =>
+      includeOwnerId
+        ? shop
+        : (Object.fromEntries(
+            Object.entries(shop).filter(([key]) => key !== "owner_id"),
+          ) as Shop),
+    );
 
   try {
     let query = supabase.from("shops").select(SHOP_LIST_SELECT);
@@ -145,9 +160,13 @@ export async function fetchShops(opts?: {
     }
 
     if (opts?.search) {
-      query = query.or(
-        `name.ilike.%${opts.search}%,category.ilike.%${opts.search}%`,
-      );
+      const safe = opts.search.replace(/[%_,.()']/g, " ").trim();
+      if (safe) {
+        const pattern = `%${safe}%`;
+        query = query.or(
+          `name.ilike.${pattern},category.ilike.${pattern}`,
+        );
+      }
     }
 
     query = query.order("name", { ascending: true });
@@ -173,11 +192,11 @@ export async function fetchShops(opts?: {
       fallback = fallback.order("name", { ascending: true });
       const retry = await fallback;
       if (retry.error) throw retry.error;
-      return { success: true, data: (retry.data as unknown as Shop[]) ?? [] };
+      return { success: true, data: redactOwnerId(retry.data) };
     }
 
     if (error) throw error;
-    return { success: true, data: (data as unknown as Shop[]) ?? [] };
+    return { success: true, data: redactOwnerId(data) };
   } catch (err) {
     logError(err, { module: "shopService.fetchShops", meta: { opts } });
     return { success: false, error: toError(err) };
@@ -196,14 +215,39 @@ export async function fetchShopById(
     let shop: Shop | null = null;
 
     if (isUuid(id)) {
-      const { data, error: shopError } = await supabase
+      // Public storefronts are only visible when live + approved. The UUID
+      // path previously skipped these filters (only the slug path enforced
+      // them), which let pending / suspended / offline shops leak their full
+      // record (owner_id, whatsapp, addresses) to anyone who had the UUID.
+      let { data, error: shopError } = await supabase
         .from("shops")
         .select("*")
         .eq("id", id)
-        .single();
+        .eq("is_live", true)
+        .eq("verification_status", "approved")
+        .maybeSingle();
 
       if (shopError) throw shopError;
-      shop = data as Shop | null;
+      shop = (data as Shop | null) ?? null;
+
+      // Owner fallback: the store owner may still open their own storefront
+      // (paused / suspended) to manage it, but it stays hidden from everyone
+      // else.
+      if (!shop) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data: owned, error: ownerError } = await supabase
+            .from("shops")
+            .select("*")
+            .eq("id", id)
+            .eq("owner_id", user.id)
+            .maybeSingle();
+          if (ownerError) throw ownerError;
+          shop = (owned as Shop | null) ?? null;
+        }
+      }
     } else {
       const slug = decodeURIComponent(id).trim().toLowerCase();
 
