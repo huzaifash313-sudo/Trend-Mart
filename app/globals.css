@@ -1039,45 +1039,40 @@ html.dark .trend-card:hover {
   flex-shrink: 0;
 }
 .tm-navbar-wordmark {
-  position: relative;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  animation: tm-wordmark-glow 4.5s ease-in-out infinite;
+  /* Fallback: solid white text */
+  color: #fff;
+  /* Premium color-fill: a heavy green/sea-green stripe sweeps THROUGH the
+     letters themselves (background-clip: text), not just over them. */
+  background-image: linear-gradient(
+    100deg,
+    #ffffff 0%,
+    #ffffff 30%,
+    #b9f6e8 38%,
+    #6ee7b7 46%,
+    #34d399 54%,
+    #2dd4bf 62%,
+    #b9f6e8 70%,
+    #ffffff 78%,
+    #ffffff 100%
+  );
+  background-size: 300% 100%;
+  background-repeat: repeat-x;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: tm-wordmark-fill 5s linear infinite;
 }
 
-/* Premium shine sweep across the "TrendMart" text */
-.tm-navbar-wordmark::after {
-  content: "";
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  left: -70%;
-  width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-  transform: skewX(-16deg);
-  animation: tm-wordmark-sweep 4.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes tm-wordmark-sweep {
+@keyframes tm-wordmark-fill {
   0% {
-    left: -70%;
+    background-position: 0% 50%;
   }
-  55%,
   100% {
-    left: 135%;
-  }
-}
-
-@keyframes tm-wordmark-glow {
-  0%,
-  100% {
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12), 0 0 0 rgba(153, 246, 228, 0);
-  }
-  50% {
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12), 0 0 16px rgba(153, 246, 228, 0.6);
+    background-position: 300% 50%;
   }
 }
 
