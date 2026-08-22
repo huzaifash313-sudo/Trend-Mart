@@ -238,7 +238,13 @@ export function isValidOrderTransition(
 // ─── Product Variant ────────────────────────────────────────────────────────
 export interface ProductVariant {
   label: string;       // e.g. "S", "M", "L" or "Red", "Blue"
-  price_adj?: number;  // optional price adjustment (+/-)
+  /**
+   * Absolute unit price for this option (Daraz-style: different colors/sizes
+   * have their own price). Overrides the product base price when set.
+   */
+  price?: number;
+  /** Optional price adjustment (+/-) on top of the base or absolute price. */
+  price_adj?: number;
   is_available?: boolean;
   /** Per-variant stock quantity (Prompt 2) */
   stock?: number;

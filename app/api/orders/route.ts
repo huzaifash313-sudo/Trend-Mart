@@ -21,6 +21,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizePkPhoneDigits, isValidUUID } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
+import { computeVariantPrice } from "@/lib/variantPricing";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { sendPushToUser } from "@/lib/webPush";
 import type { Order, OrderItem, VariantGroup } from "@/types";
@@ -429,10 +430,12 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
+      // Variant price — server-derived from the stored variants JSON (supports
+      // both Daraz-style absolute prices and additive adjustments).
       resolvedItems.push({
         productId: item.productId,
         name: product.name || item.name,
-        price: product.price,
+        price: computeVariantPrice(product.price ?? 0, product.variants, item.variant),
         quantity: item.quantity,
         variant: item.variant,
         variantGroup: item.variantGroup,

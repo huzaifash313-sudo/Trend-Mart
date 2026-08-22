@@ -21,6 +21,7 @@ import {
 import DineInOrderTracker from "@/components/DineInOrderTracker";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { formatRupees } from "@/lib/formatters";
+import { computeVariantPrice, variantPriceRange } from "@/lib/variantPricing";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product, SubCategory, VariantGroup } from "@/types";
 
@@ -229,8 +230,11 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
 
   /** Unit price incl. selected variant adjustments. */
   function unitPriceFor(product: Product, selection: SelectedVariant[]): number {
-    const base = product.price ?? 0;
-    return base + selection.reduce((sum, s) => sum + (s.priceAdj ?? 0), 0);
+    return computeVariantPrice(
+      product.price ?? 0,
+      (product.variants as VariantGroup[] | null) ?? [],
+      selection.map((s) => `${s.groupName}: ${s.optionLabel}`).join(" · "),
+    );
   }
 
   /** Build a human-readable variant label from the selection. */
@@ -465,7 +469,17 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                         </p>
                       ) : null}
                       <p className="mt-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        {formatRupees(p.price)}
+                        {hasVariants
+                          ? (() => {
+                              const { min, max } = variantPriceRange(
+                                p.price ?? 0,
+                                (p.variants as VariantGroup[] | null) ?? [],
+                              );
+                              return min === max
+                                ? formatRupees(min)
+                                : `${formatRupees(min)} – ${formatRupees(max)}`;
+                            })()
+                          : formatRupees(p.price)}
                         {hasVariants ? (
                           <span className="ml-1 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
                             · options

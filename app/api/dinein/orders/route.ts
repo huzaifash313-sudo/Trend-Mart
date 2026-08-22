@@ -17,6 +17,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/sanitization";
 import { sendPushToUser } from "@/lib/webPush";
+import { computeVariantPrice } from "@/lib/variantPricing";
 import { normalizeDinePhone } from "@/services/dineInService";
 import type { OrderItem, VariantGroup } from "@/types";
 
@@ -176,25 +177,12 @@ export async function POST(request: Request) {
     if (product.price == null) {
       return NextResponse.json({ success: false, error: `"${product.name}" has an invalid price.` }, { status: 409 });
     }
-    // Variant price adjustment (server-side, derived from the stored variants JSON).
-    let priceAdj = 0;
-    if (line.variant && product.variants.length > 0) {
-      const parts = line.variant.split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
-      for (const part of parts) {
-        const idx = part.indexOf(":");
-        const label = (idx > 0 ? part.slice(idx + 1) : part).trim();
-        const groupName = idx > 0 ? part.slice(0, idx).trim() : "";
-        for (const group of product.variants) {
-          if (groupName && group.name !== groupName) continue;
-          for (const opt of group.options) {
-            if (opt.label === label) {
-              priceAdj += opt.price_adj ?? 0;
-            }
-          }
-        }
-      }
-    }
-    const finalPrice = Math.max(0, (product.price ?? 0) + priceAdj);
+    // Variant price adjustment — server-derived from the stored variants JSON.
+    const finalPrice = computeVariantPrice(
+      product.price ?? 0,
+      product.variants,
+      line.variant,
+    );
     resolvedItems.push({
       productId: line.productId,
       name: product.name || line.name,

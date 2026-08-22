@@ -4,10 +4,11 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { computeVariantPrice } from "@/lib/variantPricing";
+import { getProductImages } from "@/lib/productImages";
+import { getSafeImageUrl } from "@/services/storageService";
 import type { Product, Shop } from "@/types";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
-import { getSafeImageUrl } from "@/services/storageService";
-import { getProductImages } from "@/lib/productImages";
 import { useToast } from "@/components/Toast";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 
@@ -97,8 +98,7 @@ export default function QuickViewModal({
   const currentUrl = images[safeIndex];
   const hasVariants = Boolean(product.variants && product.variants.length > 0);
   const variantLabel = selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · ");
-  const priceAdj = selectedVariants.reduce((sum, v) => sum + (v.priceAdj || 0), 0);
-  const displayPrice = product.price + priceAdj;
+  const displayPrice = computeVariantPrice(product.price, product.variants, variantLabel);
   const variantsReady = !hasVariants || selectedVariants.length === (product.variants?.length ?? 0);
 
   const pauseAutoUntil = useRef(0);
@@ -175,14 +175,14 @@ export default function QuickViewModal({
       return;
     }
     const productForCart =
-      priceAdj !== 0
+      displayPrice !== product.price
         ? { ...product, price: displayPrice }
         : product;
     addItem(productForCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, priceAdj, displayPrice]);
+  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, displayPrice]);
 
   const handleOrder = useCallback(() => {
     if (!variantsReady) {
@@ -194,7 +194,7 @@ export default function QuickViewModal({
       return;
     }
     const productForCart =
-      priceAdj !== 0
+      displayPrice !== product.price
         ? { ...product, price: displayPrice }
         : product;
     onOrder?.({
@@ -203,7 +203,7 @@ export default function QuickViewModal({
       quantity,
       notes: itemNotes.trim() || undefined,
     });
-  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, priceAdj, displayPrice, onOrder]);
+  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, displayPrice, onOrder]);
 
   const { hasDiscount, originalPrice, discountPercent: discountPct } = getProductDiscount(product);
 

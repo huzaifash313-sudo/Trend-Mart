@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { Product } from "@/types";
+import type { Product, VariantGroup } from "@/types";
 import { createProduct, updateProduct } from "@/services/productService";
 import {
   fetchSubCategories,
@@ -13,6 +13,7 @@ import { getProductImages, normalizeProductGallery } from "@/lib/productImages";
 import MultiImageUpload from "@/components/MultiImageUpload";
 import CustomSelect from "@/components/CustomSelect";
 import ToggleSwitch from "@/components/ToggleSwitch";
+import VariantEditor from "@/components/VariantEditor";
 import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
@@ -56,6 +57,7 @@ export default function ProductEditorModal({
   const [isAvailable, setIsAvailable] = useState(true);
   const [subCategoryId, setSubCategoryId] = useState("");
   const [subs, setSubs] = useState<SubCategoryWithMeta[]>([]);
+  const [variants, setVariants] = useState<VariantGroup[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Prefill form on open / when switching between products.
@@ -71,6 +73,7 @@ export default function ProductEditorModal({
       setGallery(images);
       setIsAvailable(product.is_available !== false);
       setSubCategoryId(product.sub_category_id ?? "");
+      setVariants((product.variants as VariantGroup[] | null) ?? []);
     } else {
       setName("");
       setDescription("");
@@ -79,6 +82,7 @@ export default function ProductEditorModal({
       setGallery([]);
       setIsAvailable(true);
       setSubCategoryId("");
+      setVariants([]);
     }
   }, [product]);
 
@@ -137,6 +141,7 @@ export default function ProductEditorModal({
         stock_status: isAvailable ? "in_stock" : "out_of_stock",
         category_id: shopCategory || null,
         sub_category_id: subId || null,
+        variants: variants.length > 0 ? variants : null,
       };
 
       const result = isEdit && product
@@ -161,6 +166,7 @@ export default function ProductEditorModal({
       gallery,
       isAvailable,
       subCategoryId,
+      variants,
       isEdit,
       product,
       shopId,
@@ -284,6 +290,8 @@ export default function ProductEditorModal({
             fileIdPrefix={`${shopId}-${product?.id ?? "new"}`}
             label="Product photos"
           />
+
+          <VariantEditor variants={variants} onChange={setVariants} />
 
           <ToggleSwitch
             checked={isAvailable}

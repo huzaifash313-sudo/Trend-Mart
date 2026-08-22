@@ -16,6 +16,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { VariantGroup, ProductVariant } from "@/types";
+import { computeVariantPrice } from "@/lib/variantPricing";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -156,10 +157,13 @@ export default function VariantSelector({
     });
   }, [variants, selectedMap]);
 
-  /** Total price with adjustments. */
+  /** Total price with adjustments (absolute prices + additive adjustments). */
   const totalPrice = useMemo(() => {
-    return selectedEntries.reduce((sum, entry) => sum + entry.priceAdj, basePrice);
-  }, [basePrice, selectedEntries]);
+    const label = selectedEntries
+      .map((e) => `${e.groupName}: ${e.optionLabel}`)
+      .join(" · ");
+    return computeVariantPrice(basePrice, variants, label);
+  }, [basePrice, variants, selectedEntries]);
 
   const handleSelect = useCallback(
     (groupName: string, optionLabel: string) => {
@@ -293,7 +297,11 @@ export default function VariantSelector({
                     ) : (
                       option.label
                     )}
-                    {option.price_adj && option.price_adj !== 0 ? (
+                    {typeof option.price === "number" && option.price !== basePrice ? (
+                      <span className="ml-1 text-[0.6rem] opacity-70">
+                        Rs. {option.price}
+                      </span>
+                    ) : option.price_adj && option.price_adj !== 0 ? (
                       <span className="ml-1 text-[0.6rem] opacity-70">
                         {option.price_adj > 0 ? "+" : ""}Rs. {option.price_adj}
                       </span>
