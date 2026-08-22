@@ -19,13 +19,18 @@ import {
   type DineTableLookup,
 } from "@/services/dineInService";
 import DineInOrderTracker from "@/components/DineInOrderTracker";
+import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { formatRupees } from "@/lib/formatters";
 import { getSafeImageUrl } from "@/services/storageService";
-import type { Product, SubCategory } from "@/types";
+import type { Product, SubCategory, VariantGroup } from "@/types";
 
 interface CartLine {
   qty: number;
   notes?: string;
+  /** Human-readable selected options, e.g. "Size: Large · Spice: Extra Spicy" */
+  variantLabel?: string;
+  /** Unit price including variant adjustments. */
+  unitPrice?: number;
 }
 
 /* ─── Icons ─────────────────────────────────────────────────────────────────── */
@@ -96,6 +101,11 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
+  // Variant selection sheet state.
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
+  const [variantSelection, setVariantSelection] = useState<SelectedVariant[]>([]);
+  const [variantQty, setVariantQty] = useState(1);
+
   useEffect(() => {
     let cancelled = false;
     // Fresh table scan → clear any state from a previous table's order.
@@ -111,6 +121,9 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
     setPlaceError(null);
     setPlacedOrderId(null);
     setImgErrors({});
+    setVariantProduct(null);
+    setVariantSelection([]);
+    setVariantQty(1);
     (async () => {
       const res = await lookupTableByToken(token);
       if (cancelled) return;
@@ -148,12 +161,21 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
     };
   }, [token]);
 
+  /** Total qty in cart for a product (all variant lines combined). */
+  function productQty(productId: string): number {
+    return Object.entries(cart).reduce((sum, [key, line]) => {
+      return key === productId || key.startsWith(`${productId}::`) ? sum + line.qty : sum;
+    }, 0);
+  }
+
   const cartCount = useMemo(() => Object.values(cart).reduce((n, l) => n + l.qty, 0), [cart]);
   const cartTotal = useMemo(
     () =>
-      Object.entries(cart).reduce((sum, [id, line]) => {
+      Object.entries(cart).reduce((sum, [key, line]) => {
+        const id = key.split("::")[0]!;
         const p = products.find((x) => x.id === id);
-        return sum + (p?.price ?? 0) * line.qty;
+        const unit = line.unitPrice ?? p?.price ?? 0;
+        return sum + unit * line.qty;
       }, 0),
     [cart, products],
   );
@@ -193,6 +215,63 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
     });
   }
 
+  /** Add to cart, opening the variant sheet first when the product has options. */
+  function handleAdd(product: Product) {
+    const groups: VariantGroup[] = (product.variants as VariantGroup[] | null) ?? [];
+    if (groups.length > 0) {
+      setVariantSelection([]);
+      setVariantQty(1);
+      setVariantProduct(product);
+    } else {
+      bump(product.id, 1);
+    }
+  }
+
+  /** Unit price incl. selected variant adjustments. */
+  function unitPriceFor(product: Product, selection: SelectedVariant[]): number {
+    const base = product.price ?? 0;
+    return base + selection.reduce((sum, s) => sum + (s.priceAdj ?? 0), 0);
+  }
+
+  /** Build a human-readable variant label from the selection. */
+  function variantLabelFor(selection: SelectedVariant[]): string {
+    return selection.map((s) => `${s.groupName}: ${s.optionLabel}`).join(" · ");
+  }
+
+  /** Confirm the variant sheet — add the line to cart. */
+  function confirmVariantAdd() {
+    if (!variantProduct) return;
+    const groups: VariantGroup[] = (variantProduct.variants as VariantGroup[] | null) ?? [];
+    // Require a selection in every group so the order is unambiguous.
+    const missing = groups.filter((g) => !variantSelection.some((s) => s.groupName === g.name));
+    if (missing.length > 0) {
+      setPlaceError(`Please choose: ${missing.map((g) => g.name).join(", ")}.`);
+      return;
+    }
+    const label = variantLabelFor(variantSelection);
+    const unit = unitPriceFor(variantProduct, variantSelection);
+    const id = variantProduct.id;
+    setCart((prev) => {
+      const next = { ...prev };
+      const existing = next[id];
+      if (existing) {
+        // Merge same product + same options into one line; otherwise keep separate lines.
+        if (existing.variantLabel === label) {
+          next[id] = { ...existing, qty: existing.qty + variantQty };
+          return next;
+        }
+      }
+      next[`${id}::${label || "plain"}`] = {
+        qty: variantQty,
+        variantLabel: label,
+        unitPrice: unit,
+      };
+      return next;
+    });
+    setVariantProduct(null);
+    setPlaceError(null);
+  }
+
   async function submitOrder() {
     if (!table) return;
     if (!table.shop_is_live) {
@@ -203,13 +282,15 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
       setPlaceError("Please enter your name so the kitchen knows who ordered.");
       return;
     }
-    const items = Object.entries(cart).map(([productId, line]) => {
-      const p = products.find((x) => x.id === productId)!;
+    const items = Object.entries(cart).map(([key, line]) => {
+      const id = key.split("::")[0]!;
+      const p = products.find((x) => x.id === id)!;
       return {
-        productId,
+        productId: id,
         name: p.name,
-        price: p.price,
+        price: line.unitPrice ?? p.price,
         quantity: line.qty,
+        variant: line.variantLabel,
         notes: line.notes?.trim() || undefined,
       };
     });
@@ -355,7 +436,8 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
             </h2>
             <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-100 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
               {items.map((p) => {
-                const qty = cart[p.id]?.qty ?? 0;
+                const qty = productQty(p.id);
+                const hasVariants = ((p.variants as VariantGroup[] | null) ?? []).length > 0;
                 const showImg = p.image_url && !imgErrors[p.id];
                 return (
                   <div key={p.id} className="flex items-center gap-3 px-3 py-3">
@@ -384,12 +466,17 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                       ) : null}
                       <p className="mt-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">
                         {formatRupees(p.price)}
+                        {hasVariants ? (
+                          <span className="ml-1 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+                            · options
+                          </span>
+                        ) : null}
                       </p>
                     </div>
                     {qty === 0 ? (
                       <button
                         type="button"
-                        onClick={() => bump(p.id, 1)}
+                        onClick={() => handleAdd(p)}
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-600 text-emerald-600 transition hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                         aria-label={`Add ${p.name}`}
                       >
@@ -397,11 +484,34 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                       </button>
                     ) : (
                       <div className="flex shrink-0 items-center gap-2 rounded-full bg-emerald-600 px-1.5 py-1 text-white">
-                        <button type="button" onClick={() => bump(p.id, -1)} className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-emerald-700" aria-label={`Remove ${p.name}`}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (hasVariants) {
+                              // For variants, clear all lines of this product.
+                              setCart((prev) => {
+                                const next = { ...prev };
+                                for (const key of Object.keys(next)) {
+                                  if (key === p.id || key.startsWith(`${p.id}::`)) delete next[key];
+                                }
+                                return next;
+                              });
+                            } else {
+                              bump(p.id, -1);
+                            }
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-emerald-700"
+                          aria-label={`Remove ${p.name}`}
+                        >
                           <MinusIcon />
                         </button>
                         <span className="w-5 text-center text-sm font-bold">{qty}</span>
-                        <button type="button" onClick={() => bump(p.id, 1)} className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-emerald-700" aria-label={`Add more ${p.name}`}>
+                        <button
+                          type="button"
+                          onClick={() => handleAdd(p)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-emerald-700"
+                          aria-label={`Add more ${p.name}`}
+                        >
                           <PlusIcon />
                         </button>
                       </div>
@@ -416,12 +526,12 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
 
       {/* Cart bar — always shows once items are added */}
       {cartCount > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-100 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-100 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
           <div className="mx-auto flex max-w-md items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
               <CartIcon />
             </div>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {cartCount} item{cartCount > 1 ? "s" : ""}
               </p>
@@ -432,9 +542,83 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
             <button
               type="button"
               onClick={() => setCheckoutOpen(true)}
-              className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+              className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
             >
               Review order
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Variant selection sheet */}
+      {variantProduct && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setVariantProduct(null)}>
+          <div
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 dark:bg-[color:var(--tm-surface)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  {variantProduct.name}
+                </h3>
+                <p className="mt-0.5 text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  {formatRupees(unitPriceFor(variantProduct, variantSelection))}
+                  {variantSelection.some((s) => s.priceAdj !== 0) ? (
+                    <span className="ml-1 text-[10px] font-medium text-zinc-400">
+                      (incl. options)
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+              <button type="button" onClick={() => setVariantProduct(null)} className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Close">
+                <XIcon />
+              </button>
+            </div>
+
+            <VariantSelector
+              variants={(variantProduct.variants as VariantGroup[] | null) ?? []}
+              basePrice={variantProduct.price ?? 0}
+              compact
+              onSelectionChange={setVariantSelection}
+            />
+
+            {/* Quantity */}
+            <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4 dark:border-zinc-800">
+              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Quantity</span>
+              <div className="flex items-center gap-2 rounded-full bg-zinc-100 px-1.5 py-1 dark:bg-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setVariantQty((q) => Math.max(1, q - 1))}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-700 hover:bg-white dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  aria-label="Decrease quantity"
+                >
+                  <MinusIcon />
+                </button>
+                <span className="w-6 text-center text-sm font-bold text-zinc-900 dark:text-zinc-100">{variantQty}</span>
+                <button
+                  type="button"
+                  onClick={() => setVariantQty((q) => Math.min(20, q + 1))}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-700 hover:bg-white dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  aria-label="Increase quantity"
+                >
+                  <PlusIcon />
+                </button>
+              </div>
+            </div>
+
+            {placeError && (
+              <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                {placeError}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={confirmVariantAdd}
+              className="mt-4 w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-95"
+            >
+              Add to order · {formatRupees(unitPriceFor(variantProduct, variantSelection) * variantQty)}
             </button>
           </div>
         </div>
@@ -458,11 +642,13 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
 
             {/* Items */}
             <div className="mb-4 divide-y divide-zinc-100 rounded-xl border border-zinc-100 dark:divide-zinc-800 dark:border-zinc-800">
-              {Object.entries(cart).map(([id, line]) => {
+              {Object.entries(cart).map(([key, line]) => {
+                const id = key.split("::")[0]!;
                 const p = products.find((x) => x.id === id);
                 if (!p) return null;
+                const unit = line.unitPrice ?? p.price;
                 return (
-                  <div key={id} className="flex items-center gap-3 px-3 py-2.5">
+                  <div key={key} className="flex items-center gap-3 px-3 py-2.5">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
                       {p.image_url && !imgErrors[id] ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -477,6 +663,11 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                       <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {p.name} <span className="text-zinc-400">× {line.qty}</span>
                       </p>
+                      {line.variantLabel ? (
+                        <p className="truncate text-xs text-emerald-600 dark:text-emerald-400">
+                          {line.variantLabel}
+                        </p>
+                      ) : null}
                       {line.notes ? (
                         <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                           Note: {line.notes}
@@ -484,7 +675,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                       ) : null}
                     </div>
                     <p className="shrink-0 text-sm font-bold text-zinc-800 dark:text-zinc-200">
-                      {formatRupees(p.price * line.qty)}
+                      {formatRupees(unit * line.qty)}
                     </p>
                   </div>
                 );

@@ -188,7 +188,15 @@ export default function BottomNav() {
 
   const isMerchant = role === "merchant" || role === "admin" || !!merchantShop;
   // The admin console has its own layout — never render storefront chrome there.
-  if (pathname === "/offline" || pathname.startsWith("/admin")) return null;
+  // The QR dine-in scan page (/t/...) and table tracker are standalone flows —
+  // the global storefront nav would just cover the order bar / confuse the diner.
+  if (
+    pathname === "/offline" ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/t/")
+  ) {
+    return null;
+  }
   const accountHref = session === false
     ? "/login"
     : role === "admin"
