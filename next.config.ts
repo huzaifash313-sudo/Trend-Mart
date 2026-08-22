@@ -83,6 +83,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      // Seed/demo data uses TheMealDB food photography.
+      {
+        protocol: "https",
+        hostname: "**.themealdb.com",
+      },
     ],
     // Aggressive caching for optimized images
     formats: ["image/avif", "image/webp"],
