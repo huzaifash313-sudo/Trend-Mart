@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -141,7 +141,17 @@ export default function Navbar() {
 
           <Link href="/" className="tm-navbar-brand" aria-label="TrendMart home">
             <BrandMark />
-            <span className="tm-navbar-wordmark">TrendMart</span>
+            <span className="tm-navbar-wordmark">
+              {"TrendMart".split("").map((ch, i) => (
+                <span
+                  key={i}
+                  className="tm-navbar-wordmark-letter"
+                  style={{ "--letter-i": i } as CSSProperties}
+                >
+                  {ch}
+                </span>
+              ))}
+            </span>
           </Link>
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5">

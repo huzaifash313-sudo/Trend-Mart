@@ -801,6 +801,37 @@ html.dark .trend-card:hover {
   }
 }
 
+@keyframes tm-navbar-line-draw {
+  0% {
+    stroke-dashoffset: 420;
+    opacity: 0.35;
+  }
+  35% {
+    stroke-dashoffset: 0;
+    opacity: 0.95;
+  }
+  70% {
+    stroke-dashoffset: 0;
+    opacity: 0.85;
+  }
+  100% {
+    stroke-dashoffset: -40;
+    opacity: 0.55;
+  }
+}
+
+@keyframes tm-navbar-arrow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(3px);
+  }
+}
+
 .tm-navbar-wrap {
   position: fixed;
   top: 0;
@@ -901,11 +932,15 @@ html.dark .trend-card:hover {
 .tm-navbar-trend-line {
   stroke-dasharray: 420;
   stroke-dashoffset: 0;
-  opacity: 0.6;
+  opacity: 0.95;
+  animation: tm-navbar-line-draw 7.5s ease-in-out infinite;
 }
 
 .tm-navbar-trend-arrow {
-  opacity: 0.5;
+  opacity: 0.55;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tm-navbar-arrow-pulse 3.2s ease-in-out infinite;
 }
 
 .tm-navbar-inner {
@@ -975,13 +1010,41 @@ html.dark .trend-card:hover {
   flex-shrink: 0;
 }
 .tm-navbar-wordmark {
+  display: inline-flex;
+  align-items: baseline;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  /* Clean, professional: solid white text with a subtle depth shadow. */
+}
+
+/* Premium letter wave — each letter lights up green/seagreen one-by-one,
+   then the tail cleans back to white (chase effect). */
+.tm-navbar-wordmark-letter {
+  display: inline-block;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  animation: tm-letter-chase 4.2s ease-in-out infinite;
+  animation-delay: calc(var(--letter-i, 0) * 0.22s);
+}
+
+@keyframes tm-letter-chase {
+  0%,
+  100% {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  }
+  35% {
+    color: #6ee7b7;
+    text-shadow: 0 0 12px rgba(110, 231, 183, 0.55);
+  }
+  55% {
+    color: #34d399;
+    text-shadow: 0 0 16px rgba(52, 211, 153, 0.6);
+  }
+  78% {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  }
 }
 
 /* Logo plate — subtle lift on brand hover, no rotation */
@@ -1069,7 +1132,8 @@ html.dark .trend-card:hover {
   .tm-navbar-bg-shift,
   .tm-navbar-soft-glow,
   .tm-navbar-trend-line,
-  .tm-navbar-trend-arrow {
+  .tm-navbar-trend-arrow,
+  .tm-navbar-wordmark-letter {
     animation: none !important;
     transition: none !important;
   }
