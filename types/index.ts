@@ -170,6 +170,64 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   Cancelled: "Cancelled",
 };
 
+// ─── Dine-In Ordering (Phase 1) ──────────────────────────────────────────────
+/** How an order is fulfilled. Default is 'delivery' (marketplace/WhatsApp flow). */
+export type OrderType = "delivery" | "pickup" | "dine_in";
+
+/**
+ * Dine-in lifecycle (stored in orders.dine_status). Separate from the legacy
+ * `status` column so the marketplace flow (Pending → Processing → Dispatched →
+ * Delivered) stays untouched. The kitchen board drives dine-in only.
+ */
+export type DineStatus = "Pending" | "Preparing" | "Ready" | "Served" | "Cancelled";
+
+export const DINE_STATUS_FLOW: Record<DineStatus, DineStatus[]> = {
+  Pending: ["Preparing", "Cancelled"],
+  Preparing: ["Ready", "Cancelled"],
+  Ready: ["Served", "Cancelled"],
+  Served: [],
+  Cancelled: [],
+};
+
+export const DINE_STATUS_LABELS: Record<DineStatus, string> = {
+  Pending: "New",
+  Preparing: "Preparing",
+  Ready: "Ready",
+  Served: "Served",
+  Cancelled: "Cancelled",
+};
+
+export function isValidDineTransition(current: DineStatus, next: DineStatus): boolean {
+  return DINE_STATUS_FLOW[current]?.includes(next) ?? false;
+}
+
+/** Maps a dine-in status onto the legacy order status for shared dashboards. */
+export function dineStatusToLegacy(dine: DineStatus): OrderStatus {
+  switch (dine) {
+    case "Preparing":
+      return "Processing";
+    case "Ready":
+      return "Dispatched";
+    case "Served":
+      return "Delivered";
+    case "Cancelled":
+      return "Cancelled";
+    default:
+      return "Pending";
+  }
+}
+
+/** A QR table owned by a merchant shop (public.dine_in_tables). */
+export interface DineInTable {
+  id: string;
+  shop_id: string;
+  name: string;
+  qr_token: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export function isValidOrderTransition(
   current: OrderStatus,
   next: OrderStatus,
@@ -439,6 +497,16 @@ export interface Order {
   tracking_number?: string | null;
   /** Authenticated buyer, when the order was placed while signed in */
   customer_user_id?: string | null;
+  /** Optional customer/order-level notes (sanitized on the server). */
+  notes?: string;
+  /** Fulfilment mode — 'dine_in' for QR table orders. */
+  order_type?: OrderType;
+  /** Linked dine-in table (dine_in_tables.id) when order_type = 'dine_in'. */
+  table_id?: string | null;
+  /** Human table label stored on the order (e.g. "Table 3") for fast rendering. */
+  table_code?: string | null;
+  /** Dine-in lifecycle status (kitchen board). Null for delivery/pickup orders. */
+  dine_status?: DineStatus | null;
 }
 
 // ─── Merchant Analytics Summary (dashboard cards) ───────────────────────────

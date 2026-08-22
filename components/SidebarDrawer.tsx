@@ -605,6 +605,24 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                               <OrdersIcon /> Orders
                             </Link>
                           </li>
+                          <li>
+                            <Link
+                              href="/dashboard/kitchen"
+                              onClick={onClose}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                            >
+                              <span aria-hidden="true">🍳</span> Kitchen Board
+                            </Link>
+                          </li>
+                          <li>
+                            <Link
+                              href="/dashboard/tables"
+                              onClick={onClose}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                            >
+                              <span aria-hidden="true">🪑</span> QR Tables
+                            </Link>
+                          </li>
                           {merchantShopId ? (
                             <li>
                               <Link
