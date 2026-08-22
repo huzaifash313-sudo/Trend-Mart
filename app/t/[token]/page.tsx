@@ -20,6 +20,7 @@ import {
 } from "@/services/dineInService";
 import DineInOrderTracker from "@/components/DineInOrderTracker";
 import { formatRupees } from "@/lib/formatters";
+import { getSafeImageUrl } from "@/services/storageService";
 import type { Product, SubCategory } from "@/types";
 
 interface CartLine {
@@ -93,9 +94,23 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
+  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
+    // Fresh table scan → clear any state from a previous table's order.
+    setTable(null);
+    setLoadError(null);
+    setLoading(true);
+    setProducts([]);
+    setSubCategories([]);
+    setQuery("");
+    setCart({});
+    setCheckoutOpen(false);
+    setPlacing(false);
+    setPlaceError(null);
+    setPlacedOrderId(null);
+    setImgErrors({});
     (async () => {
       const res = await lookupTableByToken(token);
       if (cancelled) return;
@@ -180,6 +195,10 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
 
   async function submitOrder() {
     if (!table) return;
+    if (!table.shop_is_live) {
+      setPlaceError("This shop is currently offline and not taking orders.");
+      return;
+    }
     if (!name.trim()) {
       setPlaceError("Please enter your name so the kitchen knows who ordered.");
       return;
@@ -246,7 +265,14 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
       <div className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-[color:var(--tm-surface)]">
         <div className="mx-auto flex max-w-md flex-col gap-4">
           <DineInOrderTracker orderId={placedOrderId} tableToken={token} />
-          <div className="text-center">
+          <div className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPlacedOrderId(null)}
+              className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Order something else
+            </button>
             <Link
               href={`/orders/${placedOrderId}?table=${encodeURIComponent(token)}`}
               className="text-xs font-semibold text-emerald-600 underline"
@@ -330,14 +356,29 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
             <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-100 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
               {items.map((p) => {
                 const qty = cart[p.id]?.qty ?? 0;
+                const showImg = p.image_url && !imgErrors[p.id];
                 return (
-                  <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                  <div key={p.id} className="flex items-center gap-3 px-3 py-3">
+                    {showImg ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={getSafeImageUrl(p.image_url, "product")}
+                        alt={p.name}
+                        loading="lazy"
+                        className="h-16 w-16 shrink-0 rounded-xl object-cover"
+                        onError={() => setImgErrors((prev) => ({ ...prev, [p.id]: true }))}
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl font-bold text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400">
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                         {p.name}
                       </p>
                       {p.description ? (
-                        <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">
                           {p.description}
                         </p>
                       ) : null}
@@ -348,9 +389,8 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                     {qty === 0 ? (
                       <button
                         type="button"
-                        disabled={!table.shop_is_live}
                         onClick={() => bump(p.id, 1)}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-600 text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-300 dark:hover:bg-emerald-900/20"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-600 text-emerald-600 transition hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                         aria-label={`Add ${p.name}`}
                       >
                         <PlusIcon />
@@ -374,9 +414,9 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
         ))}
       </main>
 
-      {/* Cart bar */}
-      {cartCount > 0 && table.shop_is_live && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-100 bg-white p-3 dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
+      {/* Cart bar — always shows once items are added */}
+      {cartCount > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-100 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
           <div className="mx-auto flex max-w-md items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
               <CartIcon />
@@ -422,8 +462,18 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                 const p = products.find((x) => x.id === id);
                 if (!p) return null;
                 return (
-                  <div key={id} className="flex items-center justify-between gap-2 px-3 py-2.5">
-                    <div className="min-w-0">
+                  <div key={id} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                      {p.image_url && !imgErrors[id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={getSafeImageUrl(p.image_url, "product")} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          {p.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {p.name} <span className="text-zinc-400">× {line.qty}</span>
                       </p>
@@ -493,7 +543,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
               onClick={() => void submitOrder()}
               className="w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
             >
-              {placing ? "Sending order…" : `Send order • ${formatRupees(cartTotal)}`}
+              {placing ? "Sending order…" : `Order Now • ${formatRupees(cartTotal)}`}
             </button>
             <p className="mt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
               No sign-up needed. The kitchen confirms your order on this screen.

@@ -16,6 +16,7 @@ import { fetchMyShop } from "@/services/shopService";
 import { fetchKitchenOrders, updateDineStatus } from "@/services/dineInService";
 import { subscribeToOrders } from "@/lib/supabase/realtime";
 import { useToast } from "@/components/Toast";
+import { isDineInCategory } from "@/types";
 import type { DineStatus, Order, Shop } from "@/types";
 
 type BoardFilter = "active" | "all";
@@ -175,6 +176,30 @@ export default function KitchenBoardPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
         <p className="text-sm text-zinc-500">No store found.</p>
+      </div>
+    );
+  }
+
+  if (!isDineInCategory(shop.category)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 dark:bg-[color:var(--tm-surface)]">
+        <div className="max-w-sm rounded-2xl border border-zinc-100 bg-white p-6 text-center shadow-sm dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
+          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            Kitchen Board is for restaurants & cafes
+          </p>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            This feature is available for{" "}
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Fast Food & Restaurants</span> and{" "}
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Bakery & Sweets</span>{" "}
+            shops.
+          </p>
+          <Link
+            href="/dashboard/tables"
+            className="mt-4 inline-block text-xs font-semibold text-emerald-600 underline"
+          >
+            Back to dashboard
+          </Link>
+        </div>
       </div>
     );
   }

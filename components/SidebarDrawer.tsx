@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/services/authService";
-import { SHOP_CATEGORIES, CATEGORY_ICONS } from "@/types";
+import { SHOP_CATEGORIES, CATEGORY_ICONS, isDineInCategory } from "@/types";
 import PwaInstallTip from "@/components/PwaInstallTip";
 
 /* -------------------------------------------------------------------------- */
@@ -176,6 +176,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const [session, setSession] = useState(false);
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
+  const [merchantShopCategory, setMerchantShopCategory] = useState<string | null>(null);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [merchantExpanded, setMerchantExpanded] = useState(false);
 
@@ -204,10 +205,13 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             if (auth.user && !cancelled) {
               const { data: shop } = await supabase
                 .from("shops")
-                .select("id")
+                .select("id, category")
                 .eq("owner_id", auth.user.id)
                 .maybeSingle();
-              if (!cancelled) setMerchantShopId(shop?.id ?? null);
+              if (!cancelled) {
+                setMerchantShopId(shop?.id ?? null);
+                setMerchantShopCategory(typeof shop?.category === "string" ? shop.category : null);
+              }
             }
           } else if (!cancelled) {
             setMerchantShopId(null);
@@ -228,17 +232,22 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               if (auth.user && !cancelled) {
                 const { data: shop } = await supabase
                   .from("shops")
-                  .select("id")
+                  .select("id, category")
                   .eq("owner_id", auth.user.id)
                   .maybeSingle();
-                if (!cancelled) setMerchantShopId(shop?.id ?? null);
+                if (!cancelled) {
+                  setMerchantShopId(shop?.id ?? null);
+                  setMerchantShopCategory(typeof shop?.category === "string" ? shop.category : null);
+                }
               }
             } else {
               setMerchantShopId(null);
+              setMerchantShopCategory(null);
             }
           } else {
             setUserRole(null);
             setMerchantShopId(null);
+            setMerchantShopCategory(null);
           }
         });
 
@@ -605,24 +614,28 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                               <OrdersIcon /> Orders
                             </Link>
                           </li>
-                          <li>
-                            <Link
-                              href="/dashboard/kitchen"
-                              onClick={onClose}
-                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                            >
-                              <span aria-hidden="true">🍳</span> Kitchen Board
-                            </Link>
-                          </li>
-                          <li>
-                            <Link
-                              href="/dashboard/tables"
-                              onClick={onClose}
-                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-                            >
-                              <span aria-hidden="true">🪑</span> QR Tables
-                            </Link>
-                          </li>
+                          {isDineInCategory(merchantShopCategory) && (
+                            <>
+                              <li>
+                                <Link
+                                  href="/dashboard/kitchen"
+                                  onClick={onClose}
+                                  className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                                >
+                                  <span aria-hidden="true">🍳</span> Kitchen Board
+                                </Link>
+                              </li>
+                              <li>
+                                <Link
+                                  href="/dashboard/tables"
+                                  onClick={onClose}
+                                  className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                                >
+                                  <span aria-hidden="true">🪑</span> QR Tables
+                                </Link>
+                              </li>
+                            </>
+                          )}
                           {merchantShopId ? (
                             <li>
                               <Link

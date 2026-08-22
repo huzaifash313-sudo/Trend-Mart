@@ -21,6 +21,7 @@ import {
 } from "@/services/dineInService";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { isDineInCategory } from "@/types";
 import type { DineInTable, Shop } from "@/types";
 
 function PlusIcon() {
@@ -265,6 +266,30 @@ export default function MerchantTablesPage() {
     );
   }
 
+  if (!isDineInCategory(shop.category)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 dark:bg-[color:var(--tm-surface)]">
+        <div className="max-w-sm rounded-2xl border border-zinc-100 bg-white p-6 text-center shadow-sm dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
+          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            QR Table Ordering is for restaurants & cafes
+          </p>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            This feature is available for{" "}
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Fast Food & Restaurants</span> and{" "}
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Bakery & Sweets</span>{" "}
+            shops. Your store category is &ldquo;{shop.category}&rdquo;.
+          </p>
+          <Link
+            href="/dashboard/settings"
+            className="mt-4 inline-block text-xs font-semibold text-emerald-600 underline"
+          >
+            Open store settings
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <div className="mx-auto max-w-3xl px-4 py-6">
@@ -348,17 +373,20 @@ export default function MerchantTablesPage() {
                 key={table.id}
                 className="flex flex-col overflow-hidden rounded-2xl border border-zinc-100 bg-white dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]"
               >
-                <div className="relative flex items-center justify-center bg-zinc-50 py-4 dark:bg-zinc-900">
+                <div className="relative flex flex-col items-center justify-center bg-zinc-50 py-4 dark:bg-zinc-900">
                   {qrDataUrls[table.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={qrDataUrls[table.id]}
                       alt={`QR for ${table.name}`}
-                      className="h-28 w-28"
+                      className="h-24 w-24"
                     />
                   ) : (
-                    <div className="h-28 w-28 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+                    <div className="h-24 w-24 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
                   )}
+                  <p className="mt-1.5 max-w-[10rem] truncate px-2 text-[9px] text-zinc-400 dark:text-zinc-500" title={`${origin}/t/${table.qr_token}`}>
+                    /t/{table.qr_token.slice(0, 10)}…
+                  </p>
                   {!table.is_active && (
                     <span className="absolute left-2 top-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400">
                       Paused

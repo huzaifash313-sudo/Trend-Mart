@@ -606,6 +606,17 @@ export function isServiceCategory(category?: string): boolean {
   return category ? SERVICE_CATEGORIES.has(category) : false;
 }
 
+/** Food categories that should get the QR table dining feature. */
+export const DINE_IN_CATEGORIES: ReadonlySet<string> = new Set([
+  "Fast Food & Restaurants",
+  "Bakery & Sweets",
+]);
+
+/** Check if a shop category is eligible for QR table ordering. */
+export function isDineInCategory(category?: string | null): boolean {
+  return category ? DINE_IN_CATEGORIES.has(category) : false;
+}
+
 /** Professional icons for each shop category (used in sidebar, search, etc.) */
 export const CATEGORY_ICONS: Record<string, string> = {
   "Grocery & Kiryana": "🛒",

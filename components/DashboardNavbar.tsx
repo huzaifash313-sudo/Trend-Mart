@@ -12,6 +12,7 @@ import {
   subscribeToAlerts,
 } from "@/services/alertService";
 import { logError } from "@/services/errorService";
+import { isDineInCategory } from "@/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -96,6 +97,7 @@ export default function DashboardNavbar() {
   const router = useRouter();
 
   const [shopId, setShopId] = useState<string | null>(null);
+  const [shopCategory, setShopCategory] = useState<string | null>(null);
   const [alertCounts, setAlertCounts] = useState<AlertCounts>({ lowStock: 0, pendingOrders: 0, urgentInquiries: 0, total: 0 });
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -107,8 +109,11 @@ export default function DashboardNavbar() {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error || !user?.id || cancelled) return;
         setShopId(null);
-        const { data: shop } = await supabase.from("shops").select("id").eq("owner_id", user.id).maybeSingle();
-        if (!cancelled && shop?.id) setShopId(shop.id);
+        const { data: shop } = await supabase.from("shops").select("id, category").eq("owner_id", user.id).maybeSingle();
+        if (!cancelled && shop?.id) {
+          setShopId(shop.id);
+          setShopCategory(typeof shop.category === "string" ? shop.category : null);
+        }
       } catch (err) { logError(err, { module: "DashboardNavbar.resolveShop" }); }
       finally { if (!cancelled) setLoading(false); }
     }
@@ -165,6 +170,21 @@ export default function DashboardNavbar() {
           </Link>
         )}
 
+        {/* Dine-In ordering (restaurants/cafes only) */}
+        {!loading && shopId && isDineInCategory(shopCategory) && (
+          <Link
+            href="/dashboard/tables"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-50 sm:px-3 sm:text-sm dark:hover:bg-emerald-900/20"
+            aria-label="QR table ordering dashboard"
+          >
+            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+            </svg>
+            <span className="hidden sm:inline">Dine-In</span>
+            <span className="sm:hidden">Dine</span>
+          </Link>
+        )}
+
         {/* Alert Bell */}
         {!loading && shopId && (
           <div className="relative">
@@ -186,8 +206,12 @@ export default function DashboardNavbar() {
         <nav className="hidden md:flex items-center gap-1" aria-label="Dashboard navigation">
           <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Overview</Link>
           <Link href="/dashboard/orders" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Orders</Link>
-          <Link href="/dashboard/kitchen" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Kitchen</Link>
-          <Link href="/dashboard/tables" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Tables</Link>
+          {isDineInCategory(shopCategory) && (
+            <>
+              <Link href="/dashboard/kitchen" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Kitchen</Link>
+              <Link href="/dashboard/tables" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Tables</Link>
+            </>
+          )}
           <Link href="/dashboard/products" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Products</Link>
           <Link href="/dashboard/inquiries" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Inquiries</Link>
           <Link href="/dashboard/settings" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Settings</Link>
