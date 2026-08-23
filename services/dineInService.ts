@@ -91,6 +91,8 @@ export interface PlaceDineInOrderParams {
   customerPhone?: string;
   items: DineInOrderLine[];
   notes?: string;
+  /** "staff" = placed by the merchant from the kitchen (skips cooldown). */
+  source?: "staff";
 }
 
 export interface DineInPlacedOrder {
@@ -112,7 +114,7 @@ export async function placeDineInOrder(
     const res = await fetch("/api/dinein/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
+      body: JSON.stringify({ ...params, ...(params.source ? { source: params.source } : {}) }),
     });
     const json = (await res.json()) as {
       success?: boolean;
@@ -180,6 +182,36 @@ export async function fetchKitchenOrders(
     return { success: true, data: ((data as Record<string, unknown>[]) ?? []).map(parseOrder) };
   } catch (err) {
     logError(err, { module: "dineInService.fetchKitchenOrders", meta: { shopId } });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/** Today's dine-in stats for a shop (orders placed + revenue, minus cancelled). */
+export async function fetchTodayDineStats(
+  shopId: string,
+): Promise<ServiceResult<{ orders: number; revenue: number }>> {
+  const supabase = createClient();
+  try {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const { data, error } = await supabase
+      .from("orders")
+      .select("total_amount, dine_status")
+      .eq("shop_id", shopId)
+      .eq("order_type", "dine_in")
+      .gte("created_at", start.toISOString());
+    if (error) throw error;
+    const rows = (data as { total_amount: number; dine_status: string | null }[]) ?? [];
+    const active = rows.filter((r) => r.dine_status !== "Cancelled");
+    return {
+      success: true,
+      data: {
+        orders: active.length,
+        revenue: active.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0),
+      },
+    };
+  } catch (err) {
+    logError(err, { module: "dineInService.fetchTodayDineStats", meta: { shopId } });
     return { success: false, error: toError(err) };
   }
 }

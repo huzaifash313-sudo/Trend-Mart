@@ -18,6 +18,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/sanitization";
 import { sendPushToUser } from "@/lib/webPush";
 import { computeVariantPrice } from "@/lib/variantPricing";
+import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { normalizeDinePhone } from "@/services/dineInService";
 import type { OrderItem, VariantGroup } from "@/types";
 
@@ -40,6 +41,8 @@ interface DineOrderBody {
   items?: DineItemInput[] | null;
   notes?: string | null;
   idempotencyKey?: string | null;
+  /** "staff" = placed by the merchant (kitchen manual order) — skips cooldown. */
+  source?: string | null;
 }
 
 function toNumber(v: unknown, fallback = 0): number {
@@ -87,13 +90,14 @@ export async function POST(request: Request) {
   const customerName = sanitizeText(body.customerName, 100);
   const customerPhone = normalizeDinePhone(sanitizeText(body.customerPhone, 30));
   const notes = sanitizeText(body.notes, 500);
+  const isStaff = body.source === "staff";
   const idempotencyKey =
     typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim().slice(0, 100) : "";
 
   if (!tableToken) {
     return NextResponse.json({ success: false, error: "Table not found. Rescan the QR code." }, { status: 404 });
   }
-  if (customerName.length < 1) {
+  if (customerName.length < 1 && !isStaff) {
     return NextResponse.json({ success: false, error: "Please enter your name." }, { status: 400 });
   }
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -147,12 +151,20 @@ export async function POST(request: Request) {
   }
 
   const ids = [...new Set(lines.map((l) => l.productId))];
-  const { data: productRes } = await admin
-    .from("products")
-    .select("id, shop_id, name, price, is_available, variants")
-    .in("id", ids);
+  const [productRes, dealRes] = await Promise.all([
+    admin
+      .from("products")
+      .select("id, shop_id, name, price, is_available, variants")
+      .in("id", ids),
+    admin
+      .from("shop_deals")
+      .select(
+        "id, shop_id, title, price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month",
+      )
+      .in("id", ids),
+  ]);
   const productMap = new Map<string, { shop_id: string; name: string; price: number | null; is_available: boolean; variants: VariantGroup[] }>();
-  for (const row of (productRes ?? []) as Record<string, unknown>[]) {
+  for (const row of (productRes?.data ?? []) as Record<string, unknown>[]) {
     productMap.set(String(row.id), {
       shop_id: String(row.shop_id ?? ""),
       name: String(row.name ?? ""),
@@ -161,11 +173,47 @@ export async function POST(request: Request) {
       variants: (row.variants as VariantGroup[]) ?? [],
     });
   }
+  const dealMap = new Map<string, { title: string; price: number }>();
+  for (const row of (dealRes?.data ?? []) as Record<string, unknown>[]) {
+    const deal: ShopDeal = {
+      id: String(row.id),
+      shop_id: String(row.shop_id ?? ""),
+      title: String(row.title ?? "Deal"),
+      description: null,
+      schedule_type:
+        String(row.schedule_type ?? "weekly") === "date_range" ||
+        String(row.schedule_type ?? "weekly") === "monthly"
+          ? (String(row.schedule_type) as ShopDeal["schedule_type"])
+          : "weekly",
+      weekdays: Array.isArray(row.weekdays) ? (row.weekdays as number[]) : null,
+      starts_on: row.starts_on ? String(row.starts_on) : null,
+      ends_on: row.ends_on ? String(row.ends_on) : null,
+      day_of_month: row.day_of_month != null ? Number(row.day_of_month) : null,
+      is_active: row.is_active !== false,
+      created_at: "",
+    };
+    if (deal.is_active && isDealOrderableToday(deal)) {
+      const price = toMoney(row.price);
+      if (price != null && price > 0) dealMap.set(deal.id, { title: deal.title, price });
+    }
+  }
 
   const resolvedItems: Array<{ productId: string; name: string; price: number; quantity: number; variant?: string; notes?: string }> = [];
   for (const line of lines) {
     const product = productMap.get(line.productId);
     if (!product) {
+      const deal = dealMap.get(line.productId);
+      if (deal) {
+        resolvedItems.push({
+          productId: line.productId,
+          name: deal.title,
+          price: deal.price,
+          quantity: line.quantity,
+          variant: line.variant,
+          notes: line.notes,
+        });
+        continue;
+      }
       return NextResponse.json({ success: false, error: "One or more items are no longer available." }, { status: 409 });
     }
     if (product.shop_id !== shop.id) {
@@ -196,21 +244,24 @@ export async function POST(request: Request) {
   const total = Math.round(resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0) * 100) / 100;
 
   // 3. Per-table cooldown — stop a stray/spam scanner from flooding the kitchen.
+  //    Staff (kitchen manual orders) are exempt — they legitimately place back-to-back.
   const COOLDOWN_MS = 15000;
-  const { data: recentRaw } = await admin
-    .from("orders")
-    .select("id, created_at")
-    .eq("table_id", table.id)
-    .eq("order_type", "dine_in")
-    .gte("created_at", new Date(Date.now() - COOLDOWN_MS).toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const recent = (recentRaw as { id: string; created_at: string }[] | null)?.[0];
-  if (recent) {
-    return NextResponse.json(
-      { success: false, error: "Order received — please wait a moment before sending another." },
-      { status: 409 },
-    );
+  if (!isStaff) {
+    const { data: recentRaw } = await admin
+      .from("orders")
+      .select("id, created_at")
+      .eq("table_id", table.id)
+      .eq("order_type", "dine_in")
+      .gte("created_at", new Date(Date.now() - COOLDOWN_MS).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const recent = (recentRaw as { id: string; created_at: string }[] | null)?.[0];
+    if (recent) {
+      return NextResponse.json(
+        { success: false, error: "Order received — please wait a moment before sending another." },
+        { status: 409 },
+      );
+    }
   }
 
   // 4. Idempotency — same checkout token never creates a duplicate.
@@ -248,6 +299,8 @@ export async function POST(request: Request) {
     ...(i.notes ? { notes: i.notes } : {}),
   }));
 
+  const displayName = customerName.trim() || "Walk-in";
+
   const orderPayload: Record<string, unknown> = {
     shop_id: shop.id,
     table_id: table.id,
@@ -255,7 +308,7 @@ export async function POST(request: Request) {
     order_type: "dine_in",
     dine_status: "Pending",
     status: "Pending",
-    customer_name: customerName,
+    customer_name: displayName,
     customer_phone: customerPhone,
     items_json: orderItems,
     total_amount: total,
@@ -290,7 +343,7 @@ export async function POST(request: Request) {
       order_type: "dine_in",
       dine_status: "Pending",
       status: "Pending",
-      customer_name: customerName,
+      customer_name: displayName,
       customer_phone: customerPhone,
       items_json: orderItems,
       total_amount: total,

@@ -20,9 +20,18 @@ import {
 } from "@/services/dineInService";
 import DineInOrderTracker from "@/components/DineInOrderTracker";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
-import { formatRupees } from "@/lib/formatters";
+import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { computeVariantPrice, variantPriceRange } from "@/lib/variantPricing";
 import { getSafeImageUrl } from "@/services/storageService";
+import { fetchDealsByShopId } from "@/services/dealService";
+import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
+import { trackDineOrder } from "@/services/dineInService";
+import {
+  getRecentDineOrders,
+  saveRecentDineOrder,
+  removeRecentDineOrder,
+  type RecentDineOrder,
+} from "@/lib/recentDineOrders";
 import type { Product, SubCategory, VariantGroup } from "@/types";
 
 interface CartLine {
@@ -32,6 +41,10 @@ interface CartLine {
   variantLabel?: string;
   /** Unit price including variant adjustments. */
   unitPrice?: number;
+  /** Snapshot name (products + deals both live in the cart). */
+  name: string;
+  /** True when the line is a standalone shop deal (shop_deals row). */
+  isDeal?: boolean;
 }
 
 /* ─── Icons ─────────────────────────────────────────────────────────────────── */
@@ -101,6 +114,8 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
+  const [deals, setDeals] = useState<ShopDeal[]>([]);
+  const [recentOrders, setRecentOrders] = useState<RecentDineOrder[]>([]);
 
   // Variant selection sheet state.
   const [variantProduct, setVariantProduct] = useState<Product | null>(null);
@@ -141,7 +156,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
       setTable(res.data);
       setLoading(false);
 
-      const [prodRes, subRes] = await Promise.all([
+      const [prodRes, subRes, dealRes] = await Promise.all([
         fetchProductsByShopId(res.data.shop_id),
         createClient()
           .from("sub_categories")
@@ -149,6 +164,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
           .eq("is_active", true)
           .order("sort_order", { ascending: true })
           .then(({ data }) => data as SubCategory[] | null),
+        fetchDealsByShopId(res.data.shop_id),
       ]);
       if (cancelled) return;
       if (prodRes.success) {
@@ -156,6 +172,23 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
         setProducts(available);
       }
       setSubCategories(subRes ?? []);
+      if (dealRes.success) {
+        setDeals(dealRes.data.filter((d) => isDealOrderableToday(d)));
+      }
+
+      // Order recovery: this phone previously ordered at this table → let them
+      // jump straight back to live tracking.
+      const mine = getRecentDineOrders().filter((o) => o.tableToken === token);
+      if (mine.length > 0) {
+        const active: RecentDineOrder[] = [];
+        for (const rec of mine) {
+          const tracked = await trackDineOrder(rec.orderId, token);
+          const st = tracked.success ? tracked.data?.dine_status : "Served";
+          if (st && st !== "Served" && st !== "Cancelled") active.push(rec);
+          else removeRecentDineOrder(rec.orderId);
+        }
+        if (!cancelled) setRecentOrders(active);
+      }
     })();
     return () => {
       cancelled = true;
@@ -205,14 +238,28 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
     });
   }, [filtered]);
 
-  function bump(productId: string, delta: number) {
+  function bump(productId: string, delta: number, name?: string) {
     setCart((prev) => {
       const next = { ...prev };
       const current = next[productId]?.qty ?? 0;
       const qty = current + delta;
       if (qty <= 0) delete next[productId];
-      else next[productId] = { ...next[productId], qty };
+      else next[productId] = { ...next[productId], qty, ...(name ? { name } : {}) };
       return next;
+    });
+  }
+
+  /** Add a standalone deal line to the cart. */
+  function addDeal(deal: ShopDeal) {
+    setCart((prev) => {
+      const key = `${deal.id}::deal`;
+      const existing = prev[key];
+      return {
+        ...prev,
+        [key]: existing
+          ? { ...existing, qty: existing.qty + 1 }
+          : { qty: 1, unitPrice: deal.price ?? 0, name: deal.title, isDeal: true },
+      };
     });
   }
 
@@ -224,7 +271,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
       setVariantQty(1);
       setVariantProduct(product);
     } else {
-      bump(product.id, 1);
+      bump(product.id, 1, product.name);
     }
   }
 
@@ -269,6 +316,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
         qty: variantQty,
         variantLabel: label,
         unitPrice: unit,
+        name: variantProduct.name,
       };
       return next;
     });
@@ -288,11 +336,11 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
     }
     const items = Object.entries(cart).map(([key, line]) => {
       const id = key.split("::")[0]!;
-      const p = products.find((x) => x.id === id)!;
+      const p = products.find((x) => x.id === id);
       return {
         productId: id,
-        name: p.name,
-        price: line.unitPrice ?? p.price,
+        name: line.name || p?.name || "Item",
+        price: line.unitPrice ?? p?.price ?? 0,
         quantity: line.qty,
         variant: line.variantLabel,
         notes: line.notes?.trim() || undefined,
@@ -310,9 +358,17 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
     setPlacing(false);
     if (res.success) {
       setPlacedOrderId(res.data.id);
+      saveRecentDineOrder({
+        orderId: res.data.id,
+        tableToken: token,
+        tableName: table.table_name,
+        shopName: table.shop_name,
+        createdAt: Date.now(),
+      });
       setCheckoutOpen(false);
       setCart({});
       setNotes("");
+      setRecentOrders([]);
     } else {
       setPlaceError(res.error);
     }
@@ -426,6 +482,100 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
 
       {/* Menu sections */}
       <main className="mx-auto max-w-md px-4 pt-4">
+        {/* Order recovery — active orders from this phone/table */}
+        {recentOrders.length > 0 && (
+          <div className="mb-4 space-y-2">
+            {recentOrders.map((rec) => (
+              <div
+                key={rec.orderId}
+                className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-900/10"
+              >
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                    Active order — {rec.tableName}
+                  </p>
+                  <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {rec.shopName} · Track your order live
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPlacedOrderId(rec.orderId)}
+                  className="shrink-0 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                >
+                  Track
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Today's deals */}
+        {deals.length > 0 && (
+          <section className="mb-5">
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Today&apos;s Deals
+            </h2>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {deals.map((deal) => {
+                const key = `${deal.id}::deal`;
+                const qty = cart[key]?.qty ?? 0;
+                return (
+                  <div
+                    key={deal.id}
+                    className="flex w-36 shrink-0 flex-col overflow-hidden rounded-2xl border border-zinc-100 bg-white dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]"
+                  >
+                    {deal.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={getSafeImageUrl(deal.image_url, "product")}
+                        alt={deal.title}
+                        className="h-24 w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-24 w-full items-center justify-center bg-emerald-50 text-2xl dark:bg-emerald-900/20">
+                        🏷️
+                      </div>
+                    )}
+                    <div className="flex flex-1 flex-col p-2.5">
+                      <p className="line-clamp-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                        {deal.title}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatRupees(deal.price ?? 0)}
+                      </p>
+                      {qty === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => addDeal(deal)}
+                          className="mt-2 flex h-8 w-full items-center justify-center rounded-lg bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
+                        >
+                          Add
+                        </button>
+                      ) : (
+                        <div className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-emerald-600 py-1 text-white">
+                          <button type="button" onClick={() => bump(key, -1, deal.title)} className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-emerald-700" aria-label="Remove deal">
+                            <MinusIcon />
+                          </button>
+                          <span className="text-sm font-bold">{qty}</span>
+                          <button type="button" onClick={() => bump(key, 1, deal.title)} className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-emerald-700" aria-label="Add deal">
+                            <PlusIcon />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {grouped.length === 0 && (
           <p className="py-16 text-center text-sm text-zinc-400 dark:text-zinc-500">
             {query ? "Nothing matches your search." : "The menu is empty right now."}
@@ -460,28 +610,42 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {p.name}
-                      </p>
+                      <div className="flex items-start gap-1.5">
+                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {p.name}
+                        </p>
+                        {getProductDiscount(p).hasDiscount && (
+                          <span className="mt-0.5 shrink-0 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                            -{getProductDiscount(p).discountPercent}%
+                          </span>
+                        )}
+                      </div>
                       {p.description ? (
                         <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">
                           {p.description}
                         </p>
                       ) : null}
-                      <p className="mt-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        {hasVariants
-                          ? (() => {
-                              const { min, max } = variantPriceRange(
-                                p.price ?? 0,
-                                (p.variants as VariantGroup[] | null) ?? [],
-                              );
-                              return min === max
-                                ? formatRupees(min)
-                                : `${formatRupees(min)} – ${formatRupees(max)}`;
-                            })()
-                          : formatRupees(p.price)}
+                      <p className="mt-1 flex flex-wrap items-baseline gap-1.5">
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          {hasVariants
+                            ? (() => {
+                                const { min, max } = variantPriceRange(
+                                  p.price ?? 0,
+                                  (p.variants as VariantGroup[] | null) ?? [],
+                                );
+                                return min === max
+                                  ? formatRupees(min)
+                                  : `${formatRupees(min)} – ${formatRupees(max)}`;
+                              })()
+                            : formatRupees(p.price)}
+                        </span>
+                        {getProductDiscount(p).hasDiscount && (
+                          <span className="text-[11px] text-zinc-400 line-through">
+                            {formatRupees(getProductDiscount(p).originalPrice ?? p.price)}
+                          </span>
+                        )}
                         {hasVariants ? (
-                          <span className="ml-1 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+                          <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
                             · options
                           </span>
                         ) : null}
@@ -511,7 +675,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
                                 return next;
                               });
                             } else {
-                              bump(p.id, -1);
+                              bump(p.id, -1, p.name);
                             }
                           }}
                           className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-emerald-700"
@@ -659,23 +823,23 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
               {Object.entries(cart).map(([key, line]) => {
                 const id = key.split("::")[0]!;
                 const p = products.find((x) => x.id === id);
-                if (!p) return null;
-                const unit = line.unitPrice ?? p.price;
+                const unit = line.unitPrice ?? p?.price ?? 0;
                 return (
                   <div key={key} className="flex items-center gap-3 px-3 py-2.5">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                      {p.image_url && !imgErrors[id] ? (
+                      {p?.image_url && !imgErrors[id] ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={getSafeImageUrl(p.image_url, "product")} alt={p.name} className="h-full w-full object-cover" />
+                        <img src={getSafeImageUrl(p.image_url, "product")} alt={line.name} className="h-full w-full object-cover" />
                       ) : (
                         <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                          {p.name.charAt(0).toUpperCase()}
+                          {line.name.charAt(0).toUpperCase()}
                         </span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                        {p.name} <span className="text-zinc-400">× {line.qty}</span>
+                        {line.name} <span className="text-zinc-400">× {line.qty}</span>
+                        {line.isDeal ? <span className="ml-1 rounded bg-rose-100 px-1 text-[9px] font-bold text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">DEAL</span> : null}
                       </p>
                       {line.variantLabel ? (
                         <p className="truncate text-xs text-emerald-600 dark:text-emerald-400">

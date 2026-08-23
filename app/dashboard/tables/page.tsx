@@ -17,6 +17,7 @@ import {
   createTables,
   deleteTable,
   fetchTablesByShopId,
+  fetchTodayDineStats,
   setTableActive,
 } from "@/services/dineInService";
 import { useToast } from "@/components/Toast";
@@ -65,6 +66,7 @@ export default function MerchantTablesPage() {
   const [adding, setAdding] = useState(false);
   const [qrDataUrls, setQrDataUrls] = useState<Record<string, string>>({});
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [todayStats, setTodayStats] = useState<{ orders: number; revenue: number } | null>(null);
 
   const origin = useMemo(() => {
     if (typeof window !== "undefined") return window.location.origin;
@@ -98,6 +100,9 @@ export default function MerchantTablesPage() {
         setShop(shopResult.data);
         const tablesResult = await fetchTablesByShopId(shopResult.data.id);
         if (!cancelled && tablesResult.success) setTables(tablesResult.data);
+        fetchTodayDineStats(shopResult.data.id).then((r) => {
+          if (!cancelled && r.success) setTodayStats(r.data);
+        });
       } catch {
         /* handled by empty state */
       } finally {
@@ -212,24 +217,47 @@ export default function MerchantTablesPage() {
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
 
-      // Shop + table header
+      const shopName = (shop?.name ?? "TrendMart").slice(0, 28);
+      const shopLocation = (shop?.location ?? "").slice(0, 34);
+      const shopPhone = shop?.whatsapp_number ?? "";
+
+      // Header — shop name + address + phone (JazzCash-style card)
+      doc.setFillColor(6, 95, 70); // emerald-800
+      doc.rect(0, 0, pageW, 30, "F");
+      doc.setTextColor(255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text(shop?.name ?? "TrendMart", pageW / 2, 18, { align: "center" });
+      doc.setFontSize(15);
+      doc.text(shopName, pageW / 2, 13, { align: "center" });
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(12);
-      doc.text(table.name, pageW / 2, 26, { align: "center" });
+      doc.setFontSize(8);
+      let hdrY = 20;
+      if (shopLocation) {
+        doc.text(shopLocation, pageW / 2, hdrY, { align: "center" });
+        hdrY += 4.5;
+      }
+      if (shopPhone) {
+        doc.text(shopPhone, pageW / 2, hdrY, { align: "center" });
+      }
+      doc.setTextColor(0);
+
+      // Big table name
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text(table.name, pageW / 2, 42, { align: "center" });
 
       // QR centered
-      const qrSize = Math.min(pageW - 24, pageH - 62);
+      const qrSize = Math.min(pageW - 26, pageH - 42 - 24 - 16);
       const qrX = (pageW - qrSize) / 2;
-      doc.addImage(qr, "PNG", qrX, 32, qrSize, qrSize);
+      doc.addImage(qr, "PNG", qrX, 48, qrSize, qrSize);
 
-      // Instruction
+      // Footer — instruction + brand
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(90);
       doc.text("Scan to view the menu & order from your table", pageW / 2, pageH - 12, { align: "center" });
+      doc.setFontSize(7);
+      doc.setTextColor(140);
+      doc.text("Powered by TrendMart", pageW / 2, pageH - 7, { align: "center" });
       doc.setTextColor(0);
 
       doc.save(`${table.name.toLowerCase().replace(/\s+/g, "-")}-qr.pdf`);
@@ -309,6 +337,21 @@ export default function MerchantTablesPage() {
             Kitchen board
           </Link>
         </div>
+
+        {/* Today's stats strip */}
+        {todayStats && (
+          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+            <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+              Today
+            </span>
+            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+              {todayStats.orders} dine-in orders
+            </span>
+            <span className="ml-auto text-sm font-bold text-emerald-700 dark:text-emerald-400">
+              Rs. {Math.round(todayStats.revenue).toLocaleString()}
+            </span>
+          </div>
+        )}
 
         {/* Add table */}
         <div className="mb-6 rounded-2xl border border-zinc-100 bg-white p-4 dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">

@@ -13,11 +13,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMyShop } from "@/services/shopService";
-import { fetchKitchenOrders, updateDineStatus } from "@/services/dineInService";
+import {
+  fetchKitchenOrders,
+  fetchTablesByShopId,
+  fetchTodayDineStats,
+  updateDineStatus,
+} from "@/services/dineInService";
 import { subscribeToOrders } from "@/lib/supabase/realtime";
 import { useToast } from "@/components/Toast";
+import KitchenManualOrderModal from "@/components/KitchenManualOrderModal";
 import { isDineInCategory } from "@/types";
-import type { DineStatus, Order, Shop } from "@/types";
+import type { DineInTable, DineStatus, Order, Shop } from "@/types";
 
 type BoardFilter = "active" | "all";
 
@@ -52,6 +58,9 @@ export default function KitchenBoardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<BoardFilter>("active");
   const [clock, setClock] = useState(Date.now());
+  const [showManual, setShowManual] = useState(false);
+  const [tables, setTables] = useState<DineInTable[]>([]);
+  const [todayStats, setTodayStats] = useState<{ orders: number; revenue: number } | null>(null);
 
   const load = useCallback(async (shopId: string) => {
     const result = await fetchKitchenOrders(shopId);
@@ -79,15 +88,25 @@ export default function KitchenBoardPage() {
           return;
         }
         if (cancelled) return;
+        const shopId = shopResult.data.id;
         setShop(shopResult.data);
-        await load(shopResult.data.id);
+        await load(shopId);
+        fetchTodayDineStats(shopId).then((r) => {
+          if (!cancelled && r.success) setTodayStats(r.data);
+        });
+        fetchTablesByShopId(shopId).then((r) => {
+          if (!cancelled && r.success) setTables(r.data);
+        });
 
         unsub = subscribeToOrders(
-          shopResult.data.id,
+          shopId,
           (payload) => {
             const row = payload.new as Order | undefined;
             if (!row?.id || row.order_type !== "dine_in") return;
             setOrders((prev) => [row, ...prev.filter((o) => o.id !== row.id)]);
+            fetchTodayDineStats(shopId).then((r) => {
+              if (!cancelled && r.success) setTodayStats(r.data);
+            });
             try {
               const audio = new Audio("/sounds/notify.mp3");
               void audio.play().catch(() => undefined);
@@ -215,6 +234,16 @@ export default function KitchenBoardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Today's dine-in stats */}
+            {todayStats && (
+              <div className="hidden items-center gap-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold dark:bg-[color:var(--tm-surface)] md:flex">
+                <span className="text-zinc-500 dark:text-zinc-400">Today</span>
+                <span className="text-zinc-900 dark:text-zinc-100">{todayStats.orders} orders</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  Rs. {Math.round(todayStats.revenue).toLocaleString()}
+                </span>
+              </div>
+            )}
             <div className="hidden items-center gap-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold dark:bg-[color:var(--tm-surface)] sm:flex">
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-amber-500" /> New {stats.pending}
@@ -226,22 +255,13 @@ export default function KitchenBoardPage() {
                 <span className="h-2 w-2 rounded-full bg-violet-500" /> Ready {stats.ready}
               </span>
             </div>
-            <div className="flex rounded-xl bg-white p-1 dark:bg-[color:var(--tm-surface)]">
-              {(["active", "all"] as BoardFilter[]).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                    filter === f
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowManual(true)}
+              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+              + New Order
+            </button>
             <Link
               href="/dashboard/tables"
               className="rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
@@ -249,6 +269,36 @@ export default function KitchenBoardPage() {
               Manage tables
             </Link>
           </div>
+        </div>
+
+        {showManual && shop && (
+          <KitchenManualOrderModal
+            shopId={shop.id}
+            tables={tables}
+            onClose={() => setShowManual(false)}
+            onPlaced={() => {
+              setShowManual(false);
+              addToast("Order sent to kitchen.", "success");
+              void load(shop.id);
+            }}
+          />
+        )}
+
+        <div className="mb-4 flex rounded-xl bg-white p-1 dark:bg-[color:var(--tm-surface)]">
+          {(["active", "all"] as BoardFilter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${
+                filter === f
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              {f === "active" ? "Active orders" : "All orders"}
+            </button>
+          ))}
         </div>
 
         {visible.length === 0 ? (
