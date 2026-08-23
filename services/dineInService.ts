@@ -9,8 +9,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
-import type { DineInTable, DineStatus, Order, OrderItem } from "@/types";
-import { dineStatusToLegacy } from "@/types";
+import type { DineInTable, DineStatus, Order, OrderItem, Shop } from "@/types";
+import { dineStatusToLegacy, isDineInCategory } from "@/types";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -18,6 +18,35 @@ type ServiceResult<T> =
 
 function toError(err: unknown): string {
   return err instanceof Error ? err.message : "An unexpected error occurred.";
+}
+
+/**
+ * The merchant's dine-in shop (restaurant/cafe). A user may own many shops
+ * (retail + food), so `fetchMyShop()`'s "newest shop" heuristic is wrong for
+ * the kitchen/tables flows — always target the food-category shop here.
+ */
+export async function fetchMyDineInShop(): Promise<ServiceResult<Shop | null>> {
+  const supabase = createClient();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "Not authenticated." };
+
+    const { data, error } = await supabase
+      .from("shops")
+      .select("*")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+
+    const shops = (data as Shop[]) ?? [];
+    const dineIn = shops.find((s) => isDineInCategory(s.category));
+    return { success: true, data: dineIn ?? null };
+  } catch (err) {
+    logError(err, { module: "dineInService.fetchMyDineInShop" });
+    return { success: false, error: toError(err) };
+  }
 }
 
 /* -------------------------------------------------------------------------- */

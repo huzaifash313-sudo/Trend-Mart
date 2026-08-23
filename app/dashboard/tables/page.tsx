@@ -12,10 +12,10 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
 import { createClient } from "@/lib/supabase/client";
-import { fetchMyShop } from "@/services/shopService";
 import {
   createTables,
   deleteTable,
+  fetchMyDineInShop,
   fetchTablesByShopId,
   fetchTodayDineStats,
   setTableActive,
@@ -88,10 +88,10 @@ export default function MerchantTablesPage() {
           window.location.replace("/login?redirect=/dashboard/tables");
           return;
         }
-        const shopResult = await fetchMyShop();
+        const shopResult = await fetchMyDineInShop();
         if (!shopResult.success || !shopResult.data) {
           if (!cancelled) {
-            addToast("Register a store first to manage tables.", "info");
+            addToast("Register a restaurant store first to manage tables.", "info");
             window.location.replace("/account/become-merchant");
           }
           return;

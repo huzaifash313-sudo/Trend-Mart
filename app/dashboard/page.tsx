@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchMyShop } from "@/services/shopService";
+import { fetchMyDineInShop } from "@/services/dineInService";
 
 /* -------------------------------------------------------------------------- */
 /*  Dashboard → Storefront redirect                                            */
 /*                                                                             */
-/*  Clicking "Dashboard" now drops the merchant straight onto their live       */
-/*  storefront (owner mode), where they can manage profile, coupons, deals     */
-/*  and products in one place — no separate dashboard to bounce between.       */
-/*  Analytics lives at /dashboard/analytics.                                   */
+/*  Clicking "Dashboard" drops the merchant onto their live storefront        */
+/*  (owner mode). When the user owns multiple shops (e.g. retail + a          */
+/*  restaurant), the dine-in restaurant shop is preferred so the QR/kitchen    */
+/*  flows land on the right store; otherwise fall back to the newest shop.     */
 /* -------------------------------------------------------------------------- */
 
 export default function DashboardPage() {
@@ -20,6 +21,15 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Prefer the dine-in shop (restaurant/cafe) so multi-shop merchants land
+      // on the store that runs QR tables + kitchen.
+      const dineIn = await fetchMyDineInShop();
+      if (cancelled) return;
+      if (dineIn.success && dineIn.data) {
+        router.replace(`/shop/${dineIn.data.id}`);
+        return;
+      }
+
       const result = await fetchMyShop();
       if (cancelled) return;
 

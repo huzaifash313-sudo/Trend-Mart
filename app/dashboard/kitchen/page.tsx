@@ -12,9 +12,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { fetchMyShop } from "@/services/shopService";
 import {
   fetchKitchenOrders,
+  fetchMyDineInShop,
   fetchTablesByShopId,
   fetchTodayDineStats,
   updateDineStatus,
@@ -79,10 +79,10 @@ export default function KitchenBoardPage() {
           window.location.replace("/login?redirect=/dashboard/kitchen");
           return;
         }
-        const shopResult = await fetchMyShop();
+        const shopResult = await fetchMyDineInShop();
         if (!shopResult.success || !shopResult.data) {
           if (!cancelled) {
-            addToast("Register a store first to open the kitchen board.", "info");
+            addToast("Register a restaurant store first to open the kitchen board.", "info");
             window.location.replace("/account/become-merchant");
           }
           return;
