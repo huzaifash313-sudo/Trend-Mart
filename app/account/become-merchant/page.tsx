@@ -52,6 +52,8 @@ function emptyShopForm(): ShopFormData {
     free_delivery_threshold: "",
     delivery_fee_flat: "",
     delivery_fee_per_km: "",
+    accepts_delivery: true,
+    accepts_pickup: true,
   };
 }
 

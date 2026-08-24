@@ -368,7 +368,7 @@ function sortMarketplaceProducts(
 const MARKETPLACE_SELECT = `
   id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
-  category_id, sub_category_id, created_at, short_code,
+  category_id, sub_category_id, created_at, short_code, variants,
   orders_count, click_count,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
@@ -384,7 +384,7 @@ const MARKETPLACE_SELECT = `
 const MARKETPLACE_SELECT_LEGACY = `
   id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
-  category_id, sub_category_id, created_at,
+  category_id, sub_category_id, created_at, variants,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude, location

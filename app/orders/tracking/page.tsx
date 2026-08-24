@@ -347,10 +347,22 @@ function OrderCard({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
               {order.shopName}
             </h3>
+            {order.orderType && order.orderType !== "delivery" && (
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.625rem] font-bold ${
+                  order.orderType === "dine_in"
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
+                }`}
+              >
+                {order.orderType === "dine_in" ? "🍽️ Dine-in" : "🛍️ Pickup"}
+                {order.tableCode ? ` · ${order.tableCode}` : ""}
+              </span>
+            )}
             {justUpdated && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[0.625rem] font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
@@ -402,7 +414,9 @@ function OrderCard({
         <StatusTimeline timeline={order.statusHistory} />
         {order.status === "Pending" ? (
           <p className="mt-3 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Waiting for the shop to update this order. Status does not change by itself.
+            {order.orderType === "pickup"
+              ? "Waiting for the shop to prepare your order. Keep an eye on this page — you'll see when it's ready to collect."
+              : "Waiting for the shop to update this order. Status does not change by itself."}
           </p>
         ) : null}
       </div>

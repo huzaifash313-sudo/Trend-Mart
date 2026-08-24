@@ -76,6 +76,13 @@ export interface Shop {
   review_count?: number | null;
   /** Timestamp when sensitive info (name/phone/location) was last changed. */
   sensitive_info_updated_at?: string | null;
+  /**
+   * Merchant fulfillment toggles. `false` hides that channel at checkout
+   * without touching the rest of the store — a restaurant can pause Delivery
+   * while QR-table dine-in keeps running, and every shop can offer Pickup.
+   */
+  accepts_delivery?: boolean | null;
+  accepts_pickup?: boolean | null;
 }
 
 export type ShopVerificationStatus = "pending" | "approved" | "rejected";
@@ -143,6 +150,10 @@ export interface ShopFormData {
   delivery_fee_flat: string;
   /** Additional delivery fee (PKR, form input string) charged per km of distance. */
   delivery_fee_per_km: string;
+  /** Accept delivery orders at checkout (false hides Delivery). Default true. */
+  accepts_delivery: boolean;
+  /** Accept self-pickup orders at checkout (false hides Pickup). Default true. */
+  accepts_pickup: boolean;
 }
 
 // ─── Order Status Lifecycle (Prompt 4) ───────────────────────────────────────

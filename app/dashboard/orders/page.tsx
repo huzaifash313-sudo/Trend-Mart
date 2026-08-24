@@ -233,6 +233,20 @@ export default function MerchantOrdersPage() {
                       <h2 className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">
                         {order.customer_name || "Customer"}
                       </h2>
+                      {order.order_type && order.order_type !== "delivery" && (
+                        <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${
+                          order.order_type === "dine_in"
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                            : "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"
+                        }`}>
+                          {order.order_type === "dine_in" ? "🍽️ Dine-in" : "🛍️ Pickup"}
+                        </span>
+                      )}
+                      {order.table_code && (
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[0.65rem] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          {order.table_code}
+                        </span>
+                      )}
                       <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${statusTone(order.status)}`}>
                         {getStatusLabel(order.status)}
                       </span>

@@ -541,6 +541,12 @@ function ShopDetailInner({ id }: { id: string }) {
 
   const handleAddToCart = useCallback((product: Product) => {
     if (!shop || isOwner) return;
+    // Variant products must open the option picker first — otherwise the
+    // customer would silently add the base (Size/Flavour) price to cart.
+    if (product.variants && product.variants.length > 0) {
+      setQuickViewProduct(product);
+      return;
+    }
     addItem(product, { id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number });
     addToast(`"${product.name}" added to cart`, "success");
   }, [shop, isOwner, addItem, addToast]);
@@ -607,7 +613,15 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // Stable per-card Order wrapper (avoids inline arrow defeating ProductCard memo).
   const handleGridOrder = useCallback(
-    (product: Product) => handleOrder({ product, quantity: 1 }),
+    (product: Product) => {
+      // Variant products must open the option picker first so the WhatsApp
+      // order carries the selected Size/Flavour and its real price.
+      if (product.variants && product.variants.length > 0) {
+        setQuickViewProduct(product);
+        return;
+      }
+      handleOrder({ product, quantity: 1 });
+    },
     [handleOrder],
   );
 

@@ -157,6 +157,8 @@ const INITIAL_FORM: ShopFormData = {
   free_delivery_threshold: "",
   delivery_fee_flat: "",
   delivery_fee_per_km: "",
+  accepts_delivery: true,
+  accepts_pickup: true,
 };
 
 function shopToForm(source: Shop): ShopFormData {
@@ -204,6 +206,8 @@ function shopToForm(source: Shop): ShopFormData {
       source.delivery_fee_per_km != null && source.delivery_fee_per_km > 0
         ? String(source.delivery_fee_per_km)
         : "",
+    accepts_delivery: source.accepts_delivery ?? true,
+    accepts_pickup: source.accepts_pickup ?? true,
   };
 }
 
@@ -428,6 +432,8 @@ export default function DashboardSettingsPage() {
         free_delivery_threshold: form.free_delivery_threshold,
         delivery_fee_flat: form.delivery_fee_flat,
         delivery_fee_per_km: form.delivery_fee_per_km,
+        accepts_delivery: form.accepts_delivery,
+        accepts_pickup: form.accepts_pickup,
       };
 
       const result = await updateShop(shop.id, shopFormFields);
@@ -658,6 +664,44 @@ export default function DashboardSettingsPage() {
               onChange={(value) => setForm((current) => ({ ...current, delivery_fee_per_km: value }))}
               placeholder="Radius"
             />
+          </div>
+
+          {/* Fulfillment channels — pause any channel, dine-in stays live */}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Delivery 🚚
+                </p>
+                <p className="text-[0.65rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  {form.accepts_delivery
+                    ? "On — customers can order delivery"
+                    : "Off — delivery hidden at checkout (dine-in stays live)"}
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={form.accepts_delivery}
+                onChange={(v) => setForm((current) => ({ ...current, accepts_delivery: v }))}
+                label="Accept delivery orders"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Self-pickup 🛍️
+                </p>
+                <p className="text-[0.65rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  {form.accepts_pickup
+                    ? "On — customers can order and pick up"
+                    : "Off — pickup hidden at checkout"}
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={form.accepts_pickup}
+                onChange={(v) => setForm((current) => ({ ...current, accepts_pickup: v }))}
+                label="Accept pickup orders"
+              />
+            </div>
           </div>
         </SectionShell>
 

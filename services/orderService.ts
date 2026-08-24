@@ -844,6 +844,7 @@ async function placeOrderOnServer(params: {
   }>;
   couponCode?: string;
   notes?: string;
+  orderType?: "delivery" | "pickup";
   customerLat?: number | null;
   customerLng?: number | null;
   customerCity?: string | null;
@@ -884,6 +885,7 @@ export async function createOrder(params: {
   deliveryFee?: number;
   notes?: string;
   couponCode?: string;
+  orderType?: "delivery" | "pickup";
   customerLat?: number | null;
   customerLng?: number | null;
   customerCity?: string | null;
@@ -895,6 +897,7 @@ export async function createOrder(params: {
     customerPhone: params.customerPhone ?? "",
     couponCode: params.couponCode,
     notes: params.notes,
+    orderType: params.orderType,
     customerLat: params.customerLat,
     customerLng: params.customerLng,
     customerCity: params.customerCity,

@@ -27,6 +27,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { fetchActiveAds, pingAdImpression, pingAdClick } from "@/services/adsService";
+import { useMyShop } from "@/lib/queries";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
 import type { PromotionalAd, PromoAdPlacement } from "@/types";
 
@@ -431,18 +432,24 @@ export default function PromoAdsCarousel({
   const [ads, setAds] = useState<PromotionalAd[]>([]);
   const [loading, setLoading] = useState(true);
   const pingedRef = useRef<Set<string>>(new Set());
+  // A merchant never sees their own sponsored ad in the marketplace carousel.
+  const myShopQuery = useMyShop();
+  const myShopId = myShopQuery.data?.id ?? null;
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
       const result = await fetchActiveAds(placement);
-      if (!cancelled && result.success) setAds(result.data);
+      if (!cancelled && result.success) {
+        const all = result.data;
+        setAds(myShopId ? all.filter((ad) => ad.shop_id !== myShopId) : all);
+      }
       if (!cancelled) setLoading(false);
     }
     load();
     return () => { cancelled = true; };
-  }, [placement]);
+  }, [placement, myShopId]);
 
   // Fire one impression ping per ad, the first time it's loaded on this page view.
   useEffect(() => {

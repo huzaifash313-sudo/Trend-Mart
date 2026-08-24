@@ -25,6 +25,8 @@ export interface TrackedOrder {
   }>;
   totalAmount: number;
   status: OrderStatus;
+  orderType?: "delivery" | "pickup" | "dine_in";
+  tableCode?: string | null;
   statusHistory: StatusTimelineEntry[];
   trackingNumber?: string | null;
   createdAt: string;
@@ -160,6 +162,7 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
   const status = (row.status as OrderStatus) ?? "Pending";
   const createdAt = (row.created_at as string) ?? new Date().toISOString();
   const updatedAt = (row.updated_at as string) ?? undefined;
+  const rawType = (row.order_type as string | null | undefined) ?? "delivery";
 
   return {
     id: row.id as string,
@@ -176,6 +179,11 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
     items,
     totalAmount: Number(row.total_amount) || 0,
     status,
+    orderType:
+      rawType === "pickup" || rawType === "dine_in"
+        ? (rawType as "pickup" | "dine_in")
+        : "delivery",
+    tableCode: (row.table_code as string | null | undefined) ?? null,
     statusHistory: buildStatusTimeline(status, createdAt, updatedAt),
     trackingNumber: (row.tracking_number as string) ?? null,
     createdAt,

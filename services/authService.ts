@@ -205,7 +205,13 @@ export async function claimSignupRole(
         clearRoleCache(user.id);
         roleCache.set(user.id, { role, at: Date.now() });
       }
-      await supabase.auth.updateUser({ data: { role } }).catch(() => undefined);
+      const { error: metaError } = await supabase.auth.updateUser({ data: { role } });
+      if (metaError) {
+        // Non-fatal: the DB (user_roles + shop ownership) is authoritative and
+        // detectUserRole's slow path resolves the real role. Metadata just keeps
+        // the fast path warm — log so a broken metadata write is visible.
+        console.warn("[authService] updateUser role metadata failed:", metaError.message);
+      }
       return { success: true };
     }
   } catch {
@@ -228,7 +234,10 @@ export async function claimSignupRole(
     }
     clearRoleCache(user.id);
     roleCache.set(user.id, { role, at: Date.now() });
-    await supabase.auth.updateUser({ data: { role } }).catch(() => undefined);
+    const { error: metaError } = await supabase.auth.updateUser({ data: { role } });
+    if (metaError) {
+      console.warn("[authService] updateUser role metadata failed:", metaError.message);
+    }
     return { success: true };
   } catch (err) {
     return {
@@ -569,9 +578,11 @@ export function redirectToDashboard(role: AuthRole | "admin"): void {
  *   - user_metadata.role — user-editable, so it is only ever a harmless
  *     customer/merchant hint (never admin).
  *
- * Slow path (only for accounts created before metadata roles existed): runs
- * get_my_role() RPC and the shop-ownership check IN PARALLEL so the whole
- * lookup costs one max() round-trip instead of two sequential waits.
+ * Slow path: runs get_my_role() RPC and the shop-ownership check IN PARALLEL so
+ * the whole lookup costs one max() round-trip instead of two sequential waits.
+ * Reached when metadata gives no trusted answer — accounts created before
+ * metadata roles existed, AND accounts whose signup-time "customer" metadata
+ * is stale (e.g. a customer who later became a merchant).
  *
  * Results are memoized per user so components on the same page never repeat
  * the database work (BottomNav, account pages, sign-in redirect all share it).
@@ -614,7 +625,14 @@ function roleFromUserObject(user: User): AuthRole | "admin" | null {
     return appRole;
   }
   const metaRole = user.user_metadata?.role as string | undefined;
-  if (metaRole === "merchant" || metaRole === "customer") return metaRole;
+  // Only a "merchant" hint from user_metadata is trusted as a fast path — it
+  // can never elevate to admin, and matches the DB's promotion signal. A stale
+  // "customer" hint (written at signup) must NOT short-circuit the
+  // authoritative shop-ownership / user_roles check: a customer who later
+  // becomes a merchant would otherwise keep seeing the customer portal
+  // ("My Account" sidebar link, /account with "Become a Merchant") until the
+  // session metadata catches up.
+  if (metaRole === "merchant") return metaRole;
   return null;
 }
 

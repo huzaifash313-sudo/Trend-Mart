@@ -21,6 +21,7 @@ import { getSafeImageUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
 import ProductOrderModal from "@/components/ProductOrderModal";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
+import { computeVariantPrice } from "@/lib/variantPricing";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
@@ -160,8 +161,13 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
   const variantLabel = selectedVariants
     .map((v) => `${v.groupName}: ${v.optionLabel}`)
     .join(" · ");
-  const priceAdj = selectedVariants.reduce((sum, v) => sum + (v.priceAdj || 0), 0);
-  const displayPrice = (product?.price ?? 0) + priceAdj;
+  // Authoritative unit price for the selected combo — handles both absolute
+  // (Daraz-style) prices and additive adjustments via the shared helper.
+  const displayPrice = computeVariantPrice(
+    product?.price ?? 0,
+    product?.variants ?? null,
+    variantLabel,
+  );
   const variantsReady = !hasVariants || selectedVariants.length === (product?.variants?.length ?? 0);
 
   const discount = product ? getProductDiscount(product) : null;
@@ -174,12 +180,12 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
       return;
     }
     const forCart: Product =
-      priceAdj !== 0 ? { ...product, price: displayPrice } : product;
+      displayPrice !== product.price ? { ...product, price: displayPrice } : product;
     addItem(forCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, variantsReady, priceAdj, displayPrice, quantity, variantLabel, itemNotes, addItem, addToast]);
+  }, [product, shop, variantsReady, displayPrice, quantity, variantLabel, itemNotes, addItem, addToast]);
 
   const handleOrder = useCallback(() => {
     if (!product || !shop) return;

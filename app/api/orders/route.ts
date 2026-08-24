@@ -47,6 +47,8 @@ interface OrderRequestBody {
   items?: OrderItemInput[] | null;
   couponCode?: string | null;
   notes?: string | null;
+  /** Fulfilment channel: 'delivery' (default) or 'pickup'. */
+  orderType?: string | null;
   customerLat?: number | null;
   customerLng?: number | null;
   customerCity?: string | null;
@@ -72,6 +74,8 @@ interface ShopRow {
   location: string | null;
   business_hours: string | null;
   operating_status: string | null;
+  accepts_delivery: boolean | null;
+  accepts_pickup: boolean | null;
 }
 
 /** Row shape read from `public.coupons`. */
@@ -215,6 +219,10 @@ export async function POST(request: Request) {
   const customerPhone =
     normalizePkPhoneDigits(customerPhoneRaw) || customerPhoneRaw.replace(/\D/g, "");
   const notes = sanitizeText(body.notes, 500);
+  // Fulfilment channel — delivery or self-pickup. Defaults to delivery for
+  // legacy callers; dine_in is created through the dedicated dine-in service.
+  const orderType =
+    body.orderType === "pickup" ? ("pickup" as const) : ("delivery" as const);
   // Idempotency token: client-generated UUID, unique per checkout attempt.
   const idempotencyKey =
     typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim().slice(0, 100) : "";
@@ -255,7 +263,7 @@ export async function POST(request: Request) {
   const { data: shopRaw, error: shopErr } = await admin
     .from("shops")
     .select(
-      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, location, business_hours, operating_status",
+      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, location, business_hours, operating_status, accepts_delivery, accepts_pickup",
     )
     .eq("id", shopId)
     .maybeSingle();
@@ -272,6 +280,34 @@ export async function POST(request: Request) {
   if ((shopRow.verification_status ?? "approved") !== "approved") {
     return NextResponse.json(
       { success: false, error: "This shop is not currently accepting orders." },
+      { status: 409 },
+    );
+  }
+
+  // Merchant fulfillment toggles — reject a channel the shop has paused.
+  const acceptsDelivery = shopRow.accepts_delivery !== false;
+  const acceptsPickup = shopRow.accepts_pickup !== false;
+  if (orderType === "delivery" && !acceptsDelivery) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "This shop has paused delivery right now. Try pickup or contact the shop directly.",
+      },
+      { status: 409 },
+    );
+  }
+  if (orderType === "pickup" && !acceptsPickup) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "This shop has paused pickup right now. Try delivery or contact the shop directly.",
+      },
+      { status: 409 },
+    );
+  }
+  if (!acceptsDelivery && !acceptsPickup) {
+    return NextResponse.json(
+      { success: false, error: "This shop has paused all orders right now. Please try again later." },
       { status: 409 },
     );
   }
@@ -519,6 +555,7 @@ export async function POST(request: Request) {
   const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   // 7. Delivery-coverage enforcement (radius / city / nationwide).
+  //    Skipped entirely for self-pickup — the customer is coming to the shop.
   const radiusKm = toNumber(shopRow.service_radius_km, 0);
   const coverage = parseCoverage(shopRow.delivery_zones);
   const customerCity = typeof body.customerCity === "string" ? body.customerCity.trim() : "";
@@ -536,21 +573,23 @@ export async function POST(request: Request) {
     distanceKm = haversineKm(custLat, custLng, shopLat, shopLng);
   }
 
-  let coverageError: string | null = null;
-  if (coverage.mode === "city") {
-    const target = coverage.city || (shopRow.location ?? "");
-    if (customerCity && target && !cityMatch(target, customerCity)) {
-      coverageError = `This shop only delivers in ${target}.`;
-    } else if (!customerCity && distanceKm != null && distanceKm > 35) {
-      coverageError = "You appear to be outside this shop's delivery city.";
+  if (orderType !== "pickup") {
+    let coverageError: string | null = null;
+    if (coverage.mode === "city") {
+      const target = coverage.city || (shopRow.location ?? "");
+      if (customerCity && target && !cityMatch(target, customerCity)) {
+        coverageError = `This shop only delivers in ${target}.`;
+      } else if (!customerCity && distanceKm != null && distanceKm > 35) {
+        coverageError = "You appear to be outside this shop's delivery city.";
+      }
+    } else if (coverage.mode === "radius") {
+      if (radiusKm > 0 && distanceKm != null && distanceKm > radiusKm) {
+        coverageError = `You are about ${distanceKm.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`;
+      }
     }
-  } else if (coverage.mode === "radius") {
-    if (radiusKm > 0 && distanceKm != null && distanceKm > radiusKm) {
-      coverageError = `You are about ${distanceKm.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`;
+    if (coverageError) {
+      return NextResponse.json({ success: false, error: coverageError }, { status: 409 });
     }
-  }
-  if (coverageError) {
-    return NextResponse.json({ success: false, error: coverageError }, { status: 409 });
   }
 
   // 8. Coupon validation (server-side).
@@ -613,10 +652,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // 10. Delivery fee (server-side).
+  // 10. Delivery fee (server-side) — self-pickup is never charged delivery.
   const freeThreshold = toNumber(shopRow.free_delivery_threshold, 0);
   let deliveryFee = 0;
-  if (!(freeThreshold > 0 && subtotal >= freeThreshold)) {
+  if (orderType !== "pickup" && !(freeThreshold > 0 && subtotal >= freeThreshold)) {
     const flat = toNumber(shopRow.delivery_fee_flat, 0);
     const perKm = toNumber(shopRow.delivery_fee_per_km, 0);
     deliveryFee =
@@ -754,6 +793,7 @@ export async function POST(request: Request) {
     delivery_fee: deliveryFee,
     status: "Pending",
     customer_user_id: user.id,
+    order_type: orderType,
   };
   if (notes) orderPayload.notes = notes;
   if (appliedCoupon) orderPayload.coupon_code = appliedCoupon;
@@ -762,7 +802,7 @@ export async function POST(request: Request) {
   let { data: inserted, error: insertErr } = await admin
     .from("orders")
     .insert(orderPayload as never)
-    .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
+    .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at, order_type")
     .single();
 
   // Older DBs may lack the money-breakdown / coupon_code columns — retry with
@@ -776,13 +816,14 @@ export async function POST(request: Request) {
       total_amount: total,
       status: "Pending",
       customer_user_id: user.id,
+      order_type: orderType,
     };
     if (notes) corePayload.notes = notes;
     if (idempotencyKey) corePayload.client_token = idempotencyKey;
     ({ data: inserted, error: insertErr } = await admin
       .from("orders")
       .insert(corePayload as never)
-      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
+      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at, order_type")
       .single());
   }
 
@@ -801,6 +842,7 @@ export async function POST(request: Request) {
     items_json: ((inserted as Record<string, unknown>).items_json as OrderItem[]) ?? orderItems,
     total_amount: toNumber((inserted as Record<string, unknown>).total_amount, total),
     status: "Pending",
+    order_type: orderType,
     created_at: String((inserted as Record<string, unknown>).created_at ?? new Date().toISOString()),
     updated_at: (inserted as Record<string, unknown>).updated_at as string | undefined,
   };

@@ -59,6 +59,8 @@ const SHOP_EXTENDED_KEYS = [
   "operating_status",
   "slug",
   "sensitive_info_updated_at",
+  "accepts_delivery",
+  "accepts_pickup",
 ] as const;
 
 /** Persist offer end time; empty / invalid → null (no countdown). */
@@ -304,10 +306,13 @@ export async function fetchShopById(
     if (!shop) throw new Error("Shop not found.");
 
     // Fetch products (capped — storefront paginates client-side / load-more)
+    // `variants` (JSONB) is included so the QuickView modal can render the
+    // Size/Color/Flavour selector in the delivery flow — same data the
+    // restaurant/kitchen flow already sees via select("*").
     const PRODUCT_SELECT =
-      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, is_pinned, stock_status, category_id, sub_category_id, created_at, short_code";
+      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, is_pinned, stock_status, category_id, sub_category_id, created_at, short_code, variants";
     const PRODUCT_SELECT_LEGACY =
-      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, stock_status, category_id, sub_category_id, created_at";
+      "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, stock_status, category_id, sub_category_id, created_at, variants";
 
     let products: Product[] | null = null;
     let productError: unknown = null;
@@ -660,6 +665,8 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     free_delivery_threshold: sanitizeDbNumeric(form.free_delivery_threshold, 0, 999_999),
     delivery_fee_flat: sanitizeDbNumeric(form.delivery_fee_flat, 0, 99_999) ?? 0,
     delivery_fee_per_km: sanitizeDbNumeric(form.delivery_fee_per_km, 0, 9_999) ?? 0,
+    accepts_delivery: sanitizeDbBoolean(form.accepts_delivery ?? true),
+    accepts_pickup: sanitizeDbBoolean(form.accepts_pickup ?? true),
   };
 }
 
@@ -683,6 +690,23 @@ export async function createShop(
       return {
         success: false,
         error: "Please verify your email before registering a store.",
+      };
+    }
+
+    // Strict one-store-per-account rule. The DB also enforces this with a
+    // unique index (see one_shop_per_owner migration) — this guard returns a
+    // friendly error before the insert instead of a raw constraint violation.
+    const existing = await supabase
+      .from("shops")
+      .select("id")
+      .eq("owner_id", user.id)
+      .limit(1)
+      .maybeSingle();
+    if (!existing.error && existing.data) {
+      return {
+        success: false,
+        error:
+          "You already own a store on TrendMart — only one store is allowed per account. Open it from your dashboard.",
       };
     }
 

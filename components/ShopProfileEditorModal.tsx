@@ -91,6 +91,8 @@ function shopToFormData(source: Shop): ShopFormData {
       source.delivery_fee_per_km != null && source.delivery_fee_per_km > 0
         ? String(source.delivery_fee_per_km)
         : "",
+    accepts_delivery: source.accepts_delivery ?? true,
+    accepts_pickup: source.accepts_pickup ?? true,
   };
 }
 
@@ -113,6 +115,8 @@ export default function ShopProfileEditorModal({
   const [isOpen, setIsOpen] = useState(
     !(shop.operating_status ?? "Open").toLowerCase().includes("closed"),
   );
+  const [acceptsDelivery, setAcceptsDelivery] = useState(shop.accepts_delivery ?? true);
+  const [acceptsPickup, setAcceptsPickup] = useState(shop.accepts_pickup ?? true);
 
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -168,6 +172,8 @@ export default function ShopProfileEditorModal({
         form.operating_status = isOpen ? "Open" : "Closed";
         form.logo_url = logoUrl;
         form.banner_url = bannerUrl;
+        form.accepts_delivery = acceptsDelivery;
+        form.accepts_pickup = acceptsPickup;
         const result = await updateShopProfile(shop.id, form, false);
         setSaving(false);
         if (result.success) {
@@ -215,6 +221,8 @@ export default function ShopProfileEditorModal({
       form.operating_status = isOpen ? "Open" : "Closed";
       form.logo_url = logoUrl;
       form.banner_url = bannerUrl;
+      form.accepts_delivery = acceptsDelivery;
+      form.accepts_pickup = acceptsPickup;
 
       const result = await updateShopProfile(shop.id, form, sensitiveChanged);
       setSaving(false);
@@ -238,6 +246,8 @@ export default function ShopProfileEditorModal({
       isOpen,
       logoUrl,
       bannerUrl,
+      acceptsDelivery,
+      acceptsPickup,
       password,
       sensitiveChanged,
       sensitiveLocked,
@@ -434,6 +444,53 @@ export default function ShopProfileEditorModal({
                 onChange={setIsOpen}
                 label="Store open or closed"
               />
+            </div>
+
+            {/* Fulfillment channels — independent of dine-in tables */}
+            <div className="rounded-xl border border-teal-200 bg-teal-50/60 p-3 dark:border-teal-900/40 dark:bg-teal-950/20">
+              <p className="mb-1 text-[0.7rem] font-semibold text-teal-800 dark:text-teal-300">
+                How customers receive orders
+              </p>
+              <p className="mb-2 text-[0.65rem] leading-relaxed text-teal-700/90 dark:text-teal-300/80">
+                Pause any channel from the app. QR-table dine-in (restaurants) runs
+                separately and is never blocked by these toggles.
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2.5 dark:bg-zinc-900">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      Delivery 🚚
+                    </p>
+                    <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+                      {acceptsDelivery
+                        ? "Customers can order home delivery"
+                        : "Paused — delivery hidden at checkout"}
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    checked={acceptsDelivery}
+                    onChange={setAcceptsDelivery}
+                    label="Accept delivery orders"
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2.5 dark:bg-zinc-900">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      Self-pickup 🛍️
+                    </p>
+                    <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+                      {acceptsPickup
+                        ? "Customers can order and pick up themselves"
+                        : "Paused — pickup hidden at checkout"}
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    checked={acceptsPickup}
+                    onChange={setAcceptsPickup}
+                    label="Accept pickup orders"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>

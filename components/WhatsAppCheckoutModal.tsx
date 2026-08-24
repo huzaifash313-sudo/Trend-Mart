@@ -50,8 +50,6 @@ import {
 } from "@/lib/phoneFormat";
 import Link from "next/link";
 import { getPublicAppUrl } from "@/lib/appUrl";
-import { getShopPath } from "@/lib/shopSlug";
-import { getProductShortPath } from "@/lib/shortCode";
 import { useToast } from "@/components/Toast";
 
 /** Wrap an async call so a slow/never-resolving request can't hang the UI forever. */
@@ -211,7 +209,9 @@ function buildWhatsAppMessage(
   couponCode: string,
   orderRef: string,
   customerCoords?: { latitude: number; longitude: number } | null,
+  orderType: "delivery" | "pickup" = "delivery",
 ): string {
+  const isPickup = orderType === "pickup";
   // ── Sanitize all inputs ──────────────────────────────────────────────
   const safeShopName = sanitizePayloadString(shop.name, 100);
   const safeLocation = sanitizePayloadString(shop.location, 100);
@@ -245,11 +245,6 @@ function buildWhatsAppMessage(
       ? `https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`
       : null;
 
-  const shopPath = getShopPath({
-    id: shop.id,
-    name: shop.name,
-    slug: shop.slug,
-  });
   const siteOrigin = getPublicAppUrl().replace(/\/$/, "");
 
   const lines: string[] = [
@@ -257,6 +252,7 @@ function buildWhatsAppMessage(
     ``,
     `🏪 *Shop:* ${safeShopName}`,
     `📍 *Shop area:* ${safeLocation}`,
+    isPickup ? `🛍️ *Order Type:* PICKUP — customer will collect` : `🚚 *Order Type:* Delivery`,
     `🆔 *Order Ref:* ${safeOrderRef}`,
     ``,
     `──────────────────────────`,
@@ -282,32 +278,19 @@ function buildWhatsAppMessage(
     lines.push(`• ${safeItemName}${variantLabel}`);
     lines.push(`  ${qty} x ${formatRupees(safePrice)} = ${formatRupees(itemTotal)}${originalPriceStr}`);
 
-    const hashKind = item.viewKind === "deal" ? "deal" : "product";
-    const itemId = (item.productId || item.id || "").trim();
-    if (item.viewKind === "deal") {
-      // Standalone deals keep the store hash deep-link (no standalone deal page).
-      if (itemId) {
-        const viewUrl = `${siteOrigin}${shopPath}#${hashKind}-${itemId}`;
-        const safeViewUrl = sanitizePayloadUrl(viewUrl);
-        if (safeViewUrl) {
-          lines.push(`  🔗 View deal: ${safeViewUrl}`);
-        }
-      }
-    } else {
-      // Direct product page — short link that opens straight to the photo.
-      const shortPath = getProductShortPath(item.shortCode || itemId);
-      if (shortPath) {
-        const viewUrl = `${siteOrigin}${shortPath}`;
-        const safeViewUrl = sanitizePayloadUrl(viewUrl);
-        if (safeViewUrl) {
-          lines.push(`  🔗 ${safeViewUrl}`);
-        }
-      }
-    }
-
     if (safeItemNotes) {
       lines.push(`  📝 Note: ${safeItemNotes}`);
     }
+  }
+
+  // ONE grouped link for the whole order — no more a link per product.
+  // `/o/{id}` shows every item (name, variant, qty, price) + shop + total.
+  const summaryPath = `/o/${encodeURIComponent(orderRef)}`;
+  const safeSummaryUrl = sanitizePayloadUrl(`${siteOrigin}${summaryPath}`);
+  if (safeSummaryUrl) {
+    lines.push(``);
+    lines.push(`📋 *Full order:* ${safeSummaryUrl}`);
+    lines.push(`   (tap once to see all items together)`);
   }
 
   lines.push(``);
@@ -332,15 +315,19 @@ function buildWhatsAppMessage(
   lines.push(`   Name: ${safeCustomerName}`);
   lines.push(`   Phone: ${safeCustomerPhone}`);
 
-  if (safeAddress) {
-    lines.push(`   Address: ${safeAddress}`);
-  }
-
-  if (mapsPinUrl) {
-    lines.push(`   📌 Live pin (open in Maps):`);
-    lines.push(`   ${mapsPinUrl}`);
+  if (isPickup) {
+    lines.push(`   🛍️ Collection: customer will pick up from the shop`);
   } else {
-    lines.push(`   ⚠️ Map pin missing — ask customer to resend location.`);
+    if (safeAddress) {
+      lines.push(`   Address: ${safeAddress}`);
+    }
+
+    if (mapsPinUrl) {
+      lines.push(`   📌 Live pin (open in Maps):`);
+      lines.push(`   ${mapsPinUrl}`);
+    } else {
+      lines.push(`   ⚠️ Map pin missing — ask customer to resend location.`);
+    }
   }
 
   if (safeNotes) {
@@ -410,6 +397,12 @@ export default function WhatsAppCheckoutModal({
   const [authGate, setAuthGate] = useState<"checking" | "ok" | "login" | "verify">("checking");
   const [shipping, setShipping] = useState<ShippingDetails>(INITIAL_SHIPPING);
   const [errors, setErrors] = useState<ValidationErrors>({});
+  // Fulfilment channel — Delivery or Self-Pickup. Dine-in (QR tables) is a
+  // separate flow; this checkout only offers the channels the shop enables.
+  const [orderType, setOrderType] = useState<"delivery" | "pickup">(() => {
+    if (shop.accepts_delivery === false && shop.accepts_pickup !== false) return "pickup";
+    return "delivery";
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderRef, setOrderRef] = useState("");
@@ -464,16 +457,23 @@ export default function WhatsAppCheckoutModal({
     return getDistanceToShop(shop, location.coordinates.latitude, location.coordinates.longitude);
   }, [shop, location]);
 
+  // Fulfilment channels the shop actually accepts.
+  const canDeliver = shop.accepts_delivery !== false;
+  const canPickup = shop.accepts_pickup !== false;
+  const isPickup = orderType === "pickup";
+  const noFulfillment = !canDeliver && !canPickup;
+
   const minOrderAmount = shop.min_order_amount ?? 0;
   const belowMinimumOrder = minOrderAmount > 0 && subtotal > 0 && subtotal < minOrderAmount;
 
   const qualifiesForFreeDelivery =
+    !isPickup &&
     shop.free_delivery_threshold != null &&
     shop.free_delivery_threshold > 0 &&
     subtotal >= shop.free_delivery_threshold;
 
   const perKmFee = shop.delivery_fee_per_km ?? 0;
-  const needsDistanceForFee = perKmFee > 0 && !qualifiesForFreeDelivery;
+  const needsDistanceForFee = !isPickup && perKmFee > 0 && !qualifiesForFreeDelivery;
   const missingDistanceForFee = needsDistanceForFee && distanceKm == null;
 
   const shopHours = useMemo(
@@ -492,7 +492,7 @@ export default function WhatsAppCheckoutModal({
     [shop.delivery_zones],
   );
   const outsideServiceRadius = useMemo(() => {
-    if (!location?.coordinates) return false;
+    if (isPickup || !location?.coordinates) return false;
     const gate = isCustomerWithinCoverage(
       shop,
       location.coordinates.latitude,
@@ -500,9 +500,11 @@ export default function WhatsAppCheckoutModal({
       location.city,
     );
     return !gate.within;
-  }, [shop, location]);
+  }, [shop, location, isPickup]);
 
   const deliveryFee = useMemo(() => {
+    // Self-pickup never charges a delivery fee.
+    if (isPickup) return 0;
     const freeThreshold = shop.free_delivery_threshold;
     if (freeThreshold != null && freeThreshold > 0 && subtotal >= freeThreshold) return 0;
     const flat = shop.delivery_fee_flat ?? 0;
@@ -510,7 +512,7 @@ export default function WhatsAppCheckoutModal({
     // Without GPS distance, charge flat only and warn the shopper (see missingDistanceForFee).
     const distanceCharge = distanceKm != null && perKm > 0 ? distanceKm * perKm : 0;
     return Math.round((flat + distanceCharge) * 100) / 100;
-  }, [shop, subtotal, distanceKm]);
+  }, [shop, subtotal, distanceKm, isPickup]);
 
   const grandTotal = useMemo(
     () => Math.max(0, subtotal - discountAmount + deliveryFee),
@@ -781,45 +783,48 @@ export default function WhatsAppCheckoutModal({
       setErrors(validationErrors);
       if (Object.keys(validationErrors).length > 0) return;
 
-      // Live map pin is required so the rider can find the customer. A manually
-      // selected city resolves to a city centroid (not the customer's street),
-      // so it doesn't count as an exact pin — force a fresh high-accuracy read.
-      let hasPin =
-        !!location?.coordinates &&
-        location.source === "gps" &&
-        Number.isFinite(location.coordinates.latitude) &&
-        Number.isFinite(location.coordinates.longitude);
-      if (!hasPin) {
-        setLocationFillBusy(true);
-        setLocationFillError(null);
-        try {
-          const fresh = await detectLocationDetailed();
-          const c = fresh.location?.coordinates;
-          if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
-            hasPin = true;
-            const line = formatLocationAddress(fresh.location);
-            if (line) {
-              setShipping((s) => ({
-                ...s,
-                shippingAddress: s.shippingAddress.trim() || line,
-              }));
+      // Pickup needs no GPS pin — the customer is collecting from the shop.
+      if (!isPickup) {
+        // Live map pin is required so the rider can find the customer. A manually
+        // selected city resolves to a city centroid (not the customer's street),
+        // so it doesn't count as an exact pin — force a fresh high-accuracy read.
+        let hasPin =
+          !!location?.coordinates &&
+          location.source === "gps" &&
+          Number.isFinite(location.coordinates.latitude) &&
+          Number.isFinite(location.coordinates.longitude);
+        if (!hasPin) {
+          setLocationFillBusy(true);
+          setLocationFillError(null);
+          try {
+            const fresh = await detectLocationDetailed();
+            const c = fresh.location?.coordinates;
+            if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
+              hasPin = true;
+              const line = formatLocationAddress(fresh.location);
+              if (line) {
+                setShipping((s) => ({
+                  ...s,
+                  shippingAddress: s.shippingAddress.trim() || line,
+                }));
+              }
+            } else {
+              setLocationFillError(
+                locationErrorMessage(fresh.error) ||
+                  "Location is required for delivery. Turn on GPS and tap Use my precise location.",
+              );
+              setLocationFillBusy(false);
+              return;
             }
-          } else {
+          } catch {
             setLocationFillError(
-              locationErrorMessage(fresh.error) ||
-                "Location is required for delivery. Turn on GPS and tap Use my precise location.",
+              "Location is required for delivery. Turn on GPS and tap Use my precise location.",
             );
             setLocationFillBusy(false);
             return;
           }
-        } catch {
-          setLocationFillError(
-            "Location is required for delivery. Turn on GPS and tap Use my precise location.",
-          );
           setLocationFillBusy(false);
-          return;
         }
-        setLocationFillBusy(false);
       }
 
       // Email verification only — no paid SMS / phone OTP.
@@ -832,7 +837,7 @@ export default function WhatsAppCheckoutModal({
 
       setStep("confirm");
     },
-    [shipping, location, detectLocationDetailed, formatLocationAddress],
+    [shipping, location, detectLocationDetailed, formatLocationAddress, isPickup],
   );
 
   // ── Order Submission ────────────────────────────────────────────────────
@@ -900,33 +905,38 @@ export default function WhatsAppCheckoutModal({
         notes: item.notes,
       }));
 
-      // Prefer an exact GPS pin from checkout (never a city centroid); fall back
-      // to a fresh high-accuracy detect — the rider needs the real location.
-      let pinLat =
-        location?.source === "gps" ? location?.coordinates?.latitude ?? null : null;
-      let pinLng =
-        location?.source === "gps" ? location?.coordinates?.longitude ?? null : null;
-      if (pinLat == null || pinLng == null) {
-        try {
-          const fresh = await detectLocationDetailed();
-          const c = fresh.location?.coordinates;
-          if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
-            pinLat = c.latitude;
-            pinLng = c.longitude;
+      // Pickup needs no GPS pin — the customer is collecting from the shop.
+      let pinLat: number | null = null;
+      let pinLng: number | null = null;
+      if (!isPickup) {
+        // Prefer an exact GPS pin from checkout (never a city centroid); fall back
+        // to a fresh high-accuracy detect — the rider needs the real location.
+        pinLat =
+          location?.source === "gps" ? location?.coordinates?.latitude ?? null : null;
+        pinLng =
+          location?.source === "gps" ? location?.coordinates?.longitude ?? null : null;
+        if (pinLat == null || pinLng == null) {
+          try {
+            const fresh = await detectLocationDetailed();
+            const c = fresh.location?.coordinates;
+            if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
+              pinLat = c.latitude;
+              pinLng = c.longitude;
+            }
+          } catch {
+            /* handled below */
           }
-        } catch {
-          /* handled below */
         }
-      }
-      if (
-        pinLat == null ||
-        pinLng == null ||
-        !Number.isFinite(pinLat) ||
-        !Number.isFinite(pinLng)
-      ) {
-        throw new Error(
-          "Your live location is required so the rider can find you. Turn on GPS, tap Use my precise location, then try again.",
-        );
+        if (
+          pinLat == null ||
+          pinLng == null ||
+          !Number.isFinite(pinLat) ||
+          !Number.isFinite(pinLng)
+        ) {
+          throw new Error(
+            "Your live location is required so the rider can find you. Turn on GPS, tap Use my precise location, then try again.",
+          );
+        }
       }
 
       const orderResult = await withTimeout(
@@ -941,6 +951,7 @@ export default function WhatsAppCheckoutModal({
           deliveryFee,
           notes: shipping.deliveryNotes,
           couponCode: couponResult?.valid ? couponCode : undefined,
+          orderType: isPickup ? "pickup" : "delivery",
           customerLat: pinLat,
           customerLng: pinLng,
           customerCity: location?.city ?? undefined,
@@ -994,7 +1005,8 @@ export default function WhatsAppCheckoutModal({
         grandTotal,
         couponCode,
         ref,
-        { latitude: pinLat, longitude: pinLng },
+        { latitude: pinLat ?? 0, longitude: pinLng ?? 0 },
+        isPickup ? "pickup" : "delivery",
       );
 
       const whatsappUrl = `https://wa.me/${merchantPhone}?text=${encodeURIComponent(whatsappText)}`;
@@ -1051,6 +1063,7 @@ export default function WhatsAppCheckoutModal({
     onOrderPlaced,
     coverageMode,
     idempotencyKey,
+    isPickup,
   ]);
 
   const finishOrder = useCallback(() => {
@@ -1221,6 +1234,44 @@ export default function WhatsAppCheckoutModal({
         {/* ── Step: Review Cart ─────────────────────────────────────────── */}
         {step === "review" && (
           <div>
+            {/* Order-type selector — only channels the shop has enabled */}
+            <div className="px-6 pt-4">
+              <div className="flex rounded-full bg-zinc-100 p-1 dark:bg-zinc-800">
+                {canDeliver && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderType("delivery")}
+                    className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold transition-all ${
+                      !isPickup
+                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
+                        : "text-zinc-500 dark:text-zinc-400"
+                    }`}
+                  >
+                    🚚 Delivery
+                  </button>
+                )}
+                {canPickup && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderType("pickup")}
+                    className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold transition-all ${
+                      isPickup
+                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
+                        : "text-zinc-500 dark:text-zinc-400"
+                    }`}
+                  >
+                    🛍️ Pickup
+                  </button>
+                )}
+              </div>
+              {isPickup && (
+                <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                  You&apos;ll collect your order from <strong>{shop.location || shop.name}</strong> — no
+                  delivery fee applies.
+                </p>
+              )}
+            </div>
+
             <div className="max-h-64 space-y-2 overflow-y-auto px-6 py-4">
               {items.map(item => {
                 const qty = quantities[item.id] ?? item.quantity;
@@ -1350,8 +1401,8 @@ export default function WhatsAppCheckoutModal({
                 </div>
               </div>
 
-              {/* Free delivery nudge */}
-              {!qualifiesForFreeDelivery && shop.free_delivery_threshold != null && shop.free_delivery_threshold > 0 && (
+              {/* Free delivery nudge — delivery only */}
+              {!isPickup && !qualifiesForFreeDelivery && shop.free_delivery_threshold != null && shop.free_delivery_threshold > 0 && (
                 <div className="mb-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs dark:bg-emerald-900/20">
                   <InfoIcon />
                   <span className="text-emerald-700 dark:text-emerald-400">
@@ -1370,8 +1421,8 @@ export default function WhatsAppCheckoutModal({
                 </div>
               )}
 
-              {/* Distance-based delivery needs GPS */}
-              {missingDistanceForFee && (
+              {/* Distance-based delivery needs GPS — delivery only */}
+              {!isPickup && missingDistanceForFee && (
                 <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs dark:bg-amber-900/20">
                   <InfoIcon />
                   <span className="text-amber-700 dark:text-amber-400">
@@ -1401,27 +1452,40 @@ export default function WhatsAppCheckoutModal({
                 </div>
               )}
 
+              {noFulfillment && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs dark:bg-red-900/20">
+                  <InfoIcon />
+                  <span className="text-red-700 dark:text-red-400">
+                    This shop has paused delivery &amp; pickup right now. Try again later or contact them directly.
+                  </span>
+                </div>
+              )}
+
               {/* Shop info reminder */}
               <div className="mb-3 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs dark:bg-blue-900/20">
                 <InfoIcon />
                 <span className="text-blue-700 dark:text-blue-400">
-                  Your order will be sent to <strong>{shop.name}</strong> via WhatsApp
+                  Your {isPickup ? "pickup " : ""}order will be sent to <strong>{shop.name}</strong> via WhatsApp
                 </span>
               </div>
 
               <button
                 type="button"
                 onClick={handleGoToShipping}
-                disabled={items.length === 0 || belowMinimumOrder || shopClosed || outsideServiceRadius}
+                disabled={items.length === 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || noFulfillment}
                 className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
-                {shopClosed
-                  ? "Shop Closed — Come Back Later"
-                  : outsideServiceRadius
-                    ? "Outside Delivery Area"
-                    : belowMinimumOrder
-                      ? "Add More Items to Continue"
-                      : "Continue to Delivery Details →"}
+                {noFulfillment
+                  ? "Orders Paused — Try Later"
+                  : shopClosed
+                    ? "Shop Closed — Come Back Later"
+                    : outsideServiceRadius
+                      ? "Outside Delivery Area"
+                      : belowMinimumOrder
+                        ? "Add More Items to Continue"
+                        : isPickup
+                          ? "Continue to Pickup Details →"
+                          : "Continue to Delivery Details →"}
               </button>
             </div>
           </div>
@@ -1493,74 +1557,106 @@ export default function WhatsAppCheckoutModal({
                 </p>
               </div>
 
-              {/* Address */}
+              {/* Address — required for delivery, optional/hidden emphasis for pickup */}
               <div>
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <label htmlFor="wc-shipping-address" className="flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                    <MapPinIcon /> Delivery Address{" "}
-                    <span className="font-normal text-zinc-400">(recommended — helps the shop find you)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleUsePreciseLocation}
-                    disabled={locationFillBusy || isDetecting}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
-                  >
-                    {(locationFillBusy || isDetecting) ? (
-                      <>
-                        <SpinnerIcon /> Detecting…
-                      </>
+                    <MapPinIcon /> {isPickup ? "Pickup note" : "Delivery Address"}{" "}
+                    {isPickup ? (
+                      <span className="font-normal text-zinc-400">(optional)</span>
                     ) : (
-                      <>
-                        <MapPinIcon /> Use my precise location
-                      </>
+                      <span className="font-normal text-zinc-400">(recommended — helps the shop find you)</span>
                     )}
-                  </button>
+                  </label>
+                  {!isPickup && (
+                    <button
+                      type="button"
+                      onClick={handleUsePreciseLocation}
+                      disabled={locationFillBusy || isDetecting}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+                    >
+                      {(locationFillBusy || isDetecting) ? (
+                        <>
+                          <SpinnerIcon /> Detecting…
+                        </>
+                      ) : (
+                        <>
+                          <MapPinIcon /> Use my precise location
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
-                <input
-                  id="wc-shipping-address"
-                  type="text"
-                  autoComplete="street-address"
-                  value={shipping.shippingAddress}
-                  onChange={(e) => {
-                    setAutofilledFromAccount(false);
-                    setLocationFillError(null);
-                    setShipping(s => ({ ...s, shippingAddress: e.target.value }));
-                  }}
-                  placeholder="Full address"
-                  className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
-                    errors.shippingAddress
-                      ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                      : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
-                  } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
-                />
-                {errors.shippingAddress && <p className="mt-1 text-xs text-red-500">{errors.shippingAddress}</p>}
-                {locationFillError && (
-                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{locationFillError}</p>
-                )}
-                {!location?.coordinates && !locationFillError && (
-                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                    Live location is required for delivery. Tap <strong>Use my precise location</strong> so the rider gets a Maps pin.
-                  </p>
-                )}
-                {location?.coordinates && (
-                  <p className="mt-1 text-[0.65rem] text-emerald-600 dark:text-emerald-400">
-                    Location pin ready — it will be sent to the shop on WhatsApp.
-                  </p>
+                {isPickup ? (
+                  <>
+                    <input
+                      id="wc-shipping-address"
+                      type="text"
+                      value={shipping.shippingAddress}
+                      onChange={(e) => {
+                        setAutofilledFromAccount(false);
+                        setShipping(s => ({ ...s, shippingAddress: e.target.value }));
+                      }}
+                      placeholder="Anything the shop should know about collection (optional)"
+                      className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
+                        errors.shippingAddress
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                          : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                      } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
+                    />
+                    <p className="mt-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                      🛍️ You&apos;ll collect this order from <strong>{shop.location || shop.name}</strong>. No delivery
+                      fee, no GPS needed.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      id="wc-shipping-address"
+                      type="text"
+                      autoComplete="street-address"
+                      value={shipping.shippingAddress}
+                      onChange={(e) => {
+                        setAutofilledFromAccount(false);
+                        setLocationFillError(null);
+                        setShipping(s => ({ ...s, shippingAddress: e.target.value }));
+                      }}
+                      placeholder="Full address"
+                      className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
+                        errors.shippingAddress
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                          : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                      } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
+                    />
+                    {errors.shippingAddress && <p className="mt-1 text-xs text-red-500">{errors.shippingAddress}</p>}
+                    {locationFillError && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{locationFillError}</p>
+                    )}
+                    {!location?.coordinates && !locationFillError && (
+                      <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                        Live location is required for delivery. Tap <strong>Use my precise location</strong> so the rider gets a Maps pin.
+                      </p>
+                    )}
+                    {location?.coordinates && (
+                      <p className="mt-1 text-[0.65rem] text-emerald-600 dark:text-emerald-400">
+                        Location pin ready — it will be sent to the shop on WhatsApp.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* Notes */}
               <div>
                 <label htmlFor="wc-delivery-notes" className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                  Delivery Notes <span className="font-normal text-zinc-400">(optional)</span>
+                  {isPickup ? "Pickup Notes" : "Delivery Notes"} <span className="font-normal text-zinc-400">(optional)</span>
                 </label>
                 <textarea
                   id="wc-delivery-notes"
                   rows={2}
                   value={shipping.deliveryNotes}
                   onChange={(e) => setShipping(s => ({ ...s, deliveryNotes: e.target.value }))}
-                  placeholder="Delivery instructions"
+                  placeholder={isPickup ? "E.g. I'll call when I arrive" : "Delivery instructions"}
                   className={`w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-${accentColor}-500 focus:outline-none focus:ring-2 focus:ring-${accentColor}-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
               </div>
@@ -1626,22 +1722,32 @@ export default function WhatsAppCheckoutModal({
                 </div>
               </div>
 
-              {/* Delivery Info */}
+              {/* Delivery / Pickup Info */}
               <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50 space-y-1">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Delivery Information</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  {isPickup ? "Pickup Information" : "Delivery Information"}
+                </h4>
                 <p className="text-sm text-zinc-900 dark:text-zinc-100"><strong>{shipping.customerName}</strong></p>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
                   {shipping.customerPhone}
                 </p>
-                {shipping.shippingAddress && <p className="text-sm text-zinc-600 dark:text-zinc-400">📍 {shipping.shippingAddress}</p>}
-                {location?.coordinates ? (
-                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    📌 Live Maps pin will be sent for the rider
+                {isPickup ? (
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    🛍️ Collecting from <strong>{shop.location || shop.name}</strong>
                   </p>
                 ) : (
-                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                    ⚠️ Live location missing — go back and tap Use my precise location
-                  </p>
+                  <>
+                    {shipping.shippingAddress && <p className="text-sm text-zinc-600 dark:text-zinc-400">📍 {shipping.shippingAddress}</p>}
+                    {location?.coordinates ? (
+                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        📌 Live Maps pin will be sent for the rider
+                      </p>
+                    ) : (
+                      <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                        ⚠️ Live location missing — go back and tap Use my precise location
+                      </p>
+                    )}
+                  </>
                 )}
                 {shipping.deliveryNotes && (
                   <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
@@ -1682,7 +1788,7 @@ export default function WhatsAppCheckoutModal({
               <button
                 type="button"
                 onClick={handlePlaceOrder}
-                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius}
+                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || noFulfillment}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting ? (

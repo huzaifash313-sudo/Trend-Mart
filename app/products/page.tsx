@@ -537,6 +537,13 @@ function ProductsPageInner() {
         addToast("This product is unavailable.", "error");
         return;
       }
+      // Variant products must open the option picker first — otherwise the
+      // customer would silently add the base (Size/Flavour) price to cart.
+      if (full.variants && full.variants.length > 0) {
+        setQuickView(full);
+        syncUrlRef.current({ product: full.id });
+        return;
+      }
       const shop: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
         id: full.shop_id,
         name: full.shop_name || "Store",
@@ -679,7 +686,19 @@ function ProductsPageInner() {
   // during search/sort/infinite-scroll. Inline arrows here would otherwise
   // recreate on every parent render and defeat React.memo at 8k products.
   const handleGridOrder = useCallback(
-    (product: Product) => handleOrder({ product, quantity: 1 }),
+    (product: Product) => {
+      // Variant products must open the option picker first so the WhatsApp
+      // order carries the selected Size/Flavour and its real price.
+      if (product.variants && product.variants.length > 0) {
+        const full =
+          productsRef.current.find((p) => p.id === product.id) ??
+          (product as MarketplaceProduct);
+        setQuickView(full);
+        syncUrlRef.current({ product: full.id });
+        return;
+      }
+      handleOrder({ product, quantity: 1 });
+    },
     [handleOrder],
   );
 
