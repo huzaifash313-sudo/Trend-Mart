@@ -580,12 +580,17 @@ export async function filterShopsByProximity(
     };
   });
 
-  // Merchant coverage is ALWAYS enforced — regardless of the customer's browse
-  // scope (Near me / This city / All Pakistan). A shop set to "5 km only" must
-  // never be visible to a customer outside that radius, even in "All Pakistan".
-  // A shop that explicitly lists the customer's area in its zones/address is
-  // treated as covered for that area.
-  if (enforceServiceRadius) {
+  // Merchant coverage enforcement:
+  //  - "All Pakistan" browse = explicit show-everything → never hide by radius.
+  //  - No explicit km chosen ("Any" / default 0) → show everything sorted by
+  //    distance, don't hide far stores (this is why a stale/far GPS pin used
+  //    to make the whole marketplace look empty).
+  //  - Explicit radius (5/10/15 km) or "This city" → enforce merchant coverage.
+  const hasExplicitRadius =
+    browseScope === "radius" && Number.isFinite(maxDistanceKm) && maxDistanceKm > 0;
+  const enforceRadiusFilter =
+    enforceServiceRadius && (browseScope === "city" || hasExplicitRadius);
+  if (enforceRadiusFilter) {
     enriched = enriched.filter((s) => s.within_radius === true || s.matches_area === true);
   }
 

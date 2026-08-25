@@ -83,6 +83,28 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      // Openverse keyword-search results (CC-licensed) host their photos on
+      // Flickr's static CDN, Wikimedia Commons, and a few CC aggregator CDNs.
+      {
+        protocol: "https",
+        hostname: "**.staticflickr.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.wikimedia.org",
+      },
+      {
+        protocol: "https",
+        hostname: "pd.w.org",
+      },
+      {
+        protocol: "https",
+        hostname: "images.rawpixel.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.museumsvictoria.com.au",
+      },
       // Seed/demo data uses TheMealDB food photography.
       {
         protocol: "https",
