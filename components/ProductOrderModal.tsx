@@ -60,6 +60,7 @@ export default function ProductOrderModal({
       currency: product.currency || "PKR",
       shortCode: product.short_code ?? undefined,
       viewKind: "product",
+      priceTiers: product.variants?.length ? null : (product.price_tiers ?? null),
     },
   ];
 

@@ -207,6 +207,7 @@ export default function CartBar() {
     currency: i.currency,
     originalPrice: i.originalPrice ?? undefined,
     shortCode: i.shortCode ?? undefined,
+    priceTiers: i.priceTiers ?? null,
   }));
 
   const handleClearCart = async () => {

@@ -9,6 +9,7 @@ import { getProductImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product, Shop } from "@/types";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
+import { hasPriceTiers, priceForQuantity, tierPreviewLabels } from "@/lib/priceTiers";
 import { useToast } from "@/components/Toast";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 
@@ -100,6 +101,16 @@ export default function QuickViewModal({
   const variantLabel = selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · ");
   const displayPrice = computeVariantPrice(product.price, product.variants, variantLabel);
   const variantsReady = !hasVariants || selectedVariants.length === (product.variants?.length ?? 0);
+  // Quantity tiers apply only when no variant overrides the base price —
+  // otherwise the variant's own price (absolute/add-on) wins.
+  const tiersActive = hasPriceTiers(product.price_tiers) && displayPrice === product.price;
+  const tierLabels = useMemo(
+    () => (tiersActive ? tierPreviewLabels(product.price_tiers) : []),
+    [tiersActive, product.price_tiers],
+  );
+  const lineTotal = tiersActive
+    ? priceForQuantity(product.price, product.price_tiers, quantity)
+    : Math.round(displayPrice * quantity);
 
   const pauseAutoUntil = useRef(0);
 
@@ -175,14 +186,14 @@ export default function QuickViewModal({
       return;
     }
     const productForCart =
-      displayPrice !== product.price
-        ? { ...product, price: displayPrice }
+      displayPrice !== product.price || !tiersActive
+        ? { ...product, price: displayPrice, price_tiers: tiersActive ? product.price_tiers : null }
         : product;
     addItem(productForCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, displayPrice]);
+  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive]);
 
   const handleOrder = useCallback(() => {
     if (!variantsReady) {
@@ -194,8 +205,8 @@ export default function QuickViewModal({
       return;
     }
     const productForCart =
-      displayPrice !== product.price
-        ? { ...product, price: displayPrice }
+      displayPrice !== product.price || !tiersActive
+        ? { ...product, price: displayPrice, price_tiers: tiersActive ? product.price_tiers : null }
         : product;
     onOrder?.({
       product: productForCart,
@@ -203,7 +214,7 @@ export default function QuickViewModal({
       quantity,
       notes: itemNotes.trim() || undefined,
     });
-  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, displayPrice, onOrder]);
+  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive, onOrder]);
 
   const { hasDiscount, originalPrice, discountPercent: discountPct } = getProductDiscount(product);
 
@@ -321,19 +332,37 @@ export default function QuickViewModal({
 
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-              {formatRupees(displayPrice)}
+              {formatRupees(lineTotal)}
             </span>
+            {quantity > 1 && (
+              <span className="text-xs text-zinc-400">
+                ({formatRupees(Math.round(lineTotal / quantity))} each)
+              </span>
+            )}
             {hasDiscount && originalPrice != null && (
               <>
                 <span className="text-sm text-zinc-400 line-through">
-                  {formatRupees(originalPrice)}
+                  {formatRupees(originalPrice * quantity)}
                 </span>
                 <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                  Save {formatRupees(originalPrice - product.price)}
+                  Save {formatRupees(originalPrice * quantity - lineTotal)}
                 </span>
               </>
             )}
           </div>
+
+          {tierLabels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {tierLabels.map((label) => (
+                <span key={label} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                  {label}
+                </span>
+              ))}
+              <span className="rounded-full bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-400 dark:bg-zinc-800">
+                bulk price
+              </span>
+            </div>
+          )}
 
           {hasVariants && product.variants ? (
             <VariantSelector

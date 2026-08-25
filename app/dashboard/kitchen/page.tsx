@@ -22,6 +22,7 @@ import {
 import { subscribeToOrders } from "@/lib/supabase/realtime";
 import { useToast } from "@/components/Toast";
 import KitchenManualOrderModal from "@/components/KitchenManualOrderModal";
+import OrderBillModal from "@/components/OrderBillModal";
 import { isDineInCategory } from "@/types";
 import type { DineInTable, DineStatus, Order, Shop } from "@/types";
 
@@ -60,6 +61,7 @@ export default function KitchenBoardPage() {
   const [clock, setClock] = useState(Date.now());
   const [showManual, setShowManual] = useState(false);
   const [tables, setTables] = useState<DineInTable[]>([]);
+  const [billOrder, setBillOrder] = useState<Order | null>(null);
   const [todayStats, setTodayStats] = useState<{ orders: number; revenue: number } | null>(null);
 
   const load = useCallback(async (shopId: string) => {
@@ -385,6 +387,13 @@ export default function KitchenBoardPage() {
 
                   {actions.length > 0 && (
                     <div className="flex gap-2 border-t border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => setBillOrder(order)}
+                        className="rounded-xl border border-zinc-200 px-3 py-2.5 text-sm font-semibold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        🧾 Bill
+                      </button>
                       {actions.map((a) => (
                         <button
                           key={a.label}
@@ -403,6 +412,14 @@ export default function KitchenBoardPage() {
           </div>
         )}
       </div>
+
+      {billOrder && shop && (
+        <OrderBillModal
+          order={billOrder}
+          shop={shop}
+          onClose={() => setBillOrder(null)}
+        />
+      )}
     </div>
   );
 }

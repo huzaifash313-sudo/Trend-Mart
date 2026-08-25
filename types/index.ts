@@ -83,6 +83,16 @@ export interface Shop {
    */
   accepts_delivery?: boolean | null;
   accepts_pickup?: boolean | null;
+  /**
+   * Monetization tier. `'free'` (default) keeps 1 active story; `'pro'`
+   * raises the story ceiling. No payments are wired yet — an admin flips
+   * this flag (future: set automatically by the payment gateway).
+   */
+  subscription_tier?: "free" | "pro" | null;
+  /** Max concurrently-active stories for this shop. Defaults to 1. */
+  stories_quota?: number | null;
+  /** When a Pro subscription lapses (null = not subscribed / no expiry). */
+  pro_expires_at?: string | null;
 }
 
 export type ShopVerificationStatus = "pending" | "approved" | "rejected";
@@ -271,6 +281,14 @@ export interface VariantGroup {
   options: ProductVariant[];
 }
 
+// ─── Quantity Price Tier (bulk pricing) ─────────────────────────────────────
+export interface PriceTier {
+  /** Starting quantity for this price (e.g. 1, 2, 6). */
+  min_qty: number;
+  /** Per-unit price in PKR for quantities >= min_qty (until the next tier). */
+  price: number;
+}
+
 // ─── Inventory Snapshot (Prompt 2: bulk editing state) ──────────────────────
 export interface InventorySnapshot {
   /** Composite key: `${productId}::${variantLabel}` */
@@ -356,6 +374,8 @@ export interface Product {
   short_code?: string | null;
   /** Optional product variants (sizes, colors, etc.) stored as JSON */
   variants?: VariantGroup[] | null;
+  /** Optional quantity-based bulk pricing (e.g. 1 = 200, pack of 6 = 1100). */
+  price_tiers?: PriceTier[] | null;
   /** FK to main category */
   category_id?: string | null;
   /** FK to sub_category */
@@ -417,6 +437,8 @@ export interface ProductFormData {
   sub_category_id?: string | null;
   /** Optional product variants (sizes, colors, etc.) */
   variants?: VariantGroup[] | null;
+  /** Optional quantity-based bulk pricing (e.g. 1 = 200, pack of 6 = 1100). */
+  price_tiers?: PriceTier[] | null;
 }
 
 // ─── Review (public.reviews table) ──────────────────────────────────────────
@@ -472,6 +494,41 @@ export interface Story {
   shop_location?: string | null;
   shop_is_live?: boolean | null;
   shop_verification_status?: string | null;
+}
+
+// ─── Story Subscription Quota ────────────────────────────────────────────────
+/** A shop's current story allowance + usage, resolved for the merchant UI. */
+export interface StoryQuota {
+  tier: "free" | "pro";
+  /** Max concurrently-active stories this shop may have. */
+  quota: number;
+  /** Number of stories currently live (not yet expired). */
+  activeCount: number;
+  /** Slots left before the shop hits its ceiling. */
+  remaining: number;
+  /** True when a Pro subscription has lapsed and behaves as free. */
+  isProLapsed: boolean;
+}
+
+export const DEFAULT_STORIES_QUOTA = 1;
+export const PRO_STORIES_QUOTA = 10;
+
+/**
+ * Resolve a shop's effective story quota. Pro only counts while its expiry
+ * (if any) is still in the future — lapsed Pro behaves as the free default.
+ */
+export function getStoriesQuota(
+  shop?: Pick<
+    Shop,
+    "subscription_tier" | "stories_quota" | "pro_expires_at"
+  > | null,
+): number {
+  if (!shop) return DEFAULT_STORIES_QUOTA;
+  const tier = shop.subscription_tier ?? "free";
+  const expiry = shop.pro_expires_at ? new Date(shop.pro_expires_at).getTime() : null;
+  const proActive = tier === "pro" && (expiry === null || expiry > Date.now());
+  const base = proActive ? PRO_STORIES_QUOTA : DEFAULT_STORIES_QUOTA;
+  return Math.max(shop.stories_quota ?? base, 1);
 }
 
 // ─── User Profile (derived from Supabase auth.users) ───────────────────────

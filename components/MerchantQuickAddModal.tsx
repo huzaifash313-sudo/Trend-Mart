@@ -1,15 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { PriceTier, VariantGroup } from "@/types";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { createProduct } from "@/services/productService";
-import { createStory, fetchStoriesByShopId } from "@/services/storyService";
+import { createStory, fetchShopStoryQuota } from "@/services/storyService";
 import {
   fetchSubCategories,
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import BulkProductCreator from "@/components/BulkProductCreator";
 import ImageUpload from "@/components/ImageUpload";
+import VariantEditor from "@/components/VariantEditor";
+import PriceTierEditor from "@/components/PriceTierEditor";
+import { normalizeTiers } from "@/lib/priceTiers";
 import QuickCouponPanel from "@/components/QuickCouponPanel";
 import DealManager from "@/components/DealManager";
 import { useToast } from "@/components/Toast";
@@ -35,11 +39,17 @@ export default function MerchantQuickAddModal() {
   const [imageUrl, setImageUrl] = useState("");
   const [subCategoryId, setSubCategoryId] = useState("");
   const [subs, setSubs] = useState<SubCategoryWithMeta[]>([]);
+  const [variants, setVariants] = useState<VariantGroup[]>([]);
+  const [priceTiers, setPriceTiers] = useState<PriceTier[]>([]);
   const [saving, setSaving] = useState(false);
   const [storyImage, setStoryImage] = useState("");
   const [storyCaption, setStoryCaption] = useState("");
   const [storySaving, setStorySaving] = useState(false);
-  const [hasActiveStory, setHasActiveStory] = useState(false);
+  const [storyQuota, setStoryQuota] = useState<{
+    quota: number;
+    activeCount: number;
+    tier: "free" | "pro";
+  } | null>(null);
 
   useEffect(() => {
     if (!open || !shopCategory) return;
@@ -58,15 +68,9 @@ export default function MerchantQuickAddModal() {
   useEffect(() => {
     if (!open || !shopId || tab !== "story") return;
     let cancelled = false;
-    fetchStoriesByShopId(shopId).then((result) => {
+    fetchShopStoryQuota(shopId).then((result) => {
       if (cancelled || !result.success) return;
-      const active = result.data.some((s) => {
-        if (!s.expires_at && s.created_at) {
-          return Date.now() - new Date(s.created_at).getTime() < 24 * 60 * 60 * 1000;
-        }
-        return s.expires_at ? new Date(s.expires_at).getTime() > Date.now() : true;
-      });
-      setHasActiveStory(active);
+      setStoryQuota(result.data);
     });
     return () => {
       cancelled = true;
@@ -79,6 +83,8 @@ export default function MerchantQuickAddModal() {
     setPrice("");
     setOriginalPrice("");
     setImageUrl("");
+    setVariants([]);
+    setPriceTiers([]);
   }, []);
 
   const handleCreateProduct = async (e: FormEvent) => {
@@ -90,6 +96,7 @@ export default function MerchantQuickAddModal() {
       return;
     }
     setSaving(true);
+    const cleanTiers = normalizeTiers(priceTiers);
     const result = await createProduct(shopId, {
       name: name.trim(),
       description: description.trim(),
@@ -100,6 +107,8 @@ export default function MerchantQuickAddModal() {
       is_available: true,
       category_id: shopCategory,
       sub_category_id: subCategoryId || null,
+      variants: variants.length > 0 ? variants : null,
+      price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
     });
     if (result.success) {
       addToast("Product saved.", "success");
@@ -119,10 +128,11 @@ export default function MerchantQuickAddModal() {
       return;
     }
     setStorySaving(true);
-    // createStory enforces 1 active story per shop (replaces existing)
+    // createStory enforces a soft quota — posting at the limit replaces the oldest story.
     const result = await createStory(shopId, storyImage.trim(), storyCaption.trim());
     if (result.success) {
-      addToast(hasActiveStory ? "Story replaced." : "Story posted.", "success");
+      const atLimit = storyQuota ? storyQuota.activeCount >= storyQuota.quota : false;
+      addToast(atLimit ? "Story posted — oldest replaced." : "Story posted.", "success");
       setStoryImage("");
       setStoryCaption("");
       closeQuickAdd();
@@ -241,6 +251,8 @@ export default function MerchantQuickAddModal() {
                 fileId={`${shopId}-quick`}
                 showPreview
               />
+              <VariantEditor variants={variants} onChange={setVariants} />
+              <PriceTierEditor tiers={priceTiers} onChange={setPriceTiers} basePrice={Number(price) || 0} />
               <button
                 type="submit"
                 disabled={saving}
@@ -265,12 +277,23 @@ export default function MerchantQuickAddModal() {
 
           {tab === "story" ? (
             <form onSubmit={handleCreateStory} className="space-y-3">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                One active story per store. Posting a new one replaces the current story. Visible on the homepage for 24 hours.
-              </p>
-              {hasActiveStory ? (
+              {storyQuota ? (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {storyQuota.tier === "pro"
+                    ? `Pro plan: up to ${storyQuota.quota} active stories at once (${storyQuota.activeCount} live now).`
+                    : `${storyQuota.quota} active stor${storyQuota.quota === 1 ? "y" : "ies"} on the free plan (${storyQuota.activeCount} live now).`}{" "}
+                  Stories stay visible on the homepage for 24 hours.
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Stories stay visible on the homepage for 24 hours.
+                </p>
+              )}
+              {storyQuota && storyQuota.activeCount >= storyQuota.quota ? (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                  You already have an active story. Saving will replace it.
+                  {storyQuota.quota === 1
+                    ? "You already have an active story. Posting a new one will replace it."
+                    : `You're at your story limit (${storyQuota.quota}). Posting will replace the oldest one.`}
                 </p>
               ) : null}
               <ImageUpload
@@ -293,7 +316,11 @@ export default function MerchantQuickAddModal() {
                 disabled={storySaving || !storyImage.trim()}
                 className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                {storySaving ? "Posting…" : hasActiveStory ? "Replace story" : "Post story"}
+                {storySaving
+                  ? "Posting…"
+                  : storyQuota && storyQuota.activeCount >= storyQuota.quota
+                    ? "Replace story"
+                    : "Post story"}
               </button>
             </form>
           ) : null}

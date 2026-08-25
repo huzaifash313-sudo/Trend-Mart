@@ -28,8 +28,9 @@ import { createClient } from "@/lib/supabase/client";
 import { createOrder } from "@/services/orderService";
 import { validateCoupon, fetchCouponsByShopId } from "@/services/couponService";
 import { saveOrderRecord } from "@/services/orderHistoryService";
-import type { OrderItem as OrderItemType, Shop } from "@/types";
+import type { OrderItem as OrderItemType, PriceTier, Shop } from "@/types";
 import { formatRupees } from "@/lib/formatters";
+import { priceForQuantity, hasPriceTiers } from "@/lib/priceTiers";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
 import {
@@ -94,6 +95,17 @@ export interface WhatsAppCartItem {
   viewKind?: "product" | "deal";
   /** Compact `/p/{code}` short code when available. */
   shortCode?: string;
+  /** Quantity price tiers — line total recomputes when the qty changes. */
+  priceTiers?: PriceTier[] | null;
+}
+
+/** Line total for an item at a given quantity (tier-aware). */
+function itemLineTotal(item: { price: number; priceTiers?: PriceTier[] | null }, qty: number): number {
+  const q = Math.max(1, Math.min(99, Math.round(qty) || 1));
+  if (hasPriceTiers(item.priceTiers)) {
+    return priceForQuantity(item.price, item.priceTiers, q);
+  }
+  return item.price * q;
 }
 
 export interface ShippingDetails {
@@ -267,7 +279,7 @@ function buildWhatsAppMessage(
     const safeItemName = sanitizePayloadString(item.name, 100);
     const safeVariant = item.variant ? sanitizePayloadString(item.variant, 50) : "";
     const safeItemNotes = item.notes ? sanitizePayloadString(item.notes, 200) : "";
-    const itemTotal = safePrice * qty;
+    const itemTotal = itemLineTotal({ price: safePrice, priceTiers: item.priceTiers }, qty);
     const safeOriginalPrice = item.originalPrice ? sanitizePayloadNumber(item.originalPrice) : 0;
 
     const variantLabel = safeVariant ? ` (${safeVariant})` : "";
@@ -443,7 +455,7 @@ export default function WhatsAppCheckoutModal({
   const subtotal = useMemo(() => {
     return items.reduce((sum, item) => {
       const qty = quantities[item.id] ?? item.quantity;
-      return sum + item.price * qty;
+      return sum + itemLineTotal(item, qty);
     }, 0);
   }, [items, quantities]);
 
@@ -895,15 +907,19 @@ export default function WhatsAppCheckoutModal({
         );
       }
 
-      // 1. Persist order to Supabase (unit price + qty — stock deducts correctly)
-      const orderItems: OrderItemType[] = items.map(item => ({
-        product_id: item.productId,
-        name: item.name,
-        price: item.price,
-        quantity: quantities[item.id] ?? item.quantity,
-        variant: item.variant,
-        notes: item.notes,
-      }));
+      // 1. Persist order to Supabase (effective unit price + qty — tier-aware)
+      const orderItems: OrderItemType[] = items.map(item => {
+        const oQty = Math.max(1, Math.round(quantities[item.id] ?? item.quantity));
+        const oTotal = itemLineTotal(item, oQty);
+        return {
+          product_id: item.productId,
+          name: item.name,
+          price: Math.round(oTotal / Math.max(1, oQty)),
+          quantity: oQty,
+          variant: item.variant,
+          notes: item.notes,
+        };
+      });
 
       // Pickup needs no GPS pin — the customer is collecting from the shop.
       let pinLat: number | null = null;
@@ -1275,7 +1291,10 @@ export default function WhatsAppCheckoutModal({
             <div className="max-h-64 space-y-2 overflow-y-auto px-6 py-4">
               {items.map(item => {
                 const qty = quantities[item.id] ?? item.quantity;
-                const itemTotal = item.price * qty;
+                const itemTotal = itemLineTotal(item, qty);
+                const tierUnit = hasPriceTiers(item.priceTiers)
+                  ? Math.round(itemTotal / Math.max(1, qty))
+                  : item.price;
                 return (
                   <div key={item.id} className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50">
                     {/* Thumbnail */}
@@ -1292,8 +1311,8 @@ export default function WhatsAppCheckoutModal({
                       <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.name}</p>
                       {item.variant && <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.variant}</p>}
                       <div className="flex items-center gap-2">
-                        <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatRupees(item.price)}</p>
-                        {item.originalPrice && item.originalPrice > item.price && (
+                        <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatRupees(tierUnit)}</p>
+                        {item.originalPrice && item.originalPrice > tierUnit && (
                           <p className="text-[0.6rem] text-zinc-400 line-through">{formatRupees(item.originalPrice)}</p>
                         )}
                         <p className="text-xs text-zinc-400">× {qty} = {formatRupees(itemTotal)}</p>
@@ -1694,7 +1713,7 @@ export default function WhatsAppCheckoutModal({
                       {item.name} {item.variant ? `(${item.variant})` : ""} × {quantities[item.id] ?? item.quantity}
                     </span>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                      {formatRupees(item.price * (quantities[item.id] ?? item.quantity))}
+                      {formatRupees(itemLineTotal(item, quantities[item.id] ?? item.quantity))}
                     </span>
                   </div>
                 ))}

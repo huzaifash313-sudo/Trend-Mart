@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { Product, VariantGroup } from "@/types";
+import type { Product, PriceTier, VariantGroup } from "@/types";
 import { createProduct, updateProduct } from "@/services/productService";
 import {
   fetchSubCategories,
@@ -10,10 +10,12 @@ import {
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { getProductImages, normalizeProductGallery } from "@/lib/productImages";
+import { normalizeTiers } from "@/lib/priceTiers";
 import MultiImageUpload from "@/components/MultiImageUpload";
 import CustomSelect from "@/components/CustomSelect";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import VariantEditor from "@/components/VariantEditor";
+import PriceTierEditor from "@/components/PriceTierEditor";
 import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
@@ -58,6 +60,7 @@ export default function ProductEditorModal({
   const [subCategoryId, setSubCategoryId] = useState("");
   const [subs, setSubs] = useState<SubCategoryWithMeta[]>([]);
   const [variants, setVariants] = useState<VariantGroup[]>([]);
+  const [priceTiers, setPriceTiers] = useState<PriceTier[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Prefill form on open / when switching between products.
@@ -74,6 +77,7 @@ export default function ProductEditorModal({
       setIsAvailable(product.is_available !== false);
       setSubCategoryId(product.sub_category_id ?? "");
       setVariants((product.variants as VariantGroup[] | null) ?? []);
+      setPriceTiers((product.price_tiers as PriceTier[] | null) ?? []);
     } else {
       setName("");
       setDescription("");
@@ -83,6 +87,7 @@ export default function ProductEditorModal({
       setIsAvailable(true);
       setSubCategoryId("");
       setVariants([]);
+      setPriceTiers([]);
     }
   }, [product]);
 
@@ -129,6 +134,7 @@ export default function ProductEditorModal({
       const normalized = normalizeProductGallery(gallery);
       const original = originalPrice.trim() ? Number(originalPrice) : null;
       const hasDeal = original != null && Number.isFinite(original) && original > parsedPrice;
+      const cleanTiers = normalizeTiers(priceTiers);
 
       const payload = {
         name: name.trim(),
@@ -142,6 +148,7 @@ export default function ProductEditorModal({
         category_id: shopCategory || null,
         sub_category_id: subId || null,
         variants: variants.length > 0 ? variants : null,
+        price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
       };
 
       const result = isEdit && product
@@ -167,6 +174,7 @@ export default function ProductEditorModal({
       isAvailable,
       subCategoryId,
       variants,
+      priceTiers,
       isEdit,
       product,
       shopId,
@@ -292,6 +300,8 @@ export default function ProductEditorModal({
           />
 
           <VariantEditor variants={variants} onChange={setVariants} />
+
+          <PriceTierEditor tiers={priceTiers} onChange={setPriceTiers} basePrice={Number(price) || 0} />
 
           <ToggleSwitch
             checked={isAvailable}

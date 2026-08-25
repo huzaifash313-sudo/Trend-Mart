@@ -4,7 +4,8 @@
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
-import type { Story } from "@/types";
+import type { Story, StoryQuota } from "@/types";
+import { getStoriesQuota } from "@/types";
 import { logError } from "@/services/errorService";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,14 +124,69 @@ export async function fetchStoriesByShopId(
   }
 }
 
+/**
+ * Resolve a shop's story quota + live usage in one round-trip.
+ * Drives the merchant UI ("1 of 1 active", "3 of 10 active", …).
+ */
+export async function fetchShopStoryQuota(
+  shopId: string,
+): Promise<ServiceResult<StoryQuota>> {
+  const supabase = createClient();
+
+  try {
+    const { data: shop, error } = await supabase
+      .from("shops")
+      .select("id, subscription_tier, stories_quota, pro_expires_at")
+      .eq("id", shopId)
+      .maybeSingle();
+    if (error) throw error;
+
+    const { data: stories, error: storiesErr } = await supabase
+      .from("stories")
+      .select("id, expires_at, created_at")
+      .eq("shop_id", shopId);
+    if (storiesErr) throw storiesErr;
+
+    const now = Date.now();
+    const activeCount = (stories ?? []).filter((s) => {
+      if (s.expires_at) return new Date(s.expires_at).getTime() > now;
+      return s.created_at
+        ? now - new Date(s.created_at).getTime() < 24 * 60 * 60 * 1000
+        : true;
+    }).length;
+
+    const tier = (shop?.subscription_tier === "pro" ? "pro" : "free") as StoryQuota["tier"];
+    const quota = getStoriesQuota(shop);
+    const expiry = shop?.pro_expires_at ? new Date(shop.pro_expires_at).getTime() : null;
+
+    return {
+      success: true,
+      data: {
+        tier,
+        quota,
+        activeCount,
+        remaining: Math.max(quota - activeCount, 0),
+        isProLapsed: tier === "pro" && expiry !== null && expiry <= now,
+      },
+    };
+  } catch (err) {
+    logError(err, { module: "storyService.fetchShopStoryQuota", meta: { shopId } });
+    return { success: false, error: toError(err) };
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────── */
 /*  Authenticated Mutations (called from dashboard)                            */
 /* ──────────────────────────────────────────────────────────────────────────── */
 
 /**
  * Create a new story for a shop.
- * Strict rule: one active story per shop — replace any existing ones first.
- * RLS ensures only the shop owner can insert/delete.
+ * Soft quota enforcement ("help merchants, never harm a business"):
+ * posting is ALWAYS allowed, but once the shop hits its active-story ceiling
+ * the OLDEST story is replaced first. Free stores therefore keep exactly 1
+ * live story while Pro stores can keep several up at once — a merchant is
+ * never blocked from refreshing their storefront. RLS ensures only the shop
+ * owner can insert/delete.
  */
 export async function createStory(
   shopId: string,
@@ -140,19 +196,26 @@ export async function createStory(
   const supabase = createClient();
 
   try {
-    // Enforce 1 active story per merchant store
-    const { data: existing } = await supabase
-      .from("stories")
-      .select("id")
-      .eq("shop_id", shopId);
+    const quotaRes = await fetchShopStoryQuota(shopId);
+    if (!quotaRes.success) return { success: false, error: quotaRes.error };
+    const { quota, activeCount } = quotaRes.data;
 
-    if (existing && existing.length > 0) {
-      const ids = existing.map((row) => String(row.id));
-      const { error: deleteError } = await supabase
+    // At the ceiling → drop the oldest story so the new one always lands.
+    if (activeCount >= quota) {
+      const { data: existing } = await supabase
         .from("stories")
-        .delete()
-        .in("id", ids);
-      if (deleteError) throw deleteError;
+        .select("id")
+        .eq("shop_id", shopId)
+        .order("created_at", { ascending: true })
+        .limit(1);
+      const oldestId = existing && existing.length > 0 ? String(existing[0].id) : null;
+      if (oldestId) {
+        const { error: deleteError } = await supabase
+          .from("stories")
+          .delete()
+          .eq("id", oldestId);
+        if (deleteError) throw deleteError;
+      }
     }
 
     const { data, error } = await supabase

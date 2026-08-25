@@ -139,6 +139,10 @@ function buildProductRow(
     row.images = gallery.length > 0 ? gallery : [];
     row.stock_status = sanitized.stock_status || "in_stock";
     row.currency = "PKR";
+    row.price_tiers =
+      Array.isArray(sanitized.price_tiers) && sanitized.price_tiers.length > 0
+        ? sanitized.price_tiers
+        : null;
 
     // category_id: intended schema stores the category NAME (text). Live DBs that
     // still type it as uuid reject names with 400/22P02. Never POST a non-UUID
@@ -316,6 +320,7 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     is_available: row.is_available !== false,
     stock_status: (row.stock_status as string | undefined) ?? undefined,
     variants: (row.variants as Product["variants"]) ?? null,
+    price_tiers: (row.price_tiers as Product["price_tiers"]) ?? null,
     orders_count: Number(row.orders_count) || 0,
     click_count: Number(row.click_count) || 0,
     category_id: (row.category_id as string | null) ?? null,
@@ -368,7 +373,7 @@ function sortMarketplaceProducts(
 const MARKETPLACE_SELECT = `
   id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
-  category_id, sub_category_id, created_at, short_code, variants,
+  category_id, sub_category_id, created_at, short_code, variants, price_tiers,
   orders_count, click_count,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
@@ -908,6 +913,7 @@ export async function createProduct(
       if (/deal_expires_at/i.test(msg)) delete stripped.deal_expires_at;
       if (/images/i.test(msg)) delete stripped.images;
       if (/original_price/i.test(msg)) delete stripped.original_price;
+      if (/price_tiers/i.test(msg)) delete stripped.price_tiers;
       ({ data, error } = await supabase
         .from("products")
         .insert(stripped)
@@ -1088,6 +1094,7 @@ export async function updateProduct(
       if (/deal_expires_at/i.test(msg)) delete stripped.deal_expires_at;
       if (/images/i.test(msg)) delete stripped.images;
       if (/original_price/i.test(msg)) delete stripped.original_price;
+      if (/price_tiers/i.test(msg)) delete stripped.price_tiers;
       ({ data, error } = await supabase
         .from("products")
         .update(stripped)

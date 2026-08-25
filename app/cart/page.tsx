@@ -167,6 +167,7 @@ export default function CartPage() {
     currency: i.currency,
     originalPrice: i.originalPrice ?? undefined,
     shortCode: i.shortCode ?? undefined,
+    priceTiers: i.priceTiers ?? null,
   }));
 
   return (

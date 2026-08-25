@@ -9,6 +9,7 @@ import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
+import { hasPriceTiers, tierPreviewLabels } from "@/lib/priceTiers";
 import CompactRating from "@/components/CompactRating";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import KebabMenu, { type KebabMenuItem } from "@/components/KebabMenu";
@@ -247,6 +248,10 @@ const ProductCard = memo(function ProductCard({
   }, [onPinToggle, onEdit, onDelete, product, isPinned]);
 
   const { hasDiscount, originalPrice, discountPercent } = getProductDiscount(product);
+  const bulkTierChips = useMemo(
+    () => (hasPriceTiers(product.price_tiers) ? tierPreviewLabels(product.price_tiers).slice(0, 2) : []),
+    [product.price_tiers],
+  );
   const offerTags = useMemo(
     () => buildProductOfferTags(product, offerContext),
     [product, offerContext],
@@ -397,6 +402,21 @@ const ProductCard = memo(function ProductCard({
                     {discountPercent}% OFF
                   </span>
                 ) : null}
+              </div>
+            ) : null}
+            {bulkTierChips.length > 0 ? (
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
+                {bulkTierChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="whitespace-nowrap rounded bg-teal-50 px-1 py-px text-[9px] font-semibold leading-none text-teal-700 dark:bg-teal-950/40 dark:text-teal-300"
+                  >
+                    {chip}
+                  </span>
+                ))}
+                <span className="whitespace-nowrap text-[9px] leading-none text-zinc-400 dark:text-zinc-500">
+                  bulk price
+                </span>
               </div>
             ) : null}
           </div>

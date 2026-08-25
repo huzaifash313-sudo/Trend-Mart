@@ -11,8 +11,9 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { Product, Shop } from "@/types";
+import type { PriceTier, Product, Shop } from "@/types";
 import { getProductDiscount } from "@/lib/formatters";
+import { priceForQuantity } from "@/lib/priceTiers";
 import { scopedKey, scopedKeyFor } from "@/lib/clientScope";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
@@ -26,6 +27,8 @@ export interface CartItem {
   shopWhatsapp: string;
   name: string;
   price: number;
+  /** Original single-item price — tiered recompute uses this as the base. */
+  basePrice?: number;
   originalPrice?: number | null;
   imageUrl?: string | null;
   quantity: number;
@@ -35,6 +38,8 @@ export interface CartItem {
   currency?: string;
   /** Compact deep-link code for the direct product page `/p/{code}`. */
   shortCode?: string | null;
+  /** Quantity price tiers — unit price recomputes when quantity changes. */
+  priceTiers?: PriceTier[] | null;
 }
 
 /* ── Sanitization Helpers — Strict Data Validation ─────────────────────────── */
@@ -77,6 +82,28 @@ function sanitizeVariant(input: unknown): string {
   return sanitizeString(input, 100);
 }
 
+/** Sanitize persisted price tiers to {min_qty, price} numbers. */
+function sanitizePriceTiers(raw: unknown): PriceTier[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: PriceTier[] = [];
+  for (const t of raw) {
+    if (!t || typeof t !== "object") continue;
+    const rec = t as Record<string, unknown>;
+    const minQty = Math.round(Number(rec.min_qty) || 0);
+    const price = Number(rec.price);
+    if (minQty >= 1 && Number.isFinite(price) && price > 0) {
+      out.push({ min_qty: minQty, price });
+    }
+  }
+  return out.length > 0 ? out : null;
+}
+
+/** Per-unit price for a cart line given its tiers and current quantity. */
+function tieredUnitPrice(price: number, tiers: PriceTier[] | null | undefined, qty: number): number {
+  if (!tiers || tiers.length === 0) return price;
+  return Math.round(priceForQuantity(price, tiers, qty) / Math.max(1, qty));
+}
+
 function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
   const id = sanitizeString(raw.id, 200);
   const productId = sanitizeString(raw.productId, 200);
@@ -92,15 +119,17 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
   const currency = raw.currency ? sanitizeString(raw.currency, 10).toUpperCase() : undefined;
 
   const price = sanitizePrice(raw.price);
+  const basePrice = raw.basePrice != null ? sanitizePrice(raw.basePrice) : price;
   const quantity = sanitizeQuantity(raw.quantity);
   const originalPrice = raw.originalPrice != null ? sanitizePrice(raw.originalPrice) : null;
 
   const imageUrl = raw.imageUrl ? sanitizeString(raw.imageUrl, 500) : null;
   const shortCode = raw.shortCode ? sanitizeString(raw.shortCode, 32) : null;
+  const priceTiers = sanitizePriceTiers(raw.priceTiers);
   if (imageUrl && !/^https?:\/\/.+/i.test(imageUrl)) {
     return {
-      id, productId, shopId, shopName, shopWhatsapp, name, price, originalPrice,
-      imageUrl: null, quantity, variant, notes, currency, shortCode,
+      id, productId, shopId, shopName, shopWhatsapp, name, price, basePrice, originalPrice,
+      imageUrl: null, quantity, variant, notes, currency, shortCode, priceTiers,
     };
   }
 
@@ -112,6 +141,7 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
     shopWhatsapp: shopWhatsapp || "",
     name,
     price,
+    basePrice,
     originalPrice,
     imageUrl,
     quantity,
@@ -119,6 +149,7 @@ function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
     notes,
     currency,
     shortCode,
+    priceTiers,
   };
 }
 
@@ -177,6 +208,7 @@ export const useCartStore = create<CartState>()(
         const safeShortCode = product.short_code
           ? sanitizeString(product.short_code, 32)
           : null;
+        const safePriceTiers = sanitizePriceTiers(product.price_tiers);
 
         if (!safeProductId || !safeShopId || !safeName) return;
 
@@ -195,10 +227,17 @@ export const useCartStore = create<CartState>()(
 
           const existing = state.items.find((i) => i.id === cartId);
           if (existing) {
+            const mergedQty = Math.min(99, existing.quantity + safeQuantity);
             return {
               items: state.items.map((i) =>
                 i.id === cartId
-                  ? { ...i, quantity: Math.min(99, i.quantity + safeQuantity) }
+                  ? {
+                      ...i,
+                      quantity: mergedQty,
+                      price: tieredUnitPrice(safePrice, safePriceTiers, mergedQty),
+                      basePrice: safePrice,
+                      priceTiers: safePriceTiers ?? i.priceTiers,
+                    }
                   : i,
               ),
             };
@@ -214,7 +253,8 @@ export const useCartStore = create<CartState>()(
                 shopName: safeShopName || "Unknown Shop",
                 shopWhatsapp: safeShopWhatsapp || "",
                 name: safeName,
-                price: safePrice,
+                price: tieredUnitPrice(safePrice, safePriceTiers, safeQuantity),
+                basePrice: safePrice,
                 originalPrice: safeOriginalPrice,
                 imageUrl: safeImageUrl,
                 quantity: safeQuantity,
@@ -222,6 +262,7 @@ export const useCartStore = create<CartState>()(
                 notes: safeNotes,
                 currency: validCurrency,
                 shortCode: safeShortCode,
+                priceTiers: safePriceTiers,
               },
             ],
           };
@@ -242,7 +283,13 @@ export const useCartStore = create<CartState>()(
         }
         set((state) => ({
           items: state.items.map((i) =>
-            i.id === cartItemId ? { ...i, quantity: safeQuantity } : i,
+            i.id === cartItemId
+              ? {
+                  ...i,
+                  quantity: safeQuantity,
+                  price: tieredUnitPrice(i.basePrice ?? i.price, i.priceTiers, safeQuantity),
+                }
+              : i,
           ),
         }));
       },

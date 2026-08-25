@@ -14,6 +14,13 @@ import type { VariantGroup } from "@/types";
 
 const PRESET_GROUPS = ["Size", "Color", "Spice Level", "Flavour", "Portion", "Add-ons"];
 
+/** Common options auto-filled when a preset group is added, so merchants don't
+ *  have to type every option by hand for the most-used groups. */
+const PRESET_OPTIONS: Record<string, string[]> = {
+  Size: ["XS", "S", "M", "L", "XL", "XXL"],
+  Color: ["Black", "White", "Red", "Blue", "Green"],
+};
+
 function PlusIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
@@ -43,7 +50,16 @@ export default function VariantEditor({
     const clean = name.trim();
     if (!clean) return;
     if (variants.some((g) => g.name === clean)) return;
-    onChange([...variants, { name: clean, options: [] }]);
+    const preset = PRESET_OPTIONS[clean];
+    onChange([
+      ...variants,
+      {
+        name: clean,
+        options: preset
+          ? preset.map((label) => ({ label, is_available: true }))
+          : [],
+      },
+    ]);
     setCustomGroup("");
   }
 
@@ -97,6 +113,15 @@ export default function VariantEditor({
           Options / Variants{" "}
           <span className="font-normal text-zinc-400">(optional — e.g. Size, Color, Spice)</span>
         </span>
+        {variants.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+          >
+            Clear all
+          </button>
+        )}
       </div>
 
       {/* Group adder */}
@@ -231,20 +256,23 @@ export default function VariantEditor({
             Customer will see:
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {variants.map((g) => (
-              <span key={g.name} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-sm dark:bg-zinc-800 dark:text-zinc-300">
-                {g.name}:
-                {g.options.filter((o) => o.label.trim()).slice(0, 4).map((o) => (
-                  <span key={o.label} className="text-emerald-600 dark:text-emerald-400">
-                    {" "}{o.label}
-                    {typeof o.price === "number" ? ` (${o.price})` : ""}
-                    {o.price_adj ? ` +${o.price_adj}` : ""}
-                    {o !== g.options.filter((x) => x.label.trim()).slice(0, 4)[Math.min(g.options.filter((x) => x.label.trim()).length - 1, 0)] ? "·" : ""}
-                  </span>
-                ))}
-                {g.options.filter((o) => o.label.trim()).length > 4 ? "…" : ""}
-              </span>
-            ))}
+            {variants.map((g) => {
+              const shown = g.options.filter((o) => o.label.trim()).slice(0, 4);
+              const total = g.options.filter((o) => o.label.trim()).length;
+              return (
+                <span key={g.name} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-sm dark:bg-zinc-800 dark:text-zinc-300">
+                  {g.name}:
+                  {shown.map((o, idx) => (
+                    <span key={`${o.label}-${idx}`} className="text-emerald-600 dark:text-emerald-400">
+                      {idx > 0 ? " ·" : ""} {o.label}
+                      {typeof o.price === "number" ? ` (${o.price})` : ""}
+                      {o.price_adj ? ` +${o.price_adj}` : ""}
+                    </span>
+                  ))}
+                  {total > 4 ? " …" : ""}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

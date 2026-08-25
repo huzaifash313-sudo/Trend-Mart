@@ -17,6 +17,7 @@ import { fetchProductByReference } from "@/services/productService";
 import { fetchShopById } from "@/services/shopService";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { getProductImages } from "@/lib/productImages";
+import { hasPriceTiers, priceForQuantity, tierPreviewLabels } from "@/lib/priceTiers";
 import { getSafeImageUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
 import ProductOrderModal from "@/components/ProductOrderModal";
@@ -169,6 +170,15 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
     variantLabel,
   );
   const variantsReady = !hasVariants || selectedVariants.length === (product?.variants?.length ?? 0);
+  // Quantity tiers apply only when no variant overrides the base price.
+  const tiersActive = Boolean(product) && hasPriceTiers(product.price_tiers) && displayPrice === product.price;
+  const tierLabels = useMemo(
+    () => (tiersActive && product ? tierPreviewLabels(product.price_tiers) : []),
+    [tiersActive, product],
+  );
+  const lineTotal = tiersActive && product
+    ? priceForQuantity(product.price, product.price_tiers, quantity)
+    : Math.round(displayPrice * quantity);
 
   const discount = product ? getProductDiscount(product) : null;
   const showDiscount = discount?.hasDiscount && discount.originalPrice != null;
@@ -180,12 +190,14 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
       return;
     }
     const forCart: Product =
-      displayPrice !== product.price ? { ...product, price: displayPrice } : product;
+      displayPrice !== product.price || !tiersActive
+        ? { ...product, price: displayPrice, price_tiers: tiersActive ? product.price_tiers : null }
+        : product;
     addItem(forCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, variantsReady, displayPrice, quantity, variantLabel, itemNotes, addItem, addToast]);
+  }, [product, shop, variantsReady, displayPrice, tiersActive, quantity, variantLabel, itemNotes, addItem, addToast]);
 
   const handleOrder = useCallback(() => {
     if (!product || !shop) return;
@@ -315,19 +327,37 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
 
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatRupees(displayPrice)}
+              {formatRupees(lineTotal)}
             </span>
+            {quantity > 1 && (
+              <span className="text-xs text-zinc-400">
+                ({formatRupees(Math.round(lineTotal / quantity))} each)
+              </span>
+            )}
             {showDiscount && discount?.originalPrice != null && (
               <>
                 <span className="text-sm text-zinc-400 line-through">
-                  {formatRupees(discount.originalPrice)}
+                  {formatRupees(discount.originalPrice * quantity)}
                 </span>
                 <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                  Save {formatRupees(discount.originalPrice - product.price)}
+                  Save {formatRupees(discount.originalPrice * quantity - lineTotal)}
                 </span>
               </>
             )}
           </div>
+
+          {tierLabels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {tierLabels.map((label) => (
+                <span key={label} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+                  {label}
+                </span>
+              ))}
+              <span className="rounded-full bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-400 dark:bg-zinc-800">
+                bulk price
+              </span>
+            </div>
+          )}
 
           {hasVariants && product.variants ? (
             <VariantSelector

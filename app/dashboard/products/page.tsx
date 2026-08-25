@@ -29,6 +29,7 @@ import { scopedKey } from "@/lib/clientScope";
 import type {
   Product,
   ProductFormData,
+  PriceTier,
   VariantGroup,
   Shop,
   AnalyticsSummary,
@@ -45,12 +46,15 @@ import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import { downloadProductsCSV } from "@/services/exportService";
 import { getProductDiscount } from "@/lib/formatters";
 import MultiImageUpload from "@/components/MultiImageUpload";
+import VariantEditor from "@/components/VariantEditor";
+import PriceTierEditor from "@/components/PriceTierEditor";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import CustomSelect from "@/components/CustomSelect";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import Link from "next/link";
 import { getProductImages, normalizeProductGallery } from "@/lib/productImages";
+import { normalizeTiers } from "@/lib/priceTiers";
 import {
   fetchSubCategories,
   getOthersSubCategoryId,
@@ -67,13 +71,6 @@ function emitProductsChanged() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("trendmart:products-updated"));
   }
-}
-
-interface PriceTier {
-  label: string;
-  minQuantity: number;
-  discountPercent: number;
-  discountedPrice: number;
 }
 
 interface ProductFormState {
@@ -118,73 +115,14 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   subCategoryId: "",
 };
 
-const COLOR_OPTIONS = [
-  { label: "Black", hex: "#000000" },
-  { label: "White", hex: "#FFFFFF" },
-  { label: "Red", hex: "#EF4444" },
-  { label: "Blue", hex: "#3B82F6" },
-  { label: "Green", hex: "#10B981" },
-  { label: "Yellow", hex: "#F59E0B" },
-  { label: "Purple", hex: "#8B5CF6" },
-  { label: "Pink", hex: "#EC4899" },
-  { label: "Gray", hex: "#6B7280" },
-  { label: "Navy", hex: "#1E3A5F" },
-  { label: "Brown", hex: "#92400E" },
-  { label: "Beige", hex: "#D6C3A9" },
-];
-
-const SIZE_OPTIONS = [
-  { label: "XS", description: "Extra Small" },
-  { label: "S", description: "Small" },
-  { label: "M", description: "Medium" },
-  { label: "L", description: "Large" },
-  { label: "XL", description: "Extra Large" },
-  { label: "XXL", description: "Double XL" },
-  { label: "3XL", description: "Triple XL" },
-  { label: "28", description: "Waist 28\"" },
-  { label: "30", description: "Waist 30\"" },
-  { label: "32", description: "Waist 32\"" },
-  { label: "34", description: "Waist 34\"" },
-  { label: "36", description: "Waist 36\"" },
-  { label: "38", description: "Waist 38\"" },
-  { label: "40", description: "Waist 40\"" },
-  { label: "7", description: "Shoe size 7" },
-  { label: "8", description: "Shoe size 8" },
-  { label: "9", description: "Shoe size 9" },
-  { label: "10", description: "Shoe size 10" },
-  { label: "11", description: "Shoe size 11" },
-];
-
 // ─── Inline Icons ───────────────────────────────────────────────────────────
 
 function PlusIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>); }
 function TrashIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>); }
 function SaveIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>); }
 function PackageIcon() { return (<svg className="h-8 w-8 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>); }
-function ChevronDownIcon() { return (<svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>); }
-function DragIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="18" x2="16" y2="18" /></svg>); }
 function UploadIcon() { return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>); }
 function DownloadIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>); }
-
-// ─── Color Swatch Component ─────────────────────────────────────────────────
-
-function ColorSwatch({ hex, label, selected, onClick }: { hex: string; label: string; selected: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-        selected
-          ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:bg-emerald-900/30 dark:text-emerald-300"
-          : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-      }`}
-      title={label}
-    >
-      <span className="h-4 w-4 rounded-full border border-zinc-300 dark:border-zinc-600" style={{ backgroundColor: hex }} />
-      {label}
-    </button>
-  );
-}
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -208,11 +146,6 @@ export default function ProductsDashboardPage() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // Variant selection state (for building variant groups)
-  const [activeVariantGroup, setActiveVariantGroup] = useState<"size" | "color" | null>(null);
-  const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
-  const [selectedSizes, setSelectedSizes] = useState<Set<string>>(new Set());
 
   // Bulk operations
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
@@ -371,75 +304,6 @@ export default function ProductsDashboardPage() {
     }));
   }, [generateSkuPrefix]);
 
-  const toggleColorSelection = useCallback((colorLabel: string) => {
-    setSelectedColors(prev => {
-      const next = new Set(prev);
-      if (next.has(colorLabel)) next.delete(colorLabel); else next.add(colorLabel);
-      return next;
-    });
-  }, []);
-
-  const toggleSizeSelection = useCallback((sizeLabel: string) => {
-    setSelectedSizes(prev => {
-      const next = new Set(prev);
-      if (next.has(sizeLabel)) next.delete(sizeLabel); else next.add(sizeLabel);
-      return next;
-    });
-  }, []);
-
-  const applyVariants = useCallback(() => {
-    const groups: VariantGroup[] = [];
-
-    if (selectedColors.size > 0) {
-      groups.push({
-        name: "Color",
-        options: [...selectedColors].map(label => ({
-          label,
-          is_available: true,
-        })),
-      });
-    }
-
-    if (selectedSizes.size > 0) {
-      groups.push({
-        name: "Size",
-        options: [...selectedSizes].map(label => ({
-          label,
-          is_available: true,
-        })),
-      });
-    }
-
-    setForm(f => ({ ...f, variantGroups: groups }));
-    setActiveVariantGroup(null);
-  }, [selectedColors, selectedSizes]);
-
-  const clearVariants = useCallback(() => {
-    setForm(f => ({ ...f, variantGroups: [] }));
-    setSelectedColors(new Set());
-    setSelectedSizes(new Set());
-    setActiveVariantGroup(null);
-  }, []);
-
-  const addPriceTier = useCallback(() => {
-    setForm(f => ({
-      ...f,
-      priceTiers: [...f.priceTiers, {
-        label: `Bulk ${f.priceTiers.length + 1}`,
-        minQuantity: (f.priceTiers.length + 1) * 5,
-        discountPercent: (f.priceTiers.length + 1) * 5,
-        discountedPrice: Math.round(f.basePrice * (1 - ((f.priceTiers.length + 1) * 5) / 100)),
-      }],
-    }));
-  }, []);
-
-  const removePriceTier = useCallback((index: number) => {
-    setForm(f => ({
-      ...f,
-      priceTiers: f.priceTiers.filter((_, i) => i !== index),
-    }));
-  }, []);
-
   const addTag = useCallback((tag: string) => {
     if (!tag.trim() || form.tags.includes(tag.trim())) return;
     setForm(f => ({ ...f, tags: [...f.tags, tag.trim()] }));
@@ -515,6 +379,7 @@ export default function ProductsDashboardPage() {
     const original = form.originalPrice ? parseFloat(form.originalPrice) : null;
     const hasDeal =
       original != null && Number.isFinite(original) && original > form.basePrice;
+    const cleanTiers = normalizeTiers(form.priceTiers);
     const productData: ProductFormData = {
       name: form.name.trim(),
       description: form.description.trim(),
@@ -530,6 +395,7 @@ export default function ProductsDashboardPage() {
       stock_status: form.isAvailable ? "in_stock" : "out_of_stock",
       // Availability toggle only — no numeric stock counts.
       variants: form.variantGroups.length > 0 ? form.variantGroups : null,
+      price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
       category_id: shopCat || null,
       sub_category_id: subId && isValidUUID(subId) ? subId : null,
     };
@@ -553,8 +419,6 @@ export default function ProductsDashboardPage() {
         // Reset form
         setForm(INITIAL_PRODUCT_FORM);
         setEditingProductId(null);
-        setSelectedColors(new Set());
-        setSelectedSizes(new Set());
       } else {
         addToast(result.error ?? "Failed to save product.", "error");
       }
@@ -579,21 +443,11 @@ export default function ProductsDashboardPage() {
       isAvailable: product.is_available,
       skuPrefix: generateSkuPrefix(product.name),
       variantGroups: product.variants ?? [],
-      priceTiers: [],
+      priceTiers: product.price_tiers ?? [],
       galleryImages: gallery,
       tags: [],
       subCategoryId: product.sub_category_id ?? "",
     });
-
-    // Pre-populate variant selections
-    const newColors = new Set<string>();
-    const newSizes = new Set<string>();
-    product.variants?.forEach(g => {
-      if (g.name === "Color") g.options.forEach(o => newColors.add(o.label));
-      if (g.name === "Size") g.options.forEach(o => newSizes.add(o.label));
-    });
-    setSelectedColors(newColors);
-    setSelectedSizes(newSizes);
 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [generateSkuPrefix]);
@@ -1049,123 +903,12 @@ export default function ProductsDashboardPage() {
                 fileIdPrefix={editingProductId ?? activeShopId ?? "new"}
               />
 
-              {/* Multi-Attribute Variant Builder */}
+              {/* Multi-Attribute Variant Builder — always visible */}
               <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                    Product Variants (Sizes, Colors)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
-                  >
-                    {showAdvanced ? "Hide Advanced" : "Show Advanced"}
-                  </button>
-                </div>
-
-                {showAdvanced && (
-                  <div className="space-y-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
-                    {/* Variant Type Selector */}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveVariantGroup(activeVariantGroup === "color" ? null : "color")}
-                        className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-                          activeVariantGroup === "color"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-white text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                        }`}
-                      >
-                        Color Variants
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveVariantGroup(activeVariantGroup === "size" ? null : "size")}
-                        className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-                          activeVariantGroup === "size"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-white text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                        }`}
-                      >
-                        Size Variants
-                      </button>
-                    </div>
-
-                    {/* Color Swatches */}
-                    {activeVariantGroup === "color" && (
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">Select colors:</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {COLOR_OPTIONS.map(color => (
-                            <ColorSwatch
-                              key={color.label}
-                              hex={color.hex}
-                              label={color.label}
-                              selected={selectedColors.has(color.label)}
-                              onClick={() => toggleColorSelection(color.label)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Size Options */}
-                    {activeVariantGroup === "size" && (
-                      <div>
-                        <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">Select sizes:</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {SIZE_OPTIONS.map(size => (
-                            <button
-                              key={size.label}
-                              type="button"
-                              onClick={() => toggleSizeSelection(size.label)}
-                              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                                selectedSizes.has(size.label)
-                                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:bg-emerald-900/30 dark:text-emerald-300"
-                                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-                              }`}
-                              title={size.description}
-                            >
-                              {size.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Apply / Clear Buttons */}
-                    {(selectedColors.size > 0 || selectedSizes.size > 0 || form.variantGroups.length > 0) && (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={applyVariants}
-                          className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                        >
-                          Apply Variants
-                        </button>
-                        <button
-                          type="button"
-                          onClick={clearVariants}
-                          className="rounded-lg bg-red-100 px-4 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Variant Summary */}
-                    {form.variantGroups.length > 0 && (
-                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-900/20">
-                        <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                          {form.variantGroups.map(g => `${g.options.length} ${g.name}s`).join(" × ")}
-                          {" = "}
-                          {form.variantGroups.reduce((acc, g) => acc * g.options.length, 1)} unique variants
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <VariantEditor
+                  variants={form.variantGroups}
+                  onChange={(v) => setForm((f) => ({ ...f, variantGroups: v }))}
+                />
               </div>
 
               {/* Availability only — no numeric stock counts */}
@@ -1176,53 +919,22 @@ export default function ProductsDashboardPage() {
                 </p>
               )}
 
-              {/* Price Tiers (Bulk Discounts) */}
-              {showAdvanced && (
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                      Discounted Pricing Tiers
-                      <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[0.6rem] font-semibold text-zinc-500 dark:bg-zinc-800">Coming soon</span>
-                    </label>
-                    <button
-                      type="button"
-                      disabled
-                      title="Bulk price tiers are not persisted yet"
-                      className="cursor-not-allowed text-xs font-medium text-zinc-400"
-                    >
-                      + Add Tier
-                    </button>
-                  </div>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+              >
+                {showAdvanced ? "▾ Hide advanced options" : "▸ Show advanced options (tags)"}
+              </button>
 
-                  {form.priceTiers.length > 0 && (
-                    <div className="space-y-2">
-                      {form.priceTiers.map((tier, idx) => (
-                        <div key={idx} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800/50">
-                          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Min {tier.minQuantity} units</span>
-                          <input
-                            type="number"
-                            value={tier.discountPercent}
-                            onChange={(e) => {
-                              const pct = Math.min(99, Math.max(0, Number(e.target.value)));
-                              setForm(f => ({
-                                ...f,
-                                priceTiers: f.priceTiers.map((t, i) =>
-                                  i === idx
-                                    ? { ...t, discountPercent: pct, discountedPrice: Math.round(form.basePrice * (1 - pct / 100)) }
-                                    : t
-                                ),
-                              }));
-                            }}
-                            className="w-16 rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
-                          />
-                          <span className="text-xs text-zinc-400">% off → Rs. {tier.discountedPrice.toLocaleString()}</span>
-                          <button type="button" onClick={() => removePriceTier(idx)} className="ml-auto text-red-500 hover:text-red-600"><TrashIcon /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Quantity Price Tiers — always visible, live editor */}
+              <div>
+                <PriceTierEditor
+                  tiers={form.priceTiers}
+                  onChange={(tiers) => setForm((f) => ({ ...f, priceTiers: tiers }))}
+                  basePrice={form.basePrice || undefined}
+                />
+              </div>
 
               {/* Tags */}
               {showAdvanced && (
@@ -1268,8 +980,6 @@ export default function ProductsDashboardPage() {
                       onClick={() => {
                         setForm(INITIAL_PRODUCT_FORM);
                         setEditingProductId(null);
-                        setSelectedColors(new Set());
-                        setSelectedSizes(new Set());
                       }}
                       className="rounded-xl px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                     >

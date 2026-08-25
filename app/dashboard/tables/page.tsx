@@ -18,12 +18,14 @@ import {
   fetchMyDineInShop,
   fetchTablesByShopId,
   fetchTodayDineStats,
+  fetchKitchenOrders,
   setTableActive,
 } from "@/services/dineInService";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
+import OrderBillModal from "@/components/OrderBillModal";
 import { isDineInCategory } from "@/types";
-import type { DineInTable, Shop } from "@/types";
+import type { DineInTable, Order, Shop } from "@/types";
 
 function PlusIcon() {
   return (
@@ -67,11 +69,39 @@ export default function MerchantTablesPage() {
   const [qrDataUrls, setQrDataUrls] = useState<Record<string, string>>({});
   const [downloading, setDownloading] = useState<string | null>(null);
   const [todayStats, setTodayStats] = useState<{ orders: number; revenue: number } | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [billOrder, setBillOrder] = useState<Order | null>(null);
 
   const origin = useMemo(() => {
     if (typeof window !== "undefined") return window.location.origin;
     return "";
   }, []);
+
+  /** Latest active (non-cancelled) dine-in order for a table. */
+  const latestOrderFor = useCallback(
+    (table: DineInTable): Order | undefined =>
+      orders.find(
+        (o) =>
+          o.dine_status !== "Cancelled" &&
+          (o.table_id === table.id ||
+            (o.table_code != null &&
+              o.table_code.trim().toLowerCase() === table.name.trim().toLowerCase())),
+      ),
+    [orders],
+  );
+
+  /** Recent non-cancelled dine-in orders, newest first, for the bills list. */
+  const recentBills = useMemo(
+    () =>
+      orders
+        .filter((o) => o.dine_status !== "Cancelled")
+        .sort(
+          (a, b) =>
+            new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
+        )
+        .slice(0, 20),
+    [orders],
+  );
 
   const load = useCallback(async () => {
     const result = await fetchTablesByShopId(shop?.id ?? "");
@@ -103,6 +133,8 @@ export default function MerchantTablesPage() {
         fetchTodayDineStats(shopResult.data.id).then((r) => {
           if (!cancelled && r.success) setTodayStats(r.data);
         });
+        const ordersResult = await fetchKitchenOrders(shopResult.data.id);
+        if (!cancelled && ordersResult.success) setOrders(ordersResult.data);
       } catch {
         /* handled by empty state */
       } finally {
@@ -450,6 +482,15 @@ export default function MerchantTablesPage() {
                     </label>
                   </div>
                   <div className="flex gap-1.5">
+                    {latestOrderFor(table) && (
+                      <button
+                        type="button"
+                        onClick={() => setBillOrder(latestOrderFor(table)!)}
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      >
+                        🧾 Bill
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={downloading === table.id}
@@ -479,7 +520,50 @@ export default function MerchantTablesPage() {
             ))}
           </div>
         )}
+
+        {/* Recent dine-in orders — print bills from here */}
+        {recentBills.length > 0 && (
+          <section className="mt-6">
+            <h2 className="mb-2 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+              Recent orders — print bills
+            </h2>
+            <div className="space-y-2">
+              {recentBills.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                      {order.table_code ?? "Table"} · {order.customer_name || "Guest"}
+                      {order.customer_phone ? ` · ${order.customer_phone}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-[0.65rem] text-zinc-400">
+                      {new Date(order.created_at).toLocaleString()} · #{order.id.slice(0, 8)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                      Rs. {Math.round(order.total_amount ?? 0).toLocaleString()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBillOrder(order)}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                    >
+                      🧾 Bill
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
+
+      {billOrder && shop && (
+        <OrderBillModal order={billOrder} shop={shop} onClose={() => setBillOrder(null)} />
+      )}
     </div>
   );
 }

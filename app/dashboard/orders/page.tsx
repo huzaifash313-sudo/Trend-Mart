@@ -13,6 +13,7 @@ import {
 import { subscribeToOrders } from "@/lib/supabase/realtime";
 import { useToast } from "@/components/Toast";
 import CustomSelect from "@/components/CustomSelect";
+import OrderBillModal from "@/components/OrderBillModal";
 import type { Order, OrderStatus, Shop } from "@/types";
 import { toPkWhatsAppDigits } from "@/lib/phoneFormat";
 
@@ -46,6 +47,7 @@ export default function MerchantOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  const [billOrder, setBillOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -260,6 +262,13 @@ export default function MerchantOrdersPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => setBillOrder(order)}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      🧾 Bill
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openWhatsApp(order)}
                       className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                     >
@@ -302,6 +311,14 @@ export default function MerchantOrdersPage() {
             );
           })}
         </div>
+      )}
+
+      {billOrder && shop && (
+        <OrderBillModal
+          order={billOrder}
+          shop={shop}
+          onClose={() => setBillOrder(null)}
+        />
       )}
     </div>
   );

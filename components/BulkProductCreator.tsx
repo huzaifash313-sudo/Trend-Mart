@@ -5,8 +5,8 @@
 /*  Desktop: one product = one wide table row · Mobile: stacked cards          */
 /* -------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ProductFormData } from "@/types";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import type { PriceTier, ProductFormData, VariantGroup } from "@/types";
 import {
   fetchSubCategories,
   getOthersSubCategoryId,
@@ -16,7 +16,10 @@ import {
 import { bulkCreateProducts } from "@/services/productService";
 import { isValidUUID } from "@/lib/sanitization";
 import MultiImageUpload from "@/components/MultiImageUpload";
+import VariantEditor from "@/components/VariantEditor";
+import PriceTierEditor from "@/components/PriceTierEditor";
 import { normalizeProductGallery } from "@/lib/productImages";
+import { normalizeTiers } from "@/lib/priceTiers";
 import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 import CustomSelect from "@/components/CustomSelect";
 
@@ -36,6 +39,8 @@ interface BulkRow {
   original_price: string;
   deal_expires_at: string;
   images: string[];
+  variants: VariantGroup[];
+  price_tiers: PriceTier[];
 }
 
 function newRow(defaultSubId = ""): BulkRow {
@@ -48,6 +53,8 @@ function newRow(defaultSubId = ""): BulkRow {
     original_price: "",
     deal_expires_at: "",
     images: [],
+    variants: [],
+    price_tiers: [],
   };
 }
 
@@ -75,6 +82,7 @@ export default function BulkProductCreator({
   const [rows, setRows] = useState<BulkRow[]>([newRow()]);
   const [saving, setSaving] = useState(false);
   const [defaultSubId, setDefaultSubId] = useState("");
+  const [expandedVariants, setExpandedVariants] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -123,6 +131,35 @@ export default function BulkProductCreator({
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== key)));
   }, []);
 
+  const toggleVariants = useCallback((key: string) => {
+    setExpandedVariants((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const anyVariants = useMemo(
+    () => rows.some((r) => r.variants.length > 0 || r.price_tiers.length > 0),
+    [rows],
+  );
+
+  const copyVariantsToAll = useCallback(() => {
+    const source = rows.find((r) => r.variants.length > 0 || r.price_tiers.length > 0);
+    if (!source) return;
+    setRows((prev) =>
+      prev.map((r) =>
+        r.key === source.key
+          ? r
+          : {
+              ...r,
+              variants: JSON.parse(JSON.stringify(source.variants)),
+              price_tiers: JSON.parse(JSON.stringify(source.price_tiers)),
+            },
+      ),
+    );
+  }, [rows]);
+
+  const clearAllVariants = useCallback(() => {
+    setRows((prev) => prev.map((r) => ({ ...r, variants: [], price_tiers: [] })));
+  }, []);
+
   const filledCount = useMemo(
     () => rows.filter((r) => r.name.trim() && Number(r.price) > 0).length,
     [rows],
@@ -163,6 +200,7 @@ export default function BulkProductCreator({
       }
 
       const gallery = normalizeProductGallery(r.images);
+      const cleanTiers = normalizeTiers(r.price_tiers);
 
       forms.push({
         name: r.name.trim(),
@@ -178,6 +216,8 @@ export default function BulkProductCreator({
         is_available: true,
         category_id: shopCategory,
         sub_category_id: subId,
+        variants: r.variants.length > 0 ? r.variants : null,
+        price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
       });
     }
 
@@ -200,6 +240,7 @@ export default function BulkProductCreator({
     }
 
     setRows([newRow(defaultSubId)]);
+    setExpandedVariants({});
     onCreated?.();
   }, [shopId, shopCategory, rows, defaultSubId, onToast, onCreated]);
 
@@ -223,10 +264,29 @@ export default function BulkProductCreator({
             <span className="font-semibold text-teal-700 dark:text-teal-300">
               {shopCategory || "—"}
             </span>
-            {" · "}Ek line = ek product · 5–6 rows ek saath · har row mein 6 photos.
+            {" · "}Ek line = ek product · har row mein options (Size/Color) aur 6 photos add kar sakte ho.
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
+          {anyVariants && (
+            <>
+              <button
+                type="button"
+                onClick={copyVariantsToAll}
+                className="btn-compact rounded-full border border-emerald-200 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                title="Copy the first row's options/variants to every row"
+              >
+                Copy options to all rows
+              </button>
+              <button
+                type="button"
+                onClick={clearAllVariants}
+                className="btn-compact rounded-full border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/40"
+              >
+                Clear options
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={addRow}
@@ -269,8 +329,8 @@ export default function BulkProductCreator({
               const dealOk =
                 !!row.original_price && Number.isFinite(wasN) && wasN > priceN;
               return (
+                <Fragment key={row.key}>
                 <tr
-                  key={row.key}
                   className="border-b border-zinc-100 align-top dark:border-[color:var(--tm-border)]"
                 >
                   <td className="px-2 py-2.5">
@@ -291,6 +351,20 @@ export default function BulkProductCreator({
                       placeholder="Description"
                       className={`${fieldClass} mt-1.5`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => toggleVariants(row.key)}
+                      className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold ${
+                        row.variants.length > 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400"
+                      }`}
+                    >
+                      <span className={`inline-block transition-transform ${expandedVariants[row.key] ? "rotate-90" : ""}`}>▸</span>
+                      {row.variants.length > 0
+                        ? `Options (${row.variants.reduce((acc, g) => acc + g.options.length, 0)})`
+                        : "＋ Add Options / Variants (optional)"}
+                    </button>
                   </td>
                   <td className="px-2 py-2.5">
                     <CustomSelect
@@ -369,7 +443,23 @@ export default function BulkProductCreator({
                     </button>
                   </td>
                 </tr>
-              );
+                {expandedVariants[row.key] && (
+                  <tr className="border-b border-zinc-100 dark:border-[color:var(--tm-border)]">
+                    <td colSpan={7} className="space-y-2 px-2 pb-3 pt-1">
+                      <VariantEditor
+                        variants={row.variants}
+                        onChange={(v) => updateRow(row.key, { variants: v })}
+                      />
+                      <PriceTierEditor
+                        tiers={row.price_tiers}
+                        onChange={(t) => updateRow(row.key, { price_tiers: t })}
+                        basePrice={Number(row.price) || 0}
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+            );
             })}
           </tbody>
         </table>
@@ -487,6 +577,36 @@ export default function BulkProductCreator({
                   className={`${fieldClass} disabled:opacity-40`}
                 />
               </div>
+
+              <button
+                type="button"
+                onClick={() => toggleVariants(row.key)}
+                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold ${
+                  row.variants.length > 0
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    : "border-dashed border-zinc-300 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400"
+                }`}
+              >
+                <span>
+                  {row.variants.length > 0
+                    ? `Options / Variants (${row.variants.reduce((acc, g) => acc + g.options.length, 0)})`
+                    : "＋ Add Options / Variants (optional)"}
+                </span>
+                <span className={`transition-transform ${expandedVariants[row.key] ? "rotate-180" : ""}`}>▾</span>
+              </button>
+              {expandedVariants[row.key] && (
+                <div className="space-y-2">
+                  <VariantEditor
+                    variants={row.variants}
+                    onChange={(v) => updateRow(row.key, { variants: v })}
+                  />
+                  <PriceTierEditor
+                    tiers={row.price_tiers}
+                    onChange={(t) => updateRow(row.key, { price_tiers: t })}
+                    basePrice={Number(row.price) || 0}
+                  />
+                </div>
+              )}
 
               <MultiImageUpload
                 label="Product photos"
