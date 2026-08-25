@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type InputHTMLAttributes,
   type ReactNode,
@@ -21,6 +22,7 @@ import { useMyShop } from "@/lib/queries";
 import type { Shop, ShopFormData } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -108,6 +110,7 @@ type SectionId =
   | "live"
   | "social"
   | "fees"
+  | "area"
   | "alerts"
   | "qr"
   | "audit-logs";
@@ -120,6 +123,7 @@ const SECTION_LINKS: Array<{ id: SectionId; label: string }> = [
   { id: "live", label: "Live" },
   { id: "social", label: "Social" },
   { id: "fees", label: "Fees" },
+  { id: "area", label: "Area" },
   { id: "alerts", label: "Alerts" },
   { id: "qr", label: "QR" },
   { id: "audit-logs", label: "Audit logs" },
@@ -351,6 +355,25 @@ export default function DashboardSettingsPage() {
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
   const [pushBusy, setPushBusy] = useState(false);
   const { addToast } = useToast();
+
+  // Live delivery-charge preview — mirrors what the customer sees at checkout.
+  // Free-delivery offer applies above the threshold; otherwise flat + per-km.
+  const feePreview = useMemo(() => {
+    const flat = Number(form.delivery_fee_flat) || 0;
+    const perKm = Number(form.delivery_fee_per_km) || 0;
+    const freeThreshold = Number(form.free_delivery_threshold) || 0;
+    const minOrder = Number(form.min_order_amount) || 0;
+    const radius = form.service_radius_km ?? 10;
+    const feeAt = (km: number) => {
+      if (freeThreshold > 0) return { label: "FREE", hint: "above free-delivery offer" };
+      const amount = Math.round((flat + perKm * km) * 100) / 100;
+      return { label: amount > 0 ? `Rs. ${amount.toLocaleString()}` : "FREE", hint: amount > 0 ? "delivery charge" : "no charge set" };
+    };
+    const samples = [2, 5, radius === 2 || radius === 5 ? radius + 1 : radius]
+      .filter((km, i, arr) => arr.indexOf(km) === i)
+      .slice(0, 3);
+    return { flat, perKm, freeThreshold, minOrder, radius, samples, feeAt };
+  }, [form.delivery_fee_flat, form.delivery_fee_per_km, form.free_delivery_threshold, form.min_order_amount, form.service_radius_km]);
 
   // Seed the editable form from the shop once it's available (on first load or
   // when switching shops). We intentionally key on the id so an in-progress
@@ -666,6 +689,49 @@ export default function DashboardSettingsPage() {
             />
           </div>
 
+          {/* Live auto-calc preview of what customers will be charged */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+            <p className="mb-2 text-[0.7rem] font-semibold text-emerald-800 dark:text-emerald-300">
+              Live delivery-charge preview
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {feePreview.samples.map((km) => {
+                const sample = feePreview.feeAt(km);
+                return (
+                  <span
+                    key={km}
+                    className="inline-flex flex-col rounded-lg bg-white px-2.5 py-1.5 text-[0.7rem] font-semibold text-emerald-800 shadow-sm dark:bg-zinc-900 dark:text-emerald-300"
+                  >
+                    <span>{km} km</span>
+                    <span className="font-bold">{sample.label}</span>
+                    <span className="text-[0.6rem] font-normal text-zinc-500 dark:text-zinc-400">
+                      {sample.hint}
+                    </span>
+                  </span>
+                );
+              })}
+              {feePreview.freeThreshold > 0 && (
+                <span className="inline-flex flex-col rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[0.7rem] font-semibold text-white shadow-sm">
+                  <span>Offer</span>
+                  <span className="font-bold">FREE</span>
+                  <span className="text-[0.6rem] font-normal text-emerald-100">
+                    above Rs. {feePreview.freeThreshold.toLocaleString()}
+                  </span>
+                </span>
+              )}
+            </div>
+            <p className="mt-2 text-[0.65rem] leading-relaxed text-emerald-700/90 dark:text-emerald-300/80">
+              {feePreview.perKm > 0
+                ? `Auto-calculated: flat Rs. ${feePreview.flat.toLocaleString()} + Rs. ${feePreview.perKm} × customer distance${feePreview.freeThreshold > 0 ? ` — FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
+                : feePreview.flat > 0
+                  ? `Flat delivery charge of Rs. ${feePreview.flat.toLocaleString()}${feePreview.freeThreshold > 0 ? `, FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
+                  : "No delivery fee set — delivery will show as FREE."}
+              {feePreview.minOrder > 0
+                ? ` Minimum order: Rs. ${feePreview.minOrder.toLocaleString()}.`
+                : ""}
+            </p>
+          </div>
+
           {/* Fulfillment channels — pause any channel, dine-in stays live */}
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
@@ -703,6 +769,25 @@ export default function DashboardSettingsPage() {
               />
             </div>
           </div>
+        </SectionShell>
+
+        <SectionShell
+          id="area"
+          icon={<StoreIcon />}
+          title="Delivery area"
+          helper="Where your dukaan delivers — pin your location, set a radius, or cover a whole city / nationwide. Save anytime."
+        >
+          <ShopLocationRadiusPicker
+            value={{
+              latitude: form.latitude,
+              longitude: form.longitude,
+              service_radius_km: form.service_radius_km ?? 10,
+              address_display: form.address_display,
+              location: form.location,
+              delivery_zones: form.delivery_zones,
+            }}
+            onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
+          />
         </SectionShell>
 
         <SectionShell

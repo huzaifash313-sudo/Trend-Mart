@@ -9,6 +9,7 @@ import { normalizePkPhoneDigits } from "@/lib/sanitization";
 import ImageUpload from "@/components/ImageUpload";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import CustomSelect from "@/components/CustomSelect";
+import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
@@ -117,6 +118,11 @@ export default function ShopProfileEditorModal({
   );
   const [acceptsDelivery, setAcceptsDelivery] = useState(shop.accepts_delivery ?? true);
   const [acceptsPickup, setAcceptsPickup] = useState(shop.accepts_pickup ?? true);
+  const [latitude, setLatitude] = useState<number | null>(shop.latitude ?? null);
+  const [longitude, setLongitude] = useState<number | null>(shop.longitude ?? null);
+  const [serviceRadiusKm, setServiceRadiusKm] = useState(shop.service_radius_km ?? 10);
+  const [addressDisplay, setAddressDisplay] = useState(shop.address_display ?? "");
+  const [deliveryZones, setDeliveryZones] = useState<string[]>(shop.delivery_zones ?? []);
 
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -174,6 +180,11 @@ export default function ShopProfileEditorModal({
         form.banner_url = bannerUrl;
         form.accepts_delivery = acceptsDelivery;
         form.accepts_pickup = acceptsPickup;
+        form.latitude = latitude;
+        form.longitude = longitude;
+        form.service_radius_km = serviceRadiusKm;
+        form.address_display = addressDisplay;
+        form.delivery_zones = deliveryZones;
         const result = await updateShopProfile(shop.id, form, false);
         setSaving(false);
         if (result.success) {
@@ -223,6 +234,11 @@ export default function ShopProfileEditorModal({
       form.banner_url = bannerUrl;
       form.accepts_delivery = acceptsDelivery;
       form.accepts_pickup = acceptsPickup;
+      form.latitude = latitude;
+      form.longitude = longitude;
+      form.service_radius_km = serviceRadiusKm;
+      form.address_display = addressDisplay;
+      form.delivery_zones = deliveryZones;
 
       const result = await updateShopProfile(shop.id, form, sensitiveChanged);
       setSaving(false);
@@ -248,6 +264,11 @@ export default function ShopProfileEditorModal({
       bannerUrl,
       acceptsDelivery,
       acceptsPickup,
+      latitude,
+      longitude,
+      serviceRadiusKm,
+      addressDisplay,
+      deliveryZones,
       password,
       sensitiveChanged,
       sensitiveLocked,
@@ -414,6 +435,32 @@ export default function ShopProfileEditorModal({
                 onChange={(e) => setLocation(e.target.value)}
                 maxLength={200}
                 className={fieldCls}
+              />
+            </div>
+
+            {/* Delivery area — pin + radius / city / nationwide, free to edit anytime */}
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+              <p className="mb-2 text-[0.7rem] font-semibold text-zinc-700 dark:text-zinc-300">
+                Delivery area
+              </p>
+              <ShopLocationRadiusPicker
+                compact
+                value={{
+                  latitude,
+                  longitude,
+                  service_radius_km: serviceRadiusKm,
+                  address_display: addressDisplay,
+                  location,
+                  delivery_zones: deliveryZones,
+                }}
+                onChange={(patch) => {
+                  if (patch.latitude !== undefined) setLatitude(patch.latitude);
+                  if (patch.longitude !== undefined) setLongitude(patch.longitude);
+                  if (patch.service_radius_km !== undefined) setServiceRadiusKm(patch.service_radius_km);
+                  if (patch.address_display !== undefined) setAddressDisplay(patch.address_display);
+                  if (patch.delivery_zones !== undefined) setDeliveryZones(patch.delivery_zones);
+                  if (patch.location !== undefined) setLocation(patch.location);
+                }}
               />
             </div>
 
