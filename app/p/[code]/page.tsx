@@ -171,7 +171,9 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
   );
   const variantsReady = !hasVariants || selectedVariants.length === (product?.variants?.length ?? 0);
   // Quantity tiers apply only when no variant overrides the base price.
-  const tiersActive = Boolean(product) && hasPriceTiers(product.price_tiers) && displayPrice === product.price;
+  const tiersActive = product
+    ? hasPriceTiers(product.price_tiers) && displayPrice === product.price
+    : false;
   const tierLabels = useMemo(
     () => (tiersActive && product ? tierPreviewLabels(product.price_tiers) : []),
     [tiersActive, product],
