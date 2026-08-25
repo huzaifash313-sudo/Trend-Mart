@@ -155,5 +155,26 @@ VALUES
   ('d0000000-0000-4000-8000-000000000005', 'merchant', now(), now())
 ON CONFLICT DO NOTHING;
 
+-- 3e) FIX GoTrue NULL-token scan error (auth/users manually inserted rows leave
+--     these columns NULL, so /auth/v1/token returns HTTP 500). Empty-string any
+--     token column that is NULL. Safe to re-run.
+DO $$
+DECLARE col text;
+BEGIN
+  FOREACH col IN ARRAY ARRAY[
+    'confirmation_token','recovery_token','email_change',
+    'email_change_token_new','email_change_token_current',
+    'phone_change','phone_change_token','reauthentication_token'
+  ]
+  LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'auth' AND table_name = 'users' AND column_name = col
+    ) THEN
+      EXECUTE format('UPDATE auth.users SET %I = COALESCE(%I, '''') WHERE %I IS NULL', col, col, col);
+    END IF;
+  END LOOP;
+END $$;
+
 -- ── 4) OPTIONAL: make merchant1 a Super-Admin (uncomment to enable /admin) ──
 -- UPDATE public.user_roles SET role = 'admin' WHERE user_id = 'd0000000-0000-4000-8000-000000000001';

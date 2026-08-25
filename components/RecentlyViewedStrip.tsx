@@ -25,13 +25,22 @@ function ClockIcon() {
 
 export default function RecentlyViewedStrip() {
   const [items, setItems] = useState<RecentlyViewedItem[]>([]);
+  // Re-read whenever the active account changes (sign-out / sign-in as a
+  // different user) so one account's history never shows in another's strip.
+  const [scopeVersion, setScopeVersion] = useState(0);
   const myShopQuery = useMyShop();
   const myShopId = myShopQuery.data?.id ?? null;
 
   useEffect(() => {
+    const onScopeChange = () => setScopeVersion((v) => v + 1);
+    window.addEventListener("trendmart:scope-change", onScopeChange);
+    return () => window.removeEventListener("trendmart:scope-change", onScopeChange);
+  }, []);
+
+  useEffect(() => {
     const all = getRecentlyViewed();
     setItems(myShopId ? all.filter((i) => i.shopId !== myShopId) : all);
-  }, [myShopId]);
+  }, [myShopId, scopeVersion]);
 
   if (items.length === 0) return null;
 
