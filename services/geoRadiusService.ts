@@ -631,7 +631,9 @@ export async function filterShopsByProximity(
   // city / pakistan: no customer km-cap here
 
   // Soft zone match for legacy free-text delivery_zones (ignore our coverage markers).
-  if (deliveryZone && deliveryZone.trim()) {
+  // In "All Pakistan" browse this must NOT hide shops — the whole point of that
+  // scope is to show every store in the country regardless of the pin's zone.
+  if (browseScope !== "pakistan" && deliveryZone && deliveryZone.trim()) {
     const zone = deliveryZone.toLowerCase().trim();
     enriched = enriched.filter((s) => {
       const coverage = parseCoverageFromZones(s.delivery_zones);

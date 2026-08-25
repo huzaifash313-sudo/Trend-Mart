@@ -258,6 +258,11 @@ function DealsInner() {
       const scope = geoFilter.scope;
       const coords = geoFilter.coordinates ?? globalCoords ?? null;
 
+      // All Pakistan never narrows by location — show every shop's deals.
+      if (scope === "pakistan") {
+        setGeoVisibleShopIds(null);
+        return;
+      }
       if ((scope === "pakistan" || scope === "city") && !coords) {
         setGeoVisibleShopIds(null);
         return;

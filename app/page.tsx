@@ -330,8 +330,9 @@ function HomeInner() {
       const scope = geoFilter.scope;
       const coords = geoFilter.coordinates ?? globalCoords ?? null;
 
-      // Default nationwide browse with no pin: show all category-filtered shops
-      if (scope === "pakistan" && !coords) {
+      // All Pakistan always shows every category-filtered shop — pin or no pin.
+      // The merchant radius / zone logic only narrows "Near me" and "This city".
+      if (scope === "pakistan") {
         setProximityActive(false);
         setGeoFilteredShops([]);
         setGeoFiltering(false);
