@@ -1,14 +1,28 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Quantity Price Tier Helpers                                    */
 /*                                                                             */
-/*  Bulk/quantity pricing: a merchant sets pack prices like                    */
-/*  "1 = Rs 200 · 6 = Rs 1100" (DEW-style: a 6-pack costs 1100, not 1200).     */
-/*  The system auto-fills the quantities in between with a linear ramp on the  */
-/*  TOTAL price, so the customer always gets a fair price at any quantity.     */
-/*  Above the last breakpoint the pack's per-unit rate extends.                */
+/*  Two bulk-pricing modes, both optional and chosen per product:              */
+/*                                                                             */
+/*   1. Pack mode (default, "6 = Rs 1100"):                                    */
+/*        `price` is the TOTAL for buying exactly `min_qty` items.             */
+/*        The discount applies ONLY at the quantities the merchant set.        */
+/*        In-between quantities are plain base-price singles, and above the    */
+/*        top pack the system combines packs intelligently:                    */
+/*          1 bottle = 200 · 6 bottles = 1100                                  */
+/*          qty 5  → 5 × 200  = 1000   (no discount, as merchant intended)     */
+/*          qty 6  → 1100                                                      */
+/*          qty 7  → 1100 + 200 = 1300  (one 6-pack + one single)              */
+/*          qty 12 → 2 × 1100 = 2200                                           */
+/*        The engine never lets a pack cost more than singles.                 */
+/*                                                                             */
+/*   2. Unit mode ("6+ = Rs 183"):                                             */
+/*        `price` is the PER-ITEM price for any quantity >= `min_qty`.         */
+/*        The last tier whose min_qty the quantity reaches wins.               */
 /* -------------------------------------------------------------------------- */
 
 import type { PriceTier } from "@/types";
+
+export type TierMode = "pack" | "unit";
 
 /** Sort, validate and dedupe tiers (highest min_qty wins on collision). */
 export function normalizeTiers(tiers: PriceTier[] | null | undefined): PriceTier[] {
@@ -17,6 +31,7 @@ export function normalizeTiers(tiers: PriceTier[] | null | undefined): PriceTier
     .map((t) => ({
       min_qty: Math.max(1, Math.round(Number(t?.min_qty) || 0)),
       price: Number(t?.price),
+      mode: t?.mode === "unit" ? ("unit" as const) : ("pack" as const),
     }))
     .filter(
       (t) =>
@@ -36,11 +51,50 @@ export function hasPriceTiers(tiers: PriceTier[] | null | undefined): boolean {
   return normalizeTiers(tiers).length > 0;
 }
 
+/** The mode in effect for a tier list ("pack" when not specified / mixed). */
+export function tierMode(tiers: PriceTier[] | null | undefined): TierMode {
+  const sorted = normalizeTiers(tiers);
+  if (sorted.length === 0) return "pack";
+  // Any explicitly-unit tier wins — a merchant toggling the editor applies
+  // the mode to every tier, so mixed lists only happen pre-toggle.
+  return sorted.some((t) => t.mode === "unit") ? "unit" : "pack";
+}
+
+/** Pack mode: best combination of packs to buy exactly `qty` items. */
+function packTotal(basePrice: number, tiers: PriceTier[], qty: number): number {
+  const base = Math.max(0, Number(basePrice) || 0);
+  // A single at base price is always available (falls back to base × qty).
+  const items: { qty: number; total: number }[] = [{ qty: 1, total: base }];
+  for (const t of tiers) items.push({ qty: t.min_qty, total: t.price });
+
+  const dp = new Array<number>(qty + 1).fill(Infinity);
+  dp[0] = 0;
+  for (let q = 1; q <= qty; q++) {
+    for (const it of items) {
+      if (it.qty <= q) {
+        const cand = it.total + dp[q - it.qty];
+        if (cand < dp[q]) dp[q] = cand;
+      }
+    }
+  }
+  return Number.isFinite(dp[qty]) ? Math.round(dp[qty]) : Math.round(base * qty);
+}
+
+/** Unit mode: per-item price for `qty`, last applicable tier wins. */
+function unitPrice(basePrice: number, tiers: PriceTier[], qty: number): number {
+  let unit = Math.max(0, Number(basePrice) || 0);
+  for (const t of tiers) {
+    if (qty >= t.min_qty) unit = t.price;
+  }
+  return unit;
+}
+
 /**
  * TOTAL price for buying `quantity` items.
- * - Below the first tier → base price × qty.
- * - Between tiers → linear interpolation of the pack total.
- * - At/above the last tier → the last tier's per-unit rate extends.
+ * - Pack mode: exact tier totals at the set quantities; elsewhere the
+ *   cheapest combination of packs (a pack is only used when it actually
+ *   saves money). Below the first tier it's plain base × qty.
+ * - Unit mode: per-unit price × qty using the last tier that applies.
  */
 export function priceForQuantity(
   basePrice: number,
@@ -52,26 +106,10 @@ export function priceForQuantity(
   const base = Math.max(0, Number(basePrice) || 0);
   if (sorted.length === 0) return Math.round(base * qty);
 
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-
-  if (qty < first.min_qty) return Math.round(base * qty);
-  if (qty >= last.min_qty) {
-    const perUnit = last.price / last.min_qty;
-    return Math.max(0, Math.round(perUnit * qty));
+  if (tierMode(sorted) === "unit") {
+    return Math.round(unitPrice(base, sorted, qty) * qty);
   }
-
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const a = sorted[i];
-    const b = sorted[i + 1];
-    if (qty >= a.min_qty && qty < b.min_qty) {
-      const span = b.min_qty - a.min_qty;
-      const t = span > 0 ? (qty - a.min_qty) / span : 1;
-      const total = a.price + (b.price - a.price) * t;
-      return Math.max(0, Math.round(total));
-    }
-  }
-  return Math.max(0, Math.round(last.price));
+  return packTotal(base, sorted, qty);
 }
 
 /** Effective per-unit price for a quantity (total ÷ qty). */
@@ -86,8 +124,21 @@ export function unitPriceForQuantity(
 
 /** Preview chips like "1 = Rs 200" / "6-pack = Rs 1100" for defined breakpoints. */
 export function tierPreviewLabels(tiers: PriceTier[] | null | undefined): string[] {
-  return normalizeTiers(tiers).map((t) => {
+  const sorted = normalizeTiers(tiers);
+  const mode = tierMode(sorted);
+  return sorted.map((t) => {
     const price = `Rs ${Math.round(t.price).toLocaleString("en-PK")}`;
+    if (mode === "unit") {
+      return t.min_qty === 1 ? `1+ = ${price} each` : `${t.min_qty}+ = ${price} each`;
+    }
     return t.min_qty === 1 ? `1 = ${price}` : `${t.min_qty}-pack = ${price}`;
   });
+}
+
+/** Human hint shown under the tier list (mode-aware). */
+export function tierModeHint(tiers: PriceTier[] | null | undefined): string {
+  if (tierMode(tiers) === "unit") {
+    return "Per-unit pricing — the price applies to every item once the quantity reaches the tier.";
+  }
+  return "Pack pricing — discount applies only at the exact pack quantities you set. Other quantities combine packs + singles automatically.";
 }

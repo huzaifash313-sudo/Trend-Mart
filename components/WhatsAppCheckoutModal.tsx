@@ -31,6 +31,7 @@ import { saveOrderRecord } from "@/services/orderHistoryService";
 import type { OrderItem as OrderItemType, PriceTier, Shop } from "@/types";
 import { formatRupees } from "@/lib/formatters";
 import { priceForQuantity, hasPriceTiers } from "@/lib/priceTiers";
+import { computeDeliveryFee } from "@/lib/deliveryFee";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
 import {
@@ -515,16 +516,17 @@ export default function WhatsAppCheckoutModal({
   }, [shop, location, isPickup]);
 
   const deliveryFee = useMemo(() => {
-    // Self-pickup never charges a delivery fee.
-    if (isPickup) return 0;
-    const freeThreshold = shop.free_delivery_threshold;
-    if (freeThreshold != null && freeThreshold > 0 && subtotal >= freeThreshold) return 0;
-    const flat = shop.delivery_fee_flat ?? 0;
-    const perKm = shop.delivery_fee_per_km ?? 0;
-    // Without GPS distance, charge flat only and warn the shopper (see missingDistanceForFee).
-    const distanceCharge = distanceKm != null && perKm > 0 ? distanceKm * perKm : 0;
-    return Math.round((flat + distanceCharge) * 100) / 100;
-  }, [shop, subtotal, distanceKm, isPickup]);
+    // Single shared helper — identical to the server-side calculation, so the
+    // fee shown here is always the fee stored on the order.
+    return computeDeliveryFee({
+      flat: shop.delivery_fee_flat,
+      perKm: shop.delivery_fee_per_km,
+      distanceKm,
+      freeThreshold: shop.free_delivery_threshold,
+      subtotal,
+      isPickup,
+    });
+  }, [shop.delivery_fee_flat, shop.delivery_fee_per_km, distanceKm, shop.free_delivery_threshold, subtotal, isPickup]);
 
   const grandTotal = useMemo(
     () => Math.max(0, subtotal - discountAmount + deliveryFee),

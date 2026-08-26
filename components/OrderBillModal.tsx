@@ -110,6 +110,10 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
         ? "PICKUP"
         : "DELIVERY";
 
+  const isPickup = order.order_type === "pickup";
+  const isDineIn = order.order_type === "dine_in";
+  const paymentLabel = isDineIn || isPickup ? "Pay at counter" : "Cash on delivery";
+
   const orderShort = order.id.slice(0, 10).toUpperCase();
 
   const printBill = () => {
@@ -307,10 +311,10 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
                   <span className="text-zinc-500">Subtotal</span>
                   <span>{formatRs(subtotalCol)}</span>
                 </div>
-                {deliveryFee > 0 && (
+                {!isPickup && !isDineIn && (
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Delivery fee</span>
-                    <span>{formatRs(deliveryFee)}</span>
+                    <span>{deliveryFee > 0 ? formatRs(deliveryFee) : "FREE"}</span>
                   </div>
                 )}
                 {discount > 0 && (
@@ -329,7 +333,7 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
 
               {/* ── Footer ───────────────────────────────────────────── */}
               <div className="mt-2 space-y-1 text-center text-[9px] text-zinc-500">
-                <p>Payment: {order.order_type === "dine_in" ? "Pay at counter" : "Cash on delivery"}</p>
+                <p>Payment: {paymentLabel}</p>
                 {order.notes ? (
                   <p className="whitespace-pre-wrap break-words text-zinc-700">Note: {order.notes}</p>
                 ) : null}

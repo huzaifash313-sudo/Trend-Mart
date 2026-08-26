@@ -50,6 +50,7 @@ interface PublicOrderSummary {
   shop_location: string | null;
   items_json: OrderItem[];
   total_amount: number;
+  subtotal_amount: number;
   discount_amount: number;
   delivery_fee: number;
   order_type: "delivery" | "pickup" | "dine_in";
@@ -90,6 +91,7 @@ function OrderSummaryInner({ id }: { id: string }) {
             ? (row.items_json as OrderItem[])
             : [],
           total_amount: Number(row.total_amount) || 0,
+          subtotal_amount: Number(row.subtotal_amount) || 0,
           discount_amount: Number(row.discount_amount) || 0,
           delivery_fee: Number(row.delivery_fee) || 0,
           order_type:
@@ -114,6 +116,9 @@ function OrderSummaryInner({ id }: { id: string }) {
   }, [id]);
 
   const subtotal = useMemo(() => {
+    // Prefer the server-stored subtotal (pack/quantity-tier accurate); fall
+    // back to summing items_json on older rows.
+    if (order?.subtotal_amount) return order.subtotal_amount;
     return (order?.items_json ?? []).reduce(
       (sum, item) => sum + (item.price || 0) * (item.quantity ?? 1),
       0,

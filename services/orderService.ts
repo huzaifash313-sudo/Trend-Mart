@@ -8,7 +8,7 @@ import { logError } from "@/services/errorService";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { getDistanceToShop } from "@/services/geoRadiusService";
-import type { Order, OrderItem, ProductVariant, VariantGroup } from "@/types";
+import type { Order, OrderItem, OrderType, ProductVariant, VariantGroup } from "@/types";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -86,6 +86,11 @@ function parseOrder(row: Record<string, unknown>): Order {
   } catch {
     items = [];
   }
+  const orderTypeRaw = String(row.order_type ?? "delivery");
+  const orderType =
+    orderTypeRaw === "pickup" || orderTypeRaw === "dine_in"
+      ? (orderTypeRaw as OrderType)
+      : "delivery";
   return {
     id: row.id as string,
     shop_id: row.shop_id as string,
@@ -96,6 +101,16 @@ function parseOrder(row: Record<string, unknown>): Order {
     status: (row.status as Order["status"]) ?? "Pending",
     created_at: row.created_at as string,
     updated_at: (row.updated_at as string) ?? undefined,
+    order_type: orderType,
+    subtotal_amount:
+      row.subtotal_amount == null ? undefined : Number(row.subtotal_amount) || 0,
+    delivery_fee: row.delivery_fee == null ? undefined : Number(row.delivery_fee) || 0,
+    discount_amount:
+      row.discount_amount == null ? undefined : Number(row.discount_amount) || 0,
+    coupon_code:
+      typeof row.coupon_code === "string" && row.coupon_code.trim()
+        ? row.coupon_code.trim()
+        : undefined,
   };
 }
 
@@ -717,6 +732,10 @@ export async function placeOrderAtomic(
         customer_phone: customerPhone,
         items_json: orderItems,
         total_amount: finalAmount,
+        subtotal_amount: totalAmount,
+        discount_amount: discount,
+        delivery_fee: deliveryFee,
+        order_type: "delivery",
         status: "Pending",
       };
 

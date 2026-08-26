@@ -24,6 +24,7 @@ RETURNS TABLE (
   shop_location text,
   items_json jsonb,
   total_amount numeric,
+  subtotal_amount numeric,
   discount_amount numeric,
   delivery_fee numeric,
   order_type text,
@@ -40,7 +41,7 @@ AS $$
     o.id, o.shop_id, s.name AS shop_name, s.logo_url AS shop_logo_url,
     s.location AS shop_location,
     o.items_json, o.total_amount,
-    COALESCE(o.discount_amount, 0), COALESCE(o.delivery_fee, 0),
+    COALESCE(o.subtotal_amount, 0), COALESCE(o.discount_amount, 0), COALESCE(o.delivery_fee, 0),
     o.order_type, o.table_code, o.status, o.created_at
   FROM public.orders o
   JOIN public.shops s ON s.id = o.shop_id

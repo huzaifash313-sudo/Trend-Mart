@@ -299,8 +299,15 @@ export interface VariantGroup {
 export interface PriceTier {
   /** Starting quantity for this price (e.g. 1, 2, 6). */
   min_qty: number;
-  /** Per-unit price in PKR for quantities >= min_qty (until the next tier). */
+  /**
+   * Pack mode (default): TOTAL price for buying exactly `min_qty` items
+   * (e.g. 6 = Rs 1100). In-between / above quantities combine packs
+   * intelligently (a 6-pack + singles), never showing a discount the
+   * merchant didn't set. Per-unit mode: price per item for any qty >= min_qty.
+   */
   price: number;
+  /** "pack" (default) → price is the pack TOTAL · "unit" → price per item. */
+  mode?: "pack" | "unit";
 }
 
 // ─── Inventory Snapshot (Prompt 2: bulk editing state) ──────────────────────
@@ -595,6 +602,21 @@ export interface Order {
   table_code?: string | null;
   /** Dine-in lifecycle status (kitchen board). Null for delivery/pickup orders. */
   dine_status?: DineStatus | null;
+  /**
+   * Pre-discount items subtotal (server-stored money breakdown). Present on
+   * orders created after the order-money migration; falls back to the sum of
+   * items_json on older rows.
+   */
+  subtotal_amount?: number | null;
+  /**
+   * Delivery fee charged (Rs). 0 for self-pickup / free delivery / no fee.
+   * Server-stored so bills and order summaries can show the exact charge.
+   */
+  delivery_fee?: number | null;
+  /** Coupon discount applied (Rs), when a coupon was used. */
+  discount_amount?: number | null;
+  /** Coupon code used, when any. */
+  coupon_code?: string | null;
 }
 
 // ─── Merchant Analytics Summary (dashboard cards) ───────────────────────────

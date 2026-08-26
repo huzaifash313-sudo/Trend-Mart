@@ -3,14 +3,19 @@
 /* -------------------------------------------------------------------------- */
 /*  PriceTierEditor — quantity-based bulk pricing builder for merchants        */
 /*                                                                             */
-/*  Set breakpoints like "1 = Rs 200" · "6 = Rs 1100" and the system           */
-/*  auto-fills quantities in between (linear ramp) and holds the last tier     */
-/*  price above the top breakpoint. No math needed.                            */
+/*  Set breakpoints like "1 = Rs 200" · "6 = Rs 1100" (pack totals) or a       */
+/*  per-unit rate ("6+ = Rs 183"). Pack discounts apply only at the set         */
+/*  quantities; other quantities combine packs + singles automatically.         */
 /* -------------------------------------------------------------------------- */
 
 import { useState } from "react";
 import type { PriceTier } from "@/types";
-import { normalizeTiers, tierPreviewLabels } from "@/lib/priceTiers";
+import {
+  normalizeTiers,
+  tierPreviewLabels,
+  tierMode,
+  tierModeHint,
+} from "@/lib/priceTiers";
 
 const QUICK_PACKS = [2, 3, 6, 12];
 
@@ -43,6 +48,12 @@ export default function PriceTierEditor({
 
   const sorted = normalizeTiers(tiers);
   const labels = tierPreviewLabels(tiers);
+  const mode = tierMode(tiers);
+
+  function setMode(next: "pack" | "unit") {
+    if (next === mode) return;
+    onChange(tiers.map((t) => ({ ...t, mode: next })));
+  }
 
   function addTier(minQty: number, price?: number) {
     const qty = Math.round(Number(minQty) || 0);
@@ -50,9 +61,9 @@ export default function PriceTierEditor({
     const priceValue = price ?? Number(qtyDraft);
     const next = tiers.filter((t) => Number(t.min_qty) !== qty);
     if (Number.isFinite(priceValue) && priceValue > 0) {
-      next.push({ min_qty: qty, price: Math.round(priceValue) });
+      next.push({ min_qty: qty, price: Math.round(priceValue), mode });
     } else {
-      next.push({ min_qty: qty, price: 0 });
+      next.push({ min_qty: qty, price: 0, mode });
     }
     onChange(next);
     setQtyDraft("");
@@ -71,7 +82,10 @@ export default function PriceTierEditor({
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
           Quantity pricing (bulk)
-          <span className="font-normal text-zinc-400"> — optional · e.g. 1 = Rs 200, 6 = Rs 1100</span>
+          <span className="font-normal text-zinc-400">
+            {" "}
+            — {mode === "unit" ? "per-unit rate" : "pack prices"} · e.g. 6 = Rs 1100
+          </span>
         </span>
         {tiers.length > 0 && (
           <button
@@ -84,9 +98,39 @@ export default function PriceTierEditor({
         )}
       </div>
 
+      {/* Mode toggle: pack total vs per-unit */}
+      <div className="mb-2 flex items-center gap-1 rounded-lg border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+        <button
+          type="button"
+          onClick={() => setMode("pack")}
+          className={`flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+            mode === "pack"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          }`}
+          title="Set a TOTAL price for a pack, e.g. 6 items = Rs 1100"
+        >
+          Pack total
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("unit")}
+          className={`flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+            mode === "unit"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          }`}
+          title="Set a PER-ITEM price that applies once the quantity reaches the tier"
+        >
+          Per-unit rate
+        </button>
+      </div>
+
       {tiers.length === 0 && (
         <p className="mb-2 rounded-lg border border-dashed border-zinc-200 px-3 py-2 text-center text-[11px] text-zinc-400 dark:border-zinc-700">
-          Add a pack price, e.g. qty "6" → "1100" (a 6-pack costs Rs 1100). In-between quantities auto-calculate.
+          {mode === "unit"
+            ? 'Add a per-unit rate, e.g. qty "6" → "183" (each item costs Rs 183 once you buy 6+).'
+            : 'Add a pack price, e.g. qty "6" → "1100" (a 6-pack costs Rs 1100). Discount shows only at the quantities you set.'}
         </p>
       )}
 
@@ -100,7 +144,7 @@ export default function PriceTierEditor({
                 type="number"
                 min={1}
                 placeholder="Qty"
-                title="Quantity (minimum) for this price"
+                title="Quantity for this price"
                 className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
               <span className="text-[10px] text-zinc-400">= Rs</span>
@@ -110,10 +154,16 @@ export default function PriceTierEditor({
                 type="number"
                 min={0}
                 placeholder="Price"
-                title="Total price for this pack quantity (e.g. 6 items = Rs 1100)"
+                title={
+                  mode === "unit"
+                    ? "Per-item price once the quantity reaches this tier"
+                    : "Total price for this pack quantity (e.g. 6 items = Rs 1100)"
+                }
                 className="w-24 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
-              <span className="text-[10px] text-zinc-400">total</span>
+              <span className="text-[10px] text-zinc-400">
+                {mode === "unit" ? "each" : "total"}
+              </span>
               <button
                 type="button"
                 onClick={() => removeTier(idx)}
@@ -181,12 +231,12 @@ export default function PriceTierEditor({
             ))}
             {basePrice != null && basePrice > 0 && (
               <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-sm dark:bg-zinc-800 dark:text-zinc-300">
-                below {sorted[0]?.min_qty ?? 1} = Rs {Math.round(basePrice).toLocaleString("en-PK")}
+                below {sorted[0]?.min_qty ?? 1} = Rs {Math.round(basePrice).toLocaleString("en-PK")} each
               </span>
             )}
           </div>
           <p className="mt-1 text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
-            In-between quantities auto-calculate (e.g. 3, 4, 5 between 1 and 6).
+            {tierModeHint(tiers)}
           </p>
         </div>
       )}

@@ -13,7 +13,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { PriceTier, Product, Shop } from "@/types";
 import { getProductDiscount } from "@/lib/formatters";
-import { priceForQuantity } from "@/lib/priceTiers";
+import { hasPriceTiers, priceForQuantity } from "@/lib/priceTiers";
 import { scopedKey, scopedKeyFor } from "@/lib/clientScope";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
@@ -82,7 +82,7 @@ function sanitizeVariant(input: unknown): string {
   return sanitizeString(input, 100);
 }
 
-/** Sanitize persisted price tiers to {min_qty, price} numbers. */
+/** Sanitize persisted price tiers to {min_qty, price, mode} numbers. */
 function sanitizePriceTiers(raw: unknown): PriceTier[] | null {
   if (!Array.isArray(raw)) return null;
   const out: PriceTier[] = [];
@@ -92,7 +92,11 @@ function sanitizePriceTiers(raw: unknown): PriceTier[] | null {
     const minQty = Math.round(Number(rec.min_qty) || 0);
     const price = Number(rec.price);
     if (minQty >= 1 && Number.isFinite(price) && price > 0) {
-      out.push({ min_qty: minQty, price });
+      out.push({
+        min_qty: minQty,
+        price,
+        mode: rec.mode === "unit" ? "unit" : "pack",
+      });
     }
   }
   return out.length > 0 ? out : null;
@@ -377,9 +381,13 @@ export function useCart() {
 
   const totalItems = items.reduce((sum, i) => sum + sanitizeQuantity(i.quantity), 0);
   const totalAmount = items.reduce((sum, i) => {
-    const price = sanitizePrice(i.price);
     const qty = sanitizeQuantity(i.quantity);
-    const lineTotal = price * qty;
+    const price = sanitizePrice(i.price);
+    // Exact tier-aware line total (pack mode = best pack combination), so the
+    // cart always matches the checkout modal / WhatsApp message.
+    const lineTotal = hasPriceTiers(i.priceTiers)
+      ? priceForQuantity(i.basePrice ?? price, i.priceTiers, qty)
+      : price * qty;
     return sum + (Number.isFinite(lineTotal) ? lineTotal : 0);
   }, 0);
 

@@ -22,9 +22,11 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizePkPhoneDigits, isValidUUID } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { computeVariantPrice } from "@/lib/variantPricing";
+import { hasPriceTiers, priceForQuantity } from "@/lib/priceTiers";
+import { computeDeliveryFee } from "@/lib/deliveryFee";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { sendPushToUser } from "@/lib/webPush";
-import type { Order, OrderItem, VariantGroup } from "@/types";
+import type { Order, OrderItem, PriceTier, VariantGroup } from "@/types";
 
 export const runtime = "nodejs";
 
@@ -355,7 +357,7 @@ export async function POST(request: Request) {
   const [productRes, packageRes, dealRes] = await Promise.all([
     admin
       .from("products")
-      .select("id, shop_id, name, price, is_available, variants, updated_at")
+      .select("id, shop_id, name, price, is_available, variants, price_tiers, updated_at")
       .in("id", ids),
     admin.from("service_packages").select("id, shop_id, name, price").in("id", ids),
     admin
@@ -368,7 +370,16 @@ export async function POST(request: Request) {
 
   const productMap = new Map<
     string,
-    { id: string; shop_id: string; name: string; price: number | null; is_available: boolean; variants: VariantGroup[]; updated_at?: string }
+    {
+      id: string;
+      shop_id: string;
+      name: string;
+      price: number | null;
+      is_available: boolean;
+      variants: VariantGroup[];
+      price_tiers: PriceTier[] | null;
+      updated_at?: string;
+    }
   >();
   for (const row of (productRes.data ?? []) as Record<string, unknown>[]) {
     productMap.set(String(row.id), {
@@ -378,6 +389,9 @@ export async function POST(request: Request) {
       price: toMoney(row.price),
       is_available: row.is_available !== false,
       variants: (row.variants as VariantGroup[]) ?? [],
+      price_tiers: Array.isArray(row.price_tiers)
+        ? (row.price_tiers as PriceTier[])
+        : null,
       updated_at: row.updated_at as string | undefined,
     });
   }
@@ -436,6 +450,7 @@ export async function POST(request: Request) {
     notes?: string;
     isProduct: boolean;
     variants: VariantGroup[];
+    priceTiers?: PriceTier[] | null;
     updated_at?: string;
   }> = [];
 
@@ -478,6 +493,7 @@ export async function POST(request: Request) {
         notes: item.notes,
         isProduct: true,
         variants: product.variants,
+        priceTiers: product.price_tiers,
         updated_at: product.updated_at,
       });
       continue;
@@ -551,8 +567,14 @@ export async function POST(request: Request) {
     );
   }
 
-  // 6. Subtotal from authoritative prices.
-  const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  // 6. Subtotal from authoritative prices — pack/quantity tiers honoured so a
+  //    "6 = Rs 1100" bottle never gets billed as 6 × 200 = 1200.
+  const subtotal = resolvedItems.reduce((sum, i) => {
+    if (hasPriceTiers(i.priceTiers)) {
+      return sum + priceForQuantity(i.price, i.priceTiers, i.quantity);
+    }
+    return sum + i.price * i.quantity;
+  }, 0);
 
   // 7. Delivery-coverage enforcement (radius / city / nationwide).
   //    Skipped entirely for self-pickup — the customer is coming to the shop.
@@ -653,14 +675,15 @@ export async function POST(request: Request) {
   }
 
   // 10. Delivery fee (server-side) — self-pickup is never charged delivery.
-  const freeThreshold = toNumber(shopRow.free_delivery_threshold, 0);
-  let deliveryFee = 0;
-  if (orderType !== "pickup" && !(freeThreshold > 0 && subtotal >= freeThreshold)) {
-    const flat = toNumber(shopRow.delivery_fee_flat, 0);
-    const perKm = toNumber(shopRow.delivery_fee_per_km, 0);
-    deliveryFee =
-      Math.round((flat + (perKm > 0 && distanceKm != null ? perKm * distanceKm : 0)) * 100) / 100;
-  }
+  //     Shared helper = exactly what the customer saw in checkout.
+  const deliveryFee = computeDeliveryFee({
+    flat: toNumber(shopRow.delivery_fee_flat, 0),
+    perKm: toNumber(shopRow.delivery_fee_per_km, 0),
+    distanceKm,
+    freeThreshold: toNumber(shopRow.free_delivery_threshold, 0),
+    subtotal,
+    isPickup: orderType === "pickup",
+  });
 
   const total = Math.max(0, Math.round((subtotal - discount + deliveryFee) * 100) / 100);
 
@@ -671,11 +694,12 @@ export async function POST(request: Request) {
   if (idempotencyKey) {
     const { data: existing } = await admin
       .from("orders")
-      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at")
+      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, subtotal_amount, delivery_fee, discount_amount, coupon_code, order_type, status, created_at, updated_at")
       .eq("client_token", idempotencyKey)
       .maybeSingle();
     if (existing) {
       const prior = existing as Record<string, unknown>;
+      const priorOrderType = String(prior.order_type ?? "delivery");
       const order: Order = {
         id: String(prior.id),
         shop_id: String(prior.shop_id),
@@ -684,6 +708,20 @@ export async function POST(request: Request) {
         items_json: (prior.items_json as OrderItem[]) ?? [],
         total_amount: toNumber(prior.total_amount, 0),
         status: (prior.status as Order["status"]) ?? "Pending",
+        order_type:
+          priorOrderType === "pickup" || priorOrderType === "dine_in"
+            ? (priorOrderType as "pickup" | "dine_in")
+            : "delivery",
+        subtotal_amount:
+          prior.subtotal_amount == null ? undefined : toNumber(prior.subtotal_amount, 0),
+        delivery_fee:
+          prior.delivery_fee == null ? undefined : toNumber(prior.delivery_fee, 0),
+        discount_amount:
+          prior.discount_amount == null ? undefined : toNumber(prior.discount_amount, 0),
+        coupon_code:
+          typeof prior.coupon_code === "string" && prior.coupon_code.trim()
+            ? prior.coupon_code.trim()
+            : undefined,
         created_at: String(prior.created_at ?? new Date().toISOString()),
         updated_at: prior.updated_at as string | undefined,
       };
@@ -773,14 +811,23 @@ export async function POST(request: Request) {
   }
 
   // 14. Insert the order with the full money breakdown.
-  const orderItems: OrderItem[] = resolvedItems.map((i) => ({
-    product_id: i.productId,
-    name: i.name,
-    price: i.price,
-    quantity: i.quantity,
-    ...(i.variant ? { variant: i.variant } : {}),
-    ...(i.notes ? { notes: i.notes } : {}),
-  }));
+  const orderItems: OrderItem[] = resolvedItems.map((i) => {
+    // Effective per-unit price so bill lines match the pack/quantity subtotal
+    // (e.g. "6 = Rs 1100" → line is 183.33 × 6, subtotal stays exactly 1100).
+    let unit = i.price;
+    if (hasPriceTiers(i.priceTiers)) {
+      unit = priceForQuantity(i.price, i.priceTiers, i.quantity) / i.quantity;
+      unit = Math.round(unit * 100) / 100;
+    }
+    return {
+      product_id: i.productId,
+      name: i.name,
+      price: unit,
+      quantity: i.quantity,
+      ...(i.variant ? { variant: i.variant } : {}),
+      ...(i.notes ? { notes: i.notes } : {}),
+    };
+  });
 
   const orderPayload: Record<string, unknown> = {
     shop_id: shopId,
@@ -843,6 +890,10 @@ export async function POST(request: Request) {
     total_amount: toNumber((inserted as Record<string, unknown>).total_amount, total),
     status: "Pending",
     order_type: orderType,
+    subtotal_amount: subtotal,
+    delivery_fee: deliveryFee,
+    discount_amount: discount,
+    coupon_code: appliedCoupon ?? undefined,
     created_at: String((inserted as Record<string, unknown>).created_at ?? new Date().toISOString()),
     updated_at: (inserted as Record<string, unknown>).updated_at as string | undefined,
   };
