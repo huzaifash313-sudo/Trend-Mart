@@ -42,23 +42,32 @@ const DASH = "━━━━━━━━━━━━━━━━━━━━━━
 const THIN = "──────────────────────────────";
 
 /** Render a single bill line with right-aligned amount (thermal layout). */
-function BillRow({ qty, name, meta, amount }: {
+function BillRow({ qty, name, meta, amount, originalAmount }: {
   qty?: number;
   name: string;
   meta?: string;
   amount?: number;
+  /** Pre-discount line total — shown as a strikethrough "was" price. */
+  originalAmount?: number;
 }) {
   const left = `${qty && qty > 1 ? `${qty}x ` : ""}${name}`;
   const amountText = amount != null ? formatRs(amount) : "";
+  const hasMarkdown =
+    originalAmount != null && amount != null && originalAmount > amount;
   return (
     <div className="flex items-start justify-between gap-2 text-[11px] leading-snug">
       <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-zinc-900">
         {left}
         {meta ? <span className="text-zinc-500"> ({meta})</span> : null}
       </span>
-      {amountText ? (
-        <span className="shrink-0 whitespace-nowrap text-zinc-900">{amountText}</span>
-      ) : null}
+      <span className="shrink-0 whitespace-nowrap text-right text-zinc-900">
+        {hasMarkdown ? (
+          <span className="block text-[10px] text-zinc-400 line-through">
+            was {formatRs(originalAmount as number)}
+          </span>
+        ) : null}
+        {amountText}
+      </span>
     </div>
   );
 }
@@ -96,10 +105,10 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
   );
 
   const subtotalCol = orderMoney(order, "subtotal_amount") || itemsSubtotal;
-  const deliveryFee = orderMoney(order, "delivery_fee");
+  const storedDeliveryFee = orderMoney(order, "delivery_fee");
   const discount = orderMoney(order, "discount_amount");
   const couponCode = (order as unknown as Record<string, unknown>).coupon_code as string | undefined;
-  const grandTotal = order.total_amount ?? Math.max(0, subtotalCol - discount + deliveryFee);
+  const grandTotal = order.total_amount ?? Math.max(0, subtotalCol - discount + storedDeliveryFee);
 
   const orderTypeLabel =
     order.order_type === "dine_in"
@@ -113,6 +122,29 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
   const isPickup = order.order_type === "pickup";
   const isDineIn = order.order_type === "dine_in";
   const paymentLabel = isDineIn || isPickup ? "Pay at counter" : "Cash on delivery";
+
+  // Legacy / fallback rows stored the delivery charge inside total_amount but
+  // left delivery_fee empty (older schema, or the API's column-drop fallback).
+  // Recover the true fee from the arithmetic so the bill never shows "FREE"
+  // while actually charging. Pickup / dine-in always stay Rs 0.
+  const deliveryFee =
+    !isPickup && !isDineIn && storedDeliveryFee <= 0 && subtotalCol > 0 && grandTotal > subtotalCol - discount
+      ? Math.max(0, Math.round(grandTotal - subtotalCol + discount))
+      : storedDeliveryFee;
+
+  // Item-level savings (deal / markdown pricing) so the bill shows the deal
+  // as "Was Rs X → Rs Y" and a total savings line when applicable.
+  const itemSavings = useMemo(
+    () =>
+      rows.reduce((sum, it) => {
+        const orig = it.original_price != null ? it.original_price : 0;
+        const unit = it.price ?? 0;
+        const qty = it.quantity ?? 1;
+        return orig > unit ? sum + (orig - unit) * qty : sum;
+      }, 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows],
+  );
 
   const orderShort = order.id.slice(0, 10).toUpperCase();
 
@@ -291,15 +323,20 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
                 {rows.length === 0 ? (
                   <p className="text-center text-zinc-500">No items</p>
                 ) : (
-                  rows.map((item, idx) => (
-                    <BillRow
-                      key={idx}
-                      qty={item.quantity ?? 1}
-                      name={item.name}
-                      meta={item.variant}
-                      amount={lineTotal(item)}
-                    />
-                  ))
+                  rows.map((item, idx) => {
+                    const qty = item.quantity ?? 1;
+                    const orig = item.original_price != null ? item.original_price : 0;
+                    return (
+                      <BillRow
+                        key={idx}
+                        qty={qty}
+                        name={item.name}
+                        meta={item.variant}
+                        amount={lineTotal(item)}
+                        originalAmount={orig > (item.price ?? 0) ? orig * qty : undefined}
+                      />
+                    );
+                  })
                 )}
               </div>
 
@@ -321,6 +358,12 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
                   <div className="flex justify-between text-emerald-700">
                     <span>Discount{couponCode ? ` (${couponCode})` : ""}</span>
                     <span>-{formatRs(discount)}</span>
+                  </div>
+                )}
+                {itemSavings > 0 && discount <= 0 && (
+                  <div className="flex justify-between text-emerald-700">
+                    <span>You saved on deals</span>
+                    <span>-{formatRs(itemSavings)}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-dashed border-zinc-400 pt-1 text-[13px] font-bold">

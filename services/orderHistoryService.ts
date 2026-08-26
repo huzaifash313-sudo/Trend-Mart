@@ -120,6 +120,11 @@ function sanitizeOrderParams(
             product_id: truncate(sanitizeLight(it.product_id ?? ""), 100),
             name: truncate(sanitizeLight(it.name), 200),
             price: sanitizeNumeric(it.price, 0, 99_999_999, 0),
+            ...(typeof it.original_price === "number" &&
+            it.original_price > 0 &&
+            it.original_price > it.price
+              ? { original_price: sanitizeNumeric(it.original_price, 0, 99_999_999, 0) }
+              : {}),
             quantity: sanitizeNumeric(it.quantity, 1, 999, 1),
             ...(it.variant ? { variant: truncate(sanitizeLight(it.variant), 100) } : {}),
           })),

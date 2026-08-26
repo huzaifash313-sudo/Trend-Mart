@@ -125,6 +125,19 @@ function OrderSummaryInner({ id }: { id: string }) {
     );
   }, [order]);
 
+  // Legacy / fallback rows stored the delivery charge inside total_amount but
+  // left delivery_fee empty — recover it so the summary never shows FREE while
+  // actually charging. Pickup / dine-in always stay Rs 0.
+  const recoveredDeliveryFee = useMemo(() => {
+    if (!order) return 0;
+    const isDelivery =
+      order.order_type !== "pickup" && order.order_type !== "dine_in";
+    if (!isDelivery) return 0;
+    if (order.delivery_fee > 0) return order.delivery_fee;
+    const diff = order.total_amount - subtotal + order.discount_amount;
+    return diff > 0 ? Math.round(diff) : 0;
+  }, [order, subtotal]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
@@ -241,6 +254,11 @@ function OrderSummaryInner({ id }: { id: string }) {
                     <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                       {formatRupees(item.price * qty)}
                     </p>
+                    {item.original_price != null && item.original_price > item.price && (
+                      <p className="text-[0.65rem] text-zinc-400 line-through">
+                        was {formatRupees(item.original_price * qty)}
+                      </p>
+                    )}
                     {qty > 1 && (
                       <p className="text-[0.65rem] text-zinc-400">
                         {qty} × {formatRupees(item.price)}
@@ -275,7 +293,7 @@ function OrderSummaryInner({ id }: { id: string }) {
                 {isPickup ? "Pickup" : "Delivery"}
               </span>
               <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                {isPickup ? "—" : order.delivery_fee > 0 ? formatRupees(order.delivery_fee) : "FREE"}
+                {isPickup ? "—" : recoveredDeliveryFee > 0 ? formatRupees(recoveredDeliveryFee) : "FREE"}
               </span>
             </div>
             <div className="flex justify-between border-t border-zinc-100 pt-2 text-base font-bold dark:border-zinc-800">

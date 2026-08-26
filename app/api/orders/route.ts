@@ -21,7 +21,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizePkPhoneDigits, isValidUUID } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
-import { computeVariantPrice } from "@/lib/variantPricing";
+import { computeVariantPricing } from "@/lib/variantPricing";
 import { hasPriceTiers, priceForQuantity } from "@/lib/priceTiers";
 import { computeDeliveryFee } from "@/lib/deliveryFee";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
@@ -357,13 +357,15 @@ export async function POST(request: Request) {
   const [productRes, packageRes, dealRes] = await Promise.all([
     admin
       .from("products")
-      .select("id, shop_id, name, price, is_available, variants, price_tiers, updated_at")
+      .select(
+        "id, shop_id, name, price, original_price, compare_at_price, is_available, variants, price_tiers, updated_at",
+      )
       .in("id", ids),
     admin.from("service_packages").select("id, shop_id, name, price").in("id", ids),
     admin
       .from("shop_deals")
       .select(
-        "id, shop_id, title, price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month",
+        "id, shop_id, title, price, original_price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month",
       )
       .in("id", ids),
   ]);
@@ -375,6 +377,7 @@ export async function POST(request: Request) {
       shop_id: string;
       name: string;
       price: number | null;
+      original_price: number | null;
       is_available: boolean;
       variants: VariantGroup[];
       price_tiers: PriceTier[] | null;
@@ -382,11 +385,13 @@ export async function POST(request: Request) {
     }
   >();
   for (const row of (productRes.data ?? []) as Record<string, unknown>[]) {
+    const original = toMoney(row.original_price) ?? toMoney(row.compare_at_price) ?? null;
     productMap.set(String(row.id), {
       id: String(row.id),
       shop_id: String(row.shop_id ?? ""),
       name: String(row.name ?? ""),
       price: toMoney(row.price),
+      original_price: original,
       is_available: row.is_available !== false,
       variants: (row.variants as VariantGroup[]) ?? [],
       price_tiers: Array.isArray(row.price_tiers)
@@ -412,6 +417,7 @@ export async function POST(request: Request) {
       shop_id: string;
       title: string;
       price: number;
+      original_price: number | null;
       deal: ShopDeal;
     }
   >();
@@ -436,6 +442,7 @@ export async function POST(request: Request) {
       shop_id: deal.shop_id,
       title: deal.title,
       price: toNumber(row.price),
+      original_price: toMoney(row.original_price),
       deal,
     });
   }
@@ -444,6 +451,7 @@ export async function POST(request: Request) {
     productId: string;
     name: string;
     price: number;
+    originalPrice: number | null;
     quantity: number;
     variant?: string;
     variantGroup?: string;
@@ -482,11 +490,19 @@ export async function POST(request: Request) {
         );
       }
       // Variant price — server-derived from the stored variants JSON (supports
-      // both Daraz-style absolute prices and additive adjustments).
+      // both Daraz-style absolute prices and additive adjustments). Original
+      // price is variant-aware too so the bill's strikethrough stays accurate.
+      const { price: variantPrice, originalPrice: variantOriginal } = computeVariantPricing(
+        product.price ?? 0,
+        product.original_price,
+        product.variants,
+        item.variant,
+      );
       resolvedItems.push({
         productId: item.productId,
         name: product.name || item.name,
-        price: computeVariantPrice(product.price ?? 0, product.variants, item.variant),
+        price: variantPrice,
+        originalPrice: variantOriginal,
         quantity: item.quantity,
         variant: item.variant,
         variantGroup: item.variantGroup,
@@ -523,6 +539,7 @@ export async function POST(request: Request) {
         productId: item.productId,
         name: deal.title || item.name,
         price: deal.price,
+        originalPrice: deal.original_price != null && deal.original_price > deal.price ? deal.original_price : null,
         quantity: item.quantity,
         variant: item.variant,
         variantGroup: item.variantGroup,
@@ -551,6 +568,7 @@ export async function POST(request: Request) {
         productId: item.productId,
         name: pkg.name || item.name,
         price: pkg.price,
+        originalPrice: null,
         quantity: item.quantity,
         variant: item.variant,
         variantGroup: item.variantGroup,
@@ -823,6 +841,9 @@ export async function POST(request: Request) {
       product_id: i.productId,
       name: i.name,
       price: unit,
+      ...(i.originalPrice != null && i.originalPrice > unit
+        ? { original_price: i.originalPrice }
+        : {}),
       quantity: i.quantity,
       ...(i.variant ? { variant: i.variant } : {}),
       ...(i.notes ? { notes: i.notes } : {}),

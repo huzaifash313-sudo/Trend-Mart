@@ -568,6 +568,9 @@ export interface OrderItem {
   name: string;
   /** Unit price (PKR). Line total = price × quantity when quantity is set. */
   price: number;
+  /** Original ("before discount") unit price (PKR). Set when the item had a
+   *  markdown/deal so bills can show the strikethrough and savings. */
+  original_price?: number;
   /** Quantity ordered (defaults to 1 when omitted). */
   quantity?: number;
   /** Selected variant label (e.g. "Size: M", "Color: Red") if applicable */

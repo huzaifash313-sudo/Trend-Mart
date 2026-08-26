@@ -917,6 +917,9 @@ export default function WhatsAppCheckoutModal({
           product_id: item.productId,
           name: item.name,
           price: Math.round(oTotal / Math.max(1, oQty)),
+          ...(item.originalPrice != null && item.originalPrice > (item.price ?? 0)
+            ? { original_price: item.originalPrice }
+            : {}),
           quantity: oQty,
           variant: item.variant,
           notes: item.notes,
