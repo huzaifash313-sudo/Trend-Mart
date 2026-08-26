@@ -753,3 +753,44 @@ NOTIFY pgrst, 'reload schema';
 --   merchant  test12345@gmail.com
 --   customer  abdwhaw99@gmail.com
 -- =============================================================================
+
+-- ============================================================================
+-- PER-VARIANT ORIGINAL PRICES (compare-at / strikethrough)
+-- ----------------------------------------------------------------------------
+-- Idempotent enrichment so every variant option with an absolute `price` gets
+-- its own `original_price` (~15% above the option price, rounded to 50). The
+-- discount badge then renders per selected variant instead of from the
+-- product base price (which caused 0% / negative "Save" on pricier options).
+-- Options that already carry an `original_price` are preserved.
+-- ============================================================================
+UPDATE public.products
+SET variants = (
+  SELECT jsonb_agg(
+    CASE
+      WHEN jsonb_typeof(g) <> 'object' OR NOT (g ? 'options') OR jsonb_typeof(g->'options') <> 'array'
+        THEN g
+      ELSE jsonb_build_object(
+        'name', g->'name',
+        'options', (
+          SELECT jsonb_agg(
+            CASE
+              WHEN jsonb_typeof(o) <> 'object'
+                OR NOT (o ? 'price')
+                OR jsonb_typeof(o->'price') <> 'number'
+                THEN o
+              WHEN o ? 'original_price' THEN o
+              ELSE jsonb_set(
+                o,
+                '{original_price}',
+                to_jsonb((ceil(((o->>'price')::numeric) * 1.15 / 50) * 50)::bigint)
+              )
+            END
+          )
+          FROM jsonb_array_elements(g->'options') o
+        )
+      )
+    END
+  )
+  FROM jsonb_array_elements(variants) g
+)
+WHERE variants IS NOT NULL AND jsonb_typeof(variants) = 'array';

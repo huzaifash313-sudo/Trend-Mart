@@ -72,6 +72,9 @@ export const phoneSchema = z
 
 export const productVariantSchema = z.object({
   label: safeStringSchema(1, 50),
+  price: z.number().finite().nonnegative().optional(),
+  original_price: z.number().finite().nonnegative().optional(),
+  discount_pct: z.number().finite().nonnegative().max(99).optional(),
   price_adj: z.number().finite().optional().default(0),
   is_available: z.boolean().optional().default(true),
   stock: z.number().int().nonnegative().optional(),

@@ -162,14 +162,20 @@ const uuid5 = (seed) => {
   return `${s.slice(0, 8)}-${s.slice(8, 12)}-${s.slice(12, 16)}-${s.slice(16, 20)}-${s.slice(20)}`;
 };
 
+/** Nice rounded original ("before discount") price for a variant option, so
+ *  every size/colour/portion shows its OWN % OFF badge (never 0% / negative
+ *  when the selected option is more expensive than the product base price). */
+const origPrice = (p) => Math.max(p + 1, Math.ceil((p * 1.15) / 50) * 50);
+const withOrig = (opt) => (typeof opt.price === "number" ? { ...opt, original_price: origPrice(opt.price) } : opt);
+
 // variant group builders
 const sizeGroup = (base, adj = { s: -150, m: 0, l: 150, f: 350 }) => ({
   name: "Size",
   options: [
-    { label: "Small", price: r(base + adj.s) },
-    { label: "Medium", price: r(base + adj.m) },
-    { label: "Large", price: r(base + adj.l) },
-    { label: "Family", price: r(base + adj.f) },
+    withOrig({ label: "Small", price: r(base + adj.s) }),
+    withOrig({ label: "Medium", price: r(base + adj.m) }),
+    withOrig({ label: "Large", price: r(base + adj.l) }),
+    withOrig({ label: "Family", price: r(base + adj.f) }),
   ],
 });
 const clothesSizeGroup = {
@@ -182,7 +188,11 @@ const kidsSizeGroup = {
 };
 const colorGroup = (cols, extraPriceFor = {}) => ({
   name: "Color",
-  options: cols.map((c) => (extraPriceFor[c] ? { label: c, price: r(extraPriceFor[c]) } : { label: c })),
+  options: cols.map((c) =>
+    extraPriceFor[c]
+      ? withOrig({ label: c, price: r(extraPriceFor[c]) })
+      : { label: c },
+  ),
 });
 const spiceGroup = {
   name: "Spice Level",
@@ -191,15 +201,15 @@ const spiceGroup = {
 const halfFullGroup = (base) => ({
   name: "Portion",
   options: [
-    { label: "Half", price: r(base * 0.55) },
-    { label: "Full", price: base },
+    withOrig({ label: "Half", price: r(base * 0.55) }),
+    withOrig({ label: "Full", price: base }),
   ],
 });
 const singleDoubleGroup = (base, extra = 260) => ({
   name: "Portion",
   options: [
-    { label: "Single", price: base },
-    { label: "Double", price: r(base + extra) },
+    withOrig({ label: "Single", price: base }),
+    withOrig({ label: "Double", price: r(base + extra) }),
   ],
 });
 const tier = (arr) => arr.map(([q, price]) => ({ min_qty: q, price: r(price) }));

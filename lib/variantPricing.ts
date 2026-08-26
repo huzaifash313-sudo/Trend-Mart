@@ -12,7 +12,7 @@
 /*  option's price_adj is then added on top. Never negative, always 2dp.       */
 /* -------------------------------------------------------------------------- */
 
-import type { VariantGroup } from "@/types";
+import type { ProductVariant, VariantGroup } from "@/types";
 
 export interface VariantSelectionPart {
   groupName: string;
@@ -46,6 +46,127 @@ function findOption(groups: VariantGroup[], part: VariantSelectionPart) {
     if (opt) return opt;
   }
   return undefined;
+}
+
+/**
+ * Effective unit price for a single option in isolation: absolute `price`
+ * wins, then any `price_adj` is added on top. Used by the variant editor to
+ * preview per-option pricing / % OFF before anything is saved.
+ */
+export function effectiveOptionPrice(
+  basePrice: number,
+  opt: Pick<ProductVariant, "price" | "price_adj">,
+): number {
+  let p =
+    typeof opt.price === "number" && Number.isFinite(opt.price) ? opt.price : basePrice;
+  if (typeof opt.price_adj === "number" && Number.isFinite(opt.price_adj)) {
+    p += opt.price_adj;
+  }
+  return Math.max(0, Math.round(p * 100) / 100);
+}
+
+/**
+ * Original ("before discount") price for a single option, or `null` when no
+ * discount applies to it. Resolution order:
+ *   1. Explicit per-option `original_price` (> effective price).
+ *   2. Per-option `discount_pct` → derived original = round(price/(1-pct/100)).
+ *   3. Product-level original scaled by the option's price delta from base.
+ */
+export function effectiveOptionOriginal(
+  basePrice: number,
+  baseOriginal: number | null | undefined,
+  opt: ProductVariant,
+): number | null {
+  const effective = effectiveOptionPrice(basePrice, opt);
+
+  if (
+    typeof opt.original_price === "number" &&
+    Number.isFinite(opt.original_price) &&
+    opt.original_price > effective
+  ) {
+    return Math.round(opt.original_price * 100) / 100;
+  }
+
+  if (
+    typeof opt.discount_pct === "number" &&
+    Number.isFinite(opt.discount_pct) &&
+    opt.discount_pct > 0 &&
+    opt.discount_pct < 100
+  ) {
+    const derived = Math.round(effective / (1 - opt.discount_pct / 100));
+    return derived > effective ? derived : null;
+  }
+
+  if (baseOriginal != null && Number.isFinite(baseOriginal) && baseOriginal > basePrice) {
+    const ratio = baseOriginal / basePrice;
+    const scaled = Math.round(effective * ratio);
+    return scaled > effective ? scaled : null;
+  }
+
+  return null;
+}
+
+/**
+ * Compute the authoritative original ("before discount") price for a product
+ * + selected variant combination. Returns `null` when no discount applies to
+ * the selected combo (so callers can hide the badge / strikethrough safely).
+ * Resolution mirrors `computeVariantPrice` (absolute price wins, then every
+ * selected option's `price_adj` is added) while `effectiveOptionOriginal()`
+ * decides each option's own original price.
+ */
+export function computeVariantOriginalPrice(
+  basePrice: number,
+  baseOriginalPrice: number | null | undefined,
+  variants: VariantGroup[] | null | undefined,
+  variantLabel?: string,
+): number | null {
+  const groups = variants ?? [];
+  if (!variantLabel || groups.length === 0) {
+    return baseOriginalPrice != null &&
+      Number.isFinite(baseOriginalPrice) &&
+      baseOriginalPrice > basePrice
+      ? baseOriginalPrice
+      : null;
+  }
+
+  const effective = computeVariantPrice(basePrice, groups, variantLabel);
+  let original: number | null = null;
+  for (const part of parseVariantLabel(variantLabel)) {
+    const opt = findOption(groups, part);
+    if (!opt) continue;
+    const optOriginal = effectiveOptionOriginal(basePrice, baseOriginalPrice, opt);
+    if (optOriginal != null) original = optOriginal;
+  }
+  // Base fallback when no selected option carries its own original.
+  if (original == null) {
+    original =
+      baseOriginalPrice != null && Number.isFinite(baseOriginalPrice) && baseOriginalPrice > effective
+        ? baseOriginalPrice
+        : null;
+  }
+  return original != null && original > effective ? original : null;
+}
+
+/**
+ * One-call helper: unit price + original price for a product/variant combo.
+ * `originalPrice` is `null` when there is no discount on the selected combo —
+ * feed both into `getProductDiscount()` to also honour `deal_expires_at`.
+ */
+export function computeVariantPricing(
+  basePrice: number,
+  baseOriginalPrice: number | null | undefined,
+  variants: VariantGroup[] | null | undefined,
+  variantLabel?: string,
+): { price: number; originalPrice: number | null } {
+  return {
+    price: computeVariantPrice(basePrice, variants, variantLabel),
+    originalPrice: computeVariantOriginalPrice(
+      basePrice,
+      baseOriginalPrice,
+      variants,
+      variantLabel,
+    ),
+  };
 }
 
 /**

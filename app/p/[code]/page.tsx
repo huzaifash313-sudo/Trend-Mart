@@ -22,7 +22,7 @@ import { getSafeImageUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
 import ProductOrderModal from "@/components/ProductOrderModal";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
-import { computeVariantPrice } from "@/lib/variantPricing";
+import { computeVariantPricing } from "@/lib/variantPricing";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
@@ -162,13 +162,16 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
   const variantLabel = selectedVariants
     .map((v) => `${v.groupName}: ${v.optionLabel}`)
     .join(" · ");
-  // Authoritative unit price for the selected combo — handles both absolute
-  // (Daraz-style) prices and additive adjustments via the shared helper.
-  const displayPrice = computeVariantPrice(
+  // Authoritative unit price + original ("before discount") price for the
+  // selected combo — discount badge / strikethrough are computed per variant
+  // so a higher-priced size never shows a negative "Save" or a wrong % OFF.
+  const variantPricing = computeVariantPricing(
     product?.price ?? 0,
+    product?.original_price ?? product?.compare_at_price ?? null,
     product?.variants ?? null,
     variantLabel,
   );
+  const displayPrice = variantPricing.price;
   const variantsReady = !hasVariants || selectedVariants.length === (product?.variants?.length ?? 0);
   // Quantity tiers apply only when no variant overrides the base price.
   const tiersActive = product
@@ -182,7 +185,14 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
     ? priceForQuantity(product.price, product.price_tiers, quantity)
     : Math.round(displayPrice * quantity);
 
-  const discount = product ? getProductDiscount(product) : null;
+  const discount = product
+    ? getProductDiscount({
+        price: displayPrice,
+        original_price: variantPricing.originalPrice,
+        compare_at_price: null,
+        deal_expires_at: product.deal_expires_at,
+      })
+    : null;
   const showDiscount = discount?.hasDiscount && discount.originalPrice != null;
 
   const handleAddToCart = useCallback(() => {
@@ -191,15 +201,23 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
       addToast("Please choose the options first.", "error");
       return;
     }
+    const variantOriginal = discount?.hasDiscount ? discount.originalPrice : null;
     const forCart: Product =
-      displayPrice !== product.price || !tiersActive
-        ? { ...product, price: displayPrice, price_tiers: tiersActive ? product.price_tiers : null }
+      displayPrice !== product.price ||
+      variantOriginal !== (product.original_price ?? null) ||
+      !tiersActive
+        ? {
+            ...product,
+            price: displayPrice,
+            original_price: variantOriginal,
+            price_tiers: tiersActive ? product.price_tiers : null,
+          }
         : product;
     addItem(forCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, variantsReady, displayPrice, tiersActive, quantity, variantLabel, itemNotes, addItem, addToast]);
+  }, [product, shop, variantsReady, displayPrice, tiersActive, quantity, variantLabel, itemNotes, discount, addItem, addToast]);
 
   const handleOrder = useCallback(() => {
     if (!product || !shop) return;
@@ -450,7 +468,13 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
       {/* Direct order modal */}
       {orderOpen && shop && (
         <ProductOrderModal
-          product={{ ...product, price: displayPrice } as Product}
+          product={
+            {
+              ...product,
+              price: displayPrice,
+              original_price: discount?.hasDiscount ? discount.originalPrice : null,
+            } as Product
+          }
           shop={shop}
           variant={variantLabel || undefined}
           quantity={quantity}

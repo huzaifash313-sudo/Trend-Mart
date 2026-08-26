@@ -10,7 +10,8 @@
 /* -------------------------------------------------------------------------- */
 
 import { useState } from "react";
-import type { VariantGroup } from "@/types";
+import type { ProductVariant, VariantGroup } from "@/types";
+import { effectiveOptionPrice } from "@/lib/variantPricing";
 
 const PRESET_GROUPS = ["Size", "Color", "Spice Level", "Flavour", "Portion", "Add-ons"];
 
@@ -20,6 +21,20 @@ const PRESET_OPTIONS: Record<string, string[]> = {
   Size: ["XS", "S", "M", "L", "XL", "XXL"],
   Color: ["Black", "White", "Red", "Blue", "Green"],
 };
+
+/** When "% Off" is typed, the Original price is auto-filled from the option's
+ *  effective unit price so every variant shows its own correct discount. */
+function originalFromPercent(effective: number, pct: number): number | undefined {
+  if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) return undefined;
+  const derived = Math.round(effective / (1 - pct / 100));
+  return derived > effective ? derived : undefined;
+}
+
+/** % OFF implied by an option's original price vs its effective price. */
+function percentFromOriginal(effective: number, original?: number): number | undefined {
+  if (original == null || !Number.isFinite(original) || original <= effective) return undefined;
+  return Math.round(((original - effective) / original) * 100);
+}
 
 function PlusIcon() {
   return (
@@ -40,9 +55,11 @@ function TrashIcon() {
 export default function VariantEditor({
   variants,
   onChange,
+  basePrice = 0,
 }: {
   variants: VariantGroup[];
   onChange: (next: VariantGroup[]) => void;
+  basePrice?: number;
 }) {
   const [customGroup, setCustomGroup] = useState("");
 
@@ -75,7 +92,7 @@ export default function VariantEditor({
             ...g,
             options: [
               ...g.options,
-              { label: "", price: undefined, price_adj: undefined, is_available: true },
+              { label: "", price: undefined, price_adj: undefined, original_price: undefined, is_available: true },
             ],
           }
         : g,
@@ -200,50 +217,91 @@ export default function VariantEditor({
             )}
 
             <div className="space-y-1.5">
-              {group.options.map((option, optIdx) => (
-                <div key={optIdx} className="flex items-center gap-1.5">
-                  <input
-                    value={option.label}
-                    onChange={(e) => updateOption(groupIdx, optIdx, { label: e.target.value })}
-                    placeholder="Option name (e.g. Large)"
-                    className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                  <input
-                    value={option.price ?? ""}
-                    onChange={(e) =>
-                      updateOption(groupIdx, optIdx, {
-                        price: e.target.value === "" ? undefined : Number(e.target.value),
-                      })
-                    }
-                    type="number"
-                    min={0}
-                    placeholder="Price"
-                    title="Absolute price for this option (Daraz-style)"
-                    className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                  <span className="text-[10px] text-zinc-400">Rs.</span>
-                  <input
-                    value={option.price_adj ?? ""}
-                    onChange={(e) =>
-                      updateOption(groupIdx, optIdx, {
-                        price_adj: e.target.value === "" ? undefined : Number(e.target.value),
-                      })
-                    }
-                    type="number"
-                    placeholder="+Add"
-                    title="Price add-on on top of base (e.g. +100)"
-                    className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeOption(groupIdx, optIdx)}
-                    className="rounded-md p-1 text-zinc-300 hover:text-red-500"
-                    aria-label="Remove option"
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
-              ))}
+              {group.options.map((option, optIdx) => {
+                const eff = effectiveOptionPrice(basePrice, option);
+                const impliedPct =
+                  option.discount_pct ?? percentFromOriginal(eff, option.original_price);
+                return (
+                  <div key={optIdx} className="flex flex-wrap items-center gap-1.5">
+                    <input
+                      value={option.label}
+                      onChange={(e) => updateOption(groupIdx, optIdx, { label: e.target.value })}
+                      placeholder="Option name (e.g. Large)"
+                      className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <input
+                      value={option.price ?? ""}
+                      onChange={(e) =>
+                        updateOption(groupIdx, optIdx, {
+                          price: e.target.value === "" ? undefined : Number(e.target.value),
+                        })
+                      }
+                      type="number"
+                      min={0}
+                      placeholder="Price"
+                      title="Absolute price for this option (Daraz-style)"
+                      className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <input
+                      value={option.original_price ?? ""}
+                      onChange={(e) =>
+                        updateOption(groupIdx, optIdx, {
+                          original_price:
+                            e.target.value === "" ? undefined : Number(e.target.value),
+                          // Manual original overrides any % OFF shortcut.
+                          discount_pct: undefined,
+                        })
+                      }
+                      type="number"
+                      min={0}
+                      placeholder="Orig."
+                      title='Original ("before discount") price for this option — shows the strikethrough / % OFF'
+                      className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <input
+                      value={option.discount_pct ?? ""}
+                      onChange={(e) => {
+                        const pct = e.target.value === "" ? undefined : Number(e.target.value);
+                        updateOption(groupIdx, optIdx, {
+                          discount_pct: pct,
+                          original_price: pct != null ? originalFromPercent(eff, pct) : undefined,
+                        });
+                      }}
+                      type="number"
+                      min={0}
+                      max={99}
+                      placeholder="% Off"
+                      title="% OFF shortcut — Original is auto-filled from this option's price"
+                      className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    <input
+                      value={option.price_adj ?? ""}
+                      onChange={(e) =>
+                        updateOption(groupIdx, optIdx, {
+                          price_adj: e.target.value === "" ? undefined : Number(e.target.value),
+                        })
+                      }
+                      type="number"
+                      placeholder="+Add"
+                      title="Price add-on on top of base (e.g. +100)"
+                      className="w-14 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1.5 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                    {impliedPct != null && impliedPct > 0 && (
+                      <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        -{impliedPct}%
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeOption(groupIdx, optIdx)}
+                      className="rounded-md p-1 text-zinc-300 hover:text-red-500"
+                      aria-label="Remove option"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -262,13 +320,23 @@ export default function VariantEditor({
               return (
                 <span key={g.name} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-sm dark:bg-zinc-800 dark:text-zinc-300">
                   {g.name}:
-                  {shown.map((o, idx) => (
-                    <span key={`${o.label}-${idx}`} className="text-emerald-600 dark:text-emerald-400">
-                      {idx > 0 ? " ·" : ""} {o.label}
-                      {typeof o.price === "number" ? ` (${o.price})` : ""}
-                      {o.price_adj ? ` +${o.price_adj}` : ""}
-                    </span>
-                  ))}
+                  {shown.map((o, idx) => {
+                    const eff = effectiveOptionPrice(basePrice, o);
+                    const pct = percentFromOriginal(eff, o.original_price);
+                    return (
+                      <span key={`${o.label}-${idx}`} className="text-emerald-600 dark:text-emerald-400">
+                        {idx > 0 ? " ·" : ""} {o.label}
+                        {typeof o.price === "number" ? ` (${o.price})` : ""}
+                        {o.price_adj ? ` +${o.price_adj}` : ""}
+                        {pct != null && pct > 0 ? (
+                          <span className="text-red-500">
+                            {" "}
+                            <s>{eff}</s> -{pct}%
+                          </span>
+                        ) : null}
+                      </span>
+                    );
+                  })}
                   {total > 4 ? " …" : ""}
                 </span>
               );

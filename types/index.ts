@@ -264,6 +264,20 @@ export interface ProductVariant {
    * have their own price). Overrides the product base price when set.
    */
   price?: number;
+  /**
+   * Original ("before discount") price for THIS option. When greater than the
+   * option's effective price, the discount badge / strikethrough is computed
+   * per variant instead of from the product-level `original_price`. The single
+   * source of truth for variant-level discounts is `computeVariantPricing()`
+   * from `lib/variantPricing`.
+   */
+  original_price?: number;
+  /**
+   * Percentage discount for this option (0-100). When set and no explicit
+   * `original_price` is present, the original price is derived automatically
+   * from the option's effective price: `round(price / (1 - pct/100))`.
+   */
+  discount_pct?: number;
   /** Optional price adjustment (+/-) on top of the base or absolute price. */
   price_adj?: number;
   is_available?: boolean;

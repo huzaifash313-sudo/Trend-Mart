@@ -743,3 +743,45 @@ COMMIT;
 -- ============================================================================
 -- SUMMARY: 562 products, 1173 variant options, 56 deals
 -- ============================================================================
+
+-- ============================================================================
+-- PER-VARIANT ORIGINAL PRICES (compare-at / strikethrough)
+-- ----------------------------------------------------------------------------
+-- Every size/colour/portion option with an absolute `price` gets its own
+-- `original_price` so the discount badge is computed per variant — a larger
+-- size (e.g. Large at 999) never shows 0% OFF or a negative "Save" just
+-- because the product base price (599) is lower. Idempotent: existing
+-- `original_price` values are preserved, and options without a price are
+-- untouched.
+-- ============================================================================
+UPDATE public.products
+SET variants = (
+  SELECT jsonb_agg(
+    CASE
+      WHEN jsonb_typeof(g) <> 'object' OR NOT (g ? 'options') OR jsonb_typeof(g->'options') <> 'array'
+        THEN g
+      ELSE jsonb_build_object(
+        'name', g->'name',
+        'options', (
+          SELECT jsonb_agg(
+            CASE
+              WHEN jsonb_typeof(o) <> 'object'
+                OR NOT (o ? 'price')
+                OR jsonb_typeof(o->'price') <> 'number'
+                THEN o
+              WHEN o ? 'original_price' THEN o
+              ELSE jsonb_set(
+                o,
+                '{original_price}',
+                to_jsonb((ceil(((o->>'price')::numeric) * 1.15 / 50) * 50)::bigint)
+              )
+            END
+          )
+          FROM jsonb_array_elements(g->'options') o
+        )
+      )
+    END
+  )
+  FROM jsonb_array_elements(variants) g
+)
+WHERE variants IS NOT NULL AND jsonb_typeof(variants) = 'array';

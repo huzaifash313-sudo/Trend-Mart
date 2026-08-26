@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { computeVariantPrice } from "@/lib/variantPricing";
+import { computeVariantPricing } from "@/lib/variantPricing";
 import { getProductImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product, Shop } from "@/types";
@@ -99,7 +99,14 @@ export default function QuickViewModal({
   const currentUrl = images[safeIndex];
   const hasVariants = Boolean(product.variants && product.variants.length > 0);
   const variantLabel = selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · ");
-  const displayPrice = computeVariantPrice(product.price, product.variants, variantLabel);
+  // Unit price + original ("before discount") price for the selected combo so
+  // the badge/strikethrough are per-variant (never a wrong % / negative Save).
+  const { price: displayPrice, originalPrice: variantOriginal } = computeVariantPricing(
+    product.price,
+    product.original_price ?? product.compare_at_price ?? null,
+    product.variants,
+    variantLabel,
+  );
   const variantsReady = !hasVariants || selectedVariants.length === (product.variants?.length ?? 0);
   // Quantity tiers apply only when no variant overrides the base price —
   // otherwise the variant's own price (absolute/add-on) wins.
@@ -111,6 +118,13 @@ export default function QuickViewModal({
   const lineTotal = tiersActive
     ? priceForQuantity(product.price, product.price_tiers, quantity)
     : Math.round(displayPrice * quantity);
+
+  const { hasDiscount, originalPrice, discountPercent: discountPct } = getProductDiscount({
+    price: displayPrice,
+    original_price: variantOriginal,
+    compare_at_price: null,
+    deal_expires_at: product.deal_expires_at,
+  });
 
   const pauseAutoUntil = useRef(0);
 
@@ -185,15 +199,21 @@ export default function QuickViewModal({
       addToast("Please choose flavour / options first.", "error");
       return;
     }
+    const variantOriginal = hasDiscount ? originalPrice : null;
     const productForCart =
-      displayPrice !== product.price || !tiersActive
-        ? { ...product, price: displayPrice, price_tiers: tiersActive ? product.price_tiers : null }
+      displayPrice !== product.price || variantOriginal !== (product.original_price ?? null) || !tiersActive
+        ? {
+            ...product,
+            price: displayPrice,
+            original_price: variantOriginal,
+            price_tiers: tiersActive ? product.price_tiers : null,
+          }
         : product;
     addItem(productForCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive]);
+  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive, hasDiscount, originalPrice]);
 
   const handleOrder = useCallback(() => {
     if (!variantsReady) {
@@ -204,9 +224,15 @@ export default function QuickViewModal({
       addToast("This store has no WhatsApp number yet — please contact them directly.", "info");
       return;
     }
+    const variantOriginal = hasDiscount ? originalPrice : null;
     const productForCart =
-      displayPrice !== product.price || !tiersActive
-        ? { ...product, price: displayPrice, price_tiers: tiersActive ? product.price_tiers : null }
+      displayPrice !== product.price || variantOriginal !== (product.original_price ?? null) || !tiersActive
+        ? {
+            ...product,
+            price: displayPrice,
+            original_price: variantOriginal,
+            price_tiers: tiersActive ? product.price_tiers : null,
+          }
         : product;
     onOrder?.({
       product: productForCart,
@@ -214,9 +240,7 @@ export default function QuickViewModal({
       quantity,
       notes: itemNotes.trim() || undefined,
     });
-  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive, onOrder]);
-
-  const { hasDiscount, originalPrice, discountPercent: discountPct } = getProductDiscount(product);
+  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive, onOrder, hasDiscount, originalPrice]);
 
   return (
     <div

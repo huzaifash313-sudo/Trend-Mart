@@ -16,7 +16,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import type { VariantGroup, ProductVariant } from "@/types";
-import { computeVariantPrice } from "@/lib/variantPricing";
+import { computeVariantPrice, effectiveOptionPrice } from "@/lib/variantPricing";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -299,11 +299,28 @@ export default function VariantSelector({
                     )}
                     {typeof option.price === "number" && option.price !== basePrice ? (
                       <span className="ml-1 text-[0.6rem] opacity-70">
-                        Rs. {option.price}
+                        {typeof option.original_price === "number" &&
+                        option.original_price > option.price ? (
+                          <span>
+                            <s className="mr-0.5">{option.original_price}</s>
+                            <span className="text-red-500 font-bold">-{Math.round(((option.original_price - option.price) / option.original_price) * 100)}%</span>
+                          </span>
+                        ) : (
+                          <>Rs. {option.price}</>
+                        )}
                       </span>
                     ) : option.price_adj && option.price_adj !== 0 ? (
                       <span className="ml-1 text-[0.6rem] opacity-70">
                         {option.price_adj > 0 ? "+" : ""}Rs. {option.price_adj}
+                      </span>
+                    ) : effectiveOptionPrice(basePrice, option) > 0 &&
+                      typeof option.original_price === "number" &&
+                      option.original_price > effectiveOptionPrice(basePrice, option) ? (
+                      <span className="ml-1 text-[0.6rem] opacity-70">
+                        <s>{option.original_price}</s>{" "}
+                        <span className="text-red-500 font-bold">
+                          -{Math.round(((option.original_price - effectiveOptionPrice(basePrice, option)) / option.original_price) * 100)}%
+                        </span>
                       </span>
                     ) : null}
                   </button>

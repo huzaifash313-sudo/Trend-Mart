@@ -299,7 +299,7 @@ export default function ProductEditorModal({
             label="Product photos"
           />
 
-          <VariantEditor variants={variants} onChange={setVariants} />
+          <VariantEditor variants={variants} onChange={setVariants} basePrice={Number(price) || 0} />
 
           <PriceTierEditor tiers={priceTiers} onChange={setPriceTiers} basePrice={Number(price) || 0} />
 
