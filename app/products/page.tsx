@@ -377,7 +377,8 @@ function ProductsPageInner() {
         setGeoVisibleShopIds(null);
         return;
       }
-      if ((scope === "pakistan" || scope === "city") && !coords) {
+      // No pin + city browse → no location restriction on products.
+      if (scope === "city" && !coords) {
         setGeoVisibleShopIds(null);
         return;
       }
