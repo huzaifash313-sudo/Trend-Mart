@@ -5,10 +5,12 @@
 // Generates `supabase/migrations/demo-seed-data.sql` with:
 //   • 7 demo shops (2 restaurants, grocery, bakery, desi food, toys, clothing)
 //   • ~600 products with variants (sizes/flavours/colours/spice) + pack price
-//     tiers + discount (original_price) + real Unsplash images (verified 200)
+//     tiers + discount (original_price) + REAL name-matched images: every
+//     product searches Openverse by its exact name and each candidate URL is
+//     verified to actually serve an image before it is written to the seed
 //   • ~55 scheduled weekly deals linked to products
-//   • 2 extra merchant accounts (merchant6/merchant7) for the toy + clothing
-//     stores (clean-slate created only merchant1-5)
+//   • 7 merchant + 3 customer test accounts (password: Trend@123), fully
+//     self-contained — no clean-slate file needed to run the generated seed
 //
 // Run:  node scripts/generate-demo-seed.mjs
 // Then: paste the generated .sql into the Supabase SQL editor.
@@ -46,8 +48,40 @@ function saveOvCache() {
 
 const OV_UA = "trendmart-demo-seed/1.0 (image search)";
 
-/** Search Openverse (free CC search API, no key) for a keyword-matched photo.
- *  Returns the direct image URL (jpg/png only) or null after retries. */
+/** True when the URL actually returns an image (avoids broken/hotlink-blocked links). */
+async function imageIsOk(url) {
+  const check = (method) =>
+    new Promise((resolve) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      fetch(url, { method, signal: ctrl.signal, headers: { "user-agent": OV_UA } })
+        .then((res) => {
+          clearTimeout(t);
+          if (!res.ok) return resolve({ ok: false, status: res.status });
+          const ct = (res.headers.get("content-type") || "").toLowerCase();
+          if (/^image\/(jpe?g|png|webp|gif)/i.test(ct)) return resolve({ ok: true, status: res.status });
+          return resolve({ ok: /^2/.test(String(res.status)), status: res.status });
+        })
+        .catch(() => {
+          clearTimeout(t);
+          resolve({ ok: false, status: 0 });
+        });
+    });
+
+  const head = await check("HEAD");
+  if (head.ok) return true;
+  // Some CDNs (flickr, wikimedia, imgur) reject HEAD with 403/405 but still
+  // serve the image on a plain GET — only a real 404/4xx-on-GET means broken.
+  if (head.status === 403 || head.status === 405 || head.status === 501 || head.status === 0) {
+    const get = await check("GET");
+    return get.ok;
+  }
+  return false;
+}
+
+/** Search Openverse (free CC search API, no key) for a keyword-matched photo,
+ *  then VERIFY each candidate URL actually serves an image before returning.
+ *  Returns the direct image URL (jpg/png/webp) or null after retries. */
 async function openverseImage(query) {
   const key = String(query || "").toLowerCase().trim();
   if (!key) return null;
@@ -55,7 +89,7 @@ async function openverseImage(query) {
   const url =
     "https://api.openverse.org/v1/images/?q=" +
     encodeURIComponent(key) +
-    "&page_size=5&license_type=commercial";
+    "&page_size=10&license_type=commercial";
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const ctrl = new AbortController();
@@ -71,14 +105,18 @@ async function openverseImage(query) {
         continue;
       }
       const j = await res.json();
-      const pick = (j.results || []).find(
-        (r) => r?.url && /\.(jpe?g|png)$/i.test(r.url) && !/\.svg/i.test(r.url),
-      );
-      if (pick?.url) {
-        ovCache[key] = pick.url;
-        return pick.url;
+      const candidates = (j.results || [])
+        .map((r) => r?.url)
+        .filter((u) => u && /\.(jpe?g|png|webp)$/i.test(u) && !/\.svg/i.test(u))
+        .slice(0, 6);
+      for (const u of candidates) {
+        if (await imageIsOk(u)) {
+          ovCache[key] = u;
+          return u;
+        }
+        await sleep(150);
       }
-      break; // 200 but no usable result — don't retry the same query
+      break; // 200 but no usable candidate — don't retry the same query
     } catch {
       await sleep(900);
     }
@@ -97,17 +135,19 @@ function cleanSearchQuery(name) {
     .replace(/\s+/g, " ")
     .trim();
 }
+const POOL_KEYWORDS = {
+  pizza: "pizza", burger: "burger", fries: "fries", bbq: "grilled bbq",
+  desi: "pakistani food", naan: "naan bread", drink: "drink", dessert: "dessert",
+  grocery: "grocery", bakery: "bakery", cake: "cake", toys: "toy",
+  clothes: "clothing", kurta: "pakistani kurta", shoes: "shoes",
+  dairy: "dairy", snacks: "snacks", pantry: "pantry", household: "household",
+};
 function searchQueryFor(name, pool) {
   let q = cleanSearchQuery(name);
-  if (pool === "naan" && !/(naan|roti|kulcha|bread|sheermal)/.test(q)) q += " naan";
-  if (pool === "kurta" && !/(kurta|kameez|shalwar|waistcoat|sherwani)/.test(q)) q += " pakistani kurta";
-  if (pool === "kurta" && /waistcoat/.test(q)) q = "waistcoat vest";
-  if (pool === "desi" && /^(raita|salad|kuchumber|chutney|lassi|kheer)$/.test(q)) q += " pakistani food";
-  if (pool === "drink" && /green tea/.test(q)) q = "green tea";
-  if (pool === "drink" && /(lassi|lab-e-shireen)/.test(q)) q = "lassi drink";
-  if (pool === "clothes" && /socks/.test(q)) q = "socks";
-  if (pool === "shoes" && /sneakers/.test(q)) q = "sneakers shoes";
-  return q || String(name || "").toLowerCase();
+  if (!q) q = String(name || "").toLowerCase();
+  const kw = POOL_KEYWORDS[pool];
+  if (kw && !new RegExp(kw.split(" ")[0], "i").test(q)) q += " " + kw;
+  return q;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -925,7 +965,7 @@ function expandCatalogs() {
     ["Cuban Collar Shirt", 1899, ["Floral-1", "Floral-2", "Solid"]],
   ];
   for (const [name, price, colors] of shirtDesigns) {
-    CATALOGS.clothes.push([name, price, "clothes", [clothesSizeGroup, colorGroup(colors)], null, pct(price, 12)]);
+    CATALOGS.clothes.push([name, price, "clothes", [clothesSizeGroup, colorGroup(colors)], null, Math.round(price * 1.12)]);
   }
   const jeansExtra = [
     ["Slim Fit Jeans", 2999, "clothes", [clothesSizeGroup, colorGroup(["Blue", "Black", "Grey"])], null, 3399],
@@ -981,7 +1021,7 @@ function buildDeals() {
       const name = row[0];
       const price = row[1];
       const imgId = IMG[row[2]][i % IMG[row[2]].length];
-      const original = row[5] ?? pct(price, 15);
+      const original = row[5] && row[5] > price ? row[5] : Math.round(price * 1.15);
       const pctOff = Math.round((1 - price / original) * 100);
       deals.push({
         shop: shop.key,
@@ -1061,37 +1101,57 @@ function buildSql() {
   const L = [];
   L.push("-- ============================================================================");
   L.push("-- TrendMart — DEMO SEED DATA (generated — do not edit by hand)");
-  L.push("--   • 7 demo shops   • ~600 products   • ~56 weekly deals   • 2 new merchants");
-  L.push("-- Safe to re-run (deterministic UUIDs + ON CONFLICT DO NOTHING).");
-  L.push("-- NOTE: if you re-run and want a truly clean slate first, run");
-  L.push("--       20260825050000_clean_slate_test_accounts.sql BEFORE this file.");
+  L.push("--   • 7 demo shops   • ~600 products   • ~56 weekly deals   • 7 merchants + 3 customers");
+  L.push("-- Safe to re-run (deterministic UUIDs; shops/products/deals UPSERT in place).");
+  L.push("-- Self-contained: creates every account it needs (no clean-slate required).");
   L.push("-- ============================================================================");
   L.push("");
   L.push("BEGIN;");
   L.push("");
 
-  // 1) Extra merchant accounts (merchant6 / merchant7) if missing
-  L.push("-- ── 1) Extra merchant accounts for ToyKart + Trendy Threads ──────────────");
+  // 1) All test accounts required by the seed (merchant1-7 + customer1-3)
+  const ACCOUNTS = [
+    { id: MERCHANTS.m1, email: "merchant1@trendmart.pk", name: "Ali Hassan", phone: "0301-5551001", role: "merchant" },
+    { id: MERCHANTS.m2, email: "merchant2@trendmart.pk", name: "Fatima Noor", phone: "0301-5551002", role: "merchant" },
+    { id: MERCHANTS.m3, email: "merchant3@trendmart.pk", name: "Usman Tariq", phone: "0301-5551003", role: "merchant" },
+    { id: MERCHANTS.m4, email: "merchant4@trendmart.pk", name: "Zainab Iqbal", phone: "0301-5551004", role: "merchant" },
+    { id: MERCHANTS.m5, email: "merchant5@trendmart.pk", name: "Hamza Sheikh", phone: "0301-5551005", role: "merchant" },
+    { id: MERCHANTS.m6, email: "merchant6@trendmart.pk", name: "Ayesha Khan", phone: "0301-5551006", role: "merchant" },
+    { id: MERCHANTS.m7, email: "merchant7@trendmart.pk", name: "Omar Farooq", phone: "0301-5551007", role: "merchant" },
+    { id: "c0000000-0000-4000-8000-000000000001", email: "customer1@trendmart.pk", name: "Ahmed Raza", phone: "0300-1234001", role: "customer" },
+    { id: "c0000000-0000-4000-8000-000000000002", email: "customer2@trendmart.pk", name: "Sana Malik", phone: "0300-1234002", role: "customer" },
+    { id: "c0000000-0000-4000-8000-000000000003", email: "customer3@trendmart.pk", name: "Bilal Khan", phone: "0300-1234003", role: "customer" },
+  ];
+  L.push("-- ── 1) Test accounts required by this seed (merchant1-7 + customer1-3) ──");
+  L.push("--    Self-contained: runs without the clean-slate file. All password: Trend@123");
   L.push("INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)");
   L.push("VALUES");
-  L.push("  ('00000000-0000-0000-0000-000000000000', '" + MERCHANTS.m6 + "', 'authenticated', 'authenticated', 'merchant6@trendmart.pk', crypt('Trend@123', gen_salt('bf')), now(), '{\"provider\":\"email\",\"providers\":[\"email\"]}', '{\"full_name\":\"Ayesha Khan\"}', now(), now()),");
-  L.push("  ('00000000-0000-0000-0000-000000000000', '" + MERCHANTS.m7 + "', 'authenticated', 'authenticated', 'merchant7@trendmart.pk', crypt('Trend@123', gen_salt('bf')), now(), '{\"provider\":\"email\",\"providers\":[\"email\"]}', '{\"full_name\":\"Omar Farooq\"}', now(), now())");
+  ACCOUNTS.forEach((a, i) => {
+    const comma = i === ACCOUNTS.length - 1 ? "" : ",";
+    L.push(`  ('00000000-0000-0000-0000-000000000000', '${a.id}', 'authenticated', 'authenticated', '${a.email}', crypt('Trend@123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"full_name":"${a.name}"}', now(), now())${comma}`);
+  });
   L.push("ON CONFLICT DO NOTHING;");
   L.push("");
   L.push("INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)");
   L.push("VALUES");
-  L.push("  ('" + MERCHANTS.m6 + "', '" + MERCHANTS.m6 + "', '{\"sub\":\"" + MERCHANTS.m6 + "\",\"email\":\"merchant6@trendmart.pk\",\"email_verified\":true,\"phone_verified\":false}', 'email', '" + MERCHANTS.m6 + "', now(), now(), now()),");
-  L.push("  ('" + MERCHANTS.m7 + "', '" + MERCHANTS.m7 + "', '{\"sub\":\"" + MERCHANTS.m7 + "\",\"email\":\"merchant7@trendmart.pk\",\"email_verified\":true,\"phone_verified\":false}', 'email', '" + MERCHANTS.m7 + "', now(), now(), now())");
+  ACCOUNTS.forEach((a, i) => {
+    const comma = i === ACCOUNTS.length - 1 ? "" : ",";
+    L.push(`  ('${a.id}', '${a.id}', '{"sub":"${a.id}","email":"${a.email}","email_verified":true,"phone_verified":false}', 'email', '${a.id}', now(), now(), now())${comma}`);
+  });
   L.push("ON CONFLICT DO NOTHING;");
   L.push("");
   L.push("INSERT INTO public.user_profiles (user_id, full_name, phone, created_at, updated_at) VALUES");
-  L.push("  ('" + MERCHANTS.m6 + "', 'Ayesha Khan', '0301-5551006', now(), now()),");
-  L.push("  ('" + MERCHANTS.m7 + "', 'Omar Farooq', '0301-5551007', now(), now())");
+  ACCOUNTS.forEach((a, i) => {
+    const comma = i === ACCOUNTS.length - 1 ? "" : ",";
+    L.push(`  ('${a.id}', '${a.name}', '${a.phone}', now(), now())${comma}`);
+  });
   L.push("ON CONFLICT DO NOTHING;");
   L.push("");
   L.push("INSERT INTO public.user_roles (user_id, role, created_at, updated_at) VALUES");
-  L.push("  ('" + MERCHANTS.m6 + "', 'merchant', now(), now()),");
-  L.push("  ('" + MERCHANTS.m7 + "', 'merchant', now(), now())");
+  ACCOUNTS.forEach((a, i) => {
+    const comma = i === ACCOUNTS.length - 1 ? "" : ",";
+    L.push(`  ('${a.id}', '${a.role}', now(), now())${comma}`);
+  });
   L.push("ON CONFLICT DO NOTHING;");
   L.push("");
 
@@ -1100,7 +1160,11 @@ function buildSql() {
   L.push("INSERT INTO public.shops (id, owner_id, name, slug, category, location, address_display, whatsapp_number, logo_url, banner_url, is_live, verification_status, latitude, longitude, service_radius_km, delivery_zones, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, store_bio, announcement, business_hours, operating_status, accent_color) VALUES");
   SHOPS.forEach((s, i) => {
     const slug = "demo-" + s.key;
-    const zones = s.zones.map((z) => `'${esc(z)}'`).join(", ");
+    // City marker FIRST so the app's geo filter never hides the shop when a
+    // customer's city is set (plain area names alone don't match the city).
+    const zones = ["__pk_city__:Gujranwala", ...s.zones]
+      .map((z) => `'${esc(z)}'`)
+      .join(", ");
     const comma = i === SHOPS.length - 1 ? "" : ",";
     const logo = resolvedShopImgs[s.key]?.logo ?? imgUrl(IMG_FINAL[imgCatOf(s.logo)]?.[0] ?? IMG_FINAL.generic[0], 400);
     const banner = resolvedShopImgs[s.key]?.banner ?? imgUrl(IMG_FINAL[bannerCatOf(s)]?.[0] ?? IMG_FINAL.generic[0], 1200);
@@ -1108,7 +1172,7 @@ function buildSql() {
       `  ('${s.id}', '${s.owner}', '${esc(s.name)}', '${slug}', '${esc(s.category)}', '${esc(s.location)}', '${esc(s.address_display)}', '${s.whatsapp}', '${logo}', '${banner}', true, 'approved', ${s.lat}, ${s.lng}, ${s.radius}, ARRAY[${zones}]::text[], ${s.min_order}, ${s.free_delivery}, ${s.fee_flat}, ${s.fee_per_km}, '${esc(s.bio)}', '${esc(s.announcement)}', '${esc(s.hours)}', '${esc(s.op_status)}', '${s.accent}')${comma}`
     );
   });
-  L.push("ON CONFLICT (id) DO NOTHING;");
+  L.push("ON CONFLICT (id) DO UPDATE SET logo_url = EXCLUDED.logo_url, banner_url = EXCLUDED.banner_url, delivery_zones = EXCLUDED.delivery_zones, is_live = EXCLUDED.is_live, verification_status = EXCLUDED.verification_status;");
   L.push("");
   L.push("UPDATE public.shops SET slug = 'demo-' || id WHERE slug IS NULL;");
   L.push("");
@@ -1128,6 +1192,7 @@ function buildSql() {
   L.push("-- ── 3) Products (with variants, pack tiers, discounts) ────────────────");
   let prodCount = 0;
   let variantCount = 0;
+  let fallbackCount = 0;
   for (const shop of SHOPS) {
     const cat = CATALOGS[shop.key];
     const seen = new Set();
@@ -1143,12 +1208,14 @@ function buildSql() {
       const [name, price, pool, variantsRaw, tiers, original, stock] = row;
       const variants = Array.isArray(variantsRaw) ? variantsRaw : variantsRaw ? [variantsRaw] : null;
       const pid = uuid5(`prod:${shop.key}:${name}`);
-      const img = resolvedImgs.get(pid) ?? imgUrl(IMG_FINAL[pool]?.[i % IMG_FINAL[pool].length] ?? IMG_FINAL.generic[0], 800);
+      const resolved = resolvedImgs.get(pid);
+      const img = resolved ?? imgUrl(IMG_FINAL[pool]?.[i % IMG_FINAL[pool].length] ?? IMG_FINAL.generic[0], 800);
+      if (!resolved) fallbackCount++;
       const desc = `${name} from ${shop.name} — order on WhatsApp for fast delivery.`;
       const stockStatus = stock ?? (i % 17 === 0 ? "low_stock" : "in_stock");
       const variantsJson = variants ? `'${jsonArr(variants)}'::jsonb` : "NULL";
       const tiersJson = tiers ? `'${jsonArr(tiers)}'::jsonb` : "NULL";
-      const orig = original ?? "NULL";
+      const orig = original && original > price ? original : "NULL";
       const comma = i === rows.length - 1 ? "" : ",";
       L.push(
         `  ('${pid}', '${shop.id}', '${esc(name)}', '${esc(desc)}', ${price}, ${orig}, 'PKR', '${img}', '["${img}"]'::jsonb, true, '${stockStatus}', ${variantsJson}, ${tiersJson})${comma}`
@@ -1156,7 +1223,7 @@ function buildSql() {
       prodCount++;
       if (variants) variantCount += variants.reduce((n, g) => n + g.options.length, 0);
     });
-    L.push("ON CONFLICT (id) DO NOTHING;");
+    L.push("ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, price = EXCLUDED.price, original_price = EXCLUDED.original_price, image_url = EXCLUDED.image_url, images = EXCLUDED.images, variants = EXCLUDED.variants, price_tiers = EXCLUDED.price_tiers, stock_status = EXCLUDED.stock_status;");
     L.push("");
   }
 
@@ -1174,7 +1241,7 @@ function buildSql() {
       `  ('${did}', '${shop.id}', '${esc(d.title)}', '${esc(d.description)}', 'weekly', '{${d.weekdays.join(",")}}'::smallint[], true, '${dealImg}', '${esc(d.badge_text)}', ${d.is_featured}, '${pid}', ${d.price}, ${d.original_price})${comma}`
     );
   });
-  L.push("ON CONFLICT (id) DO NOTHING;");
+  L.push("ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, price = EXCLUDED.price, original_price = EXCLUDED.original_price, image_url = EXCLUDED.image_url, badge_text = EXCLUDED.badge_text;");
   L.push("");
 
   L.push("COMMIT;");
@@ -1183,7 +1250,7 @@ function buildSql() {
   L.push(`-- SUMMARY: ${prodCount} products, ${variantCount} variant options, ${deals.length} deals`);
   L.push("-- ============================================================================");
 
-  return { sql: L.join("\n"), prodCount, variantCount, dealCount: deals.length };
+  return { sql: L.join("\n"), prodCount, variantCount, dealCount: deals.length, fallbackCount };
 }
 
 // helpers used above (kept tiny to avoid closure ordering issues)
@@ -1212,17 +1279,18 @@ async function resolveAllImages() {
     tasks.push({ kind: "shop", key: s.key, field: "logo", query: `${s.category} shop storefront` });
     tasks.push({ kind: "shop", key: s.key, field: "banner", query: `${s.name} ${s.category}` });
   }
-  const seen = new Set();
   for (const shop of SHOPS) {
+    const seen = new Set(); // dedupe within one shop only (names repeat across shops)
     for (const row of CATALOGS[shop.key]) {
       const name = row[0];
-      if (seen.has(name)) continue; // product names unique per shop
+      if (seen.has(name)) continue;
       seen.add(name);
       const pool = row[2];
       tasks.push({
         kind: "product",
         pid: uuid5(`prod:${shop.key}:${name}`),
         query: searchQueryFor(name, pool),
+        fallbackQuery: POOL_KEYWORDS[pool] || searchQueryFor(name, pool),
       });
     }
   }
@@ -1231,7 +1299,12 @@ async function resolveAllImages() {
   async function worker() {
     while (cursor < tasks.length) {
       const t = tasks[cursor++];
-      const url = await openverseImage(t.query);
+      let url = await openverseImage(t.query);
+      // Second chance: search by just the category keyword so naan/kurta etc.
+      // still get a relevant food/clothing photo instead of a generic one.
+      if (!url && t.fallbackQuery && t.fallbackQuery !== t.query) {
+        url = await openverseImage(t.fallbackQuery);
+      }
       if (url) {
         if (t.kind === "product") resolvedImgs.set(t.pid, url);
         else {
@@ -1251,19 +1324,26 @@ async function resolveAllImages() {
 
 // ── main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log("TrendMart demo seed generator");
+  const fresh = process.argv.includes("--fresh");
+  console.log("TrendMart demo seed generator" + (fresh ? "  [--fresh: re-searching all images]" : ""));
   expandCatalogs();
   loadOvCache();
+  if (fresh) {
+    ovCache = {};
+    saveOvCache();
+    console.log("  cleared Openverse image cache");
+  }
   console.log("Verifying fallback images…");
   await verifyImages();
-  console.log("Resolving keyword-matched images via Openverse…");
+  console.log("Resolving + verifying name-matched images via Openverse…");
   await resolveAllImages();
-  const { sql, prodCount, variantCount, dealCount } = buildSql();
+  const { sql, prodCount, variantCount, dealCount, fallbackCount } = buildSql();
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, sql, "utf8");
   console.log(`\n✅ Wrote ${OUT}`);
   console.log(`   ${prodCount} products · ${variantCount} variant options · ${dealCount} deals`);
-  console.log(`   resolved via keyword search: ${resolvedImgs.size} product images`);
+  console.log(`   name-matched (verified) product images: ${resolvedImgs.size}`);
+  console.log(`   products on category-pool fallback images: ${fallbackCount}`);
   console.log("\nNext: open Supabase → SQL Editor → paste demo-seed-data.sql → Run.");
 }
 
