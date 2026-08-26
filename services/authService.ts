@@ -1,9 +1,10 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import type { AuthError, User } from "@supabase/supabase-js";
 import { getPublicAppUrl } from "@/lib/appUrl";
 import { clearQueryCache } from "@/lib/cacheBus";
+import { withTimeout } from "@/lib/withTimeout";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -30,6 +31,16 @@ export interface OtpVerificationResult {
 const supabase = createClient();
 
 /**
+ * Give up on a direct Supabase sign-in request after 20s. A browser that
+ * cannot reach Supabase (ad-blocker, VPN, firewall, dying network) would
+ * otherwise leave the login button spinning forever with no error. 20s is a
+ * compromise: long enough for slow-but-working connections to finish, short
+ * enough that a hung request surfaces a clear error instead of an endless
+ * spinner.
+ */
+const SIGN_IN_TIMEOUT_MS = 20_000;
+
+/**
  * Sign in with email and password.
  * On success, queries the user's role and returns the appropriate redirect path.
  * Enforces email verification: returns an error if the user hasn't confirmed their email.
@@ -39,10 +50,19 @@ export async function signInWithEmail(
   password: string,
 ): Promise<AuthResult & { needsVerification?: boolean }> {
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    const { data, error } = await withTimeout(
+      supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      }),
+      SIGN_IN_TIMEOUT_MS,
+      () => ({
+        data: { user: null, session: null },
+        error: new Error(
+          "Sign-in is taking too long. Check your internet connection and try again.",
+        ) as unknown as AuthError,
+      }),
+    );
 
     if (error) {
       return {
@@ -638,7 +658,9 @@ function roleFromUserObject(user: User): AuthRole | "admin" | null {
 
 /** Authoritative fallback — parallel RPC + shop-ownership lookups. Never throws. */
 async function resolveRoleFromDb(user: User): Promise<AuthRole | "admin"> {
-  const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T | null> =>
+  // Resolve null on timeout (local helper) so a hung Supabase response can
+  // never block the sign-in; distinct from the shared lib/withTimeout.
+  const raceWithTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T | null> =>
     Promise.race([
       Promise.resolve(p),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
@@ -646,7 +668,7 @@ async function resolveRoleFromDb(user: User): Promise<AuthRole | "admin"> {
 
   const ownsShop = async (): Promise<boolean> => {
     try {
-      const result = await withTimeout(
+      const result = await raceWithTimeout(
         supabase
           .from("shops")
           .select("id")
@@ -667,7 +689,7 @@ async function resolveRoleFromDb(user: User): Promise<AuthRole | "admin"> {
   let hasShop = false;
   try {
     const [rpcResult, shop] = await Promise.all([
-      withTimeout(supabase.rpc("get_my_role").then((r) => r), 4000),
+      raceWithTimeout(supabase.rpc("get_my_role").then((r) => r), 4000),
       ownsShop(),
     ]);
     rpcRole =

@@ -15,6 +15,12 @@ import {
   LEGAL_VERSIONS,
   isVersionBehind,
 } from "@/lib/legalVersions";
+import { withTimeout } from "@/lib/withTimeout";
+
+/** Give up on the audit-trail network call after this long (8s). */
+const AUDIT_FETCH_TIMEOUT_MS = 8_000;
+/** Fire-and-forget acceptance write deadline (10s). */
+const AUDIT_WRITE_TIMEOUT_MS = 10_000;
 
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Versioned Policy-Update Notice                                 */
@@ -101,8 +107,14 @@ export default function PolicyNotice() {
       }
       if (outOfDate.length === 0 || cancelled) return;
 
-      // Cross-check against the audit trail in the DB.
-      const accepted = await getLegalAcceptances(user.id);
+      // Cross-check against the audit trail in the DB. Timed out so a hung
+      // Supabase request (blocked network / ad-blocker) can never stall the
+      // effect forever — an empty trail simply re-prompts the notice.
+      const accepted = await withTimeout(
+        getLegalAcceptances(user.id),
+        AUDIT_FETCH_TIMEOUT_MS,
+        () => [],
+      );
       if (cancelled) return;
       const acceptedMap = new Map(
         accepted.map((row) => [row.document, row.version]),
@@ -129,14 +141,8 @@ export default function PolicyNotice() {
     if (!userId || pendingDocs.length === 0) return;
     setAccepting(true);
     try {
-      // Record each document at its own current version so future updates
-      // that bump only one policy still surface correctly. This write is
-      // best-effort — if the audit table is missing or RLS blocks it, the
-      // notice must still dismiss, or the user gets trapped on every reload.
-      // The localStorage marker below keeps this device from re-showing it.
-      for (const doc of pendingDocs) {
-        await recordLegalAcceptance(userId, [doc], LEGAL_VERSIONS[doc]);
-      }
+      // Mark this device as seen FIRST so the notice can never re-show on
+      // this browser — even if the audit write below is slow or never lands.
       for (const doc of pendingDocs) {
         try {
           localStorage.setItem(
@@ -147,7 +153,22 @@ export default function PolicyNotice() {
           /* ignore */
         }
       }
+
+      // Dismiss immediately — the user must never be trapped on the notice.
+      // The audit write is best-effort and runs in the background behind a
+      // timeout: if the audit table is missing, RLS blocks it, or Supabase
+      // simply hangs (blocked network), the notice still goes away. A
+      // late-resolving write is discarded; a late rejection is swallowed.
       setOpen(false);
+      for (const doc of pendingDocs) {
+        // `recordLegalAcceptance` never throws, but guard anyway so a future
+        // refactor can't leak an unhandled rejection to the console.
+        void withTimeout(
+          recordLegalAcceptance(userId, [doc], LEGAL_VERSIONS[doc]),
+          AUDIT_WRITE_TIMEOUT_MS,
+          () => false,
+        ).catch(() => false);
+      }
     } finally {
       setAccepting(false);
     }
