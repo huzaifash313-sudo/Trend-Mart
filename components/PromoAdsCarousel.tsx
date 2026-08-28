@@ -463,18 +463,10 @@ export default function PromoAdsCarousel({
 
   if (!loading && ads.length === 0) return null;
 
-  if (loading) {
-    return (
-      <section aria-label="Sponsored" className={className} aria-busy="true">
-        <div className="mb-1.5 h-8 w-1/2 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />
-        <div className="flex gap-3 overflow-hidden">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-48 flex-1 animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800/50" aria-hidden />
-          ))}
-        </div>
-      </section>
-    );
-  }
+  // While ads load, render nothing — a pulsing skeleton that collapses into
+  // empty space when there are no live ads causes a visible layout glitch on
+  // every page load.
+  if (loading) return null;
 
   return <SponsoredShelf ads={ads} className={className} />;
 }

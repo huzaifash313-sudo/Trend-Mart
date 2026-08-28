@@ -58,9 +58,15 @@ export function markStoryViewed(storyId: string): void {
   }
 }
 
-/** Unseen first (newest among unseen), then viewed (newest among viewed). */
-export function sortStoriesUnseenFirst(stories: Story[]): Story[] {
-  const viewed = getViewedStoryIds();
+/** Unseen first (newest among unseen), then viewed (newest among viewed).
+ *  Accepts an optional server/hydration-safe viewed set — pass it from React
+ *  state so SSR and the first client render agree (no localStorage during
+ *  render). */
+export function sortStoriesUnseenFirst(
+  stories: Story[],
+  viewedIds?: ReadonlySet<string>,
+): Story[] {
+  const viewed = viewedIds ?? getViewedStoryIds();
   const unseen = stories
     .filter((s) => !viewed.has(s.id))
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));

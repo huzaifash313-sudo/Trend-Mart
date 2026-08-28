@@ -22,7 +22,7 @@ import { fetchCouponsByShopId, type Coupon } from "@/services/couponService";
 import { fetchDealsByShopId } from "@/services/dealService";
 import type { ShopDeal } from "@/lib/dealSchedule";
 import { createClient } from "@/lib/supabase/client";
-import type { Product, Shop } from "@/types";
+import type { Product, Shop, Story } from "@/types";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -52,7 +52,7 @@ export const queryKeys = {
 
 /* ── Shops ─────────────────────────────────────────────────────────────────── */
 
-export function useShops() {
+export function useShops(options?: { initialData?: Shop[] }) {
   return useQuery({
     queryKey: queryKeys.shops,
     queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 300 })),
@@ -60,6 +60,9 @@ export function useShops() {
     // Keep the previous list on screen during refetch so content never flashes
     // blank / skeletons when a merchant publishes or the user pulls to refresh.
     placeholderData: keepPreviousData,
+    ...(options?.initialData !== undefined
+      ? { initialData: options.initialData }
+      : {}),
   });
 }
 
@@ -79,12 +82,15 @@ export function useMyShop() {
 
 /* ── Enrichment (non-blocking on homepage) ─────────────────────────────────── */
 
-export function useStories() {
+export function useStories(options?: { initialData?: Story[] }) {
   return useQuery({
     queryKey: queryKeys.stories,
     queryFn: () => unwrap(fetchActiveStories()),
     staleTime: 2 * 60_000,
     placeholderData: keepPreviousData,
+    ...(options?.initialData !== undefined
+      ? { initialData: options.initialData }
+      : {}),
   });
 }
 

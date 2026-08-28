@@ -111,7 +111,6 @@ function ShopCard({
   const href = getShopPath(shop);
   const { openShopReviews } = useShopReviews();
   const isLive = !!shop.is_live;
-  const isVerified = isLive && (shop.verification_status ?? "approved") === "approved";
   const hasRating = hasShopRating(shop.avg_rating, shop.review_count);
   const distance =
     showDistance && shop.distance_km != null
@@ -170,43 +169,17 @@ function ShopCard({
       </Link>
 
       <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-1.5 pt-1.5 sm:px-2.5 sm:pb-2">
-        {/* Name + wishlist */}
-        <div className="flex min-w-0 items-start gap-1.5">
-          <Link
-            href={href}
-            title={shop.name}
-            className="tm-shop-name min-w-0 flex-1 text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
-          >
-            {shop.name}
-          </Link>
+        {/* Name — wraps to max 2 lines, never more */}
+        <Link
+          href={href}
+          title={shop.name}
+          className="tm-shop-name min-w-0 text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
+        >
+          {shop.name}
+        </Link>
 
-          {isVerified ? (
-            <span className="-mt-0.5 shrink-0 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800/70">
-              Verified
-            </span>
-          ) : null}
-
-          {onToggleFavorite ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onToggleFavorite();
-              }}
-              className={`icon-only -mr-0.5 -mt-0.5 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
-                favorited
-                  ? "text-rose-500"
-                  : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
-              }`}
-              aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
-            >
-              <HeartIcon filled={favorited} />
-            </button>
-          ) : null}
-        </div>
-
-        <div className="mt-1">
+        {/* Reviews + wishlist (heart sits after the rating row) */}
+        <div className="mt-1 flex min-w-0 items-center gap-1">
           <button
             type="button"
             onClick={(e) => {
@@ -214,7 +187,7 @@ function ShopCard({
               e.stopPropagation();
               openShopReviews({ id: shop.id, name: shop.name });
             }}
-            className={`group/rating flex items-center rounded-lg text-left transition-opacity ${
+            className={`group/rating flex min-w-0 flex-1 items-center rounded-lg text-left transition-opacity ${
               hasRating ? "hover:opacity-80" : ""
             }`}
             title={
@@ -230,7 +203,7 @@ function ShopCard({
           >
             <CompactRating average={shop.avg_rating} count={shop.review_count} />
             {!hasRating ? (
-              <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+              <span className="truncate text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
                 No reviews yet ·{" "}
                 <span className="font-semibold text-emerald-600 underline decoration-emerald-600/40 underline-offset-2 transition-colors group-hover/rating:text-emerald-700 dark:text-emerald-400 dark:decoration-emerald-400/40 dark:group-hover/rating:text-emerald-300">
                   Add one
@@ -238,6 +211,25 @@ function ShopCard({
               </span>
             ) : null}
           </button>
+
+          {onToggleFavorite ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFavorite();
+              }}
+              className={`icon-only -mr-1 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
+                favorited
+                  ? "text-rose-500"
+                  : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+              }`}
+              aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
+            >
+              <HeartIcon filled={favorited} />
+            </button>
+          ) : null}
         </div>
 
         {offerSlides.length > 0 ? (
