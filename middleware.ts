@@ -596,9 +596,10 @@ function applySecurityHeaders(response: NextResponse): void {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     // Always allow Supabase HTTPS + Realtime WebSockets (prod was missing wss://)
+    // + Cloudinary upload API (merchant image/story uploads run from the browser).
     isProd
-      ? "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org"
-      : "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org",
+      ? "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com"
+      : "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com",
     "font-src 'self'",
     "frame-src 'none'",
     "object-src 'none'",

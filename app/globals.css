@@ -434,6 +434,9 @@ h6 {
   min-width: 0;
   width: 100%;
   line-height: 1.28;
+  /* Reserve exactly 2 lines (2 × 1.28em) so every card's title block is the
+     same height — short names no longer leave dead space above the CTA. */
+  min-height: 2.56em;
   overflow-wrap: break-word;
   word-break: break-word;
   hyphens: none;

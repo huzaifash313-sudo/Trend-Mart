@@ -258,6 +258,13 @@ function HomeClient({
 
   const storiesQuery = useStories(initialStories.length > 0 ? { initialData: initialStories } : undefined);
   const [storiesVersion, setStoriesVersion] = useState(0);
+  /** Merchant's own active stories — shown in the "Your story" ring so they
+   *  can confirm a posted story is live (their stories are hidden from the
+   *  public tray by design). */
+  const myStories = useMemo(
+    () => (storiesQuery.data ?? EMPTY_STORIES).filter((s) => s.shop_id === myShopId),
+    [storiesQuery.data, myShopId],
+  );
   const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
   // Hydration-safe viewed tracking: SSR + first client render agree on "all
   // unseen", then the effect fills real seen state from localStorage.
@@ -605,12 +612,49 @@ function HomeClient({
                 openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" })
               }
               className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-              aria-label="Add your store story"
+              aria-label={
+                myStories.length > 0
+                  ? `Your story is live — tap to add or replace`
+                  : "Add your store story"
+              }
             >
-              <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
-                <div className="relative flex h-[3.35rem] w-[3.35rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
-                  <span className="text-2xl font-bold leading-none text-emerald-600 dark:text-emerald-400">+</span>
-                </div>
+              <div className="relative">
+                {myStories.length > 0 && myStories[0].image_url ? (
+                  <>
+                    <StoryRing total={myStories.length} seen={0}>
+                      {!brokenStoryImgs.has(myStories[0].id) ? (
+                        <Image
+                          src={getSafeImageUrl(myStories[0].image_url, "product")}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="3.5rem"
+                          onError={() =>
+                            setBrokenStoryImgs((prev) => new Set(prev).add(myStories[0].id))
+                          }
+                        />
+                      ) : (
+                        <div className="tm-avatar-fallback h-full w-full text-base font-bold">
+                          {myShop.name?.trim()?.charAt(0).toUpperCase() || "S"}
+                        </div>
+                      )}
+                    </StoryRing>
+                    {myStories.length > 1 ? (
+                      <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
+                        {myStories.length}
+                      </span>
+                    ) : null}
+                    <span className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
+                      +
+                    </span>
+                  </>
+                ) : (
+                  <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
+                    <div className="relative flex h-[3.35rem] w-[3.35rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
+                      <span className="text-2xl font-bold leading-none text-emerald-600 dark:text-emerald-400">+</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
                 Your story

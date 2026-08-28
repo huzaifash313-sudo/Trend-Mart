@@ -54,7 +54,8 @@ export function buildStrictCspPolicy(nonce: string): string {
     "font-src 'self' data:",
 
     // Connections: Supabase API + realtime websockets + OSM reverse geocode
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org",
+    // + Cloudinary upload API (merchant image/story uploads run from the browser).
+    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com",
 
     // Frames: none (prevents clickjacking via iframes)
     "frame-src 'none'",

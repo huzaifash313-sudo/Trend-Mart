@@ -168,50 +168,16 @@ function ShopCard({
         </ShopMediaHeader>
       </Link>
 
-      <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-1.5 pt-1.5 sm:px-2.5 sm:pb-2">
-        {/* Name — wraps to max 2 lines, never more */}
-        <Link
-          href={href}
-          title={shop.name}
-          className="tm-shop-name min-w-0 text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
-        >
-          {shop.name}
-        </Link>
-
-        {/* Reviews + wishlist (heart sits after the rating row) */}
-        <div className="mt-1 flex min-w-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openShopReviews({ id: shop.id, name: shop.name });
-            }}
-            className={`group/rating flex min-w-0 flex-1 items-center rounded-lg text-left transition-opacity ${
-              hasRating ? "hover:opacity-80" : ""
-            }`}
-            title={
-              hasRating
-                ? `See ${shop.review_count} review${Number(shop.review_count) === 1 ? "" : "s"} or add yours`
-                : "No reviews yet — be the first to rate"
-            }
-            aria-label={
-              hasRating
-                ? `View reviews and rating for ${shop.name}`
-                : `Add the first review for ${shop.name}`
-            }
+      <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-1 pt-1 sm:px-2 sm:pb-1.5">
+        {/* Name + wishlist — heart stays top-aligned beside the name */}
+        <div className="flex items-start gap-1">
+          <Link
+            href={href}
+            title={shop.name}
+            className="tm-shop-name line-clamp-2 min-w-0 flex-1 break-words text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
           >
-            <CompactRating average={shop.avg_rating} count={shop.review_count} />
-            {!hasRating ? (
-              <span className="truncate text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
-                No reviews yet ·{" "}
-                <span className="font-semibold text-emerald-600 underline decoration-emerald-600/40 underline-offset-2 transition-colors group-hover/rating:text-emerald-700 dark:text-emerald-400 dark:decoration-emerald-400/40 dark:group-hover/rating:text-emerald-300">
-                  Add one
-                </span>
-              </span>
-            ) : null}
-          </button>
-
+            {shop.name}
+          </Link>
           {onToggleFavorite ? (
             <button
               type="button"
@@ -220,7 +186,7 @@ function ShopCard({
                 e.stopPropagation();
                 onToggleFavorite();
               }}
-              className={`icon-only -mr-1 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
+              className={`icon-only -mr-1 -mt-0.5 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
                 favorited
                   ? "text-rose-500"
                   : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
@@ -231,6 +197,39 @@ function ShopCard({
             </button>
           ) : null}
         </div>
+
+        {/* Reviews — always directly under the name */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openShopReviews({ id: shop.id, name: shop.name });
+          }}
+          className={`group/rating mt-1 flex min-w-0 w-full items-center rounded-lg text-left transition-opacity ${
+            hasRating ? "hover:opacity-80" : ""
+          }`}
+          title={
+            hasRating
+              ? `See ${shop.review_count} review${Number(shop.review_count) === 1 ? "" : "s"} or add yours`
+              : "No reviews yet — be the first to rate"
+          }
+          aria-label={
+            hasRating
+              ? `View reviews and rating for ${shop.name}`
+              : `Add the first review for ${shop.name}`
+          }
+        >
+          <CompactRating average={shop.avg_rating} count={shop.review_count} />
+          {!hasRating ? (
+            <span className="truncate text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+              No reviews yet ·{" "}
+              <span className="font-semibold text-emerald-600 underline decoration-emerald-600/40 underline-offset-2 transition-colors group-hover/rating:text-emerald-700 dark:text-emerald-400 dark:decoration-emerald-400/40 dark:group-hover/rating:text-emerald-300">
+                Add one
+              </span>
+            </span>
+          ) : null}
+        </button>
 
         {offerSlides.length > 0 ? (
           <div className="mt-1">
