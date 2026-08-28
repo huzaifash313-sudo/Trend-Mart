@@ -159,9 +159,10 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
   const currentUrl = images[safeIndex];
 
   const hasVariants = Boolean(product?.variants && product.variants.length > 0);
-  const variantLabel = selectedVariants
-    .map((v) => `${v.groupName}: ${v.optionLabel}`)
-    .join(" · ");
+  const variantLabel = useMemo(
+    () => selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · "),
+    [selectedVariants],
+  );
   // Authoritative unit price + original ("before discount") price for the
   // selected combo — discount badge / strikethrough are computed per variant
   // so a higher-priced size never shows a negative "Save" or a wrong % OFF.
@@ -194,30 +195,38 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
       })
     : null;
   const showDiscount = discount?.hasDiscount && discount.originalPrice != null;
+  const discountHasDiscount = discount?.hasDiscount ?? false;
+  const discountOriginalPrice = discount?.originalPrice ?? null;
+
+  // The exact Product handed to cart/order: per-variant price + discount
+  // applied. Extracted so the callbacks below keep stable deps (the React
+  // Compiler can't preserve manual memoization around the inline ternary).
+  const cartItem = useMemo<Product | null>(() => {
+    if (!product) return null;
+    const variantOriginal = discountHasDiscount ? discountOriginalPrice : null;
+    return displayPrice !== product.price ||
+      variantOriginal !== (product.original_price ?? null) ||
+      !tiersActive
+      ? {
+          ...product,
+          price: displayPrice,
+          original_price: variantOriginal,
+          price_tiers: tiersActive ? product.price_tiers : null,
+        }
+      : product;
+  }, [product, displayPrice, tiersActive, discountHasDiscount, discountOriginalPrice]);
 
   const handleAddToCart = useCallback(() => {
-    if (!product || !shop) return;
+    if (!product || !shop || !cartItem) return;
     if (!variantsReady) {
       addToast("Please choose the options first.", "error");
       return;
     }
-    const variantOriginal = discount?.hasDiscount ? discount.originalPrice : null;
-    const forCart: Product =
-      displayPrice !== product.price ||
-      variantOriginal !== (product.original_price ?? null) ||
-      !tiersActive
-        ? {
-            ...product,
-            price: displayPrice,
-            original_price: variantOriginal,
-            price_tiers: tiersActive ? product.price_tiers : null,
-          }
-        : product;
-    addItem(forCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
+    addItem(cartItem, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, variantsReady, displayPrice, tiersActive, quantity, variantLabel, itemNotes, discount, addItem, addToast]);
+  }, [product, shop, variantsReady, cartItem, quantity, variantLabel, itemNotes, addItem, addToast]);
 
   const handleOrder = useCallback(() => {
     if (!product || !shop) return;

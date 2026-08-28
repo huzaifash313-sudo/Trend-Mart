@@ -206,7 +206,7 @@ function HomeInner() {
   const couponsQuery = useShopCoupons(shopIds);
   const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
 
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
+  const [searchQuery] = useState(searchParams.get("q") ?? "");
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);

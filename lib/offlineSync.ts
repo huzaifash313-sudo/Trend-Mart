@@ -143,15 +143,6 @@ const DEFAULT_WISHLIST_CONFIG: SyncConfig = {
   persistDebounceMs: 300,
 };
 
-const DEFAULT_PREFERENCES_CONFIG: SyncConfig = {
-  namespace: "trendmart_prefs_sync",
-  maxRetries: 3,
-  retryBaseDelayMs: 1000,
-  retryMaxDelayMs: 10_000,
-  maxLocalEntities: 1,
-  persistDebounceMs: 500,
-};
-
 const DEFAULT_USER_PREFERENCES: UserPreferences = {
   language: "en",
   currency: "PKR",
@@ -257,7 +248,7 @@ function safeLocalSet(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
     return true;
-  } catch (err) {
+  } catch {
     // QuotaExceededError — attempt emergency cleanup
     console.warn("[OfflineSync] localStorage quota exceeded, attempting cleanup.");
 

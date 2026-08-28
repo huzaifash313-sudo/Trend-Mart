@@ -98,7 +98,10 @@ export default function QuickViewModal({
   const safeIndex = images.length ? Math.min(activeIndex, images.length - 1) : 0;
   const currentUrl = images[safeIndex];
   const hasVariants = Boolean(product.variants && product.variants.length > 0);
-  const variantLabel = selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · ");
+  const variantLabel = useMemo(
+    () => selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · "),
+    [selectedVariants],
+  );
   // Unit price + original ("before discount") price for the selected combo so
   // the badge/strikethrough are per-variant (never a wrong % / negative Save).
   const { price: displayPrice, originalPrice: variantOriginal } = computeVariantPricing(
@@ -125,6 +128,26 @@ export default function QuickViewModal({
     compare_at_price: null,
     deal_expires_at: product.deal_expires_at,
   });
+
+  // The exact Product handed to cart/order: per-variant price + discount
+  // applied. Extracted so the callbacks below keep stable deps (the React
+  // Compiler can't preserve manual memoization around the inline ternary).
+  const cartItem = useMemo<Product>(
+    () => {
+      const variantOriginal = hasDiscount ? originalPrice : null;
+      return displayPrice !== product.price ||
+        variantOriginal !== (product.original_price ?? null) ||
+        !tiersActive
+        ? {
+            ...product,
+            price: displayPrice,
+            original_price: variantOriginal,
+            price_tiers: tiersActive ? product.price_tiers : null,
+          }
+        : product;
+    },
+    [product, displayPrice, tiersActive, hasDiscount, originalPrice],
+  );
 
   const pauseAutoUntil = useRef(0);
 
@@ -199,21 +222,11 @@ export default function QuickViewModal({
       addToast("Please choose flavour / options first.", "error");
       return;
     }
-    const variantOriginal = hasDiscount ? originalPrice : null;
-    const productForCart =
-      displayPrice !== product.price || variantOriginal !== (product.original_price ?? null) || !tiersActive
-        ? {
-            ...product,
-            price: displayPrice,
-            original_price: variantOriginal,
-            price_tiers: tiersActive ? product.price_tiers : null,
-          }
-        : product;
-    addItem(productForCart, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
+    addItem(cartItem, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
     addToast(`"${product.name}" added to cart`, "success");
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, quantity, addItem, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive, hasDiscount, originalPrice]);
+  }, [product, shop, quantity, addItem, addToast, variantsReady, cartItem, variantLabel, itemNotes]);
 
   const handleOrder = useCallback(() => {
     if (!variantsReady) {
@@ -224,23 +237,13 @@ export default function QuickViewModal({
       addToast("This store has no WhatsApp number yet — please contact them directly.", "info");
       return;
     }
-    const variantOriginal = hasDiscount ? originalPrice : null;
-    const productForCart =
-      displayPrice !== product.price || variantOriginal !== (product.original_price ?? null) || !tiersActive
-        ? {
-            ...product,
-            price: displayPrice,
-            original_price: variantOriginal,
-            price_tiers: tiersActive ? product.price_tiers : null,
-          }
-        : product;
     onOrder?.({
-      product: productForCart,
+      product: cartItem,
       variant: variantLabel || undefined,
       quantity,
       notes: itemNotes.trim() || undefined,
     });
-  }, [product, shop, quantity, addToast, variantsReady, variantLabel, itemNotes, displayPrice, tiersActive, onOrder, hasDiscount, originalPrice]);
+  }, [shop, quantity, addToast, variantsReady, cartItem, variantLabel, itemNotes, onOrder]);
 
   return (
     <div

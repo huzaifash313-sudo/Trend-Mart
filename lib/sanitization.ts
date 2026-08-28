@@ -262,13 +262,6 @@ export function truncate(input: string, maxLength: number): string {
 // ─── Image URL Validation & Sanitization ───────────────────────────────────
 
 /**
- * Allowed URL protocols for image sources.
- * Only https: and data: are permitted — http: is explicitly blocked
- * to prevent mixed-content warnings and MITM injection attacks.
- */
-const ALLOWED_IMAGE_PROTOCOLS = ["https:", "data:"] as const;
-
-/**
  * Known-safe image hosting domains. Any URL not matching these patterns
  * (and not being a data: URI) is treated as untrusted and rejected.
  * Supabase storage domains are the only external sources allowed.
@@ -277,19 +270,6 @@ const TRUSTED_IMAGE_HOST_PATTERNS = [
   /^.+\.supabase\.co$/i,       // Supabase storage
   /^.+\.supabase\.in$/i,       // Supabase India region
 ];
-
-/**
- * Extensions considered safe for image URLs. Reject anything else
- * (e.g. .php, .exe, .html served from a compromised CDN).
- */
-const VALID_IMAGE_EXTENSIONS = [
-  ".jpg", ".jpeg", ".jfif",
-  ".png",
-  ".webp",
-  ".avif",
-  ".gif",
-  ".svg",
-] as const;
 
 /**
  * Validate that an image URL is safe to render in an <img> tag.

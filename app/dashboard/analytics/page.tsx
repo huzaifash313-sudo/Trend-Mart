@@ -229,11 +229,9 @@ export default function AnalyticsDashboard() {
         const leadSources = new Map<string, { count: number; converted: number }>();
         const sources = ["whatsapp", "catalog", "chatbot", "direct", "other"];
         for (const s of sources) leadSources.set(s, { count: 0, converted: 0 });
-        for (const o of orderList) {
-          const entry = leadSources.get("whatsapp")!;
-          entry.count += 1;
-          entry.converted += 1;
-        }
+        const whatsappEntry = leadSources.get("whatsapp")!;
+        whatsappEntry.count += orderList.length;
+        whatsappEntry.converted += orderList.length;
         const shopViewCount = logList.filter((l) => l.event_type === "shop_view").length;
         const catEntry = leadSources.get("catalog")!;
         catEntry.count = shopViewCount;

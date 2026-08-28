@@ -19,8 +19,6 @@ import type { Product, Shop } from "@/types";
 /* -------------------------------------------------------------------------- */
 
 const SITE_NAME = "TrendMart";
-const SITE_DESCRIPTION =
-  "Discover local shops across Pakistan. Browse products, place orders via WhatsApp, and support small businesses.";
 const BASE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://trend-marts.vercel.app";
 const OG_IMAGE_DEFAULT = `${BASE_URL}/og-default.png`;

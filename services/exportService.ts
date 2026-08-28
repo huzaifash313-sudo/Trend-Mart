@@ -4,14 +4,12 @@
 /*           order reports, inventory levels, and merchant accounting data.     */
 /* -------------------------------------------------------------------------- */
 
-import type { Product, Order, OrderItem, VariantGroup } from "@/types";
-import { formatRupees } from "@/lib/formatters";
+import type { Product, Order, VariantGroup } from "@/types";
 import {
   escapeCSVField,
   buildCSVDocument,
   sanitizeLight,
   sanitizePathSegment,
-  truncate,
 } from "@/lib/sanitization";
 
 /* -------------------------------------------------------------------------- */

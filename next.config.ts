@@ -195,7 +195,7 @@ const nextConfig: NextConfig = {
     }
 
     // ── Bundle Analyzer support (opt-in via ANALYZE=true env var) ────────
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     if (process.env.ANALYZE === "true") {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");

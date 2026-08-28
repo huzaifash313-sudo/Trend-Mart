@@ -19,9 +19,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
-  useRef,
   type FormEvent,
-  type DragEvent,
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -117,7 +115,6 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
 
 // ─── Inline Icons ───────────────────────────────────────────────────────────
 
-function PlusIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>); }
 function TrashIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>); }
 function SaveIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>); }
 function PackageIcon() { return (<svg className="h-8 w-8 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>); }
@@ -156,10 +153,6 @@ export default function ProductsDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "available" | "sold_out">("all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "price_asc" | "price_desc" | "name">("newest");
-
-  // Drag & drop image
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // CSV import
   const [csvImporting, setCsvImporting] = useState(false);
@@ -312,41 +305,6 @@ export default function ProductsDashboardPage() {
   const removeTag = useCallback((tag: string) => {
     setForm(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }));
   }, []);
-
-  // ── Image Drag & Drop ──────────────────────────────────────────────────
-
-  const handleDragOver = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        addToast("Please upload an image file (PNG, JPG, WebP, etc.)", "error");
-        return;
-      }
-      // Validate file size (max 20MB — photos get compressed on upload)
-      if (file.size > 20 * 1024 * 1024) {
-        addToast("Image size must be under 20MB.", "error");
-        return;
-      }
-      // The ImageUpload component handles the actual upload
-      // This just validates and provides visual feedback
-      addToast(`Image "${file.name}" ready for upload.`, "info");
-    }
-  }, [addToast]);
 
   // ── Form Submission ─────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
-import { sanitizePathSegment, truncate } from "@/lib/sanitization";
+import { sanitizePathSegment } from "@/lib/sanitization";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

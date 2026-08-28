@@ -29,12 +29,6 @@ const MAX_NAME_LENGTH = 60;
 /** Minimum seconds between reviews from the same session (anti-spam). */
 const RATE_LIMIT_WINDOW_SECONDS = 30;
 
-/** Maximum reviews per IP per hour (anti-spam). */
-const MAX_REVIEWS_PER_HOUR = 10;
-
-/** Maximum reviews per shop per 5 minutes (flood protection). */
-const MAX_REVIEWS_PER_SHOP_5MIN = 20;
-
 /** In-memory rate limit trackers (per-edge-worker). */
 const reviewRateLimits = new Map<string, { count: number; windowStart: number }>();
 const ipRateLimits = new Map<string, { count: number; windowStart: number }>();
@@ -148,28 +142,6 @@ function checkSessionRateLimit(sessionKey: string): { allowed: boolean; retryAft
     const elapsed = now - existing.windowStart;
     const retryAfter = Math.ceil((RATE_LIMIT_WINDOW_SECONDS * 1000 - elapsed) / 1000);
     return { allowed: false, retryAfter };
-  }
-
-  existing.count++;
-  return { allowed: true };
-}
-
-/**
- * Check IP-based rate limiting.
- * Prevents spam from a single IP address.
- */
-function checkIpRateLimit(ip: string): { allowed: boolean } {
-  const now = Date.now();
-  const ONE_HOUR = 60 * 60 * 1000;
-  const existing = ipRateLimits.get(ip);
-
-  if (!existing || now - existing.windowStart > ONE_HOUR) {
-    ipRateLimits.set(ip, { count: 1, windowStart: now });
-    return { allowed: true };
-  }
-
-  if (existing.count >= MAX_REVIEWS_PER_HOUR) {
-    return { allowed: false };
   }
 
   existing.count++;

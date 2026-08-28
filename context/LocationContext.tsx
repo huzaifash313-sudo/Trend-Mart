@@ -150,7 +150,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         setIsDetecting(false);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   const coordinates: GeoCoordinates | null = location
     ? resolveCoordinates(location)

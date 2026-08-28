@@ -5,8 +5,6 @@
 
 import {
   productSchema,
-  shopSchema,
-  orderSchema,
   cartItemSchema,
   validateProduct,
   validateShop,
@@ -15,8 +13,6 @@ import {
   validateArray,
   validateMerchantSettings,
   isProduct,
-  isShop,
-  isOrder,
   isNotNullish,
   isSafeInteger,
   isNonEmptyString,

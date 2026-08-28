@@ -2,5 +2,6 @@
 
 /** Return a simple product name placeholder. */
 export function getProductNamePlaceholder(_category?: string | null): string {
+  void _category; // reserved for future category-aware placeholders
   return "Product name";
 }

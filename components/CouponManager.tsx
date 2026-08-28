@@ -10,16 +10,13 @@ import {
   useEffect,
   useCallback,
   useMemo,
-  useRef,
   type FormEvent,
 } from "react";
-import { createClient } from "@/lib/supabase/client";
 import {
   createCoupon,
   fetchCouponsByShopId,
   updateCouponStatus,
   deleteCoupon,
-  validateCoupon,
 } from "@/services/couponService";
 import type { Coupon } from "@/services/couponService";
 import { formatRupees } from "@/lib/formatters";
@@ -86,7 +83,6 @@ interface CouponManagerProps {
 }
 
 export default function CouponManager({ shopId }: CouponManagerProps) {
-  const supabase = useMemo(() => createClient(), []);
 
   // ── State ───────────────────────────────────────────────────────────────
   const [coupons, setCoupons] = useState<Coupon[]>([]);

@@ -231,13 +231,6 @@ export function flushPendingEvents(): void {
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
       // Note: Supabase client uses fetch which may not work reliably during unload.
       // The regular flushEventQueue handles the primary path; sendBeacon is a best-effort fallback.
-      const payload = JSON.stringify(
-        eventQueue.map((e) => ({
-          shop_id: e.shop_id,
-          event_type: e.event_type,
-          product_id: e.product_id ?? null,
-        })),
-      );
       // sendBeacon to a Supabase Edge Function would be ideal; for now just flush normally
     }
     flushEventQueue();
@@ -320,7 +313,6 @@ export function subscribeToLiveMetrics(
  */
 export function subscribeToRealtimeAnalytics(
   shopId: string,
-  callback: MetricsCallback,
 ): () => void {
   const supabase = createClient();
   const channelKey = `analytics-metrics-${shopId}`;

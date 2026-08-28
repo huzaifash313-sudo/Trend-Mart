@@ -398,7 +398,6 @@ export default function WhatsAppCheckoutModal({
   onClose,
   onOrderPlaced,
   accentColor = "emerald",
-  accentHex = "#10b981",
 }: WhatsAppCheckoutModalProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -540,9 +539,7 @@ export default function WhatsAppCheckoutModal({
   const accentBgHover = `hover:bg-${accentColor}-700`;
   const accentRing = `focus:ring-${accentColor}-500`;
   const accentLight = `bg-${accentColor}-50`;
-  const accentBorder = `border-${accentColor}-200/50`;
   const accentText = `text-${accentColor}-700`;
-  const accentTextDark = `dark:text-${accentColor}-400`;
 
   // ── Quantity Handlers ───────────────────────────────────────────────────
   const updateQuantity = useCallback((itemId: string, delta: number) => {

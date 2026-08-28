@@ -9,7 +9,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
-import { sanitizeNumeric, isValidUUID } from "@/lib/sanitization";
+import { isValidUUID } from "@/lib/sanitization";
 import type { Product } from "@/types";
 
 type ServiceResult<T> =
@@ -66,9 +66,6 @@ export interface BulkStockUpdate {
 
 /** Maximum stock quantity allowed (prevents integer overflow/abuse). */
 const MAX_STOCK_QUANTITY = 999_999;
-
-/** Minimum stock quantity (always 0 — negative values are coerced). */
-const MIN_STOCK_QUANTITY = 0;
 
 /** Default low stock threshold. */
 const DEFAULT_LOW_STOCK_THRESHOLD = 5;

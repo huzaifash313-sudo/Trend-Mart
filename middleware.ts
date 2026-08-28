@@ -208,13 +208,6 @@ function isAuthRoute(pathname: string): boolean {
   return AUTH_ROUTES.some((route) => pathname === route);
 }
 
-function canAccessRoute(role: AppRole | null, pathname: string): boolean {
-  const required = getRequiredRole(pathname);
-  if (required === "public") return true;
-  if (!role) return false;
-  return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[required];
-}
-
 // ─── Session & Role Resolution ────────────────────────────────────────────
 
 /**

@@ -2,7 +2,6 @@ import {
   expandSearchQuery,
   fuzzyFilterAndRank,
   scoreTextMatch,
-  suggestSearchCorrections,
 } from "@/lib/fuzzySearch";
 
 describe("fuzzySearch", () => {

@@ -113,7 +113,7 @@ export default function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   useEffect(() => {
     setPortalReady(true);
   }, []);

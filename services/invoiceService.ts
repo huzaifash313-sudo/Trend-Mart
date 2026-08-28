@@ -854,9 +854,7 @@ export function generateInvoicePDF(invoice: InvoiceData): jsPDF {
   y += 24;
 
   // ── Items Table ─────────────────────────────────────────────────────────
-  const tableTop = y;
   const colW = [10, 70, 14, 28, 28]; // #, Description, Qty, Unit Price, Amount
-  const rightMargin = margin;
 
   // Table header
   doc.setFillColor(243, 244, 246);

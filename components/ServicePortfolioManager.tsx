@@ -111,7 +111,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
 
       if (error) throw error;
       setPortfolioItems(data as PortfolioItem[]);
-    } catch (err) {
+    } catch {
       addToast("Failed to load portfolio items.", "error");
     } finally {
       setLoading(false);

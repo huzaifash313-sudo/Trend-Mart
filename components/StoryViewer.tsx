@@ -154,7 +154,7 @@ export default function StoryViewer({
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [direction, setDirection] = useState<"forward" | "backward">("forward");
+  const [, setDirection] = useState<"forward" | "backward">("forward");
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // ── Refs for stale-closure-proof values ─────────────────────────────────

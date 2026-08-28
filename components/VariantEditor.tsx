@@ -10,7 +10,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { useState } from "react";
-import type { ProductVariant, VariantGroup } from "@/types";
+import type { VariantGroup } from "@/types";
 import { effectiveOptionPrice } from "@/lib/variantPricing";
 
 const PRESET_GROUPS = ["Size", "Color", "Spice Level", "Flavour", "Portion", "Add-ons"];

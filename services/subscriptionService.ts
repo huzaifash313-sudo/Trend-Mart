@@ -737,7 +737,7 @@ export async function fetchAllSubscriptions(
     const { data, error } = await query;
     if (error) throw error;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const flattened: SubscriptionWithShop[] = (data ?? []).map((row: Record<string, unknown>) => ({
       ...row,
       shop_name: (row.shops as { name?: string } | undefined)?.name ?? "Unknown",

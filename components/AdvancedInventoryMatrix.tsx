@@ -20,7 +20,6 @@
 import {
   useState,
   useEffect,
-  useCallback,
   useMemo,
   useRef,
   type FormEvent,
@@ -33,7 +32,7 @@ import {
   type InventoryVariantPayload,
 } from "@/lib/supabase/realtime";
 import { logError } from "@/services/errorService";
-import type { Product, VariantGroup, ProductVariant } from "@/types";
+import type { Product, VariantGroup } from "@/types";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

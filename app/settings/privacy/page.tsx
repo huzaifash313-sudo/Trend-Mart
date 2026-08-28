@@ -29,7 +29,7 @@ function TrashIcon() {
 export default function PrivacyPage() {
   const router = useRouter();
   const { addToast } = useToast();
-  const [session, setSession] = useState(false);
+  const [, setSession] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
 

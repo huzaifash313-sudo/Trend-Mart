@@ -71,7 +71,7 @@ export class DistributedRateLimiter {
       return this.redisAtomicCheck(key, maxRequests, windowMs, now, windowStart);
     }
 
-    return this.redisNonAtomicCheck(key, maxRequests, windowMs, now, windowStart);
+    return this.redisNonAtomicCheck(key, maxRequests, windowMs, now);
   }
 
   private async redisAtomicCheck(
@@ -134,7 +134,6 @@ export class DistributedRateLimiter {
     maxRequests: number,
     windowMs: number,
     now: number,
-    _windowStart: number,
   ): Promise<RateLimitResult> {
     const countStr = await this.store!.get(key);
     const current = countStr ? parseInt(countStr, 10) : 0;

@@ -11,8 +11,7 @@
 
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState, useMemo, useCallback } from "react";
 import { createOrder } from "@/services/orderService";
 import type { Shop } from "@/types";
 import { formatRupees } from "@/lib/formatters";
@@ -67,7 +66,6 @@ function CalendarIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" f
 function ZapIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>); }
 function CheckIcon() { return (<svg className="h-4 w-4 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>); }
 function SpinnerIcon() { return (<svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>); }
-function ChevronLeftIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>); }
 function ShieldCheckIcon() { return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>); }
 
 // ─── Time slots ─────────────────────────────────────────────────────────────
@@ -197,9 +195,7 @@ export default function ServiceBookingModal({
   packages,
   onClose,
   onBookingPlaced,
-  accentHex = "#10b981",
 }: ServiceBookingModalProps) {
-  const supabase = useMemo(() => createClient(), []);
 
   // Step: "select" | "details" | "confirm" | "success"
   const [step, setStep] = useState<"select" | "details" | "confirm" | "success">("select");

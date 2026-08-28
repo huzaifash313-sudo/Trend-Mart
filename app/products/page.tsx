@@ -453,7 +453,6 @@ function ProductsPageInner() {
     geoVisibleShopIds,
     sort,
     globalCoords,
-    activeDeals,
     query,
     searchMatchedDeals,
   ]);

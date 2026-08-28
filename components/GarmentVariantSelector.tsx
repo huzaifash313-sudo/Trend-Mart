@@ -190,12 +190,10 @@ function notifyParent(
 export default function GarmentVariantSelector({
   variants,
   basePrice,
-  currency: _currency = "PKR",
   onSelectionChange,
   onConfirm,
   initialSelection,
   compact = false,
-  enforceCompatibility: _enforceCompatibility = false,
   variantImageMap,
   showConfirmButton = false,
   confirmLabel = "Confirm Selection",
@@ -266,7 +264,8 @@ export default function GarmentVariantSelector({
 
         if (isCurrentlySelected) {
           // Remove this group's selection entirely
-          const { [groupName]: _removed, ...rest } = prev;
+          const rest = { ...prev };
+          delete rest[groupName];
           next = rest;
         } else {
           // Set/update the selection for this group

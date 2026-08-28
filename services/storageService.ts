@@ -6,11 +6,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { logError, toServiceError } from "@/services/errorService";
-import {
-  sanitizePathSegment,
-  sanitizeLight,
-  truncate,
-} from "@/lib/sanitization";
+import { sanitizePathSegment } from "@/lib/sanitization";
 import {
   isCloudinaryClientConfigured,
   uploadToCloudinary,
@@ -29,9 +25,6 @@ function toError(err: unknown): string {
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-/** Allowed storage bucket names — prevents bucket-swapping attacks. */
-const ALLOWED_BUCKETS = ["trendmart-media", "images", "shop-assets"] as const;
 
 const BUCKET_NAME = "trendmart-media";
 
@@ -63,38 +56,11 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/heif": "heif",
 };
 
-/** Valid file extension mappings per MIME type (for extension sniffing). */
-const MIME_EXTENSION_MAP: Record<string, string[]> = {
-  "image/jpeg": ["jpg", "jpeg", "jfif"],
-  "image/png": ["png"],
-  "image/webp": ["webp"],
-  "image/heic": ["heic"],
-  "image/heif": ["heif"],
-  "image/avif": ["avif"],
-};
-
 /** Upload timeout in milliseconds (30 seconds). */
 const UPLOAD_TIMEOUT_MS = 30_000;
 
 /** Maximum filename length before truncation. */
 const MAX_FILENAME_LENGTH = 120;
-
-// ─── Bucket Validation ──────────────────────────────────────────────────────
-
-/**
- * Validate that a bucket name is in the allowed list.
- * Prevents bucket enumeration / bucket-swapping attacks.
- */
-function validateBucketName(bucket: string): string {
-  const safe = sanitizePathSegment(bucket, 30).toLowerCase();
-  if (!(ALLOWED_BUCKETS as readonly string[]).includes(safe)) {
-    logError(`Blocked access to unauthorized bucket: ${bucket}`, {
-      module: "storageService.validateBucketName",
-    });
-    return BUCKET_NAME; // Fallback to default
-  }
-  return safe;
-}
 
 // ─── Filename Sanitization ───────────────────────────────────────────────────
 

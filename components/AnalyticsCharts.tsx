@@ -1,9 +1,7 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   AreaChart,
@@ -17,11 +15,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
 } from "recharts";
 import { formatRupees, formatCount } from "@/lib/formatters";
 import type { Order, Product } from "@/types";
@@ -109,22 +102,16 @@ export function deriveAnalyticsData(
   // ── Category Distribution (from products ──────────────────────────────────
   const catMap = new Map<string, { count: number; revenue: number }>();
 
-  for (const product of products) {
-    // Determine category via shop association — use product-level heuristic
-    const category = "General"; // Products don't carry category directly in current schema
-    const existing = catMap.get(category);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      catMap.set(category, { count: 1, revenue: 0 });
-    }
+  // Products don't carry category directly in current schema — bucket all in
+  // "General" so the distribution still reflects the catalog size.
+  if (products.length > 0) {
+    catMap.set("General", { count: products.length, revenue: 0 });
   }
 
   // Attach revenue from orders to categories
   for (const order of orders) {
     if (order.status === "Cancelled") continue;
     for (const item of order.items_json) {
-      const product = products.find((p) => p.id === item.product_id);
       const category = "General";
       const existing = catMap.get(category);
       if (existing) {

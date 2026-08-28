@@ -100,7 +100,7 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
 
   const itemsSubtotal = useMemo(
     () => rows.reduce((sum, it) => sum + lineTotal(it), 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [rows],
   );
 
@@ -142,7 +142,7 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
         const qty = it.quantity ?? 1;
         return orig > unit ? sum + (orig - unit) * qty : sum;
       }, 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [rows],
   );
 

@@ -40,7 +40,6 @@ function MoonIcon() {
 
 export default function AppearanceSettingsPage() {
   const {
-    mode,
     resolved,
     fontScale,
     setMode,

@@ -284,7 +284,7 @@ function DealCard({
                 src={safeSrc}
                 alt={deal.title}
                 fill
-                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                className="object-contain transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                 sizes="(max-width: 640px) 52vw, (max-width: 1024px) 30vw, 20vw"
                 priority={priority}
                 loading={priority ? "eager" : "lazy"}

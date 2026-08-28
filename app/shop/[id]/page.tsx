@@ -76,10 +76,6 @@ import { deleteCoupon } from "@/services/couponService";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
-function ChevronLeftIcon() {
-  return (<svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6" /></svg>);
-}
-
 function PinIcon() {
   return (<svg className="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>);
 }
@@ -245,8 +241,8 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // ── Service-specific state ─────────────────────────────────────────────────
   const [servicePackages, setServicePackages] = useState<ServicePackageItem[]>([]);
-  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
-  const [availabilityDays, setAvailabilityDays] = useState<AvailabilityDay[]>([]);
+  const [, setPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [, setAvailabilityDays] = useState<AvailabilityDay[]>([]);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [displayPrefs, setDisplayPrefs] = useState<StorefrontDisplayPrefs>({
     showAnnouncementBanner: true,

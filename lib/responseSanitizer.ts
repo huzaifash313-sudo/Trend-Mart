@@ -6,7 +6,7 @@
 /*            rendering on the frontend. Ensures zero sensitive data leakage.  */
 /* -------------------------------------------------------------------------- */
 
-import type { Shop, Product, Order, Review } from "@/types";
+import type { Shop, Product, Review } from "@/types";
 import { sanitizeLight, sanitizeHtml } from "@/lib/sanitization";
 
 // ─── Sensitive Field Lists ──────────────────────────────────────────────────

@@ -4,7 +4,7 @@
    Adds the `push` + `notificationclick` handlers so OS notifications from
    lib/webPush.ts actually render and navigate to the right page. */
 
-self.addEventListener("install", (event) => {
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 

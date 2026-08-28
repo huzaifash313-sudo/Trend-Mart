@@ -116,7 +116,7 @@ export default function LocationPicker() {
   const placeAbortRef = useRef<AbortController | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   useEffect(() => {
     setPortalReady(true);
   }, []);

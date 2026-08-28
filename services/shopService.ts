@@ -221,7 +221,7 @@ export async function fetchShopById(
       // path previously skipped these filters (only the slug path enforced
       // them), which let pending / suspended / offline shops leak their full
       // record (owner_id, whatsapp, addresses) to anyone who had the UUID.
-      let { data, error: shopError } = await supabase
+      const { data, error: shopError } = await supabase
         .from("shops")
         .select("*")
         .eq("id", id)
