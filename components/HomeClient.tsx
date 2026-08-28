@@ -8,6 +8,7 @@ import {
   memo,
   type Dispatch,
   type SetStateAction,
+  type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -48,6 +49,60 @@ const EMPTY_SHOPS: Shop[] = [];
 const EMPTY_DEALS: ShopDeal[] = [];
 const EMPTY_STORIES: Story[] = [];
 const EMPTY_COUPONS: Record<string, Coupon[]> = {};
+
+/**
+ * WhatsApp/Instagram-style partial story ring. The gradient arc shrinks as more
+ * of the shop's stories are viewed; the gray ring underneath shows the seen
+ * portion. All-seen → fully gray, nothing-seen → full gradient.
+ */
+function StoryRing({
+  total,
+  seen,
+  children,
+}: {
+  total: number;
+  seen: number;
+  children: ReactNode;
+}) {
+  const SIZE = 60;
+  const STROKE = 2.5;
+  const r = (SIZE - STROKE) / 2;
+  const C = 2 * Math.PI * r;
+  const seenFrac = total > 0 ? Math.max(0, Math.min(seen / total, 1)) : 0;
+  const unseenFrac = 1 - seenFrac;
+  return (
+    <div className="relative h-[3.75rem] w-[3.75rem]">
+      <svg
+        className="absolute inset-0 h-full w-full -rotate-90"
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        aria-hidden="true"
+      >
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={r}
+          fill="none"
+          strokeWidth={STROKE}
+          className="stroke-zinc-300 dark:stroke-zinc-600"
+        />
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={r}
+          fill="none"
+          strokeWidth={STROKE}
+          strokeLinecap="round"
+          stroke={unseenFrac > 0 ? "url(#tmStoryRingGrad)" : "none"}
+          strokeDasharray={`${Math.max(unseenFrac * C - 1, 0)} ${C}`}
+          style={{ opacity: unseenFrac > 0 ? 1 : 0 }}
+        />
+      </svg>
+      <div className="absolute inset-[3px] overflow-hidden rounded-full ring-2 ring-white dark:ring-zinc-950">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 /** Shops rendered initially; "Show more" grows the grid without loading 300
  *  cards into the DOM on first paint (major Android perf win). */
@@ -533,6 +588,15 @@ function HomeClient({
 
       {/* Stories — first content under category tabs */}
       <section aria-label="Merchant stories">
+        <svg width="0" height="0" className="absolute" aria-hidden="true">
+          <defs>
+            <linearGradient id="tmStoryRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#34d399" />
+              <stop offset="50%" stopColor="#2dd4bf" />
+              <stop offset="100%" stopColor="#059669" />
+            </linearGradient>
+          </defs>
+        </svg>
         <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0 scrollbar-none">
           {myShop ? (
             <button
@@ -563,39 +627,38 @@ function HomeClient({
           ) : (
             storyGroups.map((group, gIdx) => {
               const first = group[0];
-              const allSeen = group.every((s) => viewedStoryIds.has(s.id));
+              const seenCount = group.filter((s) => viewedStoryIds.has(s.id)).length;
+              const allSeen = seenCount >= group.length;
               const label =
                 first.shop_name?.trim() ||
                 first.caption?.trim() ||
                 "Store";
               const initial = label.charAt(0).toUpperCase() || "?";
               const startIndex = storyGroups.slice(0, gIdx).reduce((n, g) => n + g.length, 0);
+              const firstUnseenInGroup = group.findIndex((s) => !viewedStoryIds.has(s.id));
               return (
                 <button
                   key={first.id}
                   type="button"
                   onClick={() => {
-                    setSelectedStoryIndex(startIndex);
+                    // WhatsApp-style resume: start from the first story not yet seen.
+                    setSelectedStoryIndex(
+                      startIndex + (firstUnseenInGroup === -1 ? 0 : firstUnseenInGroup),
+                    );
                     setStoryViewerOpen(true);
                   }}
                   className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                  aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : ""}`}
+                  aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : `, ${group.length - seenCount} unviewed`}`}
                 >
-                  <div
-                    className={`relative rounded-full p-[2.5px] ${
-                      allSeen
-                        ? "bg-zinc-300 dark:bg-zinc-600"
-                        : "bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600"
-                    }`}
-                  >
-                    <div className="relative h-[3.35rem] w-[3.35rem] overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
+                  <div className="relative">
+                    <StoryRing total={group.length} seen={seenCount}>
                       {first.image_url && !brokenStoryImgs.has(first.id) ? (
                         <Image
                           src={getSafeImageUrl(first.image_url, "product")}
                           alt=""
                           fill
                           className="object-cover"
-                          sizes="3.35rem"
+                          sizes="3.5rem"
                           onError={() =>
                             setBrokenStoryImgs((prev) => new Set(prev).add(first.id))
                           }
@@ -605,9 +668,9 @@ function HomeClient({
                           {initial}
                         </div>
                       )}
-                    </div>
+                    </StoryRing>
                     {group.length > 1 ? (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
+                      <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
                         {group.length}
                       </span>
                     ) : null}

@@ -62,7 +62,7 @@ function StoryImage({ story }: { story: Story }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Stories Viewer                                                            */
+/*  Stories Viewer — WhatsApp/Instagram-style                                  */
 /* -------------------------------------------------------------------------- */
 
 interface StoriesViewerProps {
@@ -73,6 +73,9 @@ interface StoriesViewerProps {
 }
 
 const STORY_DURATION_MS = 5500;
+/** A press shorter than this is a tap; longer is a hold-to-pause. */
+const TAP_MAX_MS = 300;
+const SWIPE_THRESHOLD = 50;
 
 export default function StoriesViewer({
   initialIndex = 0,
@@ -89,6 +92,14 @@ export default function StoriesViewer({
   const storiesRef = useRef<Story[]>([]);
   const currentIndexRef = useRef(initialIndex);
   const onCloseRef = useRef(onClose);
+  /** Elapsed ms of the current story — lets pause/resume continue in place. */
+  const elapsedRef = useRef(0);
+  const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
+  const touchStartTimeRef = useRef(0);
+  const movedRef = useRef(false);
+  /** Suppresses the synthetic click that follows a touch hold/swipe. */
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -103,21 +114,25 @@ export default function StoriesViewer({
   const advance = useCallback(() => {
     const total = storiesRef.current.length;
     if (total === 0) return;
+    elapsedRef.current = 0;
+    setProgress(0);
+    setPaused(false);
     if (currentIndexRef.current >= total - 1) {
       onCloseRef.current();
     } else {
       setCurrentIndex((prev) => prev + 1);
     }
-    setProgress(0);
   }, []);
 
   const goBack = useCallback(() => {
     const total = storiesRef.current.length;
     if (total === 0) return;
+    elapsedRef.current = 0;
+    setProgress(0);
+    setPaused(false);
     if (currentIndexRef.current > 0) {
       setCurrentIndex((prev) => prev - 1);
     }
-    setProgress(0);
   }, []);
 
   /* Seed once from parent list, or fetch if none passed */
@@ -158,18 +173,34 @@ export default function StoriesViewer({
     if (story?.id) markStoryViewed(story.id);
   }, [stories, currentIndex]);
 
-  /* Progress timer */
-  const startTimeRef = useRef(0);
+  /* Preload the next story's image so transitions feel instant */
   useEffect(() => {
-    if (loading || stories.length === 0 || paused) return;
-    startTimeRef.current = Date.now();
-    setProgress(0);
+    const next = stories[currentIndex + 1];
+    if (next?.image_url) {
+      const img = new Image();
+      img.src = getSafeImageUrl(next.image_url, "product");
+    }
+  }, [stories, currentIndex]);
+
+  /* Progress timer — pauses in place, resumes from the exact same spot */
+  useEffect(() => {
+    if (loading || stories.length === 0) return;
+
+    if (paused) {
+      elapsedRef.current = Math.min(elapsedRef.current, STORY_DURATION_MS);
+      return;
+    }
+
+    setProgress(Math.min(elapsedRef.current / STORY_DURATION_MS, 1));
+    const start = Date.now() - elapsedRef.current;
 
     const timer = setInterval(() => {
-      const elapsed = Date.now() - startTimeRef.current;
+      const elapsed = Date.now() - start;
+      elapsedRef.current = elapsed;
       const pct = Math.min(elapsed / STORY_DURATION_MS, 1);
       if (pct >= 1) {
         clearInterval(timer);
+        elapsedRef.current = 0;
         const total = storiesRef.current.length;
         const idx = currentIndexRef.current;
         if (idx >= total - 1) onCloseRef.current();
@@ -182,21 +213,66 @@ export default function StoriesViewer({
     return () => clearInterval(timer);
   }, [currentIndex, stories.length, loading, paused]);
 
-  const touchStartXRef = useRef(0);
+  /* ── Touch: hold to pause, swipe or tap to navigate ──────────────────── */
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartXRef.current = e.touches[0]?.clientX ?? 0;
+    const t = e.touches[0];
+    if (!t) return;
+    touchStartXRef.current = t.clientX;
+    touchStartYRef.current = t.clientY;
+    touchStartTimeRef.current = Date.now();
+    movedRef.current = false;
+    setPaused(true);
   }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    const dx = Math.abs(t.clientX - touchStartXRef.current);
+    const dy = Math.abs(t.clientY - touchStartYRef.current);
+    if (dx > 12 || dy > 12) movedRef.current = true;
+  }, []);
+
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
-      const diff = touchStartXRef.current - (e.changedTouches[0]?.clientX ?? 0);
-      if (diff > 50) advance();
-      else if (diff < -50) goBack();
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const held = Date.now() - touchStartTimeRef.current;
+      const dx = t.clientX - touchStartXRef.current;
+      const dy = t.clientY - touchStartYRef.current;
+      setPaused(false);
+
+      const suppressClick = () => {
+        suppressClickRef.current = true;
+        setTimeout(() => {
+          suppressClickRef.current = false;
+        }, 600);
+      };
+
+      // Swipe left/right wins over everything.
+      if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+        suppressClick();
+        if (dx < 0) advance();
+        else goBack();
+        return;
+      }
+
+      // Moved or held too long → treat as a scroll/hold, no navigation.
+      if (movedRef.current || held >= TAP_MAX_MS) {
+        suppressClick();
+      }
+      // Otherwise it's a quick tap — let the click handler navigate.
     },
     [advance, goBack],
   );
 
+  /* Tap zones: left third → previous, right two thirds → next */
   const handleTapZones = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      if (suppressClickRef.current) {
+        suppressClickRef.current = false;
+        return;
+      }
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
       if (x < rect.width / 3) goBack();
@@ -205,11 +281,16 @@ export default function StoriesViewer({
     [advance, goBack],
   );
 
+  /* Keyboard: arrows, Escape, Space toggles pause */
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "ArrowRight") advance();
       else if (e.key === "ArrowLeft") goBack();
       else if (e.key === "Escape") onClose();
+      else if (e.key === " ") {
+        e.preventDefault();
+        setPaused((p) => !p);
+      }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -232,14 +313,28 @@ export default function StoriesViewer({
 
       {!loading && current && (
         <div
-          className="relative flex h-full w-full max-w-lg flex-col"
+          className="relative flex h-full w-full max-w-lg select-none flex-col"
           onClick={handleTapZones}
           onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
+          onMouseEnter={() => {
+            // Hover-pause only on pointer devices — mobile synthesizes
+            // mouse events on tap and would otherwise freeze the story.
+            if (window.matchMedia("(hover: hover)").matches) setPaused(true);
+          }}
+          onMouseLeave={() => {
+            if (window.matchMedia("(hover: hover)").matches) setPaused(false);
+          }}
         >
-          {/* Progress */}
+          {/* Paused indicator */}
+          {paused && (
+            <div className="absolute left-1/2 top-11 z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white backdrop-blur-md">
+              Paused
+            </div>
+          )}
+
+          {/* Progress segments — viewed filled, current animating, rest empty */}
           <div className="absolute left-3 right-3 top-3 z-20 flex gap-1">
             {stories.map((s, i) => (
               <div key={s.id} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/25">
@@ -252,6 +347,11 @@ export default function StoriesViewer({
                 />
               </div>
             ))}
+          </div>
+
+          {/* Story counter */}
+          <div className="absolute bottom-20 left-4 z-20 rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/85 backdrop-blur-sm">
+            {currentIndex + 1} / {stories.length}
           </div>
 
           {/* Header — shop name */}

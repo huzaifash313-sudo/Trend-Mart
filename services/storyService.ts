@@ -126,7 +126,7 @@ export async function fetchStoriesByShopId(
 
 /**
  * Resolve a shop's story quota + live usage in one round-trip.
- * Drives the merchant UI ("1 of 1 active", "3 of 10 active", …).
+ * Drives the merchant UI ("unlimited", "3 live now", …).
  */
 export async function fetchShopStoryQuota(
   shopId: string,
@@ -182,11 +182,10 @@ export async function fetchShopStoryQuota(
 /**
  * Create a new story for a shop.
  * Soft quota enforcement ("help merchants, never harm a business"):
- * posting is ALWAYS allowed, but once the shop hits its active-story ceiling
- * the OLDEST story is replaced first. Free stores therefore keep exactly 1
- * live story while Pro stores can keep several up at once — a merchant is
- * never blocked from refreshing their storefront. RLS ensures only the shop
- * owner can insert/delete.
+ * posting is ALWAYS allowed, but once a shop hits its story ceiling (an
+ * effectively-unlimited soft cap by default) the OLDEST story is replaced
+ * first — a merchant is never blocked from refreshing their storefront.
+ * RLS ensures only the shop owner can insert/delete.
  */
 export async function createStory(
   shopId: string,
