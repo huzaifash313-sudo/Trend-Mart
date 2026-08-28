@@ -644,9 +644,6 @@ function HomeClient({
                         {myStories.length}
                       </span>
                     ) : null}
-                    <span className="absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
-                      +
-                    </span>
                   </>
                 ) : (
                   <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
@@ -656,8 +653,13 @@ function HomeClient({
                   </div>
                 )}
               </div>
-              <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
-                Your story
+              <span className="flex w-full items-center justify-center gap-0.5 text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+                {myStories.length > 0 ? (
+                  <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
+                    +
+                  </span>
+                ) : null}
+                <span className="truncate">Your story</span>
               </span>
             </button>
           ) : null}
