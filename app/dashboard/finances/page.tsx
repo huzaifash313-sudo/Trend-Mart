@@ -459,7 +459,7 @@ export default function FinancesPage() {
               </div>
 
               {/* Profit margin bar */}
-              <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="tm-panel mt-3 p-4">
                 <div className="mb-2 flex items-center justify-between text-xs">
                   <span className="font-semibold text-zinc-600 dark:text-zinc-400">Profit Margin</span>
                   <span className="text-zinc-500 dark:text-zinc-400">{summary.profitMargin.toFixed(1)}%</span>
@@ -539,7 +539,7 @@ export default function FinancesPage() {
             {/* ── New Entry Form ─────────────────────────────────────────── */}
             {showEntryForm && (
               <section>
-                <form onSubmit={handleSaveEntry} className="space-y-4 rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm dark:border-emerald-800 dark:bg-zinc-900">
+                <form onSubmit={handleSaveEntry} className="tm-panel space-y-4 border-emerald-200 p-5 dark:border-emerald-800">
                   <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">New Financial Entry</h3>
 
                   <div className="flex gap-2">
@@ -635,13 +635,13 @@ export default function FinancesPage() {
               {entriesLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                    <div key={i} className="tm-panel animate-pulse px-4 py-3">
                       <div className="h-5 rounded bg-zinc-200 dark:bg-zinc-800" />
                     </div>
                   ))}
                 </div>
               ) : filteredEntries.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
+                <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-12 text-center dark:border-zinc-700">
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     {filterType !== "all" || filterMonth
                       ? "No entries match your filters."
@@ -649,7 +649,7 @@ export default function FinancesPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="tm-panel overflow-hidden">
                   {/* Desktop table */}
                   <table className="hidden w-full text-left text-sm sm:table" role="table" aria-label="Financial entries">
                     <thead className="border-b border-zinc-100 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
@@ -766,13 +766,13 @@ export default function FinancesPage() {
               {ordersLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                    <div key={i} className="tm-panel animate-pulse px-4 py-3">
                       <div className="h-10 rounded bg-zinc-200 dark:bg-zinc-800" />
                     </div>
                   ))}
                 </div>
               ) : orders.filter((o) => o.status === "Pending" || o.status === "Processing").length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+                <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-8 text-center dark:border-zinc-700">
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">No pending orders. All caught up! 🎉</p>
                 </div>
               ) : (
@@ -781,7 +781,7 @@ export default function FinancesPage() {
                     .filter((o) => o.status === "Pending" || o.status === "Processing")
                     .slice(0, 10)
                     .map((order) => (
-                      <div key={order.id} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                      <div key={order.id} className="flex items-center gap-3 tm-panel px-4 py-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                             {order.customer_name || "Customer"}

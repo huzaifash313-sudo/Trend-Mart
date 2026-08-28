@@ -155,7 +155,7 @@ export default function MerchantAuditLogsPage() {
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+                className="tm-panel animate-pulse px-4 py-3"
               >
                 <div className="h-4 w-2/3 rounded bg-zinc-200 dark:bg-zinc-800" />
               </div>
@@ -164,7 +164,7 @@ export default function MerchantAuditLogsPage() {
         )}
 
         {!loading && !shopId && (
-          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-10 text-center dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-10 text-center dark:border-zinc-700">
             <p className="text-sm text-zinc-500">No shop found. Create a shop first.</p>
             <Link href="/dashboard" className="mt-2 inline-block text-sm font-medium text-emerald-600 hover:underline">
               Go to Dashboard
@@ -173,7 +173,7 @@ export default function MerchantAuditLogsPage() {
         )}
 
         {!loading && shopId && allEntries.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-10 text-center dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-10 text-center dark:border-zinc-700">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               No audit events yet. Product adds will appear here.
             </p>
@@ -181,7 +181,7 @@ export default function MerchantAuditLogsPage() {
         )}
 
         {!loading && filtered.length === 0 && allEntries.length > 0 && (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-white py-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="tm-panel rounded-xl border border-dashed border-zinc-300 py-8 text-center dark:border-zinc-700">
             <p className="text-sm text-zinc-500">No logs match your search.</p>
             <button
               type="button"
@@ -194,7 +194,7 @@ export default function MerchantAuditLogsPage() {
         )}
 
         {!loading && paged.length > 0 && (
-          <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="tm-panel overflow-x-auto">
             <table className="w-full text-left text-sm" role="table" aria-label="Audit logs">
               <thead className="border-b border-zinc-100 dark:border-zinc-800">
                 <tr>

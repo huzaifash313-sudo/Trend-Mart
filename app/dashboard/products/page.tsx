@@ -724,19 +724,19 @@ export default function ProductsDashboardPage() {
         {/* Quick Stats Bar */}
         {activeShopId && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="tm-panel p-3 text-center">
               <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{products.length}</p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Total Products</p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="tm-panel p-3 text-center">
               <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{products.filter(p => p.is_available).length}</p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Available</p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="tm-panel p-3 text-center">
               <p className="text-xl font-bold text-red-500">{products.filter(p => !p.is_available).length}</p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Sold Out</p>
             </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="tm-panel p-3 text-center">
               <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.total_product_clicks ?? "—"}</p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Total Clicks</p>
             </div>
@@ -745,7 +745,7 @@ export default function ProductsDashboardPage() {
 
         {/* Product Creation / Edit Form */}
         {activeShopId && (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <section className="tm-panel p-5">
             <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">
               {editingProductId ? "Edit Product" : "Add New Product"}
             </h2>
@@ -1140,7 +1140,7 @@ export default function ProductsDashboardPage() {
             {productsLoading && (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                  <div key={i} className="tm-panel animate-pulse px-4 py-3">
                     <div className="h-16 rounded bg-zinc-200 dark:bg-zinc-800" />
                   </div>
                 ))}
@@ -1148,7 +1148,7 @@ export default function ProductsDashboardPage() {
             )}
 
             {!productsLoading && filteredProducts.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-12 text-center dark:border-zinc-700">
                 <div className="mb-2 flex justify-center"><PackageIcon /></div>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   {products.length === 0
@@ -1163,10 +1163,10 @@ export default function ProductsDashboardPage() {
                 {filteredProducts.map((product) => (
                   <div
                     key={product.id}
-                    className={`flex items-center gap-3 rounded-xl border bg-white px-4 py-3 transition-shadow hover:shadow-sm dark:bg-zinc-900 ${
+                    className={`tm-panel flex items-center gap-3 px-4 py-3 transition-shadow hover:shadow-sm ${
                       selectedProductIds.has(product.id)
                         ? "border-emerald-300 ring-1 ring-emerald-500/20 dark:border-emerald-700"
-                        : "border-zinc-200 dark:border-zinc-800"
+                        : ""
                     }`}
                   >
                     {/* Checkbox */}

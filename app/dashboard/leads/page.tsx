@@ -116,7 +116,7 @@ function LeadRow({
 
   return (
     <div
-      className={`rounded-xl border bg-white px-4 py-3.5 shadow-sm transition-all hover:shadow-md dark:bg-zinc-900 ${
+      className={`tm-panel px-4 py-3.5 transition-all hover:shadow-md ${
         lead.is_converted
           ? "border-zinc-200 opacity-70 dark:border-zinc-700"
           : "border-emerald-200 dark:border-emerald-800"
@@ -422,7 +422,7 @@ export default function LeadsPage() {
         {/* Stats Cards */}
         {stats && (
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="tm-panel p-4 text-center">
               <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {stats.total}
               </p>
@@ -437,7 +437,7 @@ export default function LeadsPage() {
                 <span className="ml-1">Pending</span>
               </p>
             </div>
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="tm-panel p-4 text-center">
               <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {stats.converted}
               </p>
@@ -446,7 +446,7 @@ export default function LeadsPage() {
                 <span className="ml-1">Converted</span>
               </p>
             </div>
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="tm-panel p-4 text-center">
               <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {stats.todayCount}
               </p>
@@ -489,13 +489,13 @@ export default function LeadsPage() {
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+                <div key={i} className="tm-panel animate-pulse px-4 py-3">
                   <div className="h-14 rounded bg-zinc-200 dark:bg-zinc-800" />
                 </div>
               ))}
             </div>
           ) : leads.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-12 text-center dark:border-zinc-700">
               <div className="mb-2 flex justify-center">
                 <svg className="h-10 w-10 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />

@@ -169,7 +169,7 @@ function ShopCard({
         </ShopMediaHeader>
       </Link>
 
-      <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2 sm:px-2.5 sm:pb-2.5">
+      <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-1.5 pt-1.5 sm:px-2.5 sm:pb-2">
         {/* Name + wishlist */}
         <div className="flex min-w-0 items-start gap-1.5">
           <Link
@@ -206,7 +206,7 @@ function ShopCard({
           ) : null}
         </div>
 
-        <div className="mt-1.5">
+        <div className="mt-1">
           <button
             type="button"
             onClick={(e) => {
@@ -238,20 +238,20 @@ function ShopCard({
         </div>
 
         {offerSlides.length > 0 ? (
-          <div className="mt-1.5">
+          <div className="mt-1">
             <ShopOfferTicker slides={offerSlides} />
           </div>
         ) : null}
 
         <p
           title={category}
-          className="tm-title-clamp-2 mt-1.5 text-[11px] font-medium leading-snug text-teal-700 dark:text-teal-300 sm:text-[12px]"
+          className="tm-title-clamp-2 mt-1 text-[11px] font-medium leading-snug text-teal-700 dark:text-teal-300 sm:text-[12px]"
         >
           {category}
         </p>
 
         <p
-          className="mt-1 inline-flex min-w-0 items-center gap-1 text-[11px] leading-none text-zinc-500 dark:text-zinc-400"
+          className="mt-0.5 inline-flex min-w-0 items-center gap-1 text-[11px] leading-none text-zinc-500 dark:text-zinc-400"
           title={shop.location}
         >
           <PinIcon />
@@ -260,7 +260,7 @@ function ShopCard({
           </span>
         </p>
 
-        <div className="mt-auto pt-2">
+        <div className="mt-auto pt-1.5">
           <Link href={href} className="tm-cta btn-compact h-8 w-full text-[12px] sm:text-[13px]">
             View store
           </Link>

@@ -214,7 +214,7 @@ export default function MerchantOrdersPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
           <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">No orders here yet</p>
           <p className="mt-1 text-xs text-zinc-500">
             New WhatsApp checkout orders will appear here in real time.
@@ -227,7 +227,7 @@ export default function MerchantOrdersPage() {
             return (
               <article
                 key={order.id}
-                className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                className="tm-panel p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">

@@ -265,7 +265,7 @@ export default function MerchantAdsPage() {
               {plans.map((plan) => (
                 <div
                   key={plan.id}
-                  className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                  className="tm-panel p-4"
                 >
                   <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
                     {plan.duration_days} day{plan.duration_days !== 1 ? "s" : ""}
@@ -285,7 +285,7 @@ export default function MerchantAdsPage() {
 
         {/* ── Form ──────────────────────────────────────────────────────── */}
         {showForm && (
-          <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <form onSubmit={handleSubmit} className="tm-panel space-y-4 p-5">
             <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
               {editingId ? "Edit Ad Request" : "New Ad Request"}
             </h2>
@@ -326,7 +326,7 @@ export default function MerchantAdsPage() {
             )}
 
             {/* Live storefront preview — exact copy of the homepage card */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="tm-panel p-3">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                 Storefront preview
               </p>
@@ -455,11 +455,11 @@ export default function MerchantAdsPage() {
           {adsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="h-24 animate-pulse rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900" />
+                <div key={i} className="tm-panel h-24 animate-pulse" />
               ))}
             </div>
           ) : ads.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-zinc-300 bg-white py-16 text-center dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-16 text-center dark:border-zinc-700">
               <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">No ad requests yet</p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
                 Request a homepage banner slot to get more customers.
@@ -468,7 +468,7 @@ export default function MerchantAdsPage() {
           ) : (
             <div className="space-y-3">
               {ads.map((ad) => (
-                <div key={ad.id} className="flex gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                <div key={ad.id} className="flex gap-3 tm-panel p-4">
                   <div className="h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
                     {ad.image_url && <img src={ad.image_url} alt={ad.title} className="h-full w-full object-cover" />}
                   </div>

@@ -307,8 +307,8 @@ function DealCard({
             ) : null}
           </div>
 
-          <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-1.5 p-3 sm:gap-2 sm:p-3.5 md:p-4">
-            <div className="min-w-0 space-y-1.5">
+          <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-1 p-2.5 sm:gap-1.5 sm:p-3 md:p-3">
+            <div className="min-w-0 space-y-1">
               <h3 className="tm-home-deal-name line-clamp-2" title={deal.title}>
                 {deal.title}
               </h3>

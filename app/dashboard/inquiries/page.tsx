@@ -105,7 +105,7 @@ export default function MerchantInquiriesPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
           <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">No inquiries yet</p>
           <p className="mt-1 text-xs text-zinc-500">
             When customers message your shop from the storefront, they appear here.
@@ -116,7 +116,7 @@ export default function MerchantInquiriesPage() {
           {rows.map((row) => (
             <article
               key={row.id}
-              className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+              className="tm-panel p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

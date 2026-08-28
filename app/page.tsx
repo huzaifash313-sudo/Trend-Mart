@@ -684,20 +684,20 @@ function HomeInner() {
                   onClick={() => {
                     handleCategoryChange("All");
                   }}
-                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                  className="tm-btn-primary rounded-full px-4 py-2 text-xs font-semibold"
                 >
                   Clear filters
                 </button>
               )}
               <Link
                 href="/products"
-                className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                className="tm-btn-primary rounded-full px-4 py-2 text-xs font-semibold"
               >
                 Browse products
               </Link>
               <Link
                 href="/deals"
-                className="rounded-full border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="tm-btn-secondary rounded-full px-4 py-2 text-xs font-semibold"
               >
                 See deals
               </Link>
