@@ -597,27 +597,11 @@ function HomeInner() {
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="mb-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="tm-section-header flex-wrap">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-[1.05rem]">
-                Live Shops
-              </h2>
-              <Link
-                href="/products"
-                className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
-              >
-                Browse products →
-              </Link>
-              <Link
-                href="/deals"
-                className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/40"
-              >
-                All deals →
-              </Link>
-            </div>
+            <h2 className="tm-section-title">Live Shops</h2>
             {!loading && (
-              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                 {displayShops.length} shop{displayShops.length !== 1 && "s"}
                 {showProximityBadges && (
                   <span className="ml-2 inline-flex items-center rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 px-2 py-0.5 text-[0.65rem] font-semibold text-teal-700 dark:from-emerald-950/50 dark:to-teal-950/40 dark:text-teal-300">
@@ -627,14 +611,22 @@ function HomeInner() {
               </p>
             )}
           </div>
-          <div className="w-full sm:w-auto">
-            <GeoRadiusFilter
-              onFilterChange={setGeoFilter}
-              isDetecting={geoDetecting}
-              onDetectStart={() => setGeoDetecting(true)}
-              onDetectEnd={() => setGeoDetecting(false)}
-            />
+          <div className="flex items-center gap-2">
+            <Link href="/products" className="tm-chip tm-chip--green">
+              Browse products →
+            </Link>
+            <Link href="/deals" className="tm-chip tm-chip--amber">
+              All deals →
+            </Link>
           </div>
+        </div>
+        <div className="mb-3">
+          <GeoRadiusFilter
+            onFilterChange={setGeoFilter}
+            isDetecting={geoDetecting}
+            onDetectStart={() => setGeoDetecting(true)}
+            onDetectEnd={() => setGeoDetecting(false)}
+          />
         </div>
 
         {/* Loading skeletons */}

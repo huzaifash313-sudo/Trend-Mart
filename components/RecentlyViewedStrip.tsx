@@ -50,7 +50,7 @@ export default function RecentlyViewedStrip() {
         <span className="text-teal-600 dark:text-teal-400">
           <ClockIcon />
         </span>
-        <h2 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+        <h2 className="tm-section-title tm-section-title--sm">
           Recently viewed
         </h2>
       </div>

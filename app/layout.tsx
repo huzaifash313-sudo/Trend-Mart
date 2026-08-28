@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
@@ -45,6 +45,15 @@ const geistMono = Geist_Mono({
   adjustFontFallback: true,
 });
 
+/* Display face for headings / brand / prices — a single premium font keeps
+   the marketplace hierarchy consistent while Geist carries body + UI text. */
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
+});
+
 export const metadata: Metadata = generateRootMetadata();
 
 export const viewport: Viewport = {
@@ -78,7 +87,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`light ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`light ${geistSans.variable} ${geistMono.variable} ${plusJakarta.variable} h-full antialiased`}
     >
       <head>
         <meta name="theme-color" content="#0f766e" />
