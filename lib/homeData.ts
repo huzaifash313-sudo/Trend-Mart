@@ -87,7 +87,7 @@ async function fetchActiveStories(supabase: Awaited<ReturnType<typeof createClie
       )
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(150);
 
     if (!withShop.error && withShop.data) {
       return (withShop.data as Record<string, unknown>[]).map((row) => {
@@ -120,7 +120,7 @@ async function fetchActiveStories(supabase: Awaited<ReturnType<typeof createClie
       .select("*")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(150);
     if (error) throw error;
     return (data as unknown as Story[]) ?? [];
   } catch {

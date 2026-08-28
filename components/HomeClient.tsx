@@ -221,6 +221,35 @@ function HomeClient({
     return base.filter((s) => geoVisibleShopIds.has(s.shop_id));
   }, [storiesQuery.data, storiesVersion, geoVisibleShopIds, myShopId, viewedStoryIds]);
 
+  /**
+   * Instagram-style story tray: group every shop's active stories under ONE ring
+   * (with a count badge) instead of one ring per story, so shops can now post
+   * unlimited stories without flooding the tray. Shops with unseen stories come
+   * first; within a shop, newest story leads the sequence.
+   */
+  const storyGroups = useMemo(() => {
+    const byShop = new Map<string, Story[]>();
+    for (const s of stories) {
+      const list = byShop.get(s.shop_id);
+      if (list) list.push(s);
+      else byShop.set(s.shop_id, [s]);
+    }
+    const groups = Array.from(byShop.values());
+    for (const g of groups) {
+      g.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    }
+    const unseenScore = (g: Story[]) => (g.some((s) => !viewedStoryIds.has(s.id)) ? 0 : 1);
+    groups.sort(
+      (a, b) =>
+        unseenScore(a) - unseenScore(b) ||
+        (b[0]?.created_at ?? "").localeCompare(a[0]?.created_at ?? ""),
+    );
+    return groups;
+  }, [stories, viewedStoryIds]);
+
+  /** Flat list for the viewer — same order as the grouped tray. */
+  const storyViewerList = useMemo(() => storyGroups.flat(), [storyGroups]);
+
   const shopIds = useMemo(
     () => shops.map((s) => s.id).filter(Boolean),
     [shops],
@@ -532,41 +561,43 @@ function HomeClient({
           ) : stories.length === 0 && !myShop ? (
             <p className="px-3 text-xs text-zinc-400 dark:text-zinc-500">No active stories right now.</p>
           ) : (
-            stories.map((story, i) => {
-              const seen = viewedStoryIds.has(story.id);
+            storyGroups.map((group, gIdx) => {
+              const first = group[0];
+              const allSeen = group.every((s) => viewedStoryIds.has(s.id));
               const label =
-                story.shop_name?.trim() ||
-                story.caption?.trim() ||
+                first.shop_name?.trim() ||
+                first.caption?.trim() ||
                 "Store";
               const initial = label.charAt(0).toUpperCase() || "?";
+              const startIndex = storyGroups.slice(0, gIdx).reduce((n, g) => n + g.length, 0);
               return (
                 <button
-                  key={story.id}
+                  key={first.id}
                   type="button"
                   onClick={() => {
-                    setSelectedStoryIndex(i);
+                    setSelectedStoryIndex(startIndex);
                     setStoryViewerOpen(true);
                   }}
                   className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                  aria-label={`${label} story${seen ? " (viewed)" : ""}`}
+                  aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : ""}`}
                 >
                   <div
-                    className={`rounded-full p-[2.5px] ${
-                      seen
+                    className={`relative rounded-full p-[2.5px] ${
+                      allSeen
                         ? "bg-zinc-300 dark:bg-zinc-600"
                         : "bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600"
                     }`}
                   >
                     <div className="relative h-[3.35rem] w-[3.35rem] overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
-                      {story.image_url && !brokenStoryImgs.has(story.id) ? (
+                      {first.image_url && !brokenStoryImgs.has(first.id) ? (
                         <Image
-                          src={getSafeImageUrl(story.image_url, "product")}
+                          src={getSafeImageUrl(first.image_url, "product")}
                           alt=""
                           fill
                           className="object-cover"
                           sizes="3.35rem"
                           onError={() =>
-                            setBrokenStoryImgs((prev) => new Set(prev).add(story.id))
+                            setBrokenStoryImgs((prev) => new Set(prev).add(first.id))
                           }
                         />
                       ) : (
@@ -575,6 +606,11 @@ function HomeClient({
                         </div>
                       )}
                     </div>
+                    {group.length > 1 ? (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
+                        {group.length}
+                      </span>
+                    ) : null}
                   </div>
                   <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
                     {label}
@@ -591,7 +627,7 @@ function HomeClient({
 
       {storyViewerOpen && (
         <StoriesViewer
-          stories={stories}
+          stories={storyViewerList}
           initialIndex={selectedStoryIndex}
           onClose={() => {
             setStoryViewerOpen(false);

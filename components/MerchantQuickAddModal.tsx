@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { PriceTier, VariantGroup } from "@/types";
+import { isUnlimitedStoryQuota } from "@/types";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { createProduct } from "@/services/productService";
 import { createStory, fetchShopStoryQuota } from "@/services/storyService";
@@ -279,9 +280,11 @@ export default function MerchantQuickAddModal() {
             <form onSubmit={handleCreateStory} className="space-y-3">
               {storyQuota ? (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {storyQuota.tier === "pro"
-                    ? `Pro plan: up to ${storyQuota.quota} active stories at once (${storyQuota.activeCount} live now).`
-                    : `${storyQuota.quota} active stor${storyQuota.quota === 1 ? "y" : "ies"} on the free plan (${storyQuota.activeCount} live now).`}{" "}
+                  {isUnlimitedStoryQuota(storyQuota.quota)
+                    ? `Post unlimited stories — no limit (${storyQuota.activeCount} live now).`
+                    : storyQuota.tier === "pro"
+                      ? `Pro plan: up to ${storyQuota.quota} active stories at once (${storyQuota.activeCount} live now).`
+                      : `${storyQuota.quota} active stor${storyQuota.quota === 1 ? "y" : "ies"} on the free plan (${storyQuota.activeCount} live now).`}{" "}
                   Stories stay visible on the homepage for 24 hours.
                 </p>
               ) : (

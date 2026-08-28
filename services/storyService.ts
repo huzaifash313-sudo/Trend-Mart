@@ -76,7 +76,7 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
       )
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(150);
 
     if (!withShop.error && withShop.data) {
       return {
@@ -91,7 +91,7 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
       .select("*")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(150);
 
     if (error) throw error;
     return { success: true, data: (data as Story[]) ?? [] };

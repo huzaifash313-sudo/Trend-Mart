@@ -84,12 +84,13 @@ export interface Shop {
   accepts_delivery?: boolean | null;
   accepts_pickup?: boolean | null;
   /**
-   * Monetization tier. `'free'` (default) keeps 1 active story; `'pro'`
-   * raises the story ceiling. No payments are wired yet — an admin flips
-   * this flag (future: set automatically by the payment gateway).
+   * Monetization tier. `'free'` (default) allows effectively-unlimited active
+   * stories; `'pro'` raises the ceiling higher. No payments are wired yet —
+   * an admin flips this flag (future: set automatically by the payment gateway).
    */
   subscription_tier?: "free" | "pro" | null;
-  /** Max concurrently-active stories for this shop. Defaults to 1. */
+  /** Max concurrently-active stories for this shop. Defaults to the
+   *  effectively-unlimited free allowance (see DEFAULT_STORIES_QUOTA). */
   stories_quota?: number | null;
   /** When a Pro subscription lapses (null = not subscribed / no expiry). */
   pro_expires_at?: string | null;
@@ -531,12 +532,28 @@ export interface StoryQuota {
   isProLapsed: boolean;
 }
 
-export const DEFAULT_STORIES_QUOTA = 1;
-export const PRO_STORIES_QUOTA = 10;
+/**
+ * Effective-unlimited allowance: any quota at or above this value is treated as
+ * "unlimited" in merchant-facing UI copy. It is a high soft ceiling purely as an
+ * anti-flood safety net — real stores never approach it (24h expiry + soft
+ * oldest-replaced posting).
+ */
+export const STORY_QUOTA_EFFECTIVE_UNLIMITED = 100;
+
+/** Free shops may keep this many active stories — effectively unlimited. */
+export const DEFAULT_STORIES_QUOTA = STORY_QUOTA_EFFECTIVE_UNLIMITED;
+/** Pro shops get an even higher ceiling so the tier stays meaningful. */
+export const PRO_STORIES_QUOTA = 200;
+
+/** True when a quota should be presented as "unlimited" in the UI. */
+export function isUnlimitedStoryQuota(quota: number): boolean {
+  return quota >= STORY_QUOTA_EFFECTIVE_UNLIMITED;
+}
 
 /**
  * Resolve a shop's effective story quota. Pro only counts while its expiry
  * (if any) is still in the future — lapsed Pro behaves as the free default.
+ * An admin can still tune a shop below the free allowance.
  */
 export function getStoriesQuota(
   shop?: Pick<
