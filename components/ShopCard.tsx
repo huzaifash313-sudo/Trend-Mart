@@ -147,7 +147,7 @@ function ShopCard({
           priority={priority}
         >
           <span
-            className={`absolute left-1.5 top-1.5 z-[1] inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${
+            className={`absolute left-2 top-2 z-[2] inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm ${
               isLive
                 ? "bg-white/95 text-emerald-700 dark:bg-zinc-900/95 dark:text-emerald-300"
                 : "bg-zinc-900/85 text-zinc-100"
@@ -162,7 +162,7 @@ function ShopCard({
             {isLive ? "Live" : "Unavailable"}
           </span>
           {distance ? (
-            <span className="absolute right-1.5 top-1.5 z-[1] rounded-full bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+            <span className="absolute right-2 top-2 z-[2] rounded-full bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
               {distance}
             </span>
           ) : null}
@@ -230,8 +230,11 @@ function ShopCard({
           >
             <CompactRating average={shop.avg_rating} count={shop.review_count} />
             {!hasRating ? (
-              <span className="text-[11px] font-medium text-zinc-400 underline decoration-dotted underline-offset-2 transition-colors group-hover/rating:text-emerald-600 dark:text-zinc-500 dark:group-hover/rating:text-emerald-400">
-                No reviews yet · Add one
+              <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                No reviews yet ·{" "}
+                <span className="font-semibold text-emerald-600 underline decoration-emerald-600/40 underline-offset-2 transition-colors group-hover/rating:text-emerald-700 dark:text-emerald-400 dark:decoration-emerald-400/40 dark:group-hover/rating:text-emerald-300">
+                  Add one
+                </span>
               </span>
             ) : null}
           </button>

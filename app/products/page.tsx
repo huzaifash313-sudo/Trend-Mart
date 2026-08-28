@@ -784,7 +784,7 @@ function ProductsPageInner() {
       {/* Sticky mobile filter strip */}
       <div className="sticky top-[var(--tm-navbar-sticky-offset,4.35rem)] z-30 -mx-3 mb-3 border-b border-zinc-100/80 bg-white/95 px-3 py-2 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">
         <div className="flex items-center gap-2">
-          <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-none">
+          <div className="tm-fade-scroll-x flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5 pr-2 scrollbar-none">
             {SORT_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -803,10 +803,10 @@ function ProductsPageInner() {
           <button
             type="button"
             onClick={() => setAreaOpen((v) => !v)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
               areaOpen || geoFilter.locationAvailable
-                ? "bg-teal-600 text-white"
-                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+                : "border-transparent bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             }`}
             aria-expanded={areaOpen}
           >

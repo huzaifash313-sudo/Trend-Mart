@@ -72,7 +72,7 @@ export default function RecentlyViewedStrip() {
                   quality={60}
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-base font-bold text-teal-700/50">
+                <div className="tm-avatar-fallback h-full w-full text-base font-bold">
                   {item.name.charAt(0).toUpperCase()}
                 </div>
               )}

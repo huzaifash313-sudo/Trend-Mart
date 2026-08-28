@@ -382,7 +382,7 @@ const ProductCard = memo(function ProductCard({
           </p>
         ) : null}
 
-        <div className="tm-product-footer flex flex-col gap-1">
+        <div className="tm-product-footer flex flex-col gap-1.5">
           {/* Price — full width so it never collapses into a vertical stack */}
           <div className="min-w-0">
             <p
@@ -423,7 +423,7 @@ const ProductCard = memo(function ProductCard({
 
           {/* Actions — customer row only; owner manage uses the 3-dot menu above */}
           {!manage && (onFavoriteToggle || (product.is_available && (onAddToCart || onOrder))) ? (
-            <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1 dark:border-zinc-800">
+            <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
               {onFavoriteToggle ? (
                 <button
                   type="button"
@@ -481,9 +481,9 @@ function SkeletonCard() {
         <div className="tm-product-shop">
           <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
         </div>
-        <div className="tm-product-footer flex flex-col gap-1">
+        <div className="tm-product-footer flex flex-col gap-1.5">
           <div className="h-4 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-          <div className="flex items-center justify-between border-t border-zinc-100 pt-1 dark:border-zinc-800">
+          <div className="flex items-center justify-between border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
             <div className="h-5 w-5 animate-pulse rounded-full bg-zinc-100 dark:bg-zinc-800" />
             <div className="h-3 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
           </div>
@@ -523,7 +523,7 @@ export default function ProductGrid({
           ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
           : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 
-  const gap = "gap-2 sm:gap-2.5";
+  const gap = "gap-2.5 sm:gap-3";
 
   if (loading) {
     return (

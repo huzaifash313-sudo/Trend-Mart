@@ -141,7 +141,7 @@ export default function StoreManageActions({ actions }: { actions: StoreManageAc
         aria-label="Add"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="fixed bottom-36 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 md:bottom-24"
+        className="fixed bottom-44 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xl shadow-emerald-900/40 ring-4 ring-white/90 transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 md:bottom-28 dark:ring-zinc-950/70"
       >
         <PlusIcon />
       </button>

@@ -343,6 +343,27 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
   height: 0;
 }
 
+/* Right-edge fade affordance for horizontal scrollers: content dims at the
+   edge so users see there is more without a visible scrollbar. */
+.tm-fade-scroll-x {
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.25rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.25rem), transparent 100%);
+}
+
+/* Placeholder avatar for story / recently-viewed circles when the image is
+   missing — branded gradient + initial so it reads as intentional. */
+.tm-avatar-fallback {
+  background-image: linear-gradient(145deg, #99f6e4 0%, #5eead4 45%, #14b8a6 100%);
+  color: #0f766e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+html.dark .tm-avatar-fallback {
+  background-image: linear-gradient(145deg, #134e4a 0%, #115e59 55%, #0f766e 100%);
+  color: #5eead4;
+}
+
 /* ── Horizontal Overflow Guard ──────────────────────────────────────────────── */
 
 /* Prevent all container elements from overflowing horizontally on mobile. */
@@ -1971,7 +1992,7 @@ html.dark .tm-sponsored-cta {
   content: "";
   display: block;
   width: 100%;
-  padding-bottom: 80%;
+  padding-bottom: 75%;
 }
 html.dark .tm-product-media {
   background: linear-gradient(160deg, #042f2e 0%, #0f172a 100%);
@@ -1993,12 +2014,12 @@ html.dark .tm-product-placeholder {
   flex-shrink: 0;
   min-height: auto;
   min-height: min-content;
-  padding: 0.28rem 0.38rem 0.3rem;
-  gap: 0.14rem;
+  padding: 0.3rem 0.38rem 0.32rem;
+  gap: 0.18rem;
 }
 @media (min-width: 640px) {
   .tm-product-body {
-    padding: 0.32rem 0.42rem 0.34rem;
+    padding: 0.34rem 0.42rem 0.36rem;
   }
 }
 
@@ -2048,7 +2069,7 @@ html.dark .tm-product-title {
   right: 0;
   bottom: 0;
   z-index: 12;
-  height: 1.4rem;
+  height: 1.5rem;
   overflow: hidden;
   pointer-events: none;
   background: linear-gradient(
@@ -2059,6 +2080,9 @@ html.dark .tm-product-title {
   );
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.18);
+  /* Fade text at both edges so mid-animation cuts look intentional, not clipped */
+  mask-image: linear-gradient(90deg, transparent 0, #000 0.8rem, #000 calc(100% - 0.8rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 0.8rem, #000 calc(100% - 0.8rem), transparent 100%);
 }
 .tm-product-offer-track {
   display: flex;

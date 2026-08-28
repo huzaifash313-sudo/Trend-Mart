@@ -553,7 +553,7 @@ function HomeInner() {
                           }
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-base font-bold text-emerald-600 dark:text-emerald-400">
+                        <div className="tm-avatar-fallback h-full w-full text-base font-bold">
                           {initial}
                         </div>
                       )}
