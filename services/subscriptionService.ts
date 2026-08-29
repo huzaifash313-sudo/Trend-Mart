@@ -17,7 +17,20 @@ function toError(err: unknown): string {
   return err instanceof Error ? err.message : "An unexpected error occurred.";
 }
 
-/** Subscription tiers available to merchants. */
+/**
+ * Subscription tiers available to merchants.
+ *
+ * TrendMart runs a SINGLE-Plan model (confirmed business decision):
+ *   • ZERO commission for every merchant (no % cut on orders).
+ *   • One flat monthly fee: Rs 1,000/month.
+ *   • NO product limits, NO storage limits — every shop is effectively unlimited.
+ *   • Free trial = 1 MONTH (30 days), not 14.
+ *   • EVERY merchant gets the same best features (no feature tiers).
+ *
+ * The four enum values are kept for database/schema compatibility (the
+ * `merchant_subscriptions.tier` column may hold legacy values like 'starter'
+ * / 'pro' / 'enterprise'), but they all resolve to the SAME plan config below.
+ */
 export type SubscriptionTier = "free_trial" | "starter" | "pro" | "enterprise";
 
 /** Possible subscription lifecycle statuses. */
@@ -40,77 +53,78 @@ export interface TierConfig {
   priority_support: boolean;
 }
 
-/** Tier configuration lookup table. */
+/* ── Single-Plan constants ─────────────────────────────────────────────── */
+
+/** Flat monthly fee for every paid merchant — Rs 1,000. */
+export const TRENDMART_MONTHLY_FEE_PKR = 1000;
+
+/** Zero commission — TrendMart never takes a % of merchant orders. */
+export const TRENDMART_COMMISSION_PCT = 0;
+
+/** Free trial length — 1 month (30 days). */
+export const TRENDMART_FREE_TRIAL_DAYS = 30;
+
+/** Effectively unlimited product count (100k is beyond any real shop). */
+export const TRENDMART_MAX_PRODUCTS = 100_000;
+
+/** Effectively unlimited storage (100 GB). */
+export const TRENDMART_MAX_STORAGE_MB = 100_000;
+
+/** The full best-feature set — granted to EVERY merchant (paid or trial). */
+export const TRENDMART_ALL_FEATURES = [
+  "basic_storefront",
+  "whatsapp_orders",
+  "advanced_analytics",
+  "coupon_codes",
+  "stories",
+  "csv_export",
+  "inventory_matrix",
+  "variant_manager",
+  "invoice_generator",
+  "api_access",
+  "white_label",
+  "dedicated_support",
+] as const;
+
+/** Single paid plan (Rs 1,000/mo, 0% commission, unlimited, best features). */
+export const TRENDMART_PAID_PLAN: Omit<TierConfig, "name" | "free_trial_days"> = {
+  commission_rate_pct: TRENDMART_COMMISSION_PCT,
+  max_products: TRENDMART_MAX_PRODUCTS,
+  monthly_fee_pkr: TRENDMART_MONTHLY_FEE_PKR,
+  features: [...TRENDMART_ALL_FEATURES],
+  max_storage_mb: TRENDMART_MAX_STORAGE_MB,
+  priority_support: true,
+};
+
+/**
+ * Tier configuration lookup table — every tier resolves to the SAME plan.
+ * The trial is free; all paid tiers share one price/commission/limits.
+ */
 export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
   free_trial: {
-    name: "Free Trial",
-    commission_rate_pct: 10,
-    max_products: 25,
+    name: "Free Trial (1 Month)",
+    commission_rate_pct: TRENDMART_COMMISSION_PCT,
+    max_products: TRENDMART_MAX_PRODUCTS,
     monthly_fee_pkr: 0,
-    free_trial_days: 14,
-    features: ["basic_storefront", "whatsapp_orders", "basic_analytics"],
-    max_storage_mb: 100,
-    priority_support: false,
+    free_trial_days: TRENDMART_FREE_TRIAL_DAYS,
+    features: [...TRENDMART_ALL_FEATURES],
+    max_storage_mb: TRENDMART_MAX_STORAGE_MB,
+    priority_support: true,
   },
   starter: {
-    name: "Starter",
-    commission_rate_pct: 7,
-    max_products: 100,
-    monthly_fee_pkr: 1999,
+    ...TRENDMART_PAID_PLAN,
+    name: "TrendMart Standard",
     free_trial_days: 0,
-    features: [
-      "basic_storefront",
-      "whatsapp_orders",
-      "basic_analytics",
-      "coupon_codes",
-      "stories",
-      "csv_export",
-    ],
-    max_storage_mb: 500,
-    priority_support: false,
   },
   pro: {
-    name: "Pro",
-    commission_rate_pct: 5,
-    max_products: 500,
-    monthly_fee_pkr: 4999,
+    ...TRENDMART_PAID_PLAN,
+    name: "TrendMart Standard",
     free_trial_days: 0,
-    features: [
-      "basic_storefront",
-      "whatsapp_orders",
-      "advanced_analytics",
-      "coupon_codes",
-      "stories",
-      "csv_export",
-      "inventory_matrix",
-      "variant_manager",
-      "invoice_generator",
-    ],
-    max_storage_mb: 2000,
-    priority_support: true,
   },
   enterprise: {
-    name: "Enterprise",
-    commission_rate_pct: 3,
-    max_products: 5000,
-    monthly_fee_pkr: 14999,
+    ...TRENDMART_PAID_PLAN,
+    name: "TrendMart Standard",
     free_trial_days: 0,
-    features: [
-      "basic_storefront",
-      "whatsapp_orders",
-      "advanced_analytics",
-      "coupon_codes",
-      "stories",
-      "csv_export",
-      "inventory_matrix",
-      "variant_manager",
-      "invoice_generator",
-      "api_access",
-      "white_label",
-      "dedicated_support",
-    ],
-    max_storage_mb: 10000,
-    priority_support: true,
   },
 };
 
