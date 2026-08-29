@@ -121,6 +121,47 @@ Admin khud "house ads" bana sakta hai (`shop_id = NULL`, pre-approved) — e.g. 
 
 ---
 
+## 5B. Story Feature — WhatsApp-Style (UPDATED 2026-08-29)
+
+**User decision:** Stories ko poora WhatsApp/Instagram jaisa banana hai — top par stories dikhti rahen, aur nayi story **bottom-nav ke + se** lag sakti hai.
+
+### Jo code me kiya
+| Change | File |
+|---|---|
+| Bottom-nav ka **+ button ab WhatsApp-style action sheet** kholta hai (merchants ke liye): **New Story** sabse upar, phir Add Product, Bulk Add, Add Deal, Add Coupon. Har option quick-add modal ko us tab ke saath kholta hai | `components/BottomNav.tsx` |
+| Action sheet backdrop + route badalne par auto-close | `components/BottomNav.tsx` |
+| **Story viewer me "Delete my story"** — merchant apni story viewer me hi delete kar sakta hai (confirm ke saath), like WhatsApp status | `components/StoriesViewer.tsx` |
+| **Story viewer me time-ago badge** (5m · 2h · 1d) — WhatsApp jaisa | `components/StoriesViewer.tsx` |
+| Homepage se `myShopId` StoriesViewer ko pass hota hai taake delete sirf apni stories par aaye | `components/HomeClient.tsx` |
+| (Pehle se) Stories unlimited + free; posting par homepage tray instantly refresh (`trendmart:stories-updated` event) | `services/storyService.ts`, `HomeClient.tsx` |
+
+### Story flow (ab kaise chalta hai)
+1. Merchant bottom-nav ka **+** dabata hai → action sheet → **New Story**.
+2. Story image upload + caption → **Post story**.
+3. Story turant homepage ke top par "Your story" ring + public tray me appear hoti hai (24 hours).
+4. Viewer me apni story par trash icon → delete.
+5. Customer ke liye: tray par unseen ring, viewer me swipe/tap/hold-pause/progress — sab WhatsApp jaisa.
+
+---
+
+## 5C. Products / Images — Cloudinary Block Check (UPDATED 2026-08-29)
+
+### Code me verified — images BLOCKED NAHI hain
+- `next.config.ts` → `images.remotePatterns` me `**.cloudinary.com` ✓ (next/image Cloudinary par kaam karta hai).
+- CSP (`img-src 'self' data: https: blob:`) → Cloudinary CDN URLs load hote hain ✓.
+- Product images `getSafeImageUrl()` + `onError` fallback se render hoti hain ✓.
+- Upload: Cloudinary unsigned preset se; agar Cloudinary fail ho to **automatically Supabase Storage par fallback** (merchant ka upload kabhi naheen toota) ✓.
+
+### Aapko ek baar verify karo (dashboard settings)
+1. **Cloudinary dashboard** → Settings → Upload → **Unsigned preset** banao aur wo `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` me daalo (mode = Unsigned, folder allowed).
+2. Agar DB me product image URL `supabase.co/storage/...` jaisa hai, to Cloudinary upload fail ho kar fallback use hua hai — preset check karo.
+3. Delete ke liye server env: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
+4. Demo/seed images (Unsplash/themealdb) bhi remotePatterns me hain — wo load hoti hain.
+
+> **Note:** Is machine par terminal sandbox na hone ki wajah se `npm run build` nahi chal saka — ye sab changes careful review ke baad likhe hain. Build/test locally zaroor chalao.
+
+---
+
 
 
 ## 6. Status — Sab Theek Hai?

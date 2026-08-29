@@ -738,6 +738,7 @@ function HomeClient({
         <StoriesViewer
           stories={storyViewerList}
           initialIndex={selectedStoryIndex}
+          myShopId={myShopId}
           onClose={() => {
             setStoryViewerOpen(false);
             setStoriesVersion((v) => v + 1);

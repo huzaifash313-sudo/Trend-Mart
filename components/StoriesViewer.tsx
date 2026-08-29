@@ -8,9 +8,11 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { Story } from "@/types";
-import { fetchActiveStories } from "@/services/storyService";
+import { fetchActiveStories, deleteStory } from "@/services/storyService";
 import { getSafeImageUrl } from "@/services/storageService";
 import { markStoryViewed, sortStoriesUnseenFirst } from "@/lib/storyViewed";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -25,12 +27,37 @@ function CloseIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
 function ShoppingBagIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />
     </svg>
   );
+}
+
+/** Compact "time ago" (WhatsApp-style: 5m · 2h · 1d). */
+function timeAgo(dateStr?: string): string {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (!Number.isFinite(diff) || diff < 0) return "";
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return "now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(dateStr).toLocaleDateString("en-PK", { day: "numeric", month: "short" });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -69,6 +96,8 @@ interface StoriesViewerProps {
   initialIndex?: number;
   /** Prefer parent-sorted list so tray order matches viewer */
   stories?: Story[];
+  /** The merchant's own shop id — enables "Delete my story" in the viewer. */
+  myShopId?: string | null;
   onClose: () => void;
 }
 
@@ -80,14 +109,18 @@ const SWIPE_THRESHOLD = 50;
 export default function StoriesViewer({
   initialIndex = 0,
   stories: storiesProp,
+  myShopId,
   onClose,
 }: StoriesViewerProps) {
   const router = useRouter();
+  const { confirm } = useConfirm();
+  const { addToast } = useToast();
   const [stories, setStories] = useState<Story[]>(storiesProp ?? []);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(!storiesProp?.length);
+  const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
 
   const storiesRef = useRef<Story[]>([]);
   const currentIndexRef = useRef(initialIndex);
@@ -172,6 +205,40 @@ export default function StoriesViewer({
     const story = stories[currentIndex];
     if (story?.id) markStoryViewed(story.id);
   }, [stories, currentIndex]);
+
+  /* Delete the merchant's OWN story from the viewer (WhatsApp-style) */
+  const handleDeleteOwnStory = useCallback(async () => {
+    const story = storiesRef.current[currentIndexRef.current];
+    if (!story || deletingStoryId) return;
+    const ok = await confirm({
+      title: "Delete story?",
+      message: "Your story will be removed from the homepage immediately.",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setDeletingStoryId(story.id);
+    const result = await deleteStory(story.id);
+    setDeletingStoryId(null);
+    if (result.success) {
+      const remaining = storiesRef.current.filter((s) => s.id !== story.id);
+      if (remaining.length === 0) {
+        onCloseRef.current();
+        return;
+      }
+      // Stay on the same index but clamp so the next story fills the screen.
+      const nextIndex = Math.min(currentIndexRef.current, remaining.length - 1);
+      elapsedRef.current = 0;
+      setProgress(0);
+      setStories(remaining);
+      setCurrentIndex(nextIndex);
+      window.dispatchEvent(new Event("trendmart:stories-updated"));
+      addToast("Story deleted.", "success");
+    } else {
+      addToast(result.error, "error");
+    }
+  }, [confirm, addToast, deletingStoryId]);
 
   /* Preload the next story's image so transitions feel instant */
   useEffect(() => {
@@ -369,15 +436,41 @@ export default function StoriesViewer({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white drop-shadow">
-                {shopLabel}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-sm font-semibold text-white drop-shadow">
+                  {shopLabel}
+                </p>
+                {current.created_at ? (
+                  <span className="shrink-0 rounded-full bg-black/30 px-1.5 py-0.5 text-[9px] font-semibold text-white/80 backdrop-blur-sm">
+                    {timeAgo(current.created_at)}
+                  </span>
+                ) : null}
+              </div>
               {current.caption ? (
                 <p className="truncate text-[11px] text-white/75 drop-shadow">
                   {current.caption}
                 </p>
               ) : null}
             </div>
+            {myShopId && current.shop_id === myShopId ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleDeleteOwnStory();
+                }}
+                disabled={deletingStoryId === current.id}
+                className="rounded-full bg-black/35 p-2 text-white backdrop-blur-sm transition hover:bg-rose-600/80 disabled:opacity-50"
+                aria-label="Delete my story"
+                title="Delete story"
+              >
+                {deletingStoryId === current.id ? (
+                  <span className="block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <TrashIcon />
+                )}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={(e) => {

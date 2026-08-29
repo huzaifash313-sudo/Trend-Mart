@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMyShop } from "@/services/shopService";
 import { detectUserRole, type AuthRole } from "@/services/authService";
-import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
+import {
+  useMerchantQuickAdd,
+  type QuickAddTab,
+} from "@/context/MerchantQuickAddContext";
 import type { User } from "@supabase/supabase-js";
 
 /* -------------------------------------------------------------------------- */
@@ -59,6 +62,101 @@ function PlusIcon() {
   );
 }
 
+/* ── Quick-action icons (WhatsApp-style + menu) ─────────────────────────── */
+
+function StoryIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
+function TagIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function LayersIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  );
+}
+
+function TicketIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" />
+      <path d="M13 5v2" />
+      <path d="M13 17v2" />
+      <path d="M13 11v2" />
+    </svg>
+  );
+}
+
+function CloseSmallIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+/** WhatsApp-style quick actions shown when a merchant taps the + button. */
+const MERCHANT_QUICK_ACTIONS: {
+  tab: QuickAddTab;
+  label: string;
+  hint: string;
+  icon: ReactNode;
+  iconClass: string;
+}[] = [
+  {
+    tab: "story",
+    label: "New Story",
+    hint: "Post a photo update for 24h",
+    icon: <StoryIcon />,
+    iconClass: "bg-gradient-to-br from-emerald-500 to-teal-600 text-white",
+  },
+  {
+    tab: "product",
+    label: "Add Product",
+    hint: "List a single item fast",
+    icon: <PlusIcon />,
+    iconClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  },
+  {
+    tab: "bulk",
+    label: "Bulk Add",
+    hint: "Upload many products at once",
+    icon: <LayersIcon />,
+    iconClass: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
+  },
+  {
+    tab: "deal",
+    label: "Add Deal",
+    hint: "Offer a discount / deal",
+    icon: <TagIcon />,
+    iconClass: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  },
+  {
+    tab: "coupon",
+    label: "Add Coupon",
+    hint: "Create a promo code",
+    icon: <TicketIcon />,
+    iconClass: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+  },
+];
+
 /* -------------------------------------------------------------------------- */
 /*  BottomNav — Home | Deals | Add/Store | Products | Account                 */
 /* -------------------------------------------------------------------------- */
@@ -73,6 +171,7 @@ export default function BottomNav() {
   const [role, setRole] = useState<AuthRole | "admin" | null>(null);
   const [merchantShop, setMerchantShop] = useState<{ id: string; category: string } | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
 
   // Hide the fixed bottom nav while the on-screen keyboard is open, so it never
   // floats over the keyboard or covers the filter/sort row while typing.
@@ -90,6 +189,12 @@ export default function BottomNav() {
       window.removeEventListener("resize", check);
     };
   }, []);
+
+  // Close the quick-action sheet on navigation (it would otherwise float over
+  // the next page's bottom nav).
+  useEffect(() => {
+    setShowQuickActions(false);
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,9 +330,25 @@ export default function BottomNav() {
     pathname === "/login" ||
     pathname === "/signup";
 
+  const runQuickAdd = useCallback(
+    (tab: QuickAddTab) => {
+      setShowQuickActions(false);
+      if (merchantShop) {
+        openQuickAdd({
+          shopId: merchantShop.id,
+          shopCategory: merchantShop.category,
+          tab,
+        });
+      }
+    },
+    [merchantShop, openQuickAdd],
+  );
+
   const handleCenterAdd = () => {
     if (merchantShop) {
-      openQuickAdd({ shopId: merchantShop.id, shopCategory: merchantShop.category, tab: "product" });
+      // WhatsApp-style: the + opens a quick-action menu (New Story first) so a
+      // merchant can post a story or add products/deals/coupons from anywhere.
+      setShowQuickActions((v) => !v);
       return;
     }
     if (session && isMerchant) {
@@ -256,7 +377,7 @@ export default function BottomNav() {
         ? "Post"
         : "Store";
   const centerAria = merchantShop
-    ? "Add product"
+    ? "Open store quick actions (story, product, deal, coupon)"
     : session === null
       ? "Add product"
       : session && isMerchant
@@ -327,6 +448,60 @@ export default function BottomNav() {
           <span>{accountLabel}</span>
         </Link>
       </div>
+
+      {/* ── WhatsApp-style quick-action sheet (merchant + button) ──────── */}
+      {showQuickActions && merchantShop ? (
+        <>
+          <div
+            className="fixed inset-0 z-[110] bg-black/45 backdrop-blur-[2px]"
+            onClick={() => setShowQuickActions(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed bottom-[5.5rem] left-1/2 z-[120] w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
+            role="dialog"
+            aria-label="Store quick actions"
+          >
+            <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
+              <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Add to your store
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowQuickActions(false)}
+                className="rounded-full p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                aria-label="Close quick actions"
+              >
+                <CloseSmallIcon />
+              </button>
+            </div>
+            <div className="p-1.5">
+              {MERCHANT_QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.tab}
+                  type="button"
+                  onClick={() => runQuickAdd(action.tab)}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-zinc-50 active:scale-[0.98] dark:hover:bg-zinc-800"
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${action.iconClass}`}
+                  >
+                    {action.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                      {action.label}
+                    </span>
+                    <span className="block truncate text-[0.68rem] text-zinc-400 dark:text-zinc-500">
+                      {action.hint}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
     </nav>
   );
 }
