@@ -87,7 +87,8 @@ const FONT_SCALE_MAX = 20;
 function normalizeMode(raw: unknown): ThemeMode {
   if (raw === "dark") return "dark";
   if (raw === "light") return "light";
-  // "system" and unknown values fall back to explicit light (platform default).
+  if (raw === "system") return "system";
+  // Unknown values fall back to explicit light (platform default).
   return "light";
 }
 

@@ -23,8 +23,10 @@ import {
   type FormEvent,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
+import { logAuditEventWithContext } from "@/services/auditService";
 import { subscribeToPlatformTransactions } from "@/services/notificationService";
 import type {
   PlatformMetrics,
@@ -125,7 +127,42 @@ const EMPTY_AD_FORM: PromotionalAdFormData = {
 
 export default function AdminDashboardPage() {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const { confirm, prompt } = useConfirm();
+
+  // ── Defense-in-depth client-side admin gate (middleware + RLS already
+  //    protect /admin/*; this mirrors the support & audit-logs pages so a
+  //    misconfigured matcher can never expose admin data/mutations).
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkAccess() {
+      const { data: userData } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!userData.user) {
+        router.replace("/auth");
+        return;
+      }
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userData.user.id)
+        .single();
+      if (cancelled) return;
+      if (roleData?.role !== "admin") {
+        router.replace("/dashboard");
+        return;
+      }
+      setIsAdmin(true);
+      setAuthLoading(false);
+    }
+    checkAccess();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, router]);
 
   const [state, setState] = useState<AdminDashboardState>({
     metrics: null,
@@ -184,6 +221,7 @@ export default function AdminDashboardPage() {
 
   // ─── Fetch All Data ─────────────────────────────────────────────────────
   useEffect(() => {
+    if (!isAdmin) return;
     async function fetchAllData() {
       setState((s) => ({ ...s, loading: true, error: null }));
 
@@ -396,7 +434,7 @@ export default function AdminDashboardPage() {
     }
 
     fetchAllData();
-  }, [supabase]);
+  }, [supabase, isAdmin]);
 
   // ─── Realtime Transaction Feed ─────────────────────────────────────────
   useEffect(() => {
@@ -589,6 +627,19 @@ export default function AdminDashboardPage() {
           : "Merchant verified & activated.",
       );
       setTimeout(() => setActionMessage(null), 3000);
+
+      // Security trail: record the suspend/activate action.
+      void logAuditEventWithContext({
+        eventType: currentLive ? "merchant.suspended" : "merchant.activated",
+        targetType: "shop",
+        targetId: shopId,
+        description: currentLive
+          ? `Merchant suspended (shop ${shopId}).`
+          : `Merchant activated (shop ${shopId}).`,
+        oldValue: { is_live: currentLive },
+        newValue: { is_live: !currentLive },
+        severity: currentLive ? "warning" : "info",
+      });
     } catch (err) {
       logError(err, { module: "AdminDashboard.toggleStatus" });
       setActionMessage("Action failed. Please try again.");
@@ -663,6 +714,21 @@ export default function AdminDashboardPage() {
           : "Store rejected. It will remain hidden from customers.",
       );
       setTimeout(() => setActionMessage(null), 3000);
+
+      // Security trail: record the approval/rejection decision.
+      void logAuditEventWithContext({
+        eventType:
+          decision === "approved" ? "merchant.approved" : "merchant.rejected",
+        targetType: "shop",
+        targetId: shopId,
+        description:
+          decision === "approved"
+            ? `Store ${shopId} approved by admin.`
+            : `Store ${shopId} rejected by admin.`,
+        oldValue: { verification_status: "pending" },
+        newValue: { verification_status: decision },
+        severity: decision === "approved" ? "info" : "warning",
+      });
     } catch (err) {
       logError(err, { module: "AdminDashboard.reviewShop" });
       setActionMessage("Action failed. Please try again.");
@@ -726,6 +792,17 @@ export default function AdminDashboardPage() {
 
       setActionMessage("Merchant deleted permanently.");
       setTimeout(() => setActionMessage(null), 3000);
+
+      // Security trail: merchant deletion is the most destructive admin action.
+      void logAuditEventWithContext({
+        eventType: "merchant.deleted",
+        targetType: "shop",
+        targetId: shopId,
+        description: `Merchant store "${shopName}" (${shopId}) permanently deleted by admin.`,
+        oldValue: { name: shopName },
+        newValue: null,
+        severity: "critical",
+      });
     } catch (err) {
       logError(err, { module: "AdminDashboard.deleteMerchant" });
       setActionMessage("Delete failed. Please try again.");
@@ -845,6 +922,17 @@ export default function AdminDashboardPage() {
       );
       setActionMessage(nextBanned ? "User banned." : "User unbanned.");
       setTimeout(() => setActionMessage(null), 3000);
+
+      // Security trail: user moderation actions.
+      void logAuditEventWithContext({
+        eventType: nextBanned ? "user.banned" : "user.unbanned",
+        targetType: "user",
+        targetId: user.user_id,
+        description: `${nextBanned ? "Banned" : "Unbanned"} user ${user.full_name || user.email || user.user_id}.`,
+        oldValue: { is_banned: !nextBanned },
+        newValue: { is_banned: nextBanned },
+        severity: nextBanned ? "warning" : "info",
+      });
     } else {
       setActionMessage(result.error);
       setTimeout(() => setActionMessage(null), 4000);
@@ -853,6 +941,24 @@ export default function AdminDashboardPage() {
   }
 
   // ─── Render ─────────────────────────────────────────────────────────────
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)] flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            Checking admin access…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    // Redirect is in-flight — render nothing to avoid flashing admin UI.
+    return null;
+  }
+
   if (state.loading) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)] p-6">

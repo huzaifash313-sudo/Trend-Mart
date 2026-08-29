@@ -275,6 +275,88 @@ export function createUpstashAdapter(upstashClient: {
   };
 }
 
+/**
+ * Dependency-free Upstash Redis REST adapter.
+ *
+ * Uses the Upstash REST API directly (Bearer-token auth) so the distributed
+ * rate limiter can engage WITHOUT adding the `@upstash/redis` package. The
+ * non-atomic INC+EXPIRE path is slightly racy under extreme concurrency but
+ * is a massive upgrade over the per-isolate in-memory fallback (which resets
+ * on every Vercel cold start). Atomic Lua EVAL remains available when the SDK
+ * is used instead via `createUpstashAdapter`.
+ */
+export function createUpstashRestStore(
+  restUrl: string,
+  restToken: string,
+): RedisLikeStore {
+  const base = restUrl.replace(/\/+$/, "");
+  const call = async (path: string): Promise<unknown> => {
+    const res = await fetch(`${base}${path}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${restToken}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      throw new Error(`Upstash REST ${res.status}`);
+    }
+    const data: unknown = await res.json().catch(() => null);
+    if (Array.isArray(data)) return data[1];
+    if (data && typeof data === "object" && "result" in data) {
+      return (data as { result: unknown }).result;
+    }
+    return data;
+  };
+
+  return {
+    async get(key) {
+      const value = await call(`/get/${encodeURIComponent(key)}`);
+      return value == null ? null : String(value);
+    },
+    async set(key, value, opts) {
+      const ttl = opts?.ex ? `/ex/${opts.ex}` : "";
+      const result = await call(
+        `/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}${ttl}`,
+      );
+      return result === "OK" ? "OK" : null;
+    },
+    async incr(key) {
+      const result = await call(`/incr/${encodeURIComponent(key)}`);
+      return typeof result === "number" ? result : Number(result) || 0;
+    },
+    async expire(key, seconds) {
+      const result = await call(
+        `/expire/${encodeURIComponent(key)}/${Math.max(1, Math.round(seconds))}`,
+      );
+      return typeof result === "number" ? result : Number(result) || 0;
+    },
+    async del(key) {
+      const result = await call(`/del/${encodeURIComponent(key)}`);
+      return typeof result === "number" ? result : Number(result) || 0;
+    },
+  };
+}
+
+/**
+ * Bootstraps the distributed limiter from env vars when present (safe no-op
+ * otherwise). Call once during app/middleware startup.
+ */
+export function bootstrapDistributedRateLimiter(): void {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return;
+  try {
+    configureDistributedRateLimiter(createUpstashRestStore(url, token));
+    console.info(
+      "[TrendMart] Distributed rate limiter engaged (Upstash REST).",
+    );
+  } catch (err) {
+    console.warn(
+      "[TrendMart] Failed to initialise distributed rate limiter — using in-memory fallback.",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 // ─── API Route Wrapper ───────────────────────────────────────────────────────
 
 export function withDistributedRateLimit(

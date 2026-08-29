@@ -6,9 +6,15 @@
 /*  ships real content instead of skeletons, and seeds the client React Query  */
 /*  cache with `initialData` (no duplicate network round-trip).                */
 /*                                                                             */
-/*  Deals / coupons deliberately stay client-side (non-blocking enrichment).   */
+/*  SCALABILITY: the public catalog (shops + stories) is cached for 5 minutes  */
+/*  with `unstable_cache` using a plain anon client (no cookies), so 1,000s of */
+/*  concurrent anonymous homepage hits are served from the Next.js data cache  */
+/*  instead of hammering Supabase. Only the per-request merchant-shop lookup   */
+/*  (which needs auth cookies) stays dynamic.                                  */
 /* -------------------------------------------------------------------------- */
 
+import { unstable_cache } from "next/cache";
+import { createClient as createAnonClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { Shop, Story } from "@/types";
 
@@ -19,6 +25,16 @@ export interface HomeInitialData {
    *  into the public grid before the client auth query resolves. */
   myShopId: string | null;
 }
+
+/** Anon-only client for cacheable public queries — no cookies, no session. */
+function createPublicClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  if (!url || !key) return null;
+  return createAnonClient(url, key, { auth: { persistSession: false } });
+}
+
+type AnonClient = ReturnType<typeof createAnonClient>;
 
 /** Mirrors `shopService.fetchShops({ publicOnly: true })` row shape. */
 const SHOP_LIST_SELECT = [
@@ -48,7 +64,7 @@ const SHOP_LIST_SELECT = [
   "created_at",
 ].join(", ");
 
-async function fetchPublicShops(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Shop[]> {
+async function fetchPublicShops(supabase: AnonClient): Promise<Shop[]> {
   try {
     const query = supabase
       .from("shops")
@@ -78,7 +94,7 @@ async function fetchPublicShops(supabase: Awaited<ReturnType<typeof createClient
 }
 
 /** Mirrors `storyService.fetchActiveStories()` (join + mapping). */
-async function fetchActiveStories(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Story[]> {
+async function fetchActiveStories(supabase: AnonClient): Promise<Story[]> {
   try {
     const withShop = await supabase
       .from("stories")
@@ -128,6 +144,25 @@ async function fetchActiveStories(supabase: Awaited<ReturnType<typeof createClie
   }
 }
 
+/**
+ * Cached public catalog — served from the data cache for 5 minutes.
+ * Wrapped functions must not touch request-scoped APIs (cookies), so they use
+ * the anon-only client. Safe to call on every homepage request.
+ */
+const getCachedCatalog = unstable_cache(
+  async (): Promise<{ shops: Shop[]; stories: Story[] }> => {
+    const supabase = createPublicClient();
+    if (!supabase) return { shops: [], stories: [] };
+    const [shops, stories] = await Promise.all([
+      fetchPublicShops(supabase),
+      fetchActiveStories(supabase),
+    ]);
+    return { shops, stories };
+  },
+  ["home-catalog-v1"],
+  { revalidate: 300 }, // 5 minutes
+);
+
 /** Resolve the requesting merchant's own shop id (auth-cookie aware). */
 async function fetchMyShopId(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {
   try {
@@ -150,11 +185,28 @@ async function fetchMyShopId(supabase: Awaited<ReturnType<typeof createClient>>)
 
 /** Fetch everything the homepage needs for a content-rich first paint. */
 export async function fetchHomeInitialData(): Promise<HomeInitialData> {
-  const supabase = await createClient();
-  const [shops, stories, myShopId] = await Promise.all([
-    fetchPublicShops(supabase),
-    fetchActiveStories(supabase),
-    fetchMyShopId(supabase),
+  const [{ shops, stories }, myShopId] = await Promise.all([
+    getCachedCatalog(),
+    fetchMyShopIdWithCookieCheck(),
   ]);
   return { shops, stories, myShopId };
+}
+
+/**
+ * Request-scoped wrapper: only performs the auth getUser() when a Supabase
+ * session cookie is actually present (guests skip straight to null).
+ */
+async function fetchMyShopIdWithCookieCheck(): Promise<string | null> {
+  try {
+    const { cookies } = await import("next/headers");
+    const store = await cookies();
+    const hasAuthCookie = store
+      .getAll()
+      .some((c) => c.name.startsWith("sb-") && c.value.length > 0);
+    if (!hasAuthCookie) return null;
+    const supabase = await createClient();
+    return fetchMyShopId(supabase);
+  } catch {
+    return null;
+  }
 }

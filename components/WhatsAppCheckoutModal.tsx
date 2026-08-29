@@ -979,9 +979,6 @@ export default function WhatsAppCheckoutModal({
         "Order request timed out. Please check your connection and try again.",
       );
 
-      // Debuggability: log the raw API result so a "stuck" order is traceable.
-      console.log("[Checkout] createOrder response:", orderResult);
-
       if (!orderResult.success) {
         throw new Error(orderResult.error);
       }
@@ -1049,7 +1046,11 @@ export default function WhatsAppCheckoutModal({
         setStep("success");
       }
     } catch (err) {
-      console.error("[Checkout] Order failed:", err);
+      // Keep the console error message-only (no customer PII in dev logs).
+      console.error(
+        "[Checkout] Order failed:",
+        err instanceof Error ? err.message : "Unknown error",
+      );
       setOrderError(
         err instanceof Error
           ? err.message

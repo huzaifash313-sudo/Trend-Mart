@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { generateShopMetadata } from "@/lib/metadata";
+import { generateShopMetadata, absoluteUrl } from "@/lib/metadata";
+import { getShopPath } from "@/lib/shopSlug";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -16,7 +17,9 @@ async function loadShopMeta(idOrSlug: string) {
       );
     const q = supabase
       .from("shops")
-      .select("id, name, slug, category, location, store_bio, logo_url, banner_url")
+      .select(
+        "id, name, slug, category, location, store_bio, logo_url, banner_url, latitude, longitude, whatsapp_number, business_hours",
+      )
       .eq("is_live", true)
       .limit(1);
     const { data } = uuid
@@ -31,11 +34,24 @@ async function loadShopMeta(idOrSlug: string) {
       store_bio?: string | null;
       logo_url?: string | null;
       banner_url?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      whatsapp_number?: string | null;
+      business_hours?: string | null;
     } | null;
   } catch {
     return null;
   }
 }
+
+/** Map TrendMart categories to Schema.org business types. */
+const CATEGORY_TO_SCHEMA_TYPE: Record<string, string> = {
+  Food: "Restaurant",
+  Grocery: "GroceryStore",
+  Boutique: "ClothingStore",
+  Electronics: "ElectronicsStore",
+  Cosmetics: "HealthAndBeautyBusiness",
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -58,6 +74,84 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default function ShopLayout({ children }: { children: React.ReactNode }) {
-  return children;
+/**
+ * Server-rendered JSON-LD so Google/AI assistants see LocalBusiness structured
+ * data in the raw HTML (not after hydration). Includes geo coordinates and
+ * service radius — the strongest "burger near Gujranwala" local-ranking signal.
+ */
+function LocalBusinessJsonLd({
+  shop,
+}: {
+  shop: NonNullable<Awaited<ReturnType<typeof loadShopMeta>>>;
+}) {
+  const schemaType = shop.category
+    ? CATEGORY_TO_SCHEMA_TYPE[shop.category] || "LocalBusiness"
+    : "LocalBusiness";
+  const url = absoluteUrl(
+    getShopPath({
+      id: shop.id,
+      name: shop.name,
+      slug: shop.slug ?? null,
+    }),
+  );
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": schemaType,
+    name: shop.name,
+    description:
+      shop.store_bio ||
+      `${shop.name} — ${shop.category || "Local Business"} in ${shop.location || "Pakistan"}. Shop online and order via WhatsApp.`,
+    url,
+    ...(shop.logo_url ? { image: shop.logo_url } : {}),
+    ...(shop.whatsapp_number
+      ? { telephone: shop.whatsapp_number }
+      : {}),
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: shop.location || undefined,
+      addressCountry: "PK",
+    },
+    ...(shop.latitude != null && shop.longitude != null
+      ? {
+          geo: {
+            "@type": "GeoCoordinates",
+            latitude: shop.latitude,
+            longitude: shop.longitude,
+          },
+        }
+      : {}),
+    ...(shop.business_hours
+      ? {
+          openingHoursSpecification: [
+            {
+              "@type": "OpeningHoursSpecification",
+              description: shop.business_hours,
+            },
+          ],
+        }
+      : {}),
+  };
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+
+export default async function ShopLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const shop = await loadShopMeta(decodeURIComponent(id));
+  return (
+    <>
+      {shop ? <LocalBusinessJsonLd shop={shop} /> : null}
+      {children}
+    </>
+  );
 }

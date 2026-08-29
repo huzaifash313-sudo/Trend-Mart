@@ -15,7 +15,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
-import { getDistributedRateLimiter } from "@/lib/rateLimiterRedis";
+import {
+  getDistributedRateLimiter,
+  bootstrapDistributedRateLimiter,
+} from "@/lib/rateLimiterRedis";
+
+// Engage the distributed (Upstash) rate limiter when configured — safe no-op
+// without env vars, in which case the per-isolate in-memory fallback applies.
+bootstrapDistributedRateLimiter();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRENDMART MIDDLEWARE — v2.0 FIXED

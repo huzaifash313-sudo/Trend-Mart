@@ -134,6 +134,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "This shop is not accepting orders yet." }, { status: 409 });
   }
 
+  // ── Staff security: "staff" orders must be placed by the shop owner or a
+  //    platform admin. Anyone could previously POST { source: "staff" } to
+  //    bypass the per-table cooldown and spam the kitchen.
+  if (isStaff) {
+    let staffApproved = false;
+    try {
+      const adminRpc = admin.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: unknown }>;
+      const { createClient: createServerSupabaseClient } = await import("@/lib/supabase/server");
+      const supabaseServer = await createServerSupabaseClient();
+      const { data: { user } } = await supabaseServer.auth.getUser();
+      if (user?.id && shop.owner_id && user.id === shop.owner_id) {
+        staffApproved = true;
+      } else if (user?.id) {
+        const { data: isAdmin } = await adminRpc("is_admin", { p_user_id: user.id });
+        staffApproved = isAdmin === true;
+      }
+    } catch {
+      staffApproved = false;
+    }
+    if (!staffApproved) {
+      return NextResponse.json(
+        { success: false, error: "You don't have permission to place staff orders here." },
+        { status: 403 },
+      );
+    }
+  }
+
   // 2. Normalise + authoritatively price the items (must belong to this shop).
   const lines: Array<{ productId: string; name: string; quantity: number; variant?: string; notes?: string }> = [];
   for (const raw of body.items) {

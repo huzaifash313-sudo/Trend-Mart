@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { formatRupees } from "@/lib/formatters";
+import { priceForQuantity } from "@/lib/priceTiers";
 import WhatsAppCheckoutModal from "@/components/WhatsAppCheckoutModal";
 import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import type { Shop } from "@/types";
@@ -101,7 +102,9 @@ function groupItemsByShop(items: CartItem[]): ShopGroup[] {
     }
     const group = map.get(key)!;
     group.items.push(item);
-    group.subtotal += item.price * item.quantity;
+    // Tier-aware: pack/unit quantity pricing must match the store's total
+    // (e.g. "6 = Rs 1100" is never billed as 6 × 200). Mirrors cartStore.totalAmount.
+    group.subtotal += priceForQuantity(item.price, item.priceTiers ?? null, item.quantity);
   }
   return Array.from(map.values());
 }

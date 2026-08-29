@@ -710,10 +710,13 @@ export async function POST(request: Request) {
   //     (coupon increment / stock deduction) so a retry or double-click can
   //     never double-spend a coupon or double-deduct stock.
   if (idempotencyKey) {
+    // Scoped to the signed-in user: a leaked token can never be replayed to
+    // read another customer's order (name, phone, items).
     const { data: existing } = await admin
       .from("orders")
       .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, subtotal_amount, delivery_fee, discount_amount, coupon_code, order_type, status, created_at, updated_at")
       .eq("client_token", idempotencyKey)
+      .eq("customer_user_id", user.id)
       .maybeSingle();
     if (existing) {
       const prior = existing as Record<string, unknown>;
@@ -872,6 +875,52 @@ export async function POST(request: Request) {
     .insert(orderPayload as never)
     .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, status, created_at, updated_at, order_type")
     .single();
+
+  // Concurrent-duplicate race: both requests passed the idempotency check, but
+  // the DB unique index on client_token only lets one insert through. Return
+  // the winning order instead of a confusing 500.
+  if (
+    insertErr &&
+    idempotencyKey &&
+    /23505|duplicate key|unique constraint/i.test(insertErr.message || "")
+  ) {
+    const { data: existing } = await admin
+      .from("orders")
+      .select("id, shop_id, customer_name, customer_phone, items_json, total_amount, subtotal_amount, delivery_fee, discount_amount, coupon_code, order_type, status, created_at, updated_at")
+      .eq("client_token", idempotencyKey)
+      .eq("customer_user_id", user.id)
+      .maybeSingle();
+    if (existing) {
+      const prior = existing as Record<string, unknown>;
+      const priorOrderType = String(prior.order_type ?? "delivery");
+      const order: Order = {
+        id: String(prior.id),
+        shop_id: String(prior.shop_id),
+        customer_name: String(prior.customer_name ?? ""),
+        customer_phone: String(prior.customer_phone ?? ""),
+        items_json: (prior.items_json as OrderItem[]) ?? [],
+        total_amount: toNumber(prior.total_amount, 0),
+        status: (prior.status as Order["status"]) ?? "Pending",
+        order_type:
+          priorOrderType === "pickup" || priorOrderType === "dine_in"
+            ? (priorOrderType as "pickup" | "dine_in")
+            : "delivery",
+        subtotal_amount:
+          prior.subtotal_amount == null ? undefined : toNumber(prior.subtotal_amount, 0),
+        delivery_fee:
+          prior.delivery_fee == null ? undefined : toNumber(prior.delivery_fee, 0),
+        discount_amount:
+          prior.discount_amount == null ? undefined : toNumber(prior.discount_amount, 0),
+        coupon_code:
+          typeof prior.coupon_code === "string" && prior.coupon_code.trim()
+            ? prior.coupon_code.trim()
+            : undefined,
+        created_at: String(prior.created_at ?? new Date().toISOString()),
+        updated_at: prior.updated_at as string | undefined,
+      };
+      return NextResponse.json({ success: true, order });
+    }
+  }
 
   // Older DBs may lack the money-breakdown / coupon_code columns — retry with
   // core fields so checkout still works and coupon orders don't 500.

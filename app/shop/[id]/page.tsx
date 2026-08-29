@@ -50,12 +50,6 @@ import {
   normalizeFacebookUrl,
   tikTokProfileUrl,
 } from "@/lib/socialLinks";
-import {
-  LocalBusinessSchema,
-  BreadcrumbListSchema,
-} from "@/components/SeoSchema";
-import { absoluteUrl } from "@/lib/metadata";
-import { getShopPath } from "@/lib/shopSlug";
 import { subscribeToProducts } from "@/lib/supabase/realtime";
 import ServiceBookingModal, { type ServicePackageItem } from "@/components/ServiceBookingModal";
 import AvailabilitySchedule, { type AvailabilityDay } from "@/components/AvailabilitySchedule";
@@ -898,29 +892,6 @@ function ShopDetailInner({ id }: { id: string }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 space-y-3 px-3 py-3 pb-3 md:space-y-4 md:px-4 md:py-5 md:pb-6">
-      {shop ? (
-        <>
-          <LocalBusinessSchema
-            shopName={shop.name}
-            shopDescription={
-              shop.store_bio ||
-              `${shop.name} — ${shop.category} in ${shop.location}. Order via WhatsApp on TrendMart.`
-            }
-            shopUrl={absoluteUrl(getShopPath(shop))}
-            shopLogoUrl={shop.logo_url ?? undefined}
-            shopPhone={shop.whatsapp_number ?? undefined}
-            shopCategory={shop.category}
-            shopLocation={shop.location}
-          />
-          <BreadcrumbListSchema
-            items={[
-              { name: "Home", url: absoluteUrl("/") },
-              { name: "Products", url: absoluteUrl("/products") },
-              { name: shop.name, url: absoluteUrl(getShopPath(shop)) },
-            ]}
-          />
-        </>
-      ) : null}
       {loading && (<div className="space-y-4"><ShopBannerSkeleton /><ProductGridSkeleton count={4} /></div>)}
       {!loading && error && (<ErrorState title="Failed to load shop" message={error} onRetry={() => window.location.reload()} />)}
       {!loading && !error && shop && (<>
