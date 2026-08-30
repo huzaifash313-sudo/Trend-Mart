@@ -40,8 +40,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useShops, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { getTopAffinityCategories } from "@/lib/behavior";
-import RecentlyViewedStrip from "@/components/RecentlyViewedStrip";
-
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
 });
@@ -531,20 +529,6 @@ function HomeClient({
     (geoFilter.scope === "radius"
       ? !!globalCoords || !!geoFilter.coordinates
       : geoFilter.scope === "city" || geoFilter.scope === "pakistan");
-  const pickedArea = getCustomerArea(globalLocation);
-  const areaBadgeLabel =
-    geoFilter.scope === "pakistan"
-      ? "All Pakistan"
-      : geoFilter.scope === "city"
-        ? globalLocation?.city
-          ? `${globalLocation.city}`
-          : "This city"
-        : pickedArea
-          ? `${pickedArea} · ${geoFilter.maxDistanceKm || 10} km`
-          : geoFilter.maxDistanceKm > 0
-            ? `Within ${geoFilter.maxDistanceKm} km`
-            : "Near you first";
-
   const handleCategoryChange = useCallback((category: ShopCategory) => {
     setActiveCategory(category);
     const params = new URLSearchParams();
@@ -790,41 +774,30 @@ function HomeClient({
       {/* ── Sponsored / Promotional Ads (platform placements) ───────────── */}
       <PromoAdsCarousel placement="homepage_top" />
 
-      {/* ── Recently viewed (personal: pick up where you left off) ───── */}
-      <RecentlyViewedStrip />
-
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="tm-section-header flex-wrap">
+        <div className="tm-section-header">
           <div className="min-w-0">
             <h2 className="tm-section-title">Live Shops</h2>
             {!loading && (
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                 {displayShops.length} shop{displayShops.length !== 1 && "s"}
-                {showProximityBadges && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 px-2 py-0.5 text-[0.65rem] font-semibold text-teal-700 dark:from-emerald-950/50 dark:to-teal-950/40 dark:text-teal-300">
-                    {areaBadgeLabel}
-                  </span>
-                )}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/products" className="tm-chip tm-chip--green">
-              Browse products →
-            </Link>
-            <Link href="/deals" className="tm-chip tm-chip--amber">
-              All deals →
-            </Link>
-          </div>
         </div>
-        <div className="mb-3">
-          <GeoRadiusFilter
-            onFilterChange={setGeoFilter}
-            isDetecting={geoDetecting}
-            onDetectStart={() => setGeoDetecting(true)}
-            onDetectEnd={() => setGeoDetecting(false)}
-          />
+        <div className="mb-3 flex items-center gap-2 sm:gap-3">
+          <div className="w-[75%] min-w-0 [&_.relative]:w-full [&_button]:w-full">
+            <GeoRadiusFilter
+              onFilterChange={setGeoFilter}
+              isDetecting={geoDetecting}
+              onDetectStart={() => setGeoDetecting(true)}
+              onDetectEnd={() => setGeoDetecting(false)}
+            />
+          </div>
+          <span className="w-[25%] shrink-0 text-center text-[0.7rem] font-semibold leading-tight text-zinc-600 dark:text-zinc-300 sm:text-xs">
+            Recently viewed
+          </span>
         </div>
 
         {/* Loading skeletons */}
