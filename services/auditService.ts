@@ -61,8 +61,8 @@ export interface AuditLogPayload {
   targetType: AuditTargetType;
   targetId?: string;
   description: string;
-  oldValue?: Record<string, unknown>;
-  newValue?: Record<string, unknown>;
+  oldValue?: Record<string, unknown> | null;
+  newValue?: Record<string, unknown> | null;
   performedBy?: string;
   performedByEmail?: string;
   severity?: AuditSeverity;

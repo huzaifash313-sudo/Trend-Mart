@@ -14,7 +14,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { unstable_cache } from "next/cache";
-import { createClient as createAnonClient } from "@supabase/supabase-js";
+import { createClient as createAnonClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { Shop, Story } from "@/types";
 
@@ -27,14 +27,14 @@ export interface HomeInitialData {
 }
 
 /** Anon-only client for cacheable public queries — no cookies, no session. */
-function createPublicClient() {
+function createPublicClient(): AnonClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   if (!url || !key) return null;
   return createAnonClient(url, key, { auth: { persistSession: false } });
 }
 
-type AnonClient = ReturnType<typeof createAnonClient>;
+type AnonClient = SupabaseClient;
 
 /** Mirrors `shopService.fetchShops({ publicOnly: true })` row shape. */
 const SHOP_LIST_SELECT = [
