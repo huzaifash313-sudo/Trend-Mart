@@ -811,18 +811,22 @@ function HomeClient({
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="tm-section-header">
-          <div className="min-w-0">
-            <h2 className="tm-section-title">Live Shops</h2>
-            {!loading && (
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                {displayShops.length} shop{displayShops.length !== 1 && "s"}
-              </p>
-            )}
-          </div>
+        <div className="tm-live-shops-heading mb-2 min-w-0">
+          <h2 className="tm-live-shops-title">
+            <span className="tm-live-shops-indicator" aria-hidden="true">
+              <span className="tm-live-shops-indicator-ping" />
+              <span className="tm-live-shops-indicator-dot" />
+            </span>
+            Live Shops
+          </h2>
+          {!loading && (
+            <p className="tm-live-shops-count">
+              {displayShops.length} shop{displayShops.length !== 1 && "s"}
+            </p>
+          )}
         </div>
-        <div className="mb-3 flex items-center gap-2 sm:gap-3">
-          <div className="w-[75%] min-w-0">
+        <div className="tm-live-shops-toolbar mb-3">
+          <div className="tm-live-shops-geo">
             <GeoRadiusFilter
               onFilterChange={setGeoFilter}
               isDetecting={geoDetecting}
@@ -830,10 +834,7 @@ function HomeClient({
               onDetectEnd={() => setGeoDetecting(false)}
             />
           </div>
-          <Link
-            href="/recently-viewed"
-            className="w-[25%] shrink-0 text-center text-[0.7rem] font-semibold leading-tight text-teal-700 transition hover:text-teal-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-teal-300 dark:hover:text-teal-200 sm:text-xs"
-          >
+          <Link href="/recently-viewed" className="tm-live-shops-recent">
             Recently viewed
           </Link>
         </div>
