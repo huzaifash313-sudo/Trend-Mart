@@ -787,7 +787,7 @@ function HomeClient({
           </div>
         </div>
         <div className="mb-3 flex items-center gap-2 sm:gap-3">
-          <div className="w-[75%] min-w-0 [&_.relative]:w-full [&_button]:w-full">
+          <div className="w-[75%] min-w-0">
             <GeoRadiusFilter
               onFilterChange={setGeoFilter}
               isDetecting={geoDetecting}
@@ -795,9 +795,12 @@ function HomeClient({
               onDetectEnd={() => setGeoDetecting(false)}
             />
           </div>
-          <span className="w-[25%] shrink-0 text-center text-[0.7rem] font-semibold leading-tight text-zinc-600 dark:text-zinc-300 sm:text-xs">
+          <Link
+            href="/recently-viewed"
+            className="w-[25%] shrink-0 text-center text-[0.7rem] font-semibold leading-tight text-teal-700 transition hover:text-teal-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-teal-300 dark:hover:text-teal-200 sm:text-xs"
+          >
             Recently viewed
-          </span>
+          </Link>
         </div>
 
         {/* Loading skeletons */}
