@@ -168,13 +168,13 @@ function ShopCard({
         </ShopMediaHeader>
       </Link>
 
-      <div className="shop-card-body flex min-h-0 flex-1 flex-col px-2 pb-1 pt-1 sm:px-2 sm:pb-1.5">
+      <div className="shop-card-body flex min-h-0 flex-1 flex-col px-1.5 pb-1 pt-1 sm:px-2">
         {/* Name + wishlist — heart stays top-aligned beside the name */}
-        <div className="flex items-start gap-1">
+        <div className="flex items-start gap-0.5">
           <Link
             href={href}
             title={shop.name}
-            className="tm-shop-name line-clamp-2 min-w-0 flex-1 break-words text-[13px] font-semibold tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[14px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
+            className="tm-shop-name line-clamp-2 min-w-0 flex-1 break-words text-[12.5px] font-semibold leading-snug tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[13.5px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
           >
             {shop.name}
           </Link>
@@ -186,7 +186,7 @@ function ShopCard({
                 e.stopPropagation();
                 onToggleFavorite();
               }}
-              className={`icon-only -mr-1 -mt-0.5 shrink-0 rounded-full p-1 transition-transform duration-200 hover:scale-110 active:scale-95 ${
+              className={`icon-only -mr-0.5 -mt-0.5 shrink-0 rounded-full p-0.5 transition-transform duration-200 hover:scale-110 active:scale-95 ${
                 favorited
                   ? "text-rose-500"
                   : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
@@ -206,7 +206,7 @@ function ShopCard({
             e.stopPropagation();
             openShopReviews({ id: shop.id, name: shop.name });
           }}
-          className={`group/rating mt-1 flex min-w-0 w-full items-center rounded-lg text-left transition-opacity ${
+          className={`group/rating mt-0.5 flex min-w-0 w-full items-center rounded-md text-left transition-opacity ${
             hasRating ? "hover:opacity-80" : ""
           }`}
           title={
@@ -222,7 +222,7 @@ function ShopCard({
         >
           <CompactRating average={shop.avg_rating} count={shop.review_count} />
           {!hasRating ? (
-            <span className="truncate text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+            <span className="truncate text-[10.5px] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
               No reviews yet ·{" "}
               <span className="font-semibold text-emerald-600 underline decoration-emerald-600/40 underline-offset-2 transition-colors group-hover/rating:text-emerald-700 dark:text-emerald-400 dark:decoration-emerald-400/40 dark:group-hover/rating:text-emerald-300">
                 Add one
@@ -232,20 +232,20 @@ function ShopCard({
         </button>
 
         {offerSlides.length > 0 ? (
-          <div className="mt-1">
+          <div className="mt-0.5">
             <ShopOfferTicker slides={offerSlides} />
           </div>
         ) : null}
 
         <p
           title={category}
-          className="tm-title-clamp-2 mt-1 text-[11px] font-medium leading-snug text-teal-700 dark:text-teal-300 sm:text-[12px]"
+          className="tm-title-clamp-2 mt-0.5 text-[10.5px] font-medium leading-snug text-teal-700 dark:text-teal-300 sm:text-[11.5px]"
         >
           {category}
         </p>
 
         <p
-          className="mt-0.5 inline-flex min-w-0 items-center gap-1 text-[11px] leading-none text-zinc-500 dark:text-zinc-400"
+          className="mt-0.5 inline-flex min-w-0 items-center gap-0.5 text-[10.5px] leading-none text-zinc-500 dark:text-zinc-400"
           title={shop.location}
         >
           <PinIcon />
@@ -254,8 +254,8 @@ function ShopCard({
           </span>
         </p>
 
-        <div className="mt-auto pt-1.5">
-          <Link href={href} className="tm-cta btn-compact h-8 w-full text-[12px] sm:text-[13px]">
+        <div className="mt-auto pt-1">
+          <Link href={href} className="tm-cta btn-compact h-7 w-full text-[11.5px] sm:h-8 sm:text-[12.5px]">
             View store
           </Link>
         </div>

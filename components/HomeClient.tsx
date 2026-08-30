@@ -77,7 +77,7 @@ function StoryRing({
   const seenFrac = total > 0 ? Math.max(0, Math.min(seen / total, 1)) : 0;
   const unseenFrac = 1 - seenFrac;
   return (
-    <div className="relative h-[3.75rem] w-[3.75rem]">
+    <div className="relative h-[3.55rem] w-[3.55rem]">
       <svg
         className="absolute inset-0 h-full w-full -rotate-90"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -547,36 +547,12 @@ function HomeClient({
   const visibleShops = displayShops.slice(0, visibleCount);
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2.5 pb-3 md:px-4 md:py-4 md:pb-6">
-      {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
-      <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
-        <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
-          {orderedCategories.map((category) => {
-            const isActive = activeCategory === category;
-            const catCount = categoryCounts.find((c) => c.key === category)?.count;
-            return (
-              <button
-                key={category}
-                type="button"
-                onClick={() => handleCategoryChange(category)}
-                className={`tm-cat-tab${isActive ? " is-active" : ""}`}
-                aria-label={`${category}${catCount !== undefined ? ` — ${catCount} shop${catCount !== 1 ? "s" : ""}` : ""}`}
-                aria-pressed={isActive}
-              >
-                <span className="tm-cat-tab-label">{category}</span>
-                {catCount !== undefined ? (
-                  <span className="tm-cat-tab-count">{catCount}</span>
-                ) : null}
-                <span className="tm-cat-tab-line" aria-hidden="true" />
-              </button>
-            );
-          })}
-        </FadeScrollX>
-      </section>
-
-      {/* Stories tray — always reserved so the homepage layout never jumps
-          when merchants haven't posted yet. */}
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-3 md:pb-6">
+      {/* Stories tray — top of homepage, always reserved */}
       <section aria-label="Merchant stories" className="tm-stories-tray">
+        <div className="tm-stories-tray-head">
+          <h2 className="tm-stories-tray-title">Stories</h2>
+        </div>
         <svg width="0" height="0" className="absolute" aria-hidden="true">
           <defs>
             <linearGradient id="tmStoryRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -586,9 +562,9 @@ function HomeClient({
             </linearGradient>
           </defs>
         </svg>
-        <div className="tm-stories-tray-scroll -mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0 scrollbar-none">
+        <div className="tm-stories-tray-scroll -mx-3 flex gap-3 overflow-x-auto px-3 scrollbar-none">
           {myShop ? (
-            <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
+            <div className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5">
               <div className="relative">
                 <button
                   type="button"
@@ -625,7 +601,7 @@ function HomeClient({
                     </StoryRing>
                   ) : (
                     <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
-                      <div className="relative flex h-[3.35rem] w-[3.35rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
+                      <div className="relative flex h-[3.2rem] w-[3.2rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
                         <span className="text-2xl font-bold leading-none text-emerald-600 dark:text-emerald-400">+</span>
                       </div>
                     </div>
@@ -650,7 +626,7 @@ function HomeClient({
                   </button>
                 ) : null}
               </div>
-              <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+              <span className="tm-story-ring-label w-full truncate text-center">
                 Your story
               </span>
             </div>
@@ -659,9 +635,9 @@ function HomeClient({
           {storiesQuery.isLoading ? (
             <>
               {[0, 1, 2].map((i) => (
-                <div key={i} className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
-                  <div className="h-[3.75rem] w-[3.75rem] animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
-                  <div className="h-2.5 w-10 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                <div key={i} className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5">
+                  <div className="h-[3.55rem] w-[3.55rem] animate-pulse rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                  <div className="h-2 w-9 animate-pulse rounded bg-zinc-300 dark:bg-zinc-700" />
                 </div>
               ))}
             </>
@@ -670,17 +646,17 @@ function HomeClient({
               type="button"
               onClick={handleDetectForStories}
               disabled={geoDetecting}
-              className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               aria-label="Detect location to see nearby store stories"
             >
-              <div className="flex h-[3.75rem] w-[3.75rem] items-center justify-center rounded-full border border-dashed border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+              <div className="flex h-[3.55rem] w-[3.55rem] items-center justify-center rounded-full border-2 border-dashed border-zinc-400 bg-zinc-100 text-zinc-600 dark:border-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
                   <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
                 </svg>
               </div>
-              <span className="w-full text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
-                {geoDetecting ? "Detecting…" : "Nearby stories"}
+              <span className="tm-story-ring-label w-full text-center">
+                {geoDetecting ? "Detecting…" : "Nearby"}
               </span>
             </button>
           ) : storyGroups.length > 0 ? (
@@ -700,13 +676,12 @@ function HomeClient({
                   key={first.id}
                   type="button"
                   onClick={() => {
-                    // WhatsApp-style resume: start from the first story not yet seen.
                     setSelectedStoryIndex(
                       startIndex + (firstUnseenInGroup === -1 ? 0 : firstUnseenInGroup),
                     );
                     setStoryViewerOpen(true);
                   }}
-                  className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                   aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : `, ${group.length - seenCount} unviewed`}`}
                 >
                   <div className="relative">
@@ -734,49 +709,59 @@ function HomeClient({
                       </span>
                     ) : null}
                   </div>
-                  <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+                  <span className="tm-story-ring-label w-full truncate text-center">
                     {label}
                   </span>
                 </button>
               );
             })
           ) : !myShop ? (
-            /* Empty but reserved — dashed ghost rings keep the tray height stable. */
             <>
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="tm-story-slot-empty flex w-[4.25rem] shrink-0 flex-col items-center gap-1"
+                  className="tm-story-slot-empty flex w-[4rem] shrink-0 flex-col items-center gap-0.5"
                   aria-hidden={i > 0}
                 >
-                  <div className="flex h-[3.75rem] w-[3.75rem] items-center justify-center rounded-full border border-dashed border-zinc-300 bg-zinc-50/80 dark:border-zinc-700 dark:bg-zinc-900/40">
+                  <div className="flex h-[3.55rem] w-[3.55rem] items-center justify-center rounded-full border-2 border-dashed border-zinc-400 bg-zinc-100 dark:border-zinc-500 dark:bg-zinc-800/80">
                     {i === 0 ? (
-                      <svg
-                        className="h-5 w-5 text-zinc-400 dark:text-zinc-500"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.75"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden
-                      >
-                        <circle cx="12" cy="12" r="9" />
-                        <path d="M12 8v8M8 12h8" />
-                      </svg>
+                      <span className="text-xl font-bold leading-none text-zinc-500 dark:text-zinc-400" aria-hidden>+</span>
                     ) : null}
                   </div>
-                  <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
-                    {i === 0 ? "No stories yet" : "\u00a0"}
+                  <span className="tm-story-ring-label w-full truncate text-center">
+                    {i === 0 ? "Add story" : "\u00a0"}
                   </span>
                 </div>
               ))}
             </>
           ) : null}
         </div>
-        <p className="tm-stories-tray-label mt-0.5 px-0.5 text-[0.55rem] font-medium uppercase tracking-wider text-zinc-400/80 dark:text-zinc-500">
-          Stories
-        </p>
+      </section>
+
+      {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
+      <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
+        <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
+          {orderedCategories.map((category) => {
+            const isActive = activeCategory === category;
+            const catCount = categoryCounts.find((c) => c.key === category)?.count;
+            return (
+              <button
+                key={category}
+                type="button"
+                onClick={() => handleCategoryChange(category)}
+                className={`tm-cat-tab${isActive ? " is-active" : ""}`}
+                aria-label={`${category}${catCount !== undefined ? ` — ${catCount} shop${catCount !== 1 ? "s" : ""}` : ""}`}
+                aria-pressed={isActive}
+              >
+                <span className="tm-cat-tab-label">{category}</span>
+                {catCount !== undefined ? (
+                  <span className="tm-cat-tab-count">{catCount}</span>
+                ) : null}
+                <span className="tm-cat-tab-line" aria-hidden="true" />
+              </button>
+            );
+          })}
+        </FadeScrollX>
       </section>
 
       {storyViewerOpen && (
@@ -811,32 +796,44 @@ function HomeClient({
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="tm-live-shops-heading mb-2 min-w-0">
-          <h2 className="tm-live-shops-title">
-            <span className="tm-live-shops-indicator" aria-hidden="true">
-              <span className="tm-live-shops-indicator-ping" />
-              <span className="tm-live-shops-indicator-dot" />
-            </span>
-            Live Shops
-          </h2>
-          {!loading && (
-            <p className="tm-live-shops-count">
-              {displayShops.length} shop{displayShops.length !== 1 && "s"}
-            </p>
-          )}
-        </div>
-        <div className="tm-live-shops-toolbar mb-3">
-          <div className="tm-live-shops-geo">
-            <GeoRadiusFilter
-              onFilterChange={setGeoFilter}
-              isDetecting={geoDetecting}
-              onDetectStart={() => setGeoDetecting(true)}
-              onDetectEnd={() => setGeoDetecting(false)}
-            />
+        <div className="tm-live-shops-heading mb-1.5">
+          <div className="tm-live-shops-heading-main min-w-0">
+            <h2 className="tm-live-shops-title">
+              <span className="tm-live-shops-indicator" aria-hidden="true">
+                <span className="tm-live-shops-indicator-ping" />
+                <span className="tm-live-shops-indicator-dot" />
+              </span>
+              Live Shops
+            </h2>
+            {!loading && (
+              <p className="tm-live-shops-count">
+                {displayShops.length} shop{displayShops.length !== 1 && "s"}
+              </p>
+            )}
           </div>
           <Link href="/recently-viewed" className="tm-live-shops-recent">
             Recently viewed
+            <svg
+              className="tm-live-shops-recent-arrow"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </Link>
+        </div>
+        <div className="tm-live-shops-geo mb-2.5">
+          <GeoRadiusFilter
+            onFilterChange={setGeoFilter}
+            isDetecting={geoDetecting}
+            onDetectStart={() => setGeoDetecting(true)}
+            onDetectEnd={() => setGeoDetecting(false)}
+          />
         </div>
 
         {/* Loading skeletons */}

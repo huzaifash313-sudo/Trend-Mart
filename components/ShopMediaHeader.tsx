@@ -119,12 +119,12 @@ export default function ShopMediaHeader({
   const frameClass = isHero
     ? "relative h-36 w-full sm:h-44 md:h-48 lg:h-52"
     : // Compact marketplace banner (px so font-scale doesn't inflate cards)
-      "shop-card-banner relative h-[88px] w-full sm:h-[100px]";
+      "shop-card-banner relative h-[78px] w-full sm:h-[90px]";
 
   // Card: DP on banner left, slightly lifted over the banner edge
   const logoBoxClass = isHero
     ? "absolute -bottom-7 left-3 z-10 h-14 w-14 sm:-bottom-8 sm:left-4 sm:h-[4.5rem] sm:w-[4.5rem]"
-    : "absolute bottom-2 left-2 z-10 h-10 w-10 sm:bottom-2.5 sm:left-2.5 sm:h-11 sm:w-11";
+    : "absolute bottom-1.5 left-1.5 z-10 h-9 w-9 sm:bottom-2 sm:left-2 sm:h-10 sm:w-10";
 
   return (
     <div className={`relative ${className}`}>
