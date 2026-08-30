@@ -2013,6 +2013,20 @@ html.dark .tm-sponsored-cta {
   color: var(--tm-sea);
 }
 
+/* ── Stories tray (always reserved on homepage) ─────────────────────────── */
+.tm-stories-tray {
+  /* Ring (3.75rem) + label + "Stories" caption — keeps layout stable empty/full */
+  min-height: 5.35rem;
+}
+.tm-stories-tray-scroll {
+  min-height: 4.35rem;
+  align-items: flex-start;
+}
+.tm-story-slot-empty {
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Brand media showcase (homepage video + Instagram carousel) ─────────── */
 .tm-brand-showcase {
   display: flex;

@@ -574,10 +574,9 @@ function HomeClient({
         </FadeScrollX>
       </section>
 
-      {/* Stories — first content under category tabs. Hidden entirely when
-          there is nothing to show (no merchant ring, no story, not loading). */}
-      {storiesQuery.isLoading || myShop || stories.length > 0 ? (
-      <section aria-label="Merchant stories">
+      {/* Stories tray — always reserved so the homepage layout never jumps
+          when merchants haven't posted yet. */}
+      <section aria-label="Merchant stories" className="tm-stories-tray">
         <svg width="0" height="0" className="absolute" aria-hidden="true">
           <defs>
             <linearGradient id="tmStoryRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -587,7 +586,7 @@ function HomeClient({
             </linearGradient>
           </defs>
         </svg>
-        <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0 scrollbar-none">
+        <div className="tm-stories-tray-scroll -mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0 scrollbar-none">
           {myShop ? (
             <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
               <div className="relative">
@@ -658,9 +657,14 @@ function HomeClient({
           ) : null}
 
           {storiesQuery.isLoading ? (
-            <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
-              <div className="h-[3.35rem] w-[3.35rem] animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
-            </div>
+            <>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
+                  <div className="h-[3.75rem] w-[3.75rem] animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+                  <div className="h-2.5 w-10 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                </div>
+              ))}
+            </>
           ) : !globalCoords ? (
             <button
               type="button"
@@ -669,7 +673,7 @@ function HomeClient({
               className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               aria-label="Detect location to see nearby store stories"
             >
-              <div className="flex h-[3.35rem] w-[3.35rem] items-center justify-center rounded-full border border-dashed border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+              <div className="flex h-[3.75rem] w-[3.75rem] items-center justify-center rounded-full border border-dashed border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
                   <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
@@ -679,7 +683,7 @@ function HomeClient({
                 {geoDetecting ? "Detecting…" : "Nearby stories"}
               </span>
             </button>
-          ) : (
+          ) : storyGroups.length > 0 ? (
             storyGroups.map((group, gIdx) => {
               const first = group[0];
               const seenCount = group.filter((s) => viewedStoryIds.has(s.id)).length;
@@ -736,13 +740,44 @@ function HomeClient({
                 </button>
               );
             })
-          )}
+          ) : !myShop ? (
+            /* Empty but reserved — dashed ghost rings keep the tray height stable. */
+            <>
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="tm-story-slot-empty flex w-[4.25rem] shrink-0 flex-col items-center gap-1"
+                  aria-hidden={i > 0}
+                >
+                  <div className="flex h-[3.75rem] w-[3.75rem] items-center justify-center rounded-full border border-dashed border-zinc-300 bg-zinc-50/80 dark:border-zinc-700 dark:bg-zinc-900/40">
+                    {i === 0 ? (
+                      <svg
+                        className="h-5 w-5 text-zinc-400 dark:text-zinc-500"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 8v8M8 12h8" />
+                      </svg>
+                    ) : null}
+                  </div>
+                  <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
+                    {i === 0 ? "No stories yet" : "\u00a0"}
+                  </span>
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
-        <p className="mt-0.5 px-0.5 text-[0.55rem] font-medium uppercase tracking-wider text-zinc-400/80 dark:text-zinc-500">
+        <p className="tm-stories-tray-label mt-0.5 px-0.5 text-[0.55rem] font-medium uppercase tracking-wider text-zinc-400/80 dark:text-zinc-500">
           Stories
         </p>
       </section>
-      ) : null}
 
       {storyViewerOpen && (
         <StoriesViewer
