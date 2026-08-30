@@ -37,8 +37,6 @@ export default function DashboardNavSmooth() {
   /* Warm the JS bundles for sibling dashboard pages once. */
   useEffect(() => {
     let cancelled = false;
-    let idleId: number | null = null;
-    let timeoutId: number | null = null;
 
     const runPrefetch = () => {
       if (cancelled) return;
@@ -51,18 +49,11 @@ export default function DashboardNavSmooth() {
       }
     };
 
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(runPrefetch, { timeout: 1500 });
-    } else {
-      timeoutId = window.setTimeout(runPrefetch, 120);
-    }
+    const timeoutId = window.setTimeout(runPrefetch, 120);
 
     return () => {
       cancelled = true;
-      if (idleId !== null && "cancelIdleCallback" in window) {
-        window.cancelIdleCallback(idleId);
-      }
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
     };
   }, [router]);
 
