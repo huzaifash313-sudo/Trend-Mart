@@ -392,6 +392,7 @@ export default function ProductPage({ params }: { params: Promise<{ code: string
             <VariantSelector
               variants={product.variants}
               basePrice={product.price}
+              baseOriginalPrice={product.original_price ?? product.compare_at_price ?? null}
               onSelectionChange={setSelectedVariants}
               compact
             />

@@ -58,7 +58,7 @@ export function dealToProduct(deal: ShopDeal): Product {
     compare_at_price: deal.original_price ?? null,
     image_url: cover,
     images: getDealImages(deal),
-    is_available: true,
+    is_available: dealHasPrice(deal),
     currency: "PKR",
     created_at: deal.created_at,
   } as Product;

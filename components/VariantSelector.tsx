@@ -12,11 +12,20 @@
 /*                                                                             */
 /*  Also works for Food (portion sizes), Electronics (storage/RAM variants),  */
 /*  and Cosmetics (shades/volumes).                                           */
+/*                                                                             */
+/*  Each option now shows its OWN "Sold out" state and its own discount        */
+/*  (original → now price + % OFF) so a Small / Large / Family pizza each      */
+/*  carries a distinct price and markdown, Daraz-style.                       */
 /* -------------------------------------------------------------------------- */
 
 import { useState, useCallback, useMemo } from "react";
 import type { VariantGroup, ProductVariant } from "@/types";
-import { computeVariantPrice, effectiveOptionPrice } from "@/lib/variantPricing";
+import {
+  computeVariantPrice,
+  effectiveOptionPrice,
+  effectiveOptionOriginal,
+} from "@/lib/variantPricing";
+import { formatRupees } from "@/lib/formatters";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,6 +40,8 @@ interface VariantSelectorProps {
   variants: VariantGroup[];
   /** Base price of the product (for displaying total with adjustments) */
   basePrice: number;
+  /** Base "before discount" price — enables accurate per-variant % OFF. */
+  baseOriginalPrice?: number | null;
   /** Called when the user selects a variant combination */
   onSelectionChange?: (selected: SelectedVariant[]) => void;
   /** Pre-selected variant (e.g., from a shared link or saved cart) */
@@ -120,11 +131,18 @@ function isSizeGroup(groupName: string): boolean {
   );
 }
 
+/** % OFF implied by an option's original vs its effective price. */
+function percentOff(effective: number, original: number | null): number {
+  if (original == null || !Number.isFinite(original) || original <= effective) return 0;
+  return Math.round(((original - effective) / original) * 100);
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function VariantSelector({
   variants,
   basePrice,
+  baseOriginalPrice = null,
   onSelectionChange,
   initialSelection,
   displayMode = "auto",
@@ -215,6 +233,13 @@ export default function VariantSelector({
                 }`}
               >
                 {group.name}
+                <span className="ml-1 font-normal text-zinc-400">
+                  {isSize
+                    ? "(Select size)"
+                    : isColor
+                      ? "(Select color)"
+                      : "(Select)"}
+                </span>
               </span>
               {selectedMap[group.name] && (
                 <span
@@ -231,96 +256,70 @@ export default function VariantSelector({
             <div className="flex flex-wrap gap-1.5">
               {group.options.map((option) => {
                 const isSelected = selectedMap[group.name] === option.label;
-                const colorHex = getColorHex(option.label);
-                const isUnavailable = option.is_available === false;
+                const colorHex = isColor ? getColorHex(option.label) : null;
+                const unavailable = option.is_available === false;
+                const eff = effectiveOptionPrice(basePrice, option);
+                const orig = effectiveOptionOriginal(basePrice, baseOriginalPrice, option);
+                const pct = percentOff(eff, orig);
+                const hasOwnPrice =
+                  typeof option.price === "number" ||
+                  (option.price_adj != null && option.price_adj !== 0);
 
-                // ── Color Swatch ──────────────────────────────────────────
-                if (isColor && colorHex) {
-                  return (
-                    <button
-                      key={option.label}
-                      type="button"
-                      disabled={isUnavailable}
-                      onClick={() => handleSelect(group.name, option.label)}
-                      className={`relative flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1.5 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
-                        isSelected
-                          ? "border-emerald-600 bg-emerald-50 shadow-sm dark:border-emerald-400 dark:bg-emerald-900/20"
-                          : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-500"
-                      } ${
-                        isUnavailable
-                          ? "cursor-not-allowed opacity-40 line-through"
-                          : "cursor-pointer"
-                      }`}
-                      aria-label={`${option.label}${isUnavailable ? " (unavailable)" : ""}`}
-                      aria-pressed={isSelected}
-                    >
-                      {/* Color circle */}
-                      <span
-                        className="inline-block h-4 w-4 rounded-full border border-black/10"
-                        style={{ backgroundColor: colorHex }}
-                        aria-hidden="true"
-                      />
-                      {option.label}
-                      {option.price_adj && option.price_adj !== 0 ? (
-                        <span className="ml-0.5 text-[0.6rem] text-zinc-400">
-                          {option.price_adj > 0 ? "+" : "-"}Rs.{" "}
-                          {Math.abs(option.price_adj)}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                }
-
-                // ── Size / Regular Chip ───────────────────────────────────
                 return (
                   <button
                     key={option.label}
                     type="button"
-                    disabled={isUnavailable}
+                    disabled={unavailable}
                     onClick={() => handleSelect(group.name, option.label)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                    className={`relative flex flex-col items-center gap-0.5 rounded-xl border-2 px-2 py-1.5 text-center transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                       isSelected
-                        ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                        : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500"
+                        ? "border-emerald-600 bg-emerald-50 shadow-sm dark:border-emerald-400 dark:bg-emerald-900/20"
+                        : "border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-500"
                     } ${
-                      isUnavailable
-                        ? "cursor-not-allowed opacity-40 line-through"
+                      unavailable
+                        ? "cursor-not-allowed opacity-50"
                         : "cursor-pointer"
-                    }`}
-                    aria-label={`${option.label}${isUnavailable ? " (unavailable)" : ""}`}
+                    } ${compact ? "min-w-[3.25rem]" : "min-w-[4rem]"}`}
+                    aria-label={`${option.label}${unavailable ? " (sold out)" : ""}`}
                     aria-pressed={isSelected}
                   >
-                    {isSize ? (
-                      <span className="font-semibold tracking-wide uppercase">
-                        {option.label}
+                    {colorHex ? (
+                      <span
+                        className="inline-block h-5 w-5 rounded-full border border-black/10"
+                        style={{ backgroundColor: colorHex }}
+                        aria-hidden="true"
+                      />
+                    ) : null}
+
+                    <span
+                      className={`text-xs font-semibold ${
+                        isSize ? "uppercase tracking-wide" : ""
+                      } ${
+                        unavailable
+                          ? "line-through text-zinc-400"
+                          : isSelected
+                            ? "text-emerald-800 dark:text-emerald-200"
+                            : "text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      {option.label}
+                    </span>
+
+                    {unavailable ? (
+                      <span className="text-[9px] font-semibold leading-none text-red-500">
+                        Sold out
                       </span>
-                    ) : (
-                      option.label
-                    )}
-                    {typeof option.price === "number" && option.price !== basePrice ? (
-                      <span className="ml-1 text-[0.6rem] opacity-70">
-                        {typeof option.original_price === "number" &&
-                        option.original_price > option.price ? (
-                          <span>
-                            <s className="mr-0.5">{option.original_price}</s>
-                            <span className="text-red-500 font-bold">-{Math.round(((option.original_price - option.price) / option.original_price) * 100)}%</span>
-                          </span>
-                        ) : (
-                          <>Rs. {option.price}</>
-                        )}
+                    ) : pct > 0 && orig != null ? (
+                      <span className="text-[9px] leading-none">
+                        <s className="text-zinc-400">{formatRupees(orig)}</s>{" "}
+                        <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                          {formatRupees(eff)}
+                        </span>{" "}
+                        <span className="font-bold text-red-500">-{pct}%</span>
                       </span>
-                    ) : option.price_adj && option.price_adj !== 0 ? (
-                      <span className="ml-1 text-[0.6rem] opacity-70">
-                        {option.price_adj > 0 ? "+" : ""}Rs. {option.price_adj}
-                      </span>
-                    ) : effectiveOptionPrice(basePrice, option) > 0 &&
-                      typeof option.original_price === "number" &&
-                      option.original_price > effectiveOptionPrice(basePrice, option) ? (
-                      <span className="ml-1 text-[0.6rem] opacity-70">
-                        <s>{option.original_price}</s>{" "}
-                        <span className="text-red-500 font-bold">
-                          -{Math.round(((option.original_price - effectiveOptionPrice(basePrice, option)) / option.original_price) * 100)}%
-                        </span>
+                    ) : hasOwnPrice ? (
+                      <span className="text-[9px] font-semibold leading-none text-zinc-600 dark:text-zinc-400">
+                        {formatRupees(eff)}
                       </span>
                     ) : null}
                   </button>
@@ -331,8 +330,8 @@ export default function VariantSelector({
         );
       })}
 
-      {/* Total price display (if adjustments exist) */}
-      {selectedEntries.some((e) => e.priceAdj !== 0) && (
+      {/* Total price display (whenever the selected options change the price) */}
+      {totalPrice !== basePrice && (
         <div
           className={`border-t border-zinc-100 pt-3 text-right dark:border-zinc-800 ${
             compact ? "text-sm" : ""
@@ -342,13 +341,13 @@ export default function VariantSelector({
             Total:{" "}
           </span>
           <span className="font-bold text-emerald-600 dark:text-emerald-400">
-            Rs. {totalPrice.toLocaleString()}
+            {formatRupees(totalPrice)}
           </span>
-          {selectedEntries.some((e) => e.priceAdj !== 0) && (
+          {selectedEntries.some((e) => e.priceAdj !== 0) ? (
             <span className="ml-1 text-[0.65rem] text-zinc-400">
               (incl. adjustments)
             </span>
-          )}
+          ) : null}
         </div>
       )}
     </div>

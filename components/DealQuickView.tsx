@@ -14,6 +14,7 @@ import {
   dealToProduct,
   dealToShop,
   dealWishlistId,
+  dealHasPrice,
   dealToCheckoutItems,
 } from "@/lib/dealCommerce";
 import { isDealOrderableToday, formatDealWhenTag } from "@/lib/dealSchedule";
@@ -80,6 +81,10 @@ export default function DealQuickView({
     async (order: { quantity: number; variant?: string; notes?: string }) => {
       if (!isDealOrderableToday(deal)) {
         addToast(`Order opens on ${formatDealWhenTag(deal)}. Cart & wishlist still work.`, "info");
+        return;
+      }
+      if (!dealHasPrice(deal)) {
+        addToast("This deal needs a price — open the store or ask the merchant.", "info");
         return;
       }
       if (!shop.whatsapp_number) {

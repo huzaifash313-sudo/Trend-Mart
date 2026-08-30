@@ -221,13 +221,21 @@ export default function VariantEditor({
                 const eff = effectiveOptionPrice(basePrice, option);
                 const impliedPct =
                   option.discount_pct ?? percentFromOriginal(eff, option.original_price);
+                const unavailable = option.is_available === false;
                 return (
-                  <div key={optIdx} className="flex flex-wrap items-center gap-1.5">
+                  <div
+                    key={optIdx}
+                    className={`flex flex-wrap items-center gap-1.5 rounded-lg px-1.5 py-1 ${
+                      unavailable ? "bg-zinc-100 dark:bg-zinc-800/60" : ""
+                    }`}
+                  >
                     <input
                       value={option.label}
                       onChange={(e) => updateOption(groupIdx, optIdx, { label: e.target.value })}
                       placeholder="Option name (e.g. Large)"
-                      className="min-w-0 flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      className={`min-w-0 flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 ${
+                        unavailable ? "line-through text-zinc-400" : ""
+                      }`}
                     />
                     <input
                       value={option.price ?? ""}
@@ -291,6 +299,18 @@ export default function VariantEditor({
                         -{impliedPct}%
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => updateOption(groupIdx, optIdx, { is_available: unavailable })}
+                      title={unavailable ? "Mark available (back in stock)" : "Mark sold out / unavailable"}
+                      className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold transition-colors ${
+                        unavailable
+                          ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      }`}
+                    >
+                      {unavailable ? "Sold out" : "Available"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => removeOption(groupIdx, optIdx)}

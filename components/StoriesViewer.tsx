@@ -363,8 +363,15 @@ export default function StoriesViewer({
     return () => window.removeEventListener("keydown", handleKey);
   }, [advance, goBack, onClose]);
 
+  // Auto-close once the list resolves empty — as an effect, not during render,
+  // so we never update the parent component while it's still rendering.
+  useEffect(() => {
+    if (!loading && stories.length === 0) {
+      onCloseRef.current();
+    }
+  }, [loading, stories.length]);
+
   if (!loading && stories.length === 0) {
-    onClose();
     return null;
   }
 

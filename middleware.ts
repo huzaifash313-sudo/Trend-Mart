@@ -402,6 +402,10 @@ const VERIFY_EXEMPT_PATHS = [
   "/products",
   "/wishlist", // guest local wishlist; purchase still gated at checkout
   "/banned",
+  // Merchant onboarding is intentionally direct (no email-verification gate).
+  // Verification is still enforced at checkout/order time, not for store setup.
+  "/account/become-merchant",
+  "/dashboard",
 ];
 
 function isVerifyExempt(pathname: string): boolean {

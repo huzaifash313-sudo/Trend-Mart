@@ -14,6 +14,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { formatRupees } from "@/lib/formatters";
+import { computeVariantPricing } from "@/lib/variantPricing";
+import VariantSelector from "@/components/VariantSelector";
+import { createClient } from "@/lib/supabase/client";
+import type { VariantGroup } from "@/types";
 import WhatsAppCheckoutModal, {
   type WhatsAppCartItem,
 } from "@/components/WhatsAppCheckoutModal";
@@ -106,6 +110,55 @@ function stubShopFromGroup(group: ShopGroup): Shop {
   } as Shop;
 }
 
+/** Authoritative variant metadata for a cart product. */
+interface CartVariantData {
+  price: number;
+  originalPrice: number | null;
+  variants: VariantGroup[];
+}
+
+/** Convert a "Group: Label · Group: Label" string into `SelectedVariant[]`. */
+function labelToSelection(label?: string): { groupName: string; optionLabel: string; priceAdj: number }[] {
+  if (!label) return [];
+  return label
+    .split(/\s*·\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const idx = part.indexOf(":");
+      if (idx > 0) {
+        return {
+          groupName: part.slice(0, idx).trim(),
+          optionLabel: part.slice(idx + 1).trim(),
+          priceAdj: 0,
+        };
+      }
+      return { groupName: "", optionLabel: part, priceAdj: 0 };
+    });
+}
+
+/** Whether a variant label selects every group of a product's variant set. */
+function isVariantComplete(variants: VariantGroup[], label?: string): boolean {
+  if (!variants || variants.length === 0) return true;
+  if (!label) return false;
+  const selectedGroups = labelToSelection(label)
+    .map((s) => s.groupName)
+    .filter(Boolean);
+  // Legacy labels without "Group: " prefixes can't be verified per-group.
+  if (selectedGroups.length === 0) return true;
+  return variants.every((g) => selectedGroups.includes(g.name));
+}
+
+/** True when a cart item still needs an option picked before checkout. */
+function itemNeedsVariant(
+  item: CartItem,
+  variantData: Record<string, CartVariantData>,
+): boolean {
+  const data = variantData[item.productId];
+  if (!data || data.variants.length === 0) return false;
+  return !isVariantComplete(data.variants, item.variant);
+}
+
 /* ── Page ────────────────────────────────────────────────────────────────────── */
 
 export default function CartPage() {
@@ -116,6 +169,7 @@ export default function CartPage() {
     removeItem,
     updateQuantity,
     updateItemNotes,
+    updateItemVariant,
     totalItems,
     totalAmount,
     clearCart,
@@ -123,8 +177,48 @@ export default function CartPage() {
 
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
   const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
+  const [variantData, setVariantData] = useState<Record<string, CartVariantData>>({});
+  const [variantOpenId, setVariantOpenId] = useState<string | null>(null);
 
   const shopGroups = useMemo(() => groupItemsByShop(items), [items]);
+
+  // Fetch variant metadata for products that carry options so the cart can
+  // let shoppers pick/change size/color/etc. inline before checkout.
+  useEffect(() => {
+    let cancelled = false;
+    const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+    if (productIds.length === 0) return;
+    const supabase = createClient();
+    (async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, price, original_price, compare_at_price, variants")
+        .in("id", productIds);
+      if (cancelled || error || !data) return;
+      const map: Record<string, CartVariantData> = {};
+      for (const row of data as Record<string, unknown>[]) {
+        const variants = Array.isArray(row.variants)
+          ? (row.variants as VariantGroup[])
+          : [];
+        if (variants.length === 0) continue;
+        const original =
+          typeof row.original_price === "number"
+            ? row.original_price
+            : typeof row.compare_at_price === "number"
+              ? row.compare_at_price
+              : null;
+        map[String(row.id)] = {
+          price: Number(row.price) || 0,
+          originalPrice: original != null && original > 0 ? original : null,
+          variants,
+        };
+      }
+      setVariantData(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   // Load the full shop row (radius / hours / delivery rules) for checkout.
   useEffect(() => {
@@ -277,6 +371,58 @@ export default function CartPage() {
                             </span>
                           ) : null}
                         </p>
+
+                        {/* Inline variant picker */}
+                        {(() => {
+                          const data = variantData[item.productId];
+                          if (!data || data.variants.length === 0) return null;
+                          const open = variantOpenId === item.id;
+                          return (
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() => setVariantOpenId(open ? null : item.id)}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+                              >
+                                {item.variant ? "Change options" : "Select options"}
+                                {itemNeedsVariant(item, variantData) && (
+                                  <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[0.6rem] font-semibold text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                                    Required
+                                  </span>
+                                )}
+                              </button>
+                              {open && (
+                                <div className="mt-1.5">
+                                  <VariantSelector
+                                    variants={data.variants}
+                                    basePrice={data.price}
+                                    baseOriginalPrice={data.originalPrice}
+                                    initialSelection={labelToSelection(item.variant)}
+                                    onSelectionChange={(sel) => {
+                                      const label = sel
+                                        .map((v) => `${v.groupName}: ${v.optionLabel}`)
+                                        .join(" · ");
+                                      const { price, originalPrice } = computeVariantPricing(
+                                        data.price,
+                                        data.originalPrice,
+                                        data.variants,
+                                        label,
+                                      );
+                                      updateItemVariant(
+                                        item.id,
+                                        label,
+                                        price,
+                                        originalPrice,
+                                      );
+                                    }}
+                                    compact
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         <input
                           type="text"
                           value={item.notes ?? ""}
@@ -335,9 +481,12 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() => setCheckoutShop(group)}
-                    className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700 active:scale-95"
+                    disabled={group.items.some((i) => itemNeedsVariant(i, variantData))}
+                    className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Order via WhatsApp
+                    {group.items.some((i) => itemNeedsVariant(i, variantData))
+                      ? "Select options first"
+                      : "Order via WhatsApp"}
                   </button>
                 </div>
               </section>

@@ -102,29 +102,6 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
 }
 
 /**
- * Fetch active stories for a single shop.
- */
-export async function fetchStoriesByShopId(
-  shopId: string,
-): Promise<ServiceResult<Story[]>> {
-  const supabase = createClient();
-
-  try {
-    const { data, error } = await supabase
-      .from("stories")
-      .select("*")
-      .eq("shop_id", shopId)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    return { success: true, data: (data as Story[]) ?? [] };
-  } catch (err) {
-    logError(err, { module: "storyService.fetchStoriesByShopId", meta: { shopId } });
-    return { success: false, error: toError(err) };
-  }
-}
-
-/**
  * Resolve a shop's story quota + live usage in one round-trip.
  * Drives the merchant UI ("unlimited", "3 live now", …).
  */

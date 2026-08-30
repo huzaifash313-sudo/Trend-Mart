@@ -10,7 +10,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
-import type { Shop, UserLocation, SupportedCity } from "@/types";
+import type { Shop, Story, UserLocation, SupportedCity } from "@/types";
 import { SUPPORTED_CITIES } from "@/types";
 import { logError } from "@/services/errorService";
 import {
@@ -738,6 +738,54 @@ export function isCustomerWithinCoverage(
     return { within: distanceKm <= radiusKm, distanceKm, coverageMode: "radius" };
   }
   return { within: true, distanceKm, coverageMode: "radius" };
+}
+
+/**
+ * Filter active stories to shops whose delivery coverage actually includes the
+ * customer. Keeps the story tray hyper-local: a customer only sees stories from
+ * shops that deliver to them (radius / city / nationwide coverage) instead of
+ * every shop's story flooding the homepage. Shops without any geo config are
+ * treated as "deliver anywhere" and stay visible.
+ */
+export function filterStoriesByCoverage(
+  stories: Story[],
+  customer: {
+    latitude: number;
+    longitude: number;
+    city?: string | null;
+    area?: string;
+  } | null,
+): Story[] {
+  if (!customer) return stories;
+
+  const area = customer.area ? normalizeAreaName(customer.area) : "";
+
+  return stories.filter((s) => {
+    const within = isCustomerWithinCoverage(
+      {
+        latitude: s.shop_latitude ?? null,
+        longitude: s.shop_longitude ?? null,
+        service_radius_km: s.shop_service_radius_km ?? null,
+        delivery_zones: s.shop_delivery_zones ?? null,
+        location: s.shop_location ?? null,
+      },
+      customer.latitude,
+      customer.longitude,
+      customer.city ?? null,
+    ).within;
+
+    if (within) return true;
+
+    // Textual fallback: a pin-less / radius shop that names the customer's area.
+    if (area) {
+      const haystack = [s.shop_location, ...(s.shop_delivery_zones ?? [])]
+        .filter(Boolean)
+        .map((v) => normalizeAreaName(String(v)))
+        .join(" | ");
+      if (haystack && haystack.includes(area)) return true;
+    }
+    return false;
+  });
 }
 
 export function getDistanceToShop(

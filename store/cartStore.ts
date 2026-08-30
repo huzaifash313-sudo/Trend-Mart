@@ -183,6 +183,12 @@ interface CartState {
   removeItem: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
   updateItemNotes: (cartItemId: string, notes: string) => void;
+  updateItemVariant: (
+    cartItemId: string,
+    variant: string,
+    price: number,
+    originalPrice?: number | null,
+  ) => void;
   clearCart: () => void;
 }
 
@@ -308,6 +314,29 @@ export const useCartStore = create<CartState>()(
         }));
       },
 
+      updateItemVariant: (cartItemId, variant, price, originalPrice) => {
+        if (!cartItemId || typeof cartItemId !== "string") return;
+        const safeVariant = variant ? sanitizeVariant(variant) : undefined;
+        const safePrice = sanitizePrice(price);
+        const safeOriginal =
+          originalPrice != null ? sanitizePrice(originalPrice) : null;
+        set((state) => ({
+          items: state.items.map((i) =>
+            i.id === cartItemId
+              ? {
+                  ...i,
+                  variant: safeVariant,
+                  price: safePrice,
+                  basePrice: safePrice,
+                  originalPrice: safeOriginal,
+                  // Variant products never carry quantity tiers.
+                  priceTiers: null,
+                }
+              : i,
+          ),
+        }));
+      },
+
       clearCart: () => {
         set({ items: [] });
         try {
@@ -377,6 +406,7 @@ export function useCart() {
   const removeItem = useCartStore((s) => s.removeItem);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const updateItemNotes = useCartStore((s) => s.updateItemNotes);
+  const updateItemVariant = useCartStore((s) => s.updateItemVariant);
   const clearCart = useCartStore((s) => s.clearCart);
 
   const totalItems = items.reduce((sum, i) => sum + sanitizeQuantity(i.quantity), 0);
@@ -397,6 +427,7 @@ export function useCart() {
     removeItem,
     updateQuantity,
     updateItemNotes,
+    updateItemVariant,
     clearCart,
     totalItems,
     totalAmount,

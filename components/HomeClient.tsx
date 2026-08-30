@@ -24,7 +24,11 @@ import { toggleFavorite as toggleFav, getAllFavorites } from "@/services/wishlis
 import { useToast } from "@/components/Toast";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { getSafeImageUrl } from "@/services/storageService";
-import { filterShopsByProximity, getCustomerArea } from "@/services/geoRadiusService";
+import {
+  filterShopsByProximity,
+  filterStoriesByCoverage,
+  getCustomerArea,
+} from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
@@ -324,6 +328,7 @@ function HomeClient({
     SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All",
   );
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+  const [myStoryViewerOpen, setMyStoryViewerOpen] = useState(false);
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
   // Empty on both server + first client render — hearts are hydrated from
   // localStorage / DB in the effect below (reading localStorage in a useState
@@ -386,10 +391,20 @@ function HomeClient({
   const { openQuickAdd } = useMerchantQuickAdd();
 
   // Header LocationPicker + homepage area filter (Near me / City / All Pakistan)
-  const { location: globalLocation, coordinates: globalCoords } = useLocation();
+  const { location: globalLocation, coordinates: globalCoords, detectLocation } = useLocation();
 
   const [geoDetecting, setGeoDetecting] = useState(false);
   const [geoFilteredShops, setGeoFilteredShops] = useState<ShopWithDistance[]>([]);
+
+  /** Let the story tray resolve a location so it can show hyper-local stories. */
+  const handleDetectForStories = useCallback(async () => {
+    setGeoDetecting(true);
+    try {
+      await detectLocation();
+    } finally {
+      setGeoDetecting(false);
+    }
+  }, [detectLocation]);
   const [proximityActive, setProximityActive] = useState(false);
   const [geoFilter, setGeoFilter] = useState<GeoFilterState>({
     coordinates: null,
@@ -479,54 +494,32 @@ function HomeClient({
     };
   }, [filteredShops, geoFilter, globalCoords, globalLocation]);
 
-  /* Geo filter — compute location-visible shop IDs (location-only) for stories. */
+  /* Hyper-local story gating: only shops whose delivery coverage includes the
+     customer appear in the story tray — driven by the customer's saved location,
+     independent of the shop grid's browse scope. `null` means "no location yet",
+     so the tray shows a locate prompt instead of flooding every shop's story. */
   useEffect(() => {
-    let cancelled = false;
-    async function computeVisibleShopIds() {
-      const scope = geoFilter.scope;
-      const coords = geoFilter.coordinates ?? globalCoords ?? null;
-
-      // Shops not loaded yet → don't compute an (empty) visible set, otherwise
-      // every story would be filtered out and the tray would vanish until the
-      // shops query resolves. `null` means "no restriction" so stories show.
-      if (!shops || shops.length === 0) {
-        setGeoVisibleShopIds(null);
-        return;
-      }
-
-      // No pin + nationwide/city browse → no location restriction on stories.
-      if ((scope === "pakistan" || scope === "city") && !coords) {
-        setGeoVisibleShopIds(null);
-        return;
-      }
-      if (scope === "radius" && !coords) {
-        setGeoVisibleShopIds(null);
-        return;
-      }
-
-      try {
-        const result = await filterShopsByProximity(shops, {
-          coordinates: coords,
-          maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
-          enforceServiceRadius: true,
-          sortByProximity: false,
-          scope,
-          deliveryZone: globalLocation?.deliveryZone ?? undefined,
-          customerCity: globalLocation?.city ?? undefined,
-          customerArea: getCustomerArea(globalLocation),
-        });
-        if (!cancelled) {
-          setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
-        }
-      } catch {
-        if (!cancelled) setGeoVisibleShopIds(null);
-      }
+    if (!globalCoords) {
+      setGeoVisibleShopIds(null);
+      return;
     }
-    computeVisibleShopIds();
-    return () => {
-      cancelled = true;
+    const customer = {
+      latitude: globalCoords.latitude,
+      longitude: globalCoords.longitude,
+      city: globalLocation?.city ?? null,
+      area: getCustomerArea(globalLocation) ?? undefined,
     };
-  }, [shops, geoFilter, globalCoords, globalLocation]);
+    const visible = filterStoriesByCoverage(
+      storiesQuery.data ?? EMPTY_STORIES,
+      customer,
+    );
+    setGeoVisibleShopIds(new Set(visible.map((s) => s.shop_id)));
+  }, [
+    globalCoords,
+    globalLocation?.city,
+    globalLocation?.deliveryZone,
+    storiesQuery.data,
+  ]);
 
   const displayShops = proximityActive ? geoFilteredShops : filteredShops;
   const showProximityBadges =
@@ -606,21 +599,23 @@ function HomeClient({
         </svg>
         <div className="-mx-3 flex gap-3.5 overflow-x-auto px-3 pb-0 scrollbar-none">
           {myShop ? (
-            <button
-              type="button"
-              onClick={() =>
-                openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" })
-              }
-              className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-              aria-label={
-                myStories.length > 0
-                  ? `Your story is live — tap to add or replace`
-                  : "Add your store story"
-              }
-            >
+            <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
               <div className="relative">
-                {myStories.length > 0 && myStories[0].image_url ? (
-                  <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (myStories.length > 0) setMyStoryViewerOpen(true);
+                    else
+                      openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" });
+                  }}
+                  className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  aria-label={
+                    myStories.length > 0
+                      ? "Preview your live story"
+                      : "Add your store story"
+                  }
+                >
+                  {myStories.length > 0 && myStories[0].image_url ? (
                     <StoryRing total={myStories.length} seen={0}>
                       {!brokenStoryImgs.has(myStories[0].id) ? (
                         <Image
@@ -639,37 +634,63 @@ function HomeClient({
                         </div>
                       )}
                     </StoryRing>
-                    {myStories.length > 1 ? (
-                      <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
-                        {myStories.length}
-                      </span>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
-                    <div className="relative flex h-[3.35rem] w-[3.35rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
-                      <span className="text-2xl font-bold leading-none text-emerald-600 dark:text-emerald-400">+</span>
+                  ) : (
+                    <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
+                      <div className="relative flex h-[3.35rem] w-[3.35rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
+                        <span className="text-2xl font-bold leading-none text-emerald-600 dark:text-emerald-400">+</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-              <span className="flex w-full items-center justify-center gap-0.5 text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
-                {myStories.length > 0 ? (
-                  <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
-                    +
+                  )}
+                </button>
+                {myStories.length > 1 ? (
+                  <span className="pointer-events-none absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
+                    {myStories.length}
                   </span>
                 ) : null}
-                <span className="truncate">Your story</span>
+                {myStories.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" })
+                    }
+                    className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold leading-none text-white ring-2 ring-white shadow-sm transition hover:bg-emerald-700 dark:ring-zinc-950"
+                    aria-label="Add story"
+                    title="Add story"
+                  >
+                    +
+                  </button>
+                ) : null}
+              </div>
+              <span className="w-full truncate text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+                Your story
               </span>
-            </button>
+            </div>
           ) : null}
 
           {storiesQuery.isLoading ? (
             <div className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1">
               <div className="h-[3.35rem] w-[3.35rem] animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
             </div>
+          ) : !globalCoords ? (
+            <button
+              type="button"
+              onClick={handleDetectForStories}
+              disabled={geoDetecting}
+              className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              aria-label="Detect location to see nearby store stories"
+            >
+              <div className="flex h-[3.35rem] w-[3.35rem] items-center justify-center rounded-full border border-dashed border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
+                  <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
+                </svg>
+              </div>
+              <span className="w-full text-center text-[0.62rem] font-medium leading-tight text-zinc-600 dark:text-zinc-300">
+                {geoDetecting ? "Detecting…" : "Nearby stories"}
+              </span>
+            </button>
           ) : stories.length === 0 && !myShop ? (
-            <p className="px-3 text-xs text-zinc-400 dark:text-zinc-500">No active stories right now.</p>
+            <p className="px-3 text-xs text-zinc-400 dark:text-zinc-500">No nearby stories right now.</p>
           ) : (
             storyGroups.map((group, gIdx) => {
               const first = group[0];
@@ -741,6 +762,18 @@ function HomeClient({
           myShopId={myShopId}
           onClose={() => {
             setStoryViewerOpen(false);
+            setStoriesVersion((v) => v + 1);
+          }}
+        />
+      )}
+
+      {myStoryViewerOpen && (
+        <StoriesViewer
+          stories={myStories}
+          initialIndex={0}
+          myShopId={myShopId}
+          onClose={() => {
+            setMyStoryViewerOpen(false);
             setStoriesVersion((v) => v + 1);
           }}
         />

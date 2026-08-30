@@ -28,9 +28,11 @@ import { createClient } from "@/lib/supabase/client";
 import { createOrder } from "@/services/orderService";
 import { validateCoupon, fetchCouponsByShopId } from "@/services/couponService";
 import { saveOrderRecord } from "@/services/orderHistoryService";
-import type { OrderItem as OrderItemType, PriceTier, Shop } from "@/types";
+import type { OrderItem as OrderItemType, PriceTier, Shop, VariantGroup } from "@/types";
 import { formatRupees } from "@/lib/formatters";
 import { priceForQuantity, hasPriceTiers } from "@/lib/priceTiers";
+import { computeVariantPricing, parseVariantLabel } from "@/lib/variantPricing";
+import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { computeDeliveryFee } from "@/lib/deliveryFee";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
@@ -107,6 +109,35 @@ function itemLineTotal(item: { price: number; priceTiers?: PriceTier[] | null },
     return priceForQuantity(item.price, item.priceTiers, q);
   }
   return item.price * q;
+}
+
+/** Convert a "Group: Label · Group: Label" string into `SelectedVariant[]`. */
+function labelToSelection(label?: string): SelectedVariant[] {
+  if (!label) return [];
+  return parseVariantLabel(label).map((p) => ({
+    groupName: p.groupName,
+    optionLabel: p.optionLabel,
+    priceAdj: 0,
+  }));
+}
+
+/** Whether a variant label selects every group of a product's variant set. */
+function isVariantComplete(variants: VariantGroup[], label?: string): boolean {
+  if (!variants || variants.length === 0) return true;
+  if (!label) return false;
+  const selectedGroups = parseVariantLabel(label)
+    .filter((p) => p.groupName)
+    .map((p) => p.groupName);
+  // Legacy labels without "Group: " prefixes can't be verified per-group.
+  if (selectedGroups.length === 0) return true;
+  return variants.every((g) => selectedGroups.includes(g.name));
+}
+
+/** Variant metadata for a cart product (authoritative base price + options). */
+interface CartVariantData {
+  price: number;
+  originalPrice: number | null;
+  variants: VariantGroup[];
 }
 
 export interface ShippingDetails {
@@ -433,6 +464,9 @@ export default function WhatsAppCheckoutModal({
   const [couponResult, setCouponResult] = useState<CouponValidationResult | null>(null);
   const [availableCoupons, setAvailableCoupons] = useState<Array<{ id: string; code: string }>>([]);
   const couponTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether a fresh GPS fix has landed this checkout session, so the
+  // saved profile pin never overwrites a more-accurate current location.
+  const hasFreshGpsRef = useRef(false);
 
   // Idempotency token: one per checkout session. Reused across retries so a
   // double-submit can't create duplicate orders; regenerated only on success.
@@ -451,13 +485,61 @@ export default function WhatsAppCheckoutModal({
     return initial;
   });
 
+  // Variant selection at checkout — the user can confirm/change every item's
+  // options before ordering, even if the product was added to the cart from a
+  // surface that didn't ask for a variant.
+  const [variantData, setVariantData] = useState<Record<string, CartVariantData>>({});
+  const [variantSelections, setVariantSelections] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const item of items) {
+      if (item.variant) initial[item.id] = item.variant;
+    }
+    return initial;
+  });
+  const [variantOpenId, setVariantOpenId] = useState<string | null>(null);
+
   // ── Derived Values ──────────────────────────────────────────────────────
+
+  // Items with their chosen variant applied (price + original re-resolved from
+  // the authoritative product variant data). Falls back to the cart item as-is
+  // when the product has no variants or hasn't been fetched yet.
+  const resolvedItems = useMemo(() => {
+    return items.map((item) => {
+      const data = variantData[item.productId];
+      if (!data || data.variants.length === 0) return item;
+      const sel = variantSelections[item.id];
+      if (!sel) return item;
+      const { price, originalPrice } = computeVariantPricing(
+        data.price,
+        data.originalPrice,
+        data.variants,
+        sel,
+      );
+      return {
+        ...item,
+        variant: sel,
+        price,
+        originalPrice: originalPrice ?? undefined,
+      };
+    });
+  }, [items, variantData, variantSelections]);
+
+  const itemsNeedingVariant = useMemo(
+    () =>
+      items.filter((item) => {
+        const data = variantData[item.productId];
+        if (!data || data.variants.length === 0) return false;
+        return !isVariantComplete(data.variants, variantSelections[item.id]);
+      }),
+    [items, variantData, variantSelections],
+  );
+
   const subtotal = useMemo(() => {
-    return items.reduce((sum, item) => {
+    return resolvedItems.reduce((sum, item) => {
       const qty = quantities[item.id] ?? item.quantity;
       return sum + itemLineTotal(item, qty);
     }, 0);
-  }, [items, quantities]);
+  }, [resolvedItems, quantities]);
 
   const discountAmount = useMemo(() => {
     return couponResult?.valid ? couponResult.discountAmount : 0;
@@ -636,6 +718,60 @@ export default function WhatsAppCheckoutModal({
     setPortalReady(true);
   }, []);
 
+  // Fetch variant metadata (base price + option groups) for plain cart
+  // products so the review step can let the shopper confirm/change options
+  // before ordering. Deal items (viewKind set) are variant-less and skipped.
+  useEffect(() => {
+    let cancelled = false;
+    const productIds = [
+      ...new Set(
+        items.filter((i) => i.viewKind === undefined).map((i) => i.productId).filter(Boolean),
+      ),
+    ];
+    if (productIds.length === 0) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, price, original_price, compare_at_price, variants")
+        .in("id", productIds);
+      if (cancelled || error || !data) return;
+      const map: Record<string, CartVariantData> = {};
+      for (const row of data as Record<string, unknown>[]) {
+        const variants = Array.isArray(row.variants)
+          ? (row.variants as VariantGroup[])
+          : [];
+        if (variants.length === 0) continue;
+        const original =
+          typeof row.original_price === "number"
+            ? row.original_price
+            : typeof row.compare_at_price === "number"
+              ? row.compare_at_price
+              : null;
+        map[String(row.id)] = {
+          price: Number(row.price) || 0,
+          originalPrice: original != null && original > 0 ? original : null,
+          variants,
+        };
+      }
+      setVariantData(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items, supabase]);
+
+  // Refresh GPS as soon as checkout opens so the coverage / radius gate and the
+  // delivery-fee distance use the *current* position, never a stale saved pin.
+  useEffect(() => {
+    if (shop.accepts_delivery === false) return;
+    void detectLocationDetailed()
+      .then((r) => {
+        if (r.location?.coordinates) hasFreshGpsRef.current = true;
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Auto-fill from saved delivery address + profile ────────────────────
   useEffect(() => {
     if (authGate !== "ok") return;
@@ -683,8 +819,10 @@ export default function WhatsAppCheckoutModal({
         const profileLocLabel = (profile?.location_label as string | undefined)?.trim() || "";
 
         // Seed the location context from the saved profile pin so distance +
-        // coverage checks run immediately without a fresh GPS prompt.
-        if (profileLat != null && profileLng != null) {
+        // coverage checks run immediately without a fresh GPS prompt. Only as a
+        // fallback: a fresh GPS fix (current location) always wins over the
+        // saved address — the customer may have moved cities.
+        if (profileLat != null && profileLng != null && !hasFreshGpsRef.current) {
           seedLocation({
             coordinates: { latitude: profileLat, longitude: profileLng },
             city: (profile?.city as string | undefined) ?? null,
@@ -864,6 +1002,11 @@ export default function WhatsAppCheckoutModal({
     setOrderError(null);
 
     try {
+      if (itemsNeedingVariant.length > 0) {
+        throw new Error(
+          "Please select options for all items before placing your order.",
+        );
+      }
       if (belowMinimumOrder) {
         throw new Error(
           `Minimum order for this shop is ${formatRupees(minOrderAmount)}. Add more items to continue.`,
@@ -907,7 +1050,7 @@ export default function WhatsAppCheckoutModal({
       }
 
       // 1. Persist order to Supabase (effective unit price + qty — tier-aware)
-      const orderItems: OrderItemType[] = items.map(item => {
+      const orderItems: OrderItemType[] = resolvedItems.map(item => {
         const oQty = Math.max(1, Math.round(quantities[item.id] ?? item.quantity));
         const oTotal = itemLineTotal(item, oQty);
         return {
@@ -993,13 +1136,13 @@ export default function WhatsAppCheckoutModal({
       saveOrderRecord({
         shopId: shop.id,
         shopName: shop.name,
-        productName: items.map(i => i.name).join(", "),
+        productName: resolvedItems.map(i => i.name).join(", "),
         quantity: Object.values(quantities).reduce((a, b) => a + b, 0),
         totalAmount: grandTotal,
         discountAmount,
         couponCode,
         notes: shipping.deliveryNotes,
-        items: items.map((i) => ({
+        items: resolvedItems.map((i) => ({
           product_id: i.productId,
           name: i.name,
           price: i.price,
@@ -1011,7 +1154,7 @@ export default function WhatsAppCheckoutModal({
       // Build WhatsApp message (TrendMart product links + Maps pin)
       const whatsappText = buildWhatsAppMessage(
         shop,
-        items,
+        resolvedItems,
         quantities,
         shipping,
         subtotal,
@@ -1060,7 +1203,8 @@ export default function WhatsAppCheckoutModal({
     }
   }, [
     phone,
-    items,
+    resolvedItems,
+    itemsNeedingVariant,
     shop,
     shipping,
     subtotal,
@@ -1292,58 +1436,97 @@ export default function WhatsAppCheckoutModal({
             </div>
 
             <div className="max-h-64 space-y-2 overflow-y-auto px-6 py-4">
-              {items.map(item => {
+              {resolvedItems.map(item => {
                 const qty = quantities[item.id] ?? item.quantity;
                 const itemTotal = itemLineTotal(item, qty);
                 const tierUnit = hasPriceTiers(item.priceTiers)
                   ? Math.round(itemTotal / Math.max(1, qty))
                   : item.price;
+                const data = item.viewKind === undefined ? variantData[item.productId] : undefined;
+                const hasVariants = !!data && data.variants.length > 0;
+                const needsSelection = hasVariants && !isVariantComplete(data!.variants, item.variant);
+                const variantOpen = variantOpenId === item.id;
                 return (
-                  <div key={item.id} className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50">
-                    {/* Thumbnail */}
-                    <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-200 dark:bg-zinc-700">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center"><PackageIcon /></div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.name}</p>
-                      {item.variant && <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.variant}</p>}
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatRupees(tierUnit)}</p>
-                        {item.originalPrice && item.originalPrice > tierUnit && (
-                          <p className="text-[0.6rem] text-zinc-400 line-through">{formatRupees(item.originalPrice)}</p>
+                  <div key={item.id} className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50">
+                    <div className="flex items-center gap-3">
+                      {/* Thumbnail */}
+                      <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-200 dark:bg-zinc-700">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center"><PackageIcon /></div>
                         )}
-                        <p className="text-xs text-zinc-400">× {qty} = {formatRupees(itemTotal)}</p>
+                      </div>
+
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.name}</p>
+                        {item.variant && <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.variant}</p>}
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatRupees(tierUnit)}</p>
+                          {item.originalPrice && item.originalPrice > tierUnit && (
+                            <p className="text-[0.6rem] text-zinc-400 line-through">{formatRupees(item.originalPrice)}</p>
+                          )}
+                          <p className="text-xs text-zinc-400">× {qty} = {formatRupees(itemTotal)}</p>
+                        </div>
+                      </div>
+
+                      {/* Quantity Controls */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, -1)}
+                          disabled={(quantities[item.id] ?? 1) <= 1}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          aria-label={`Decrease quantity of ${item.name}`}
+                        >
+                          <MinusIcon />
+                        </button>
+                        <span className="w-8 text-center text-sm font-semibold text-zinc-900 dark:text-zinc-100">{qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, 1)}
+                          disabled={(quantities[item.id] ?? 1) >= 99}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          aria-label={`Increase quantity of ${item.name}`}
+                        >
+                          <PlusIcon />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Quantity Controls */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(item.id, -1)}
-                        disabled={(quantities[item.id] ?? 1) <= 1}
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                        aria-label={`Decrease quantity of ${item.name}`}
-                      >
-                        <MinusIcon />
-                      </button>
-                      <span className="w-8 text-center text-sm font-semibold text-zinc-900 dark:text-zinc-100">{qty}</span>
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(item.id, 1)}
-                        disabled={(quantities[item.id] ?? 1) >= 99}
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                        aria-label={`Increase quantity of ${item.name}`}
-                      >
-                        <PlusIcon />
-                      </button>
-                    </div>
+                    {/* Variant selection — confirm/change options before ordering */}
+                    {hasVariants && (
+                      <div className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setVariantOpenId(variantOpen ? null : item.id)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+                          >
+                            {item.variant ? "Change options" : "Select options"}
+                          </button>
+                          {needsSelection && (
+                            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[0.65rem] font-semibold text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                              Required
+                            </span>
+                          )}
+                        </div>
+                        {variantOpen && (
+                          <VariantSelector
+                            variants={data!.variants}
+                            basePrice={data!.price}
+                            baseOriginalPrice={data!.originalPrice}
+                            initialSelection={labelToSelection(item.variant)}
+                            onSelectionChange={(sel) => {
+                              const label = sel.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · ");
+                              setVariantSelections((prev) => ({ ...prev, [item.id]: label }));
+                            }}
+                            compact
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1491,10 +1674,23 @@ export default function WhatsAppCheckoutModal({
                 </span>
               </div>
 
+              {itemsNeedingVariant.length > 0 && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs dark:bg-amber-900/20">
+                  <InfoIcon />
+                  <span className="text-amber-700 dark:text-amber-400">
+                    Please select options for{" "}
+                    <strong>
+                      {itemsNeedingVariant.map((i) => i.name).join(", ")}
+                    </strong>{" "}
+                    before continuing.
+                  </span>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleGoToShipping}
-                disabled={items.length === 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || noFulfillment}
+                disabled={items.length === 0 || itemsNeedingVariant.length > 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || noFulfillment}
                 className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {noFulfillment
@@ -1503,11 +1699,13 @@ export default function WhatsAppCheckoutModal({
                     ? "Shop Closed — Come Back Later"
                     : outsideServiceRadius
                       ? "Outside Delivery Area"
-                      : belowMinimumOrder
-                        ? "Add More Items to Continue"
-                        : isPickup
-                          ? "Continue to Pickup Details →"
-                          : "Continue to Delivery Details →"}
+                      : itemsNeedingVariant.length > 0
+                        ? "Select Options to Continue"
+                        : belowMinimumOrder
+                          ? "Add More Items to Continue"
+                          : isPickup
+                            ? "Continue to Pickup Details →"
+                            : "Continue to Delivery Details →"}
               </button>
             </div>
           </div>
@@ -1710,7 +1908,7 @@ export default function WhatsAppCheckoutModal({
               {/* Order Summary */}
               <div className="space-y-2">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Order Summary</h4>
-                {items.map(item => (
+                {resolvedItems.map(item => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span className="text-zinc-700 dark:text-zinc-300">
                       {item.name} {item.variant ? `(${item.variant})` : ""} × {quantities[item.id] ?? item.quantity}

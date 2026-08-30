@@ -395,6 +395,7 @@ export default function QuickViewModal({
             <VariantSelector
               variants={product.variants}
               basePrice={product.price}
+              baseOriginalPrice={product.original_price ?? product.compare_at_price ?? null}
               onSelectionChange={setSelectedVariants}
               compact
             />

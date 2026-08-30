@@ -673,7 +673,8 @@ function sanitizeShopForm(form: ShopFormData): Omit<
 /**
  * Create a new shop for the currently-authenticated user.
  * New stores go live immediately (no Super-Admin approval queue).
- * Email must be verified first.
+ * Merchant onboarding is intentionally direct — email verification is not
+ * required here. Verification is instead enforced at checkout/order time.
  */
 export async function createShop(
   form: ShopFormData,
@@ -686,12 +687,6 @@ export async function createShop(
     } = await supabase.auth.getUser();
 
     if (!user) return { success: false, error: "Not authenticated." };
-    if (!user.email_confirmed_at) {
-      return {
-        success: false,
-        error: "Please verify your email before registering a store.",
-      };
-    }
 
     // Strict one-store-per-account rule. The DB also enforces this with a
     // unique index (see one_shop_per_owner migration) — this guard returns a

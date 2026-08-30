@@ -160,6 +160,41 @@ function variantIsUnavailable(
   return false;
 }
 
+/**
+ * Mark only the referenced variant option(s) unavailable inside the product's
+ * `variants` JSON — never the whole product. When a tracked variant runs out
+ * during checkout we "Sold Out" just that option (Daraz-style) so the rest of
+ * the sizes/flavours stay orderable. Returns a new array (or null if nothing
+ * matched / nothing changed).
+ */
+function markVariantUnavailable(
+  variants: VariantGroup[],
+  variantLabel: string | undefined,
+): VariantGroup[] | null {
+  if (!variantLabel || !variants.length) return null;
+  const parts = variantLabel.split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+
+  let changed = false;
+  const next = variants.map((group) => ({
+    ...group,
+    options: group.options.map((opt) => {
+      const match = parts.some((part) => {
+        const idx = part.indexOf(":");
+        const label = idx > 0 ? part.slice(idx + 1).trim() : part;
+        return opt.label === label || `${group.name}: ${opt.label}` === part;
+      });
+      if (match && opt.is_available !== false) {
+        changed = true;
+        return { ...opt, is_available: false };
+      }
+      return opt;
+    }),
+  }));
+
+  return changed ? next : null;
+}
+
 type CoverageMode = "radius" | "city" | "nationwide";
 
 function parseCoverage(zones: string[] | null | undefined): {
@@ -365,7 +400,7 @@ export async function POST(request: Request) {
     admin
       .from("shop_deals")
       .select(
-        "id, shop_id, title, price, original_price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month",
+        "id, shop_id, title, price, original_price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month, product_id",
       )
       .in("id", ids),
   ]);
@@ -421,6 +456,20 @@ export async function POST(request: Request) {
       deal: ShopDeal;
     }
   >();
+  // Deals linked to a catalog product, keyed by product id. A linked deal's
+  // cart/wishlist identity is the product id (see dealCommerceId), so we need
+  // this reverse index to re-resolve the deal price at checkout.
+  const dealByProductId = new Map<
+    string,
+    {
+      id: string;
+      shop_id: string;
+      title: string;
+      price: number;
+      original_price: number | null;
+      deal: ShopDeal;
+    }
+  >();
   for (const row of (dealRes.data ?? []) as Record<string, unknown>[]) {
     const scheduleType = String(row.schedule_type ?? "weekly");
     const deal: ShopDeal = {
@@ -435,16 +484,19 @@ export async function POST(request: Request) {
       ends_on: row.ends_on ? String(row.ends_on) : null,
       day_of_month: row.day_of_month != null ? Number(row.day_of_month) : null,
       is_active: row.is_active !== false,
+      product_id: row.product_id ? String(row.product_id) : null,
       created_at: "",
     };
-    dealMap.set(deal.id, {
+    const entry = {
       id: deal.id,
       shop_id: deal.shop_id,
       title: deal.title,
       price: toNumber(row.price),
       original_price: toMoney(row.original_price),
       deal,
-    });
+    };
+    dealMap.set(deal.id, entry);
+    if (deal.product_id) dealByProductId.set(deal.product_id, entry);
   }
 
   const resolvedItems: Array<{
@@ -477,6 +529,42 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
+
+      // A deal linked to this product (active + orderable today) sells at the
+      // DEAL price, not the catalog base price. Linked deals are variant-less,
+      // so this only applies when no variant was selected (a variant pick is a
+      // plain product order and keeps its own price).
+      const linkedDeal = dealByProductId.get(item.productId);
+      if (
+        linkedDeal &&
+        !item.variant &&
+        linkedDeal.deal.is_active &&
+        isDealOrderableToday(linkedDeal.deal)
+      ) {
+        if (!(linkedDeal.price > 0)) {
+          return NextResponse.json(
+            { success: false, error: `"${linkedDeal.title}" needs a price. Ask the shop to set one.` },
+            { status: 409 },
+          );
+        }
+        resolvedItems.push({
+          productId: item.productId,
+          name: product.name || item.name,
+          price: linkedDeal.price,
+          originalPrice:
+            linkedDeal.original_price != null && linkedDeal.original_price > linkedDeal.price
+              ? linkedDeal.original_price
+              : null,
+          quantity: item.quantity,
+          variant: item.variant,
+          variantGroup: item.variantGroup,
+          notes: item.notes,
+          isProduct: false,
+          variants: [],
+        });
+        continue;
+      }
+
       if (variantIsUnavailable(product.variants, item.variant)) {
         return NextResponse.json(
           { success: false, error: `"${product.name}"${item.variant ? ` (${item.variant})` : ""} is not available.` },
@@ -819,12 +907,31 @@ export async function POST(request: Request) {
         },
       );
       if (!deductErr && deductOk === false) {
-        // Insufficient tracked stock: don't block — just hide the product from
-        // further orders until the merchant taps it back "In Stock".
-        await admin
+        // Insufficient tracked stock for THIS variant: don't block the order,
+        // just "Sold Out" that specific option so the rest stay orderable.
+        // Re-read the current variants first so we never clobber the stock
+        // deductions an earlier line on this same product just committed.
+        const { data: fresh } = await admin
           .from("products")
-          .update({ is_available: false } as never)
-          .eq("id", item.productId);
+          .select("variants")
+          .eq("id", item.productId)
+          .maybeSingle();
+        const freshVariants =
+          ((fresh as { variants?: VariantGroup[] } | null)?.variants as
+            | VariantGroup[]
+            | undefined) ?? item.variants;
+        const updatedVariants = markVariantUnavailable(freshVariants, item.variant);
+        if (updatedVariants) {
+          await admin
+            .from("products")
+            .update({ variants: updatedVariants } as never)
+            .eq("id", item.productId);
+        } else {
+          await admin
+            .from("products")
+            .update({ is_available: false } as never)
+            .eq("id", item.productId);
+        }
       }
     } catch {
       // RPC missing (old DB) — skip deduction; availability was already checked.

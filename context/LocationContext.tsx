@@ -22,6 +22,9 @@ import {
   buildLocationFromCoords,
   resolveCoordinates,
   storeUserLocation,
+  requestUserLocationDetailed,
+  haversineDistance,
+  isValidCoordinate,
   type GeoCoordinates,
   type LocationDetectErrorCode,
 } from "@/services/geoRadiusService";
@@ -96,60 +99,61 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const saved = getValidSavedLocation();
-      if (saved) {
-        setLocation(saved);
-        setIsInitialized(true);
-        // Mark auto-detect as already handled since we have a saved location
-        autoDetectAttempted.current = true;
-        if (typeof window !== "undefined") {
-          try { sessionStorage.setItem(AUTO_DETECT_KEY, "1"); } catch { /* ignore */ }
-        }
-        return;
-      }
+      if (saved) setLocation(saved);
     } catch {
       // ignore corrupt localStorage entries
     }
     setIsInitialized(true);
   }, []);
 
-  // ── 2. Auto-detect GPS on first visit (with permission guard) ─────────
+  // ── 2. Refresh with a fresh GPS fix on mount (silent, once per session) ──
+  // Always attempt a current read so a customer who moved cities (e.g.
+  // Gujranwala → Lahore) sees shops around their *current* position, never a
+  // stale last-known pin. The browser only prompts once (permission is
+  // remembered), so this stays silent for returning users. When the fresh fix
+  // is essentially the same as the saved pin we skip the reverse-geocode and
+  // just refresh the pin timestamp.
   useEffect(() => {
-    // Only run on client, only once per session
     if (typeof window === "undefined") return;
     if (autoDetectAttempted.current) return;
-
-    // Check if already attempted this session
-    try {
-      if (sessionStorage.getItem(AUTO_DETECT_KEY) === "1") {
-        autoDetectAttempted.current = true;
-        // No saved location and auto-detect already tried this session — leave
-        // location empty so the user picks a city or enables GPS. Never fabricate
-        // a fallback pin (that would show wrong shops to distant users).
-        return;
-      }
-    } catch { /* ignore */ }
-
     autoDetectAttempted.current = true;
-
-    // Mark attempted in sessionStorage so we don't keep retrying on re-renders
     try { sessionStorage.setItem(AUTO_DETECT_KEY, "1"); } catch { /* ignore */ }
 
-    // Attempt GPS detection silently (no intrusive prompt, just a fast check)
-    setIsDetecting(true);
-    detectAndSaveLocation()
-      .then((detected) => {
-        if (detected) {
-          setLocation(detected);
+    (async () => {
+      try {
+        const { coordinates } = await requestUserLocationDetailed({
+          enableHighAccuracy: true,
+          timeout: 10_000,
+          maximumAge: 60_000,
+        });
+        if (!coordinates) return; // denied / unavailable / timeout → keep saved
+
+        const saved = getValidSavedLocation();
+        if (
+          saved?.coordinates &&
+          isValidCoordinate(saved.coordinates.latitude, saved.coordinates.longitude)
+        ) {
+          const d = haversineDistance(
+            saved.coordinates.latitude,
+            saved.coordinates.longitude,
+            coordinates.latitude,
+            coordinates.longitude,
+          );
+          // Customer hasn't moved — keep the richer saved label, refresh pin.
+          if (d != null && d <= 0.5) {
+            storeUserLocation(coordinates);
+            return;
+          }
         }
-        // GPS failed or was denied — leave location empty; the area filter will
-        // show a "Detect My Location" / city picker prompt instead of a wrong pin.
-      })
-      .catch(() => {
-        // Network error — leave location empty (no fabricated fallback pin).
-      })
-      .finally(() => {
-        setIsDetecting(false);
-      });
+
+        const fresh = await buildLocationFromCoords(coordinates, "gps");
+        saveLocation(fresh);
+        storeUserLocation(coordinates);
+        setLocation(fresh);
+      } catch {
+        // Network error during reverse-geocode — keep the saved location.
+      }
+    })();
   }, []);  
 
   const coordinates: GeoCoordinates | null = location

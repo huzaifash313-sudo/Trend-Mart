@@ -10,14 +10,20 @@ CREATE TABLE IF NOT EXISTS public.stories (
   shop_id     uuid NOT NULL REFERENCES public.shops(id) ON DELETE CASCADE,
   image_url   text,
   caption     text DEFAULT '',
+  created_at  timestamptz DEFAULT now(),
   /** Stories are shown for 24 hours, then hidden via the RLS policy below */
-  created_at  timestamptz DEFAULT now()
+  expires_at  timestamptz DEFAULT (now() + interval '24 hours')
 );
 
--- 2. Index for fast expiry queries --------------------------------------------
+-- Safety net for older deployments where `stories` predates the expiry column.
+ALTER TABLE public.stories
+  ADD COLUMN IF NOT EXISTS expires_at timestamptz DEFAULT (now() + interval '24 hours');
 
-CREATE INDEX IF NOT EXISTS idx_stories_shop_id   ON public.stories(shop_id);
-CREATE INDEX IF NOT EXISTS idx_stories_created_at ON public.stories(created_at DESC);
+-- 2. Indexes for fast expiry queries ------------------------------------------
+
+CREATE INDEX IF NOT EXISTS idx_stories_shop_id     ON public.stories(shop_id);
+CREATE INDEX IF NOT EXISTS idx_stories_created_at  ON public.stories(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stories_expires_at  ON public.stories(expires_at);
 
 -- 3. Enable RLS ---------------------------------------------------------------
 
@@ -25,10 +31,10 @@ ALTER TABLE public.stories ENABLE ROW LEVEL SECURITY;
 
 -- 4. Policies -----------------------------------------------------------------
 
--- PUBLIC: Anyone can READ stories created within the last 24 hours
+-- PUBLIC: Anyone can READ stories that have not yet expired
 CREATE POLICY "stories_public_read_active"
   ON public.stories FOR SELECT
-  USING (created_at > (now() - INTERVAL '24 hours'));
+  USING (expires_at > now());
 
 -- AUTHENTICATED: Insert a story — must own the linked shop
 CREATE POLICY "stories_owner_insert"
@@ -48,5 +54,5 @@ CREATE POLICY "stories_owner_delete"
 -- ✅ Stories auto-expire after 24 hours via the SELECT policy above.
 --    You can also optionally run a cron job to clean up old rows:
 --
---    DELETE FROM public.stories WHERE created_at < now() - INTERVAL '24 hours';
+--    DELETE FROM public.stories WHERE expires_at < now();
 -- =============================================================================
