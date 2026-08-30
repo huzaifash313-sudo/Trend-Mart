@@ -19,11 +19,13 @@ import {
   useMemo,
   type FormEvent,
 } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { scopedKey } from "@/lib/clientScope";
 import { fetchShops } from "@/services/shopService";
-import type { Shop, Order } from "@/types";
+import { getStatusLabel } from "@/services/notificationService";
+import type { Shop, Order, OrderStatus } from "@/types";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import CustomSelect from "@/components/CustomSelect";
@@ -41,12 +43,38 @@ interface CashEntry {
 }
 
 interface FinanceSummary {
+  orderRevenue: number;
+  manualIncome: number;
   totalRevenue: number;
   totalExpenses: number;
   pendingPayments: number;
   netProfit: number;
   profitMargin: number;
+  totalOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
 }
+
+type LedgerRow = {
+  id: string;
+  kind: "order" | "manual";
+  date: string;
+  type: "income" | "expense" | "pending";
+  category: string;
+  description: string;
+  amount: number;
+  status?: OrderStatus;
+};
+
+const PAGE_SIZE = 20;
+
+const ORDER_STATUS_TONES: Record<string, string> = {
+  Pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  Processing: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  Dispatched: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
+  Delivered: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+  Cancelled: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+};
 
 const EXPENSE_CATEGORIES = [
   "Rent",
@@ -134,6 +162,21 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
+function orderMonthKey(order: Order): string {
+  return (order.created_at ?? "").slice(0, 7);
+}
+
+function entryMonthKey(entry: CashEntry): string {
+  return entry.date.slice(0, 7);
+}
+
+function orderItemSummary(order: Order): string {
+  const count = order.items_json?.length ?? 0;
+  const first = order.items_json?.[0]?.name;
+  if (count <= 1) return first ?? "Order";
+  return `${first ?? "Item"} +${count - 1} more`;
+}
+
 /* ─── Page Component ───────────────────────────────────────────────────────── */
 
 export default function FinancesPage() {
@@ -171,6 +214,8 @@ export default function FinancesPage() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [ordersPage, setOrdersPage] = useState(1);
 
   // Auth check
   useEffect(() => {
@@ -235,7 +280,7 @@ export default function FinancesPage() {
         .select("*")
         .eq("shop_id", activeShopId)
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(500);
       if (!cancelled && !error) {
         setOrders((data ?? []) as unknown as Order[]);
       }
@@ -247,25 +292,32 @@ export default function FinancesPage() {
     return () => { cancelled = true; };
   }, [activeShopId, supabase]);
 
+  // ── Month-scoped data ───────────────────────────────────────────────────────
+  const monthOrders = useMemo(() => {
+    if (!filterMonth) return orders;
+    return orders.filter((o) => orderMonthKey(o) === filterMonth);
+  }, [orders, filterMonth]);
+
+  const monthEntries = useMemo(() => {
+    if (!filterMonth) return entries;
+    return entries.filter((e) => entryMonthKey(e) === filterMonth);
+  }, [entries, filterMonth]);
+
   // ── Derived Finance Summary ────────────────────────────────────────────────
   const summary = useMemo((): FinanceSummary => {
-    // Revenue from completed orders
-    const orderRevenue = orders
+    const orderRevenue = monthOrders
       .filter((o) => o.status === "Delivered" || o.status === "Dispatched")
       .reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
-    // Revenue from manual income entries
-    const manualIncome = entries
+    const manualIncome = monthEntries
       .filter((e) => e.type === "income")
       .reduce((sum, e) => sum + e.amount, 0);
 
-    // Total expenses
-    const totalExpenses = entries
+    const totalExpenses = monthEntries
       .filter((e) => e.type === "expense")
       .reduce((sum, e) => sum + e.amount, 0);
 
-    // Pending payments (orders not yet delivered)
-    const pendingPayments = orders
+    const pendingPayments = monthOrders
       .filter((o) => o.status === "Pending" || o.status === "Processing")
       .reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
@@ -273,17 +325,106 @@ export default function FinancesPage() {
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-    return { totalRevenue, totalExpenses, pendingPayments, netProfit, profitMargin };
-  }, [orders, entries]);
+    return {
+      orderRevenue,
+      manualIncome,
+      totalRevenue,
+      totalExpenses,
+      pendingPayments,
+      netProfit,
+      profitMargin,
+      totalOrders: monthOrders.length,
+      deliveredOrders: monthOrders.filter((o) => o.status === "Delivered").length,
+      cancelledOrders: monthOrders.filter((o) => o.status === "Cancelled").length,
+    };
+  }, [monthOrders, monthEntries]);
 
-  // ── Filtered entries ───────────────────────────────────────────────────────
+  const orderStatusBreakdown = useMemo(() => {
+    const statuses: OrderStatus[] = [
+      "Pending",
+      "Processing",
+      "Dispatched",
+      "Delivered",
+      "Cancelled",
+    ];
+    return statuses.map((status) => {
+      const matched = monthOrders.filter((o) => o.status === status);
+      return {
+        status,
+        count: matched.length,
+        amount: matched.reduce((sum, o) => sum + (o.total_amount || 0), 0),
+      };
+    });
+  }, [monthOrders]);
+
+  const ledgerRows = useMemo((): LedgerRow[] => {
+    const rows: LedgerRow[] = [];
+
+    for (const order of monthOrders) {
+      const isPending = order.status === "Pending" || order.status === "Processing";
+      const isCancelled = order.status === "Cancelled";
+      rows.push({
+        id: `order-${order.id}`,
+        kind: "order",
+        date: (order.created_at ?? "").slice(0, 10),
+        type: isPending ? "pending" : isCancelled ? "expense" : "income",
+        category: `Order · ${getStatusLabel(order.status)}`,
+        description: `#${order.id.slice(0, 8)} · ${order.customer_name || "Customer"} · ${orderItemSummary(order)}`,
+        amount: order.total_amount || 0,
+        status: order.status,
+      });
+    }
+
+    for (const entry of monthEntries) {
+      rows.push({
+        id: `entry-${entry.id}`,
+        kind: "manual",
+        date: entry.date,
+        type: entry.type,
+        category: entry.category,
+        description: entry.description,
+        amount: entry.amount,
+      });
+    }
+
+    rows.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    return rows;
+  }, [monthOrders, monthEntries]);
+
+  const filteredLedgerRows = useMemo(() => {
+    if (filterType === "all") return ledgerRows;
+    if (filterType === "income") {
+      return ledgerRows.filter((r) => r.type === "income");
+    }
+    return ledgerRows.filter((r) => r.type === "expense" || r.type === "pending");
+  }, [ledgerRows, filterType]);
+
+  const ledgerTotalPages = Math.max(1, Math.ceil(filteredLedgerRows.length / PAGE_SIZE));
+  const ledgerSafePage = Math.min(ledgerPage, ledgerTotalPages);
+  const pagedLedgerRows = useMemo(() => {
+    const start = (ledgerSafePage - 1) * PAGE_SIZE;
+    return filteredLedgerRows.slice(start, start + PAGE_SIZE);
+  }, [filteredLedgerRows, ledgerSafePage]);
+
+  const ordersTotalPages = Math.max(1, Math.ceil(monthOrders.length / PAGE_SIZE));
+  const ordersSafePage = Math.min(ordersPage, ordersTotalPages);
+  const pagedOrders = useMemo(() => {
+    const start = (ordersSafePage - 1) * PAGE_SIZE;
+    return monthOrders.slice(start, start + PAGE_SIZE);
+  }, [monthOrders, ordersSafePage]);
+
+  useEffect(() => {
+    setLedgerPage(1);
+    setOrdersPage(1);
+  }, [filterMonth, filterType]);
+
+  // ── Filtered manual entries (legacy table) ────────────────────────────────
   const filteredEntries = useMemo(() => {
-    return entries.filter((entry) => {
+    return monthEntries.filter((entry) => {
       if (filterType !== "all" && entry.type !== filterType) return false;
-      if (filterMonth && !entry.date.startsWith(filterMonth)) return false;
       return true;
     });
-  }, [entries, filterType, filterMonth]);
+  }, [monthEntries, filterType]);
 
   // ── Save entry ─────────────────────────────────────────────────────────────
   const handleSaveEntry = useCallback(async (e: FormEvent) => {
@@ -334,34 +475,40 @@ export default function FinancesPage() {
 
   // ── Export CSV ─────────────────────────────────────────────────────────────
   const handleExportCSV = useCallback(() => {
-    const headers = ["Date", "Type", "Category", "Description", "Amount"];
-    const rows = filteredEntries.map((e) => [
-      e.date,
-      e.type,
-      e.category,
-      `"${e.description.replace(/"/g, '""')}"`,
-      e.amount.toString(),
+    const headers = ["Date", "Source", "Type", "Category", "Description", "Amount", "Status"];
+    const rows = filteredLedgerRows.map((r) => [
+      r.date,
+      r.kind === "order" ? "Order" : "Manual",
+      r.type,
+      r.category,
+      `"${r.description.replace(/"/g, '""')}"`,
+      r.amount.toString(),
+      r.status ?? "",
     ]);
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `finances-${shop?.name ?? "export"}-${filterMonth}.csv`;
+    link.download = `finances-${shop?.name ?? "export"}-${filterMonth || "all"}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    addToast("CSV exported successfully!", "success");
-  }, [filteredEntries, filterMonth, shop, addToast]);
+    addToast("Full ledger exported!", "success");
+  }, [filteredLedgerRows, filterMonth, shop, addToast]);
 
   // ── Available months for filtering ─────────────────────────────────────────
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
     for (const entry of entries) {
-      const m = entry.date.slice(0, 7);
+      const m = entryMonthKey(entry);
+      if (m) months.add(m);
+    }
+    for (const order of orders) {
+      const m = orderMonthKey(order);
       if (m) months.add(m);
     }
     return Array.from(months).sort().reverse();
-  }, [entries]);
+  }, [entries, orders]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (authLoading) {
@@ -376,11 +523,19 @@ export default function FinancesPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
       <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <h1 className="truncate text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-              💰 Financial Ledger
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
+              Merchant dashboard
+            </p>
+            <h1 className="tm-font-display truncate text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
+              {shop?.name ? `${shop.name} — Finances` : "Financial Ledger"}
             </h1>
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              Orders, income, expenses &amp; profit — sab ek jagah
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             {allShops.length > 1 && (
               <CustomSelect
                 value={activeShopId ?? ""}
@@ -392,18 +547,23 @@ export default function FinancesPage() {
                 fullWidth={false}
               />
             )}
+            <Link
+              href="/dashboard/orders"
+              className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Manage orders
+            </Link>
+            <Link
+              href="/dashboard"
+              className="rounded-full px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              ← Dashboard
+            </Link>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            className="rounded-full px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            ← Dashboard
-          </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
         {!activeShopId && (
           <section className="py-12 text-center">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Create a shop first to track finances.</p>
@@ -414,47 +574,58 @@ export default function FinancesPage() {
           <>
             {/* ── Summary Cards ──────────────────────────────────────────── */}
             <section>
-              <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">
-                {filterMonth ? `${filterMonth} ` : ""}Financial Summary
-              </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center shadow-sm dark:border-emerald-800 dark:bg-emerald-900/20">
-                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 sm:text-2xl">
-                    {formatCurrency(summary.totalRevenue)}
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  {filterMonth ? `${filterMonth} ` : "All-time "}Summary
+                </h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {summary.totalOrders} orders · {filteredEntries.length} manual entries
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center shadow-sm dark:border-emerald-800 dark:bg-emerald-900/20">
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 sm:text-xl">
+                    {formatCurrency(summary.orderRevenue)}
                   </p>
-                  <p className="mt-1 flex items-center justify-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
-                    <ArrowDownIcon /> Total Revenue
-                  </p>
+                  <p className="mt-1 text-[0.65rem] text-emerald-700 dark:text-emerald-300">Order revenue</p>
                 </div>
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-center shadow-sm dark:border-red-800 dark:bg-red-900/20">
-                  <p className="text-xl font-bold text-red-600 dark:text-red-400 sm:text-2xl">
+                <div className="rounded-2xl border border-teal-200 bg-teal-50 p-3 text-center shadow-sm dark:border-teal-800 dark:bg-teal-900/20">
+                  <p className="text-lg font-bold text-teal-600 dark:text-teal-400 sm:text-xl">
+                    {formatCurrency(summary.manualIncome)}
+                  </p>
+                  <p className="mt-1 text-[0.65rem] text-teal-700 dark:text-teal-300">Manual income</p>
+                </div>
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-center shadow-sm dark:border-red-800 dark:bg-red-900/20">
+                  <p className="text-lg font-bold text-red-600 dark:text-red-400 sm:text-xl">
                     {formatCurrency(summary.totalExpenses)}
                   </p>
-                  <p className="mt-1 flex items-center justify-center gap-1 text-xs text-red-700 dark:text-red-300">
-                    <ArrowUpIcon /> Total Expenses
-                  </p>
+                  <p className="mt-1 text-[0.65rem] text-red-700 dark:text-red-300">Expenses</p>
                 </div>
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center shadow-sm dark:border-amber-800 dark:bg-amber-900/20">
-                  <p className="text-xl font-bold text-amber-600 dark:text-amber-400 sm:text-2xl">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-center shadow-sm dark:border-amber-800 dark:bg-amber-900/20">
+                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400 sm:text-xl">
                     {formatCurrency(summary.pendingPayments)}
                   </p>
-                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                    Pending Payments
-                  </p>
+                  <p className="mt-1 text-[0.65rem] text-amber-700 dark:text-amber-300">Pending</p>
                 </div>
-                <div className={`rounded-2xl border p-4 text-center shadow-sm ${
+                <div className={`rounded-2xl border p-3 text-center shadow-sm ${
                   summary.netProfit >= 0
                     ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
                     : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
                 }`}>
-                  <p className={`text-xl font-bold sm:text-2xl ${
+                  <p className={`text-lg font-bold sm:text-xl ${
                     summary.netProfit >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"
                   }`}>
                     {formatCurrency(summary.netProfit)}
                   </p>
-                  <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-                    Net Profit ({summary.profitMargin.toFixed(1)}%)
+                  <p className="mt-1 text-[0.65rem] text-blue-700 dark:text-blue-300">
+                    Net profit ({summary.profitMargin.toFixed(1)}%)
                   </p>
+                </div>
+                <div className="rounded-2xl border border-zinc-200 bg-white p-3 text-center shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                  <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">
+                    {formatCurrency(summary.totalRevenue)}
+                  </p>
+                  <p className="mt-1 text-[0.65rem] text-zinc-500 dark:text-zinc-400">Total income</p>
                 </div>
               </div>
 
@@ -479,6 +650,24 @@ export default function FinancesPage() {
                 <div className="mt-1 flex justify-between text-[0.625rem] text-zinc-400">
                   <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
                 </div>
+              </div>
+            </section>
+
+            {/* ── Order status breakdown ─────────────────────────────────── */}
+            <section aria-label="Order breakdown">
+              <h2 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                Order breakdown
+              </h2>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {orderStatusBreakdown.map(({ status, count, amount }) => (
+                  <div key={status} className="tm-panel p-3 text-center">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${ORDER_STATUS_TONES[status]}`}>
+                      {getStatusLabel(status)}
+                    </span>
+                    <p className="mt-2 text-lg font-bold text-zinc-900 dark:text-zinc-100">{count}</p>
+                    <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">{formatCurrency(amount)}</p>
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -520,7 +709,7 @@ export default function FinancesPage() {
                   <button
                     type="button"
                     onClick={handleExportCSV}
-                    disabled={filteredEntries.length === 0}
+                    disabled={filteredLedgerRows.length === 0}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                   >
                     <DownloadIcon /> Export CSV
@@ -626,10 +815,125 @@ export default function FinancesPage() {
               </section>
             )}
 
-            {/* ── Finance Entries Table ──────────────────────────────────── */}
+            {/* ── Unified Activity Ledger (orders + manual) ──────────────── */}
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Full activity ledger ({filteredLedgerRows.length})
+                </h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Har order aur manual entry yahan dikhegi
+                </p>
+              </div>
+
+              {(entriesLoading || ordersLoading) ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="tm-panel animate-pulse px-4 py-3">
+                      <div className="h-5 rounded bg-zinc-200 dark:bg-zinc-800" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredLedgerRows.length === 0 ? (
+                <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-12 text-center dark:border-zinc-700">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    Is month mein abhi koi order ya entry nahi.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {pagedLedgerRows.map((row) => {
+                      const body = (
+                        <>
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                          row.type === "income"
+                            ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : row.type === "pending"
+                              ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                              : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                        }`}>
+                          {row.kind === "order" ? "🧾" : row.type === "income" ? "💵" : "📤"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                            {row.description}
+                          </p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400">{row.category}</span>
+                            <span className="text-xs text-zinc-400">·</span>
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                              {new Date(row.date).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}
+                            </span>
+                            {row.status && (
+                              <span className={`rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold ${ORDER_STATUS_TONES[row.status]}`}>
+                                {getStatusLabel(row.status)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`shrink-0 text-sm font-bold ${
+                          row.type === "income"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : row.type === "pending"
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-red-600 dark:text-red-400"
+                        }`}>
+                          {row.type === "expense" ? "-" : row.type === "pending" ? "~" : "+"}
+                          {formatCurrency(row.amount)}
+                        </span>
+                        </>
+                      );
+
+                      return row.kind === "order" ? (
+                        <Link
+                          key={row.id}
+                          href="/dashboard/orders"
+                          className="tm-panel flex items-center gap-3 px-4 py-3 transition hover:border-emerald-300 dark:hover:border-emerald-700"
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <div key={row.id} className="tm-panel flex items-center gap-3 px-4 py-3">
+                          {body}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {filteredLedgerRows.length > PAGE_SIZE && (
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Page {ledgerSafePage} of {ledgerTotalPages}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={ledgerSafePage <= 1}
+                          onClick={() => setLedgerPage((p) => Math.max(1, p - 1))}
+                          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+                        >
+                          ← Prev
+                        </button>
+                        <button
+                          type="button"
+                          disabled={ledgerSafePage >= ledgerTotalPages}
+                          onClick={() => setLedgerPage((p) => Math.min(ledgerTotalPages, p + 1))}
+                          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            {/* ── Manual entries only ───────────────────────────────────── */}
             <section>
               <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Transaction History ({filteredEntries.length})
+                Manual entries ({filteredEntries.length})
               </h2>
 
               {entriesLoading ? (
@@ -758,11 +1062,19 @@ export default function FinancesPage() {
               )}
             </section>
 
-            {/* ── Pending Orders (Revenue Pipeline) ───────────────────────── */}
+            {/* ── All orders detail ─────────────────────────────────────── */}
             <section>
-              <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">
-                📋 Pending Order Payments ({orders.filter((o) => o.status === "Pending" || o.status === "Processing").length})
-              </h2>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  All orders ({monthOrders.length})
+                </h2>
+                <Link
+                  href="/dashboard/orders"
+                  className="text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+                >
+                  Manage in Orders →
+                </Link>
+              </div>
               {ordersLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 2 }).map((_, i) => (
@@ -771,40 +1083,69 @@ export default function FinancesPage() {
                     </div>
                   ))}
                 </div>
-              ) : orders.filter((o) => o.status === "Pending" || o.status === "Processing").length === 0 ? (
+              ) : monthOrders.length === 0 ? (
                 <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-8 text-center dark:border-zinc-700">
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">No pending orders. All caught up! 🎉</p>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Is month mein koi order nahi.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {orders
-                    .filter((o) => o.status === "Pending" || o.status === "Processing")
-                    .slice(0, 10)
-                    .map((order) => (
+                <>
+                  <div className="space-y-2">
+                    {pagedOrders.map((order) => (
                       <div key={order.id} className="flex items-center gap-3 tm-panel px-4 py-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                             {order.customer_name || "Customer"}
                           </p>
                           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {order.items_json?.[0]?.name ?? "Order"} · {new Date(order.created_at).toLocaleDateString()}
+                            {orderItemSummary(order)} · {new Date(order.created_at).toLocaleDateString("en-PK")}
+                            {order.customer_phone ? ` · ${order.customer_phone}` : ""}
                           </p>
+                          <p className="font-mono text-[0.65rem] text-zinc-400">#{order.id.slice(0, 8)}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                          <p className={`text-sm font-bold ${
+                            order.status === "Delivered" || order.status === "Dispatched"
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : order.status === "Cancelled"
+                                ? "text-zinc-400 line-through"
+                                : "text-amber-600 dark:text-amber-400"
+                          }`}>
                             {formatCurrency(order.total_amount)}
                           </p>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            order.status === "Pending"
-                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                          }`}>
-                            {order.status}
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ORDER_STATUS_TONES[order.status]}`}>
+                            {getStatusLabel(order.status)}
                           </span>
                         </div>
                       </div>
                     ))}
-                </div>
+                  </div>
+
+                  {monthOrders.length > PAGE_SIZE && (
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Page {ordersSafePage} of {ordersTotalPages}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={ordersSafePage <= 1}
+                          onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
+                          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+                        >
+                          ← Prev
+                        </button>
+                        <button
+                          type="button"
+                          disabled={ordersSafePage >= ordersTotalPages}
+                          onClick={() => setOrdersPage((p) => Math.min(ordersTotalPages, p + 1))}
+                          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </section>
           </>

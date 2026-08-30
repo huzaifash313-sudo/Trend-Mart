@@ -351,23 +351,31 @@ export default function MerchantTablesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      <div className="mx-auto max-w-3xl px-4 py-6">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+      <div className="mx-auto max-w-3xl px-4 py-6 pb-safe-nav">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="tm-font-display text-xl font-extrabold text-zinc-900 dark:text-zinc-50">
               QR Table Ordering
             </h1>
             <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
               Print each table&apos;s QR and stick it on the table. Customers scan, order and pay at the table.
             </p>
           </div>
-          <Link
-            href="/dashboard/kitchen"
-            className="rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-          >
-            Kitchen board
-          </Link>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+            <Link
+              href="/dashboard"
+              className="min-h-11 flex-1 rounded-xl border border-zinc-200 px-4 py-2.5 text-center text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:flex-none"
+            >
+              ← Dashboard
+            </Link>
+            <Link
+              href="/dashboard/kitchen"
+              className="min-h-11 flex-1 rounded-xl bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white sm:flex-none"
+            >
+              Kitchen board
+            </Link>
+          </div>
         </div>
 
         {/* Today's stats strip */}

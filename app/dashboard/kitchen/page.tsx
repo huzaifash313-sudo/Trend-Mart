@@ -215,7 +215,7 @@ export default function KitchenBoardPage() {
             shops.
           </p>
           <Link
-            href="/dashboard/tables"
+            href="/dashboard"
             className="mt-4 inline-block text-xs font-semibold text-emerald-600 underline"
           >
             Back to dashboard
@@ -226,19 +226,18 @@ export default function KitchenBoardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+      <div className="mx-auto max-w-5xl px-4 py-6 pb-safe-nav">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Kitchen Board</h1>
+          <div className="min-w-0">
+            <h1 className="tm-font-display text-xl font-extrabold text-zinc-900 dark:text-zinc-50">Kitchen Board</h1>
             <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
               Live dine-in orders from your QR tables.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Today's dine-in stats */}
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             {todayStats && (
-              <div className="hidden items-center gap-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold dark:bg-[color:var(--tm-surface)] md:flex">
+              <div className="flex flex-1 items-center justify-center gap-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold dark:bg-zinc-900 sm:flex-none">
                 <span className="text-zinc-500 dark:text-zinc-400">Today</span>
                 <span className="text-zinc-900 dark:text-zinc-100">{todayStats.orders} orders</span>
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
@@ -246,7 +245,7 @@ export default function KitchenBoardPage() {
                 </span>
               </div>
             )}
-            <div className="hidden items-center gap-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold dark:bg-[color:var(--tm-surface)] sm:flex">
+            <div className="flex w-full items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold dark:bg-zinc-900 sm:w-auto sm:justify-start sm:gap-3">
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-amber-500" /> New {stats.pending}
               </span>
@@ -260,13 +259,13 @@ export default function KitchenBoardPage() {
             <button
               type="button"
               onClick={() => setShowManual(true)}
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              className="min-h-11 flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 sm:flex-none"
             >
               + New Order
             </button>
             <Link
               href="/dashboard/tables"
-              className="rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+              className="min-h-11 flex-1 rounded-xl bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white sm:flex-none"
             >
               Manage tables
             </Link>

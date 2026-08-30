@@ -145,6 +145,8 @@ export default function ProductsDashboardPage() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  /** On mobile, keep the heavy create form collapsed until the merchant asks for it. */
+  const [showProductForm, setShowProductForm] = useState(false);
 
   // Bulk operations
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
@@ -391,6 +393,8 @@ export default function ProductsDashboardPage() {
         // Reset form
         setForm(INITIAL_PRODUCT_FORM);
         setEditingProductId(null);
+        setShowProductForm(false);
+        setShowAdvanced(false);
       } else {
         addToast(result.error ?? "Failed to save product.", "error");
       }
@@ -403,6 +407,7 @@ export default function ProductsDashboardPage() {
 
   const handleEdit = useCallback((product: Product) => {
     setEditingProductId(product.id);
+    setShowProductForm(true);
     const gallery = getProductImages(product);
     setForm({
       name: product.name,
@@ -650,7 +655,7 @@ export default function ProductsDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
       <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -658,8 +663,8 @@ export default function ProductsDashboardPage() {
             <Link href="/dashboard" className="shrink-0 text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
               ← Dashboard
             </Link>
-            <h1 className="truncate text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-              Product & Inventory Manager
+            <h1 className="tm-font-display truncate text-lg font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-xl">
+              Products
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -692,7 +697,7 @@ export default function ProductsDashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
         {/* Quick Stats Bar */}
         {activeShopId && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -717,10 +722,37 @@ export default function ProductsDashboardPage() {
 
         {/* Product Creation / Edit Form */}
         {activeShopId && (
-          <section className="tm-panel p-5">
-            <h2 className="mb-4 text-base font-bold text-zinc-900 dark:text-zinc-100">
-              {editingProductId ? "Edit Product" : "Add New Product"}
-            </h2>
+          <>
+            {!showProductForm && !editingProductId && (
+              <button
+                type="button"
+                onClick={() => setShowProductForm(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/80 px-4 py-3.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+              >
+                + Add product
+              </button>
+            )}
+
+            {(showProductForm || editingProductId) && (
+          <section className="tm-panel p-4 sm:p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                {editingProductId ? "Edit Product" : "Add New Product"}
+              </h2>
+              {!editingProductId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProductForm(false);
+                    setForm(INITIAL_PRODUCT_FORM);
+                    setShowAdvanced(false);
+                  }}
+                  className="text-xs font-semibold text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
+                >
+                  Hide form
+                </button>
+              )}
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Basic Info Row */}
@@ -946,12 +978,14 @@ export default function ProductsDashboardPage() {
                   visibleLabel="Available for ordering"
                 />
                 <div className="ml-auto flex gap-2">
-                  {editingProductId && (
+                  {(editingProductId || showProductForm) && (
                     <button
                       type="button"
                       onClick={() => {
                         setForm(INITIAL_PRODUCT_FORM);
                         setEditingProductId(null);
+                        setShowProductForm(false);
+                        setShowAdvanced(false);
                       }}
                       className="rounded-xl px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
                     >
@@ -969,6 +1003,8 @@ export default function ProductsDashboardPage() {
               </div>
             </form>
           </section>
+            )}
+          </>
         )}
 
         {/* Product List Section */}

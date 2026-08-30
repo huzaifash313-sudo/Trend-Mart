@@ -9,6 +9,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback, useMemo, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -228,26 +229,37 @@ export default function MerchantAdsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 pb-safe-nav">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-              <MegaphoneIcon /> Promotional Ads
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+              Promote
+            </p>
+            <h1 className="tm-font-display flex items-center gap-2 text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
+              <MegaphoneIcon /> Ads
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Get {shopName || "your store"} featured in the sponsored banner on the TrendMart homepage.
+              Feature {shopName || "your store"} in the homepage sponsored banner.
             </p>
           </div>
-          {!showForm && (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard"
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
             >
-              <PlusIcon /> Request Ad Slot
-            </button>
-          )}
+              ← Dashboard
+            </Link>
+            {!showForm && (
+              <button
+                type="button"
+                onClick={() => setShowForm(true)}
+                className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+              >
+                <PlusIcon /> Request Ad Slot
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">

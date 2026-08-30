@@ -202,16 +202,24 @@ export default function DashboardOverviewPage() {
       {
         id: "orders",
         label: "Orders",
-        description: "Fulfil & update status",
+        description: "All orders, status & WhatsApp",
         href: "/dashboard/orders",
         tone: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
         icon: "🧾",
         badge: pendingOrders.length,
       },
       {
+        id: "products",
+        label: "Products",
+        description: "Add, edit, stock & discounts",
+        href: "/dashboard/products",
+        tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+        icon: "📦",
+      },
+      {
         id: "bulk",
         label: "Bulk add",
-        description: "Upload many at once",
+        description: "CSV upload & rapid listing",
         href: "/dashboard/products/new",
         tone: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
         icon: "🗂️",
@@ -219,7 +227,7 @@ export default function DashboardOverviewPage() {
       {
         id: "analytics",
         label: "Analytics",
-        description: "Views, clicks & sales",
+        description: "Views, clicks, sales trends",
         href: "/dashboard/analytics",
         tone: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
         icon: "📊",
@@ -227,7 +235,7 @@ export default function DashboardOverviewPage() {
       {
         id: "settings",
         label: "Store settings",
-        description: "Delivery, area, QR & more",
+        description: "Delivery, radius, QR & live",
         href: "/dashboard/settings",
         tone: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
         icon: "⚙️",
@@ -235,7 +243,7 @@ export default function DashboardOverviewPage() {
       {
         id: "finances",
         label: "Finances",
-        description: "Income & expenses",
+        description: "Orders, income, expenses & profit",
         href: "/dashboard/finances",
         tone: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
         icon: "💰",
@@ -243,7 +251,7 @@ export default function DashboardOverviewPage() {
       {
         id: "ads",
         label: "Ads",
-        description: "Promote your store",
+        description: "Sponsored banners & promos",
         href: "/dashboard/ads",
         tone: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300",
         icon: "📣",
@@ -251,7 +259,7 @@ export default function DashboardOverviewPage() {
       {
         id: "inquiries",
         label: "Inquiries",
-        description: "Customer questions",
+        description: "Reply to customer questions",
         href: "/dashboard/inquiries",
         tone: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
         icon: "💬",
@@ -259,7 +267,7 @@ export default function DashboardOverviewPage() {
       {
         id: "leads",
         label: "Leads",
-        description: "Potential customers",
+        description: "Track potential customers",
         href: "/dashboard/leads",
         tone: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
         icon: "🎯",
@@ -325,7 +333,7 @@ export default function DashboardOverviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
       <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -363,7 +371,7 @@ export default function DashboardOverviewPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
         {activeShop && (
           <>
             {/* Store status strip */}
@@ -406,21 +414,19 @@ export default function DashboardOverviewPage() {
 
             {/* ── Hero catalog cards: Products & Deals ─────────────────── */}
             <section aria-label="Your catalog">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-1">
                 <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                   Your catalog
                 </h2>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Tap a card to manage it on your storefront
+                  Manage inventory here · preview on storefront
                 </span>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {/* Products card */}
-                <a
-                  href={`${storefrontUrl}#products`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                {/* Products card → inventory manager */}
+                <Link
+                  href="/dashboard/products"
                   className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
                 >
                   <div className="flex items-start justify-between p-4 pb-3">
@@ -493,9 +499,9 @@ export default function DashboardOverviewPage() {
                       →
                     </span>
                   </div>
-                </a>
+                </Link>
 
-                {/* Deals card */}
+                {/* Deals card → storefront deals section (owner can pin/edit there) */}
                 <a
                   href={`${storefrontUrl}#deals`}
                   target="_blank"
@@ -590,12 +596,12 @@ export default function DashboardOverviewPage() {
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Pending orders</p>
                 </Link>
-                <div className="tm-panel p-4 text-center">
-                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                <Link href="/dashboard/finances" className="tm-panel p-4 text-center transition-shadow hover:shadow-sm">
+                  <p className="truncate text-xl font-bold text-zinc-900 dark:text-zinc-100 sm:text-2xl">
                     {formatRupees(revenue)}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Revenue</p>
-                </div>
+                </Link>
                 <div className="tm-panel p-3 text-center">
                   <p className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                     {analytics?.total_views ?? "—"}
@@ -675,7 +681,11 @@ export default function DashboardOverviewPage() {
               ) : (
                 <div className="space-y-2">
                   {orders.slice(0, 5).map((order) => (
-                    <div key={order.id} className="tm-panel flex items-center gap-3 px-4 py-3">
+                    <Link
+                      key={order.id}
+                      href="/dashboard/orders"
+                      className="tm-panel flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                           {order.customer_name || "Customer"}
@@ -686,13 +696,15 @@ export default function DashboardOverviewPage() {
                           {new Date(order.created_at).toLocaleString()}
                         </p>
                       </div>
-                      <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                        {formatRupees(order.total_amount)}
-                      </span>
-                      <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${statusTone(order.status)}`}>
-                        {getStatusLabel(order.status)}
-                      </span>
-                    </div>
+                      <div className="flex items-center justify-between gap-2 sm:justify-end">
+                        <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                          {formatRupees(order.total_amount)}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${statusTone(order.status)}`}>
+                          {getStatusLabel(order.status)}
+                        </span>
+                      </div>
+                    </Link>
                   ))}
                 </div>
               )}

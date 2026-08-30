@@ -528,7 +528,7 @@ export default function DashboardSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-bg)]">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-bg)]">
       <div className="sticky top-[var(--tm-navbar-sticky-offset)] z-40 border-b border-zinc-200 bg-white/95 shadow-sm backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/95">
         <header className="mx-auto flex max-w-4xl items-center gap-3 px-3 py-2.5 sm:px-4">
           <Link
@@ -851,18 +851,20 @@ export default function DashboardSettingsPage() {
         </SectionShell>
 
         <div className="mb-24 pb-8 md:mb-0">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <SaveIcon />
-            {saving ? "Saving settings..." : "Save store settings"}
-          </button>
-          <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
-            Changes sync to TrendMart and take effect on your storefront after save.
-          </p>
+          <div className="tm-dashboard-save-bar">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <SaveIcon />
+              {saving ? "Saving settings..." : "Save store settings"}
+            </button>
+            <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500 md:block">
+              Changes sync to TrendMart and take effect on your storefront after save.
+            </p>
+          </div>
         </div>
       </main>
     </div>

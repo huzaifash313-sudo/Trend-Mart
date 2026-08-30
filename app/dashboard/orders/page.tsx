@@ -199,7 +199,7 @@ export default function MerchantOrdersPage() {
         </Link>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
           type="search"
           value={query}
@@ -207,14 +207,14 @@ export default function MerchantOrdersPage() {
           placeholder="Search orders"
           className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 sm:max-w-xs"
         />
-        <div className="flex flex-wrap gap-1.5">
+        <div className="tm-chip-scroll flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(["all", "Pending", "Processing", "Dispatched", "Delivered", "Cancelled"] as StatusFilter[]).map(
             (s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setFilter(s)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                   filter === s
                     ? "bg-emerald-600 text-white"
                     : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
@@ -272,9 +272,27 @@ export default function MerchantOrdersPage() {
                       {formatMoney(order.total_amount)} · {new Date(order.created_at).toLocaleString()}
                       {order.customer_phone ? ` · ${order.customer_phone}` : ""}
                     </p>
+                    {order.notes ? (
+                      <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                        Note: {order.notes}
+                      </p>
+                    ) : null}
+                    {(order.delivery_fee != null && order.delivery_fee > 0) || order.discount_amount ? (
+                      <p className="mt-0.5 text-[0.65rem] text-zinc-400">
+                        {order.delivery_fee != null && order.delivery_fee > 0
+                          ? `Delivery ${formatMoney(order.delivery_fee)}`
+                          : null}
+                        {order.delivery_fee != null && order.delivery_fee > 0 && order.discount_amount
+                          ? " · "
+                          : null}
+                        {order.discount_amount
+                          ? `Discount −${formatMoney(order.discount_amount)}`
+                          : null}
+                      </p>
+                    ) : null}
                     <p className="mt-0.5 font-mono text-[0.65rem] text-zinc-400">#{order.id.slice(0, 8)}</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     <button
                       type="button"
                       onClick={() => setBillOrder(order)}

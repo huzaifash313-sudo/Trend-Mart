@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +19,7 @@ import {
   fetchLeadStats,
   type Lead,
 } from "@/services/leadsService";
+import { toPkWhatsAppDigits } from "@/lib/phoneFormat";
 
 // ─── Icon Components ──────────────────────────────────────────────────────────
 
@@ -113,9 +115,9 @@ function LeadRow({
           : "border-emerald-200 dark:border-emerald-800"
       }`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         {/* Status indicator */}
-        <div className="mt-1 shrink-0">
+        <div className="mt-1 shrink-0 self-start">
           {lead.is_converted ? (
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
               <CheckCircleIcon />
@@ -129,7 +131,7 @@ function LeadRow({
 
         <div className="min-w-0 flex-1">
           {/* Header row */}
-          <div className="flex flex-wrap items-center gap-2 mb-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               {lead.customer_name || "Unknown Customer"}
             </span>
@@ -141,13 +143,13 @@ function LeadRow({
 
           {/* Phone */}
           {lead.customer_phone && (
-            <p className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+            <p className="mb-1 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
               <PhoneIcon />
               <a
-                href={`https://wa.me/${lead.customer_phone.replace(/\D/g, "")}`}
+                href={`https://wa.me/${toPkWhatsAppDigits(lead.customer_phone) || lead.customer_phone.replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2"
+                className="underline underline-offset-2 hover:text-emerald-600 dark:hover:text-emerald-400"
               >
                 {lead.customer_phone}
               </a>
@@ -208,7 +210,7 @@ function LeadRow({
         </div>
 
         {/* Action buttons */}
-        <div className="flex shrink-0 flex-col gap-1">
+        <div className="flex w-full shrink-0 flex-row flex-wrap gap-1 sm:w-auto sm:flex-col">
           {!lead.is_converted && (
             <button
               type="button"
@@ -260,6 +262,7 @@ export default function LeadsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showConverted, setShowConverted] = useState(true);
+  const [leadQuery, setLeadQuery] = useState("");
 
   const [stats, setStats] = useState<{
     total: number;
@@ -376,6 +379,16 @@ export default function LeadsPage() {
     setDeleting(false);
   }, [addToast, shop, confirm]);
 
+  const visibleLeads = useMemo(() => {
+    const q = leadQuery.trim().toLowerCase();
+    if (!q) return leads;
+    return leads.filter((l) =>
+      `${l.customer_name ?? ""} ${l.customer_phone ?? ""} ${l.service_context ?? ""} ${l.notes ?? ""}`
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [leads, leadQuery]);
+
   // ── Loading state ─────────────────────────────────────────────────────────
   if (authLoading) {
     return (
@@ -386,7 +399,7 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
       <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
@@ -409,7 +422,7 @@ export default function LeadsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 pb-safe-nav">
         {/* Stats Cards */}
         {stats && (
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -447,32 +460,42 @@ export default function LeadsPage() {
         )}
 
         {/* Filter Toggle */}
-        <section className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowConverted(true)}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-              showConverted
-                ? "bg-emerald-600 text-white"
-                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-            }`}
-          >
-            All Leads
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowConverted(false)}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-              !showConverted
-                ? "bg-amber-500 text-white"
-                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-            }`}
-          >
-            Pending Only
-          </button>
-          <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500">
-            {leads.length} {showConverted ? "leads" : "pending"}
-          </span>
+        <section className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowConverted(true)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                showConverted
+                  ? "bg-emerald-600 text-white"
+                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              }`}
+            >
+              All Leads
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowConverted(false)}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                !showConverted
+                  ? "bg-amber-500 text-white"
+                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              }`}
+            >
+              Pending Only
+            </button>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              {visibleLeads.length}
+              {leadQuery.trim() ? ` / ${leads.length}` : ""} {showConverted ? "leads" : "pending"}
+            </span>
+          </div>
+          <input
+            type="search"
+            value={leadQuery}
+            onChange={(e) => setLeadQuery(e.target.value)}
+            placeholder="Search name, phone, notes…"
+            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 sm:ml-auto sm:max-w-xs"
+          />
         </section>
 
         {/* Leads List */}
@@ -485,7 +508,7 @@ export default function LeadsPage() {
                 </div>
               ))}
             </div>
-          ) : leads.length === 0 ? (
+          ) : visibleLeads.length === 0 ? (
             <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-12 text-center dark:border-zinc-700">
               <div className="mb-2 flex justify-center">
                 <svg className="h-10 w-10 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -493,7 +516,11 @@ export default function LeadsPage() {
                 </svg>
               </div>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                {showConverted ? "No leads yet." : "No pending leads — great job!"}
+                {leadQuery.trim()
+                  ? "No leads match your search."
+                  : showConverted
+                    ? "No leads yet."
+                    : "No pending leads — great job!"}
               </p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
                 Customer WhatsApp clicks and inquiry form submissions will appear here.
@@ -501,7 +528,7 @@ export default function LeadsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {leads.map((lead) => (
+              {visibleLeads.map((lead) => (
                 <LeadRow
                   key={lead.id}
                   lead={lead}

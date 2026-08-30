@@ -216,15 +216,25 @@ export default function AnalyticsDashboard() {
         }
 
         const topProducts: ProductAnalyticsData[] = [];
-        for (const [, rev] of productRevMap) {
+        for (const [pid, rev] of productRevMap) {
           topProducts.push({
             name: rev.name,
-            clicks: 0,
+            clicks: clickMap.get(pid) ?? 0,
             revenue: rev.revenue,
             orders: rev.orders,
           });
         }
-        topProducts.sort((a, b) => b.revenue - a.revenue);
+        /* Also surface click-only products that had no orders in the window. */
+        for (const [pid, clicks] of clickMap) {
+          if (productRevMap.has(pid) || clicks <= 0) continue;
+          topProducts.push({
+            name: pid,
+            clicks,
+            revenue: 0,
+            orders: 0,
+          });
+        }
+        topProducts.sort((a, b) => b.revenue - a.revenue || b.clicks - a.clicks);
 
         const leadSources = new Map<string, { count: number; converted: number }>();
         const sources = ["whatsapp", "catalog", "chatbot", "direct", "other"];
@@ -300,18 +310,18 @@ export default function AnalyticsDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
           <Link href="/dashboard" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Back to dashboard">
             <ChevronLeftIcon />
           </Link>
-          <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Advanced Analytics</h1>
+          <h1 className="tm-font-display text-lg font-extrabold text-zinc-900 dark:text-zinc-50 sm:text-xl">Analytics</h1>
           <span className="ml-auto min-w-0 truncate text-xs text-zinc-400 dark:text-zinc-500">{shop.name}</span>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
             {[7, 30, 90].map((d) => (
