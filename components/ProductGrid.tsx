@@ -305,7 +305,7 @@ const ProductCard = memo(function ProductCard({
 
         {hasDiscount && discountPercent > 0 ? (
           <span
-            className={`absolute z-10 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm ${
+            className={`tm-badge-discount absolute z-10 ${
               categoryLabel ? "right-1.5 top-1.5" : "left-1.5 top-1.5"
             }`}
           >

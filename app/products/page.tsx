@@ -8,6 +8,8 @@ import type { MarketplaceProduct, Product, Shop, ShopCategory } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import { type MarketplaceSort } from "@/services/productService";
 import ProductGrid from "@/components/ProductGrid";
+import SearchInput from "@/components/SearchInput";
+import FadeScrollX from "@/components/FadeScrollX";
 import SubCategoryPills from "@/components/SubCategoryPills";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { useLocation } from "@/context/LocationContext";
@@ -48,16 +50,8 @@ const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
 });
 
 /* -------------------------------------------------------------------------- */
-/*  Icons                                                                     */
+/*  Page                                                                      */
 /* -------------------------------------------------------------------------- */
-
-function SearchIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
 
 function PackageIcon() {
   return (
@@ -718,41 +712,19 @@ function ProductsPageInner() {
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-3 md:px-4 md:py-5 md:pb-8">
       {/* Search — products only; no deal-match chrome */}
-      <form onSubmit={handleSearchSubmit} className="mb-3">
-        <label className="relative block">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
-            <SearchIcon />
-          </span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products, shops, categories"
-            className="w-full rounded-2xl border border-zinc-200 bg-white py-2.5 pl-10 pr-24 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            aria-label="Search products"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="absolute right-[4.6rem] top-1/2 -translate-y-1/2 rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-              aria-label="Clear search"
-            >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-            </button>
-          ) : null}
-          <button
-            type="submit"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-          >
-            Search
-          </button>
-        </label>
-      </form>
+      <SearchInput
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearchSubmit}
+        placeholder="Search products, shops, categories"
+        ariaLabel="Search products"
+        showClearButton
+        className="mb-3"
+      />
 
       {/* Categories */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
-        <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
+        <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
           {SHOP_CATEGORIES.map((category) => {
             const isActive = activeCategory === category;
             return (
@@ -768,7 +740,7 @@ function ProductsPageInner() {
               </button>
             );
           })}
-        </div>
+        </FadeScrollX>
       </section>
 
       {activeCategory !== "All" && (

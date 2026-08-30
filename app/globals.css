@@ -17,6 +17,9 @@
   --tm-accent-soft: #059669;
   --tm-sea: #14b8a6; /* sea green */
   --tm-sea-deep: #0f766e;
+  --tm-danger: #e11d48; /* discount / danger badges */
+  --tm-danger-soft: #f43f5e;
+  --tm-amber: #f59e0b; /* deal / highlight badges */
   /* Exact PWA / splash brand plate — never flash stark white behind boot */
   --tm-splash-bg: #0f766e;
   --tm-brand-gradient: linear-gradient(135deg, #10b981 0%, #0d9488 52%, #14b8a6 100%);
@@ -348,6 +351,43 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
 .tm-fade-scroll-x {
   mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.25rem), transparent 100%);
   -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.25rem), transparent 100%);
+}
+
+/* Semantic badges — discount/danger + deal/amber live behind tokens so every
+   surface (product cards, deal cards, lists) shares one shade. */
+.tm-badge-discount {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--tm-radius-xs);
+  padding: 0.125rem 0.375rem;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: var(--tm-danger-soft);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+.tm-badge-deal {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--tm-radius-xs);
+  padding: 0.125rem 0.375rem;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--tm-amber);
+}
+
+/* Compact category tab — used by the deals day strip so the always-visible
+   date picker row stays short on mobile. Double-class beats the base tab
+   regardless of source order. */
+.tm-cat-tab.tm-cat-tab--sm {
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem 0.4rem;
+  font-size: 0.75rem;
 }
 
 /* Placeholder avatar for story / recently-viewed circles when the image is
@@ -1789,21 +1829,22 @@ html.dark .tm-home-deal-add:hover {
   letter-spacing: 0.01em;
   white-space: nowrap;
   color: var(--tm-text-on-brand);
-  background: var(--tm-text-strong);
-  box-shadow: 0 8px 20px rgba(28, 25, 23, 0.22);
-  transition: transform 0.15s ease, background 0.15s ease;
+  background: var(--tm-brand-gradient);
+  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .tm-home-deal-order:hover {
-  background: color-mix(in srgb, var(--tm-text-strong) 92%, #000);
+  background: var(--tm-brand-gradient-hover);
+  box-shadow: 0 10px 24px rgba(13, 148, 136, 0.36);
   transform: translateY(-1px);
 }
 html.dark .tm-home-deal-order {
-  background: var(--tm-text-strong);
+  background: var(--tm-brand-gradient);
   color: var(--tm-text-on-brand);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
 }
 html.dark .tm-home-deal-order:hover {
-  background: color-mix(in srgb, var(--tm-text-strong) 92%, #fff);
+  background: var(--tm-brand-gradient-hover);
 }
 .tm-home-deal-order--disabled {
   cursor: not-allowed;

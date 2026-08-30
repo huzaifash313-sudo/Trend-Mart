@@ -3,11 +3,11 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendMart — Merchant Overview (Dashboard home)                            */
 /*                                                                             */
-/*  A single glanceable hub so a merchant lands on answers, not a redirect.    */
-/*   - Store status + verification + multi-shop switcher                       */
-/*   - KPIs: pending orders, products, availability, views/clicks, revenue     */
-/*   - One-tap quick actions for every merchant tool                           */
-/*   - Recent orders preview                                                   */
+/*  A glanceable, merchant-friendly hub. The two hero cards — Products and     */
+/*  Deals — show live counts + photo previews and deep-link straight into the  */
+/*  storefront owner sections (#products / #deals) where the merchant can      */
+/*  edit, pin, pause, or delete anything. Everything else (orders, analytics,  */
+/*  settings, finances, ads…) is one tap away.                                 */
 /* -------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,12 +17,16 @@ import { createClient } from "@/lib/supabase/client";
 import { scopedKey } from "@/lib/clientScope";
 import type { Shop, Order, AnalyticsSummary, Product } from "@/types";
 import { isShopPubliclyVisible, isDineInCategory } from "@/types";
+import type { ShopDeal } from "@/lib/dealSchedule";
 import { fetchMyShops } from "@/services/shopService";
 import { fetchProductsByShopId } from "@/services/productService";
+import { fetchDealsByShopId } from "@/services/dealService";
 import { fetchOrdersByShopId } from "@/services/orderService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import { getStatusLabel } from "@/services/notificationService";
 import { formatRupees } from "@/lib/formatters";
+import { getProductImages, getDealImages } from "@/lib/productImages";
+import { getSafeImageUrl } from "@/services/storageService";
 import { useToast } from "@/components/Toast";
 import CustomSelect from "@/components/CustomSelect";
 
@@ -55,6 +59,17 @@ function statusTone(status: string): string {
   }
 }
 
+/** Compact large numbers — 1200 → "1.2k", 34000 → "34k", under 1000 verbatim. */
+function compactCount(n: number): string {
+  if (n < 1000) return n.toLocaleString();
+  if (n < 1_000_000) {
+    const v = n / 1000;
+    return `${v >= 10 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")}k`;
+  }
+  const v = n / 1_000_000;
+  return `${v.toFixed(1).replace(/\.0$/, "")}M`;
+}
+
 /* ─── Component ────────────────────────────────────────────────────────────── */
 
 export default function DashboardOverviewPage() {
@@ -68,6 +83,7 @@ export default function DashboardOverviewPage() {
   const [activeShopId, setActiveShopId] = useState<string | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [deals, setDeals] = useState<ShopDeal[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -125,13 +141,16 @@ export default function DashboardOverviewPage() {
     let cancelled = false;
     setDataLoading(true);
     (async () => {
-      const [productResult, orderResult, analyticsResult] = await Promise.all([
-        fetchProductsByShopId(activeShopId),
-        fetchOrdersByShopId(activeShopId),
-        fetchAnalyticsSummary(activeShopId),
-      ]);
+      const [productResult, dealResult, orderResult, analyticsResult] =
+        await Promise.all([
+          fetchProductsByShopId(activeShopId),
+          fetchDealsByShopId(activeShopId),
+          fetchOrdersByShopId(activeShopId),
+          fetchAnalyticsSummary(activeShopId),
+        ]);
       if (cancelled) return;
       if (productResult.success) setProducts(productResult.data);
+      if (dealResult.success) setDeals(dealResult.data);
       if (orderResult.success) setOrders(orderResult.data);
       if (analyticsResult.success) setAnalytics(analyticsResult.data);
       setDataLoading(false);
@@ -155,6 +174,8 @@ export default function DashboardOverviewPage() {
   );
   const availableCount = products.filter((p) => p.is_available).length;
   const soldOutCount = products.length - availableCount;
+  const activeDeals = deals.filter((d) => d.is_active).length;
+  const featuredDeals = deals.filter((d) => d.is_featured).length;
   const revenue = useMemo(
     () =>
       orders
@@ -163,25 +184,21 @@ export default function DashboardOverviewPage() {
     [orders],
   );
 
+  /* Preview images for the two hero cards. */
+  const productPreviews = useMemo(
+    () => products.map((p) => getProductImages(p)[0]).filter(Boolean).slice(0, 4) as string[],
+    [products],
+  );
+  const dealPreviews = useMemo(
+    () => deals.map((d) => getDealImages(d)[0]).filter(Boolean).slice(0, 4) as string[],
+    [deals],
+  );
+
+  const storefrontUrl = activeShop ? `/shop/${activeShop.id}` : "#";
+
   const quickActions = useMemo<QuickAction[]>(() => {
     if (!activeShop) return [];
     const base: QuickAction[] = [
-      {
-        id: "product",
-        label: "Add product",
-        description: "List a single item",
-        href: "/dashboard/products",
-        tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-        icon: "📦",
-      },
-      {
-        id: "bulk",
-        label: "Bulk add",
-        description: "Upload many at once",
-        href: "/dashboard/products/new",
-        tone: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
-        icon: "🗂️",
-      },
       {
         id: "orders",
         label: "Orders",
@@ -190,6 +207,14 @@ export default function DashboardOverviewPage() {
         tone: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
         icon: "🧾",
         badge: pendingOrders.length,
+      },
+      {
+        id: "bulk",
+        label: "Bulk add",
+        description: "Upload many at once",
+        href: "/dashboard/products/new",
+        tone: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
+        icon: "🗂️",
       },
       {
         id: "analytics",
@@ -239,19 +264,11 @@ export default function DashboardOverviewPage() {
         tone: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
         icon: "🎯",
       },
-      {
-        id: "store",
-        label: "View my store",
-        description: "See your storefront",
-        href: `/shop/${activeShop.id}`,
-        tone: "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-white",
-        icon: "🏪",
-      },
     ];
 
     if (isDineInCategory(activeShop.category)) {
       base.splice(
-        4,
+        2,
         0,
         {
           id: "kitchen",
@@ -334,7 +351,7 @@ export default function DashboardOverviewPage() {
             )}
             {activeShop && (
               <Link
-                href={`/shop/${activeShop.id}`}
+                href={storefrontUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
@@ -387,7 +404,177 @@ export default function DashboardOverviewPage() {
               </div>
             </section>
 
-            {/* KPI cards */}
+            {/* ── Hero catalog cards: Products & Deals ─────────────────── */}
+            <section aria-label="Your catalog">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  Your catalog
+                </h2>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Tap a card to manage it on your storefront
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Products card */}
+                <a
+                  href={`${storefrontUrl}#products`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
+                >
+                  <div className="flex items-start justify-between p-4 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-lg dark:bg-emerald-900/40">
+                          📦
+                        </span>
+                        <div>
+                          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                            Products
+                          </p>
+                          <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                            Add, edit, pin &amp; toggle stock
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-end gap-2">
+                        <span className="text-4xl font-extrabold leading-none tracking-tight text-zinc-900 dark:text-zinc-100">
+                          {compactCount(products.length)}
+                        </span>
+                        <span className="pb-0.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                          {products.length === 1 ? "item" : "items"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          {availableCount} available
+                        </span>
+                        {soldOutCount > 0 && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[0.65rem] font-semibold text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                            {soldOutCount} sold out
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Photo preview strip */}
+                  <div className="flex items-center gap-1.5 px-4 pb-3">
+                    {productPreviews.length > 0 ? (
+                      <>
+                        {productPreviews.map((src, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={i}
+                            src={getSafeImageUrl(src, "product")}
+                            alt=""
+                            className="h-12 w-12 rounded-lg object-cover ring-1 ring-zinc-200 dark:ring-zinc-700"
+                            loading="lazy"
+                          />
+                        ))}
+                        <span className="ml-1 text-xs font-semibold text-zinc-400">
+                          +{Math.max(0, products.length - productPreviews.length)} more
+                        </span>
+                      </>
+                    ) : (
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                        No photos yet — add products to see them here.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-800/40">
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      Manage products
+                    </span>
+                    <span className="text-emerald-600 transition-transform group-hover:translate-x-0.5 dark:text-emerald-400">
+                      →
+                    </span>
+                  </div>
+                </a>
+
+                {/* Deals card */}
+                <a
+                  href={`${storefrontUrl}#deals`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-700"
+                >
+                  <div className="flex items-start justify-between p-4 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-lg dark:bg-amber-900/40">
+                          🏷️
+                        </span>
+                        <div>
+                          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                            Deals
+                          </p>
+                          <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                            Pin, edit, pause &amp; schedule offers
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-end gap-2">
+                        <span className="text-4xl font-extrabold leading-none tracking-tight text-zinc-900 dark:text-zinc-100">
+                          {compactCount(deals.length)}
+                        </span>
+                        <span className="pb-0.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                          {deals.length === 1 ? "deal" : "deals"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          {activeDeals} active
+                        </span>
+                        {featuredDeals > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            {featuredDeals} featured
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Photo preview strip */}
+                  <div className="flex items-center gap-1.5 px-4 pb-3">
+                    {dealPreviews.length > 0 ? (
+                      <>
+                        {dealPreviews.map((src, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={i}
+                            src={getSafeImageUrl(src, "product")}
+                            alt=""
+                            className="h-12 w-12 rounded-lg object-cover ring-1 ring-zinc-200 dark:ring-zinc-700"
+                            loading="lazy"
+                          />
+                        ))}
+                        <span className="ml-1 text-xs font-semibold text-zinc-400">
+                          +{Math.max(0, deals.length - dealPreviews.length)} more
+                        </span>
+                      </>
+                    ) : (
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                        No deals yet — create your first offer.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-800/40">
+                    <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      Manage deals
+                    </span>
+                    <span className="text-amber-600 transition-transform group-hover:translate-x-0.5 dark:text-amber-400">
+                      →
+                    </span>
+                  </div>
+                </a>
+              </div>
+            </section>
+
+            {/* ── KPI cards ────────────────────────────────────────────── */}
             <section aria-label="Store overview">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Link
@@ -401,35 +588,12 @@ export default function DashboardOverviewPage() {
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Pending orders</p>
                 </Link>
-                <Link
-                  href="/dashboard/products"
-                  className="tm-panel p-4 text-center transition-shadow hover:shadow-sm"
-                >
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {products.length}
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Products</p>
-                </Link>
-                <Link
-                  href="/dashboard/products"
-                  className="tm-panel p-4 text-center transition-shadow hover:shadow-sm"
-                >
-                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                    {availableCount}
-                    <span className="text-sm font-semibold text-zinc-400"> / {soldOutCount}</span>
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Available / Sold out</p>
-                </Link>
                 <div className="tm-panel p-4 text-center">
                   <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
                     {formatRupees(revenue)}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Revenue</p>
                 </div>
-              </div>
-
-              {/* Secondary metrics */}
-              <div className="mt-3 grid grid-cols-3 gap-3">
                 <div className="tm-panel p-3 text-center">
                   <p className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                     {analytics?.total_views ?? "—"}
@@ -442,64 +606,43 @@ export default function DashboardOverviewPage() {
                   </p>
                   <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">Product clicks</p>
                 </div>
-                <div className="tm-panel p-3 text-center">
-                  <p className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                    {analytics?.views_today ?? "—"}
-                  </p>
-                  <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">Views today</p>
-                </div>
               </div>
             </section>
 
-            {/* Quick actions */}
+            {/* ── Quick actions ─────────────────────────────────────────── */}
             <section aria-label="Quick actions">
               <h2 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                Quick actions
+                Everything else
               </h2>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-                {quickActions.map((action) => {
-                  const content = (
-                    <>
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${action.tone}`}>
-                        {action.icon}
+                {quickActions.map((action) => (
+                  <Link
+                    key={action.id}
+                    href={action.href ?? "#"}
+                    className="tm-panel flex items-center gap-3 px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${action.tone}`}>
+                      {action.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                        {action.label}
+                        {action.badge ? (
+                          <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[0.6rem] font-bold leading-none text-white">
+                            {action.badge}
+                          </span>
+                        ) : null}
                       </span>
-                      <span className="min-w-0">
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                          {action.label}
-                          {action.badge ? (
-                            <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[0.6rem] font-bold leading-none text-white">
-                              {action.badge}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                          {action.description}
-                        </span>
+                      <span className="mt-0.5 block truncate text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                        {action.description}
                       </span>
-                    </>
-                  );
-                  const classes =
-                    "tm-panel flex items-center gap-3 px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm";
-                  return action.href?.startsWith("/shop/") ? (
-                    <a
-                      key={action.id}
-                      href={action.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={classes}
-                    >
-                      {content}
-                    </a>
-                  ) : (
-                    <Link key={action.id} href={action.href ?? "#"} className={classes}>
-                      {content}
-                    </Link>
-                  );
-                })}
+                    </span>
+                  </Link>
+                ))}
               </div>
             </section>
 
-            {/* Recent orders */}
+            {/* ── Recent orders ─────────────────────────────────────────── */}
             <section aria-label="Recent orders">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">

@@ -134,10 +134,39 @@ export function formatDealWhenTag(deal: ShopDeal): string {
   return "Store deal";
 }
 
+/** Numeric "% OFF" badge only — custom promotional text stays untouched. */
+const PERCENT_BADGE_RE = /^(\d{1,3})\s*%\s*(?:off)?$/i;
+
+/**
+ * Merchant `badge_text` may be custom copy ("🔥 Weekend Special") or a numeric
+ * "% OFF" tag. When it's numeric, validate it against the computed markdown
+ * (original_price vs price) so the shown percentage always matches the real
+ * discount — custom text is never rewritten.
+ */
+function resolveDealBadge(deal: ShopDeal): string {
+  const badge = (deal.badge_text || "").trim();
+  if (!badge) return "";
+  const match = PERCENT_BADGE_RE.exec(badge);
+  if (!match) return badge;
+  const orig = deal.original_price;
+  const price = deal.price;
+  if (
+    orig != null &&
+    price != null &&
+    Number.isFinite(orig) &&
+    Number.isFinite(price) &&
+    orig > price
+  ) {
+    const calc = Math.round(((orig - price) / orig) * 100);
+    if (calc > 0 && calc !== Number(match[1])) return `${calc}% OFF`;
+  }
+  return badge;
+}
+
 /** Ticker / card line: badge + when-tag (or title fallback). */
 export function formatDealDisplayLabel(deal: ShopDeal): string {
   const when = formatDealWhenTag(deal);
-  const badge = (deal.badge_text || "").trim();
+  const badge = resolveDealBadge(deal);
   if (badge) return `${badge} · ${when}`;
   return when;
 }

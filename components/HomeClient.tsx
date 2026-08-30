@@ -32,6 +32,7 @@ import {
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
+import FadeScrollX from "@/components/FadeScrollX";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
@@ -562,7 +563,7 @@ function HomeClient({
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2.5 pb-3 md:px-4 md:py-4 md:pb-6">
       {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
-        <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
+        <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
           {orderedCategories.map((category) => {
             const isActive = activeCategory === category;
             const catCount = categoryCounts.find((c) => c.key === category)?.count;
@@ -583,10 +584,12 @@ function HomeClient({
               </button>
             );
           })}
-        </div>
+        </FadeScrollX>
       </section>
 
-      {/* Stories — first content under category tabs */}
+      {/* Stories — first content under category tabs. Hidden entirely when
+          there is nothing to show (no merchant ring, no story, not loading). */}
+      {storiesQuery.isLoading || myShop || stories.length > 0 ? (
       <section aria-label="Merchant stories">
         <svg width="0" height="0" className="absolute" aria-hidden="true">
           <defs>
@@ -689,8 +692,6 @@ function HomeClient({
                 {geoDetecting ? "Detecting…" : "Nearby stories"}
               </span>
             </button>
-          ) : stories.length === 0 && !myShop ? (
-            <p className="px-3 text-xs text-zinc-400 dark:text-zinc-500">No nearby stories right now.</p>
           ) : (
             storyGroups.map((group, gIdx) => {
               const first = group[0];
@@ -754,6 +755,7 @@ function HomeClient({
           Stories
         </p>
       </section>
+      ) : null}
 
       {storyViewerOpen && (
         <StoriesViewer

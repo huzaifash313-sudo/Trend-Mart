@@ -10,6 +10,7 @@ import {
   weekdayFromDateKey,
   type ShopDeal,
 } from "@/lib/dealSchedule";
+import FadeScrollX from "@/components/FadeScrollX";
 
 interface DealDayDateFilterProps {
   deals: ShopDeal[];
@@ -49,20 +50,13 @@ export default function DealDayDateFilter({
   return (
     <section
       aria-label="Filter deals by day or date"
-      className="mb-3 space-y-2.5 rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/80 to-emerald-50/40 p-3 dark:border-amber-900/40 dark:from-amber-950/30 dark:to-emerald-950/20"
+      className="mb-3 rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/80 to-emerald-50/40 p-2.5 dark:border-amber-900/40 dark:from-amber-950/30 dark:to-emerald-950/20"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-[0.65rem] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-            By day / date
-          </p>
-          <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-            {selectedDateKey
-              ? `Showing deals on ${formatOfferDayLabel(selectedDateKey, todayKey)}`
-              : "Pick a weekday or date to see whose deals run that day"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+        <p className="text-[0.65rem] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+          By day / date
+        </p>
+        <div className="flex items-center gap-1.5">
           <label className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
             <span className="text-zinc-400">Date</span>
             <input
@@ -82,17 +76,23 @@ export default function DealDayDateFilter({
             <button
               type="button"
               onClick={() => onSelectDate(null)}
-              className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="rounded-full px-2 py-1 text-[11px] font-semibold text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
-              Clear day
+              Clear
             </button>
           ) : null}
         </div>
       </div>
 
+      <p className="mt-1 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+        {selectedDateKey
+          ? `Showing deals on ${formatOfferDayLabel(selectedDateKey, todayKey)}`
+          : "Pick a weekday or date to see which stores have deals that day"}
+      </p>
+
       {/* Weekday chips — labels only; counts live on the date strip below
           so a number cannot paint over Sun/Mon/Tue. */}
-      <div className="relative z-10 flex gap-1.5 overflow-x-auto overflow-y-hidden scrollbar-none">
+      <div className="mt-2 flex gap-1.5 overflow-x-auto overflow-y-hidden scrollbar-none">
         {WEEKDAY_LABELS.map((label, weekday) => {
           const active = selectedWeekday === weekday && selectedDateKey != null;
           const nextKey = calendarKeys.find((k) => weekdayFromDateKey(k) === weekday);
@@ -101,7 +101,7 @@ export default function DealDayDateFilter({
               key={label}
               type="button"
               onClick={() => pickWeekday(weekday)}
-              className={`inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                 active
                   ? "bg-amber-500 text-zinc-900 shadow-sm shadow-amber-500/30"
                   : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700"
@@ -115,9 +115,9 @@ export default function DealDayDateFilter({
         })}
       </div>
 
-      {/* Calendar day strip — always visible */}
+      {/* Calendar day strip — always visible, fade hints it keeps scrolling */}
       <div className="tm-cat-bar relative z-0 -mx-1 overflow-hidden">
-        <div className="tm-cat-scroll px-1 scrollbar-none">
+        <FadeScrollX className="tm-cat-scroll px-1">
           {calendarKeys.map((key) => {
             const active = selectedDateKey === key;
             const count = countOn(key);
@@ -126,7 +126,7 @@ export default function DealDayDateFilter({
                 key={key}
                 type="button"
                 onClick={() => onSelectDate(active ? null : key)}
-                className={`tm-cat-tab${active ? " is-active" : ""}`}
+                className={`tm-cat-tab tm-cat-tab--sm${active ? " is-active" : ""}`}
                 aria-pressed={active}
               >
                 <span className="tm-cat-tab-label">{formatOfferDayLabel(key, todayKey)}</span>
@@ -135,7 +135,7 @@ export default function DealDayDateFilter({
               </button>
             );
           })}
-        </div>
+        </FadeScrollX>
       </div>
     </section>
   );

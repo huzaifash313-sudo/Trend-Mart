@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import DealCard from "@/components/DealCard";
+import SearchInput from "@/components/SearchInput";
+import FadeScrollX from "@/components/FadeScrollX";
 import { dealToProduct } from "@/lib/dealCommerce";
 import {
   formatOfferDayLabel,
@@ -50,15 +52,6 @@ const EMPTY_DEALS: ShopDeal[] = [];
 const EMPTY_COUPONS: Record<string, Coupon[]> = {};
 const EMPTY_DELIVERY: Record<string, ShopDeliveryMeta> = {};
 const EMPTY_SHOPS: Shop[] = [];
-
-function SearchIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
 
 function DealsInner() {
   const router = useRouter();
@@ -554,39 +547,26 @@ function DealsInner() {
           </div>
           <Link
             href="/products?sort=for_you"
-            className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+            className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300"
           >
-            Products →
+            View products →
           </Link>
         </div>
       </header>
 
-      <form onSubmit={handleSearch} className="mb-3">
-        <label className="relative block">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">
-            <SearchIcon />
-          </span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search deals"
-            className="w-full rounded-2xl border border-zinc-200 bg-white py-2.5 pl-10 pr-20 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            aria-label="Search deals"
-          />
-          <button
-            type="submit"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-          >
-            Search
-          </button>
-        </label>
-      </form>
+      <SearchInput
+        value={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+        placeholder="Search deals"
+        ariaLabel="Search deals"
+        className="mb-3"
+      />
 
       {/* Single-tap category filter — only categories that actually have deals. */}
       {availableCategories.length > 0 ? (
         <section aria-label="Filter deals by category" className="tm-cat-bar -mx-3 sm:-mx-4">
-          <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
+          <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
             <button
               type="button"
               onClick={() => handleCategoryChange("All")}
@@ -611,7 +591,7 @@ function DealsInner() {
                 </button>
               );
             })}
-          </div>
+          </FadeScrollX>
         </section>
       ) : null}
 
@@ -621,7 +601,7 @@ function DealsInner() {
           aria-label={`Filter deals by sub-category in ${activeCategory}`}
           className="tm-cat-bar tm-cat-bar--sub -mx-3 sm:-mx-4"
         >
-          <div className="tm-cat-scroll px-2 scrollbar-none sm:px-3">
+          <FadeScrollX fadeColor="var(--tm-bg)" className="tm-cat-scroll px-2 sm:px-3">
             <button
               type="button"
               onClick={() => handleSubCategoryChange(null)}
@@ -653,7 +633,7 @@ function DealsInner() {
                 Loading…
               </span>
             ) : null}
-          </div>
+          </FadeScrollX>
         </section>
       ) : null}
 

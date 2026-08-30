@@ -434,12 +434,12 @@ function DealCard({
             </div>
           )}
 
-          <span className="absolute left-1.5 top-1.5 z-10 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-white shadow-sm">
+          <span className="tm-badge-deal absolute left-1.5 top-1.5 z-10">
             Deal
           </span>
 
           {hasDiscount && discountPercent > 0 ? (
-            <span className="absolute right-1.5 top-1.5 z-10 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
+            <span className="tm-badge-discount absolute right-1.5 top-1.5 z-10">
               {discountPercent}% OFF
             </span>
           ) : null}
