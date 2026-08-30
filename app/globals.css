@@ -2013,6 +2013,177 @@ html.dark .tm-sponsored-cta {
   color: var(--tm-sea);
 }
 
+/* ── Brand media showcase (homepage video + Instagram carousel) ─────────── */
+.tm-brand-showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.tm-brand-showcase-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-inline: 0.1rem;
+}
+.tm-brand-showcase-sub {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+}
+
+.tm-brand-video {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--tm-radius-2xl);
+  border: 1px solid color-mix(in srgb, var(--tm-text-strong) 8%, transparent);
+  background: #050a14;
+  box-shadow: var(--tm-shadow-xl);
+  aspect-ratio: 16 / 9;
+}
+.tm-brand-video-el {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tm-brand-video-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 80% 40%, rgba(45, 212, 191, 0.12), transparent 70%),
+    linear-gradient(to top, rgba(5, 10, 20, 0.35) 0%, transparent 40%);
+}
+
+.tm-brand-carousel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--tm-radius-2xl);
+  border: 1px solid color-mix(in srgb, var(--tm-text-strong) 8%, transparent);
+  background: #050a14;
+  box-shadow: var(--tm-shadow-xl);
+  touch-action: pan-y;
+  user-select: none;
+}
+.tm-brand-carousel-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  cursor: grab;
+}
+.tm-brand-carousel-viewport:active {
+  cursor: grabbing;
+}
+.tm-brand-carousel-track {
+  display: flex;
+  height: 100%;
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.tm-brand-slide {
+  position: relative;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+}
+.tm-brand-slide-link {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.tm-brand-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.88);
+  color: #18181b;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+.tm-brand-nav--prev { left: 0.55rem; }
+.tm-brand-nav--next { right: 0.55rem; }
+.tm-brand-carousel:hover .tm-brand-nav,
+.tm-brand-carousel:focus-within .tm-brand-nav {
+  opacity: 1;
+}
+.tm-brand-nav:hover {
+  background: #fff;
+  transform: translateY(-50%) scale(1.06);
+}
+.tm-brand-nav:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--tm-sea);
+  outline-offset: 2px;
+}
+html.dark .tm-brand-nav {
+  background: rgba(24, 24, 27, 0.82);
+  color: #f4f4f5;
+}
+
+/* Instagram-style dots */
+.tm-brand-dots {
+  position: absolute;
+  bottom: 0.7rem;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transform: translateX(-50%);
+  padding: 0.28rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(6px);
+}
+.tm-brand-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+  transition: width 0.28s ease, background 0.28s ease;
+}
+.tm-brand-dot.is-active {
+  width: 1.15rem;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.35);
+}
+.tm-brand-dot:focus-visible {
+  outline: 2px solid var(--tm-sea);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .tm-brand-nav {
+    opacity: 0.85;
+    width: 1.85rem;
+    height: 1.85rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-brand-carousel-track {
+    transition: none;
+  }
+}
+
 .tm-product-media {
   /*
    * 5:4 image slot. MUST NOT put padding-bottom % on this flex item:

@@ -48,6 +48,9 @@ const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
 const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
   loading: () => null,
 });
+const BrandMediaShowcase = dynamic(() => import("@/components/BrandMediaShowcase"), {
+  loading: () => null,
+});
 
 /* Stable empty fallbacks so derived memos don't change identity every render. */
 const EMPTY_SHOPS: Shop[] = [];
@@ -780,6 +783,9 @@ function HomeClient({
           }}
         />
       )}
+
+      {/* ── Brand video + Instagram-style hero slides (always on) ───── */}
+      <BrandMediaShowcase />
 
       {/* ── Sponsored / Promotional Ads (platform placements) ───────────── */}
       <PromoAdsCarousel placement="homepage_top" />
