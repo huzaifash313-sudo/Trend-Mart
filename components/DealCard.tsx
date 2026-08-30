@@ -538,7 +538,7 @@ function DealCard({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1 dark:border-zinc-800">
+          <div className="tm-product-actions">
             <button
               type="button"
               onClick={handleWishlist}

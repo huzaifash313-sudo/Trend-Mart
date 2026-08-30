@@ -423,7 +423,7 @@ const ProductCard = memo(function ProductCard({
 
           {/* Actions — customer row only; owner manage uses the 3-dot menu above */}
           {!manage && (onFavoriteToggle || (product.is_available && (onAddToCart || onOrder))) ? (
-            <div className="flex items-center justify-between gap-1 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+            <div className="tm-product-actions">
               {onFavoriteToggle ? (
                 <button
                   type="button"

@@ -170,8 +170,10 @@ export default function AdPlansManager() {
                 onChange={(e) => setForm((f) => ({ ...f, placement: e.target.value as PromoAdPlacement }))}
                 className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
               >
-                <option value="homepage_top">Homepage Top</option>
-                <option value="homepage_feed">Homepage Feed</option>
+                <option value="homepage_top">Home page</option>
+                <option value="deals_top">Deals page</option>
+                <option value="products_top">Products page</option>
+                <option value="homepage_feed">Home feed</option>
               </select>
             </label>
             <label className="block">

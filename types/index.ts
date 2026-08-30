@@ -1032,7 +1032,24 @@ export interface SupportTicketFormData {
 
 // ─── Promotional Ads / Sponsored Banners (public.promotional_ads table) ────
 export type PromoAdStatus = "pending" | "approved" | "rejected";
-export type PromoAdPlacement = "homepage_top" | "homepage_feed";
+export type PromoAdPlacement = "homepage_top" | "homepage_feed" | "deals_top" | "products_top";
+
+/** Merchant-facing placement choice — "all_pages" creates one request per page. */
+export type AdPlacementChoice = PromoAdPlacement | "all_pages";
+
+export const AD_PLACEMENT_OPTIONS: { value: AdPlacementChoice; label: string }[] = [
+  { value: "homepage_top", label: "Home page" },
+  { value: "deals_top", label: "Deals page" },
+  { value: "products_top", label: "Products page" },
+  { value: "all_pages", label: "All three pages" },
+];
+
+export const AD_PLACEMENT_LABELS: Record<PromoAdPlacement, string> = {
+  homepage_top: "Home page",
+  homepage_feed: "Home feed",
+  deals_top: "Deals page",
+  products_top: "Products page",
+};
 
 export interface PromotionalAd {
   id: string;

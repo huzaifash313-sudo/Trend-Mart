@@ -3520,6 +3520,21 @@ html.dark .tm-multi-img__empty {
   cursor: pointer;
   transition: color 0.15s ease, opacity 0.15s ease;
 }
+
+/* Action row — same button sizes; only trim extra vertical gap above/below */
+.tm-product-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
+  padding-bottom: 0;
+  border-top: 1px solid #f4f4f5;
+}
+html.dark .tm-product-actions {
+  border-top-color: #27272a;
+}
 .tm-product-add-text:hover {
   color: var(--tm-accent);
 }

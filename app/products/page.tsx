@@ -49,6 +49,10 @@ const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
   ssr: false,
 });
 
+const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
+  ssr: false,
+});
+
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -721,6 +725,8 @@ function ProductsPageInner() {
         showClearButton
         className="mb-3"
       />
+
+      <PromoAdsCarousel placement="products_top" className="mb-3" />
 
       {/* Categories */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">

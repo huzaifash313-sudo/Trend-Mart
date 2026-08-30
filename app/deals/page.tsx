@@ -45,6 +45,10 @@ const DealQuickView = dynamic(() => import("@/components/DealQuickView"), {
   ssr: false,
 });
 
+const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
+  ssr: false,
+});
+
 type FilterMode = "today" | "featured" | "upcoming" | "all";
 
 /* Stable empty fallbacks so derived memos don't change identity every render. */
@@ -532,26 +536,9 @@ function DealsInner() {
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-3 md:px-4 md:py-5 md:pb-8">
       <header className="mb-3">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-          Marketplace deals
-        </p>
-        <div className="mt-0.5 flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
-              Deals for you
-            </h1>
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Filter by category, sub-category, weekday or date — see which stores
-              have deals that day.
-            </p>
-          </div>
-          <Link
-            href="/products?sort=for_you"
-            className="shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300"
-          >
-            View products →
-          </Link>
-        </div>
+        <h1 className="text-2xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-[1.65rem]">
+          Deals for you
+        </h1>
       </header>
 
       <SearchInput
@@ -562,6 +549,8 @@ function DealsInner() {
         ariaLabel="Search deals"
         className="mb-3"
       />
+
+      <PromoAdsCarousel placement="deals_top" className="mb-3" />
 
       {/* Single-tap category filter — only categories that actually have deals. */}
       {availableCategories.length > 0 ? (
@@ -638,7 +627,6 @@ function DealsInner() {
       ) : null}
 
       <DealDayDateFilter
-        deals={deals}
         selectedDateKey={dayKey}
         onSelectDate={selectDay}
         daysAhead={14}

@@ -24,8 +24,10 @@ import {
   setAdActive,
   deleteAd,
   fetchActiveAdPlans,
+  resolveAdPlacements,
 } from "@/services/adsService";
-import type { PromotionalAd, PromotionalAdFormData, AdPlan } from "@/types";
+import type { PromotionalAd, PromotionalAdFormData, AdPlan, AdPlacementChoice } from "@/types";
+import { AD_PLACEMENT_LABELS, AD_PLACEMENT_OPTIONS } from "@/types";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ export default function MerchantAdsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [plans, setPlans] = useState<AdPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [placementChoice, setPlacementChoice] = useState<AdPlacementChoice>("homepage_top");
 
   // ── Load pricing plans ───────────────────────────────────────────────
   useEffect(() => {
@@ -145,6 +148,7 @@ export default function MerchantAdsPage() {
       starts_at: ad.starts_at ? ad.starts_at.slice(0, 10) : "",
       ends_at: ad.ends_at ? ad.ends_at.slice(0, 10) : "",
     });
+    setPlacementChoice(ad.placement);
     setShowForm(true);
     setError(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -154,6 +158,7 @@ export default function MerchantAdsPage() {
     setShowForm(false);
     setEditingId(null);
     setSelectedPlanId("");
+    setPlacementChoice("homepage_top");
     setForm(EMPTY_FORM);
     setError(null);
   }, []);
@@ -168,24 +173,49 @@ export default function MerchantAdsPage() {
     setSaving(true);
     setError(null);
 
-    const result = editingId
-      ? await updateAdCreative(editingId, form)
-      : await createAdRequest(shopId, form, selectedPlanId || null);
+    if (editingId) {
+      const result = await updateAdCreative(editingId, {
+        ...form,
+        placement: placementChoice === "all_pages" ? form.placement : placementChoice,
+      });
+      if (result.success) {
+        addToast("Ad updated — it will be re-reviewed by our team.", "success");
+        await loadAds(shopId);
+        handleCancel();
+      } else {
+        setError(result.error);
+      }
+      setSaving(false);
+      return;
+    }
 
-    if (result.success) {
+    const placements = resolveAdPlacements(placementChoice);
+    let failed = false;
+    for (const placement of placements) {
+      const result = await createAdRequest(
+        shopId,
+        { ...form, placement },
+        selectedPlanId || null,
+      );
+      if (!result.success) {
+        setError(result.error);
+        failed = true;
+        break;
+      }
+    }
+
+    if (!failed) {
       addToast(
-        editingId
-          ? "Ad updated — it will be re-reviewed by our team."
+        placements.length > 1
+          ? `Ad requests submitted for ${placements.length} pages!`
           : "Ad request submitted for review!",
         "success",
       );
       await loadAds(shopId);
       handleCancel();
-    } else {
-      setError(result.error);
     }
     setSaving(false);
-  }, [shopId, editingId, form, selectedPlanId, addToast, loadAds, handleCancel]);
+  }, [shopId, editingId, form, selectedPlanId, placementChoice, addToast, loadAds, handleCancel]);
 
   const handleToggleActive = useCallback(async (ad: PromotionalAd) => {
     const result = await setAdActive(ad.id, !ad.is_active);
@@ -240,7 +270,7 @@ export default function MerchantAdsPage() {
               <MegaphoneIcon /> Ads
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Feature {shopName || "your store"} in the homepage sponsored banner.
+              Feature {shopName || "your store"} on the home, deals, or products page.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -301,6 +331,36 @@ export default function MerchantAdsPage() {
             <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
               {editingId ? "Edit Ad Request" : "New Ad Request"}
             </h2>
+
+            {!editingId && (
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  Where should this ad appear? *
+                </label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {AD_PLACEMENT_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2.5 text-center text-xs font-semibold transition-colors ${
+                        placementChoice === opt.value
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-300"
+                          : "border-zinc-200 text-zinc-600 hover:border-emerald-300 dark:border-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ad-placement"
+                        value={opt.value}
+                        checked={placementChoice === opt.value}
+                        onChange={() => setPlacementChoice(opt.value)}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {!editingId && plans.length > 0 && (
               <div>
@@ -474,7 +534,7 @@ export default function MerchantAdsPage() {
             <div className="tm-panel rounded-2xl border border-dashed border-zinc-300 py-16 text-center dark:border-zinc-700">
               <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">No ad requests yet</p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                Request a homepage banner slot to get more customers.
+                Request a banner slot on home, deals, or products to get more customers.
               </p>
             </div>
           ) : (
@@ -496,6 +556,9 @@ export default function MerchantAdsPage() {
                       </p>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                        {AD_PLACEMENT_LABELS[ad.placement] ?? ad.placement}
+                      </span>
                       {ad.price_paid != null && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
                           Rs. {ad.price_paid.toLocaleString("en-PK")} plan

@@ -10,7 +10,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { sanitizeText } from "@/lib/validations";
-import type { PromoAdPlacement, PromoAdStatus, PromotionalAd, PromotionalAdFormData, AdPlan } from "@/types";
+import type { PromoAdPlacement, PromoAdStatus, PromotionalAd, PromotionalAdFormData, AdPlan, AdPlacementChoice } from "@/types";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -43,15 +43,27 @@ function sanitizeAdForm(form: PromotionalAdFormData) {
     image_url: sanitizeAdLink(form.image_url) || form.image_url.trim().slice(0, 500),
     link_url: sanitizeAdLink(form.link_url) || "/",
     badge_label: form.badge_label ? sanitizeText(form.badge_label).slice(0, 24) : null,
-    placement: (form.placement === "homepage_feed" ? "homepage_feed" : "homepage_top") as PromoAdPlacement,
+    placement: (
+      ["homepage_feed", "deals_top", "products_top"].includes(form.placement)
+        ? form.placement
+        : "homepage_top"
+    ) as PromoAdPlacement,
     starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
     ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
   };
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Public read (homepage carousel)                                           */
-/* -------------------------------------------------------------------------- */
+/** The three main storefront pages merchants can advertise on. */
+export const PAGE_AD_PLACEMENTS: PromoAdPlacement[] = [
+  "homepage_top",
+  "deals_top",
+  "products_top",
+];
+
+export function resolveAdPlacements(choice: AdPlacementChoice): PromoAdPlacement[] {
+  if (choice === "all_pages") return PAGE_AD_PLACEMENTS;
+  return [choice];
+}
 
 /**
  * Fetch currently live, approved, in-date ads for a given placement.
