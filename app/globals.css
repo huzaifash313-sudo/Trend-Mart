@@ -418,6 +418,31 @@ object {
   height: auto;
 }
 
+/* Square thumbs — the height:auto guard above would otherwise let portrait
+   photos grow taller than landscape ones. Keep this unlayered so it wins. */
+.tm-thumb {
+  display: block;
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background-color: rgb(244 244 245);
+  box-shadow: inset 0 0 0 1px rgb(228 228 231);
+}
+html.dark .tm-thumb {
+  background-color: rgb(39 39 42);
+  box-shadow: inset 0 0 0 1px rgb(63 63 70);
+}
+.tm-thumb > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+}
+
 table {
   width: 100%;
   overflow-x: auto;
@@ -2147,13 +2172,13 @@ html.dark .tm-sponsored-cta {
   margin-bottom: 0.35rem;
   padding-inline: 0.1rem;
 }
-.tm-stories-tray-title {
+h2.tm-stories-tray-title {
   margin: 0;
   font-family: var(--font-display, var(--font-sans));
-  font-size: 1.45rem;
+  font-size: 1.75rem;
   font-weight: 900;
-  line-height: 1.15;
-  letter-spacing: -0.025em;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
   color: var(--tm-text-strong);
 }
 .tm-stories-tray-scroll {

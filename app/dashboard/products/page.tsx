@@ -121,6 +121,8 @@ function PackageIcon() { return (<svg className="h-8 w-8 text-zinc-300 dark:text
 function UploadIcon() { return (<svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>); }
 function DownloadIcon() { return (<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>); }
 
+const PRODUCT_PAGE_SIZE = 30;
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function ProductsDashboardPage() {
@@ -153,6 +155,7 @@ export default function ProductsDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "available" | "sold_out">("all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "price_asc" | "price_desc" | "name">("newest");
+  const [listPage, setListPage] = useState(1);
 
   // CSV import
   const [csvImporting, setCsvImporting] = useState(false);
@@ -277,6 +280,17 @@ export default function ProductsDashboardPage() {
 
     return filtered;
   }, [products, searchQuery, statusFilter, sortBy]);
+
+  const productTotalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCT_PAGE_SIZE));
+  const productSafePage = Math.min(listPage, productTotalPages);
+  const pagedProducts = useMemo(() => {
+    const start = (productSafePage - 1) * PRODUCT_PAGE_SIZE;
+    return filteredProducts.slice(start, start + PRODUCT_PAGE_SIZE);
+  }, [filteredProducts, productSafePage]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [searchQuery, statusFilter, sortBy]);
 
   // ── SKU Generation ──────────────────────────────────────────────────────
   const generateSkuPrefix = useCallback((name: string): string => {
@@ -1117,8 +1131,9 @@ export default function ProductsDashboardPage() {
             )}
 
             {!productsLoading && filteredProducts.length > 0 && (
+              <>
               <div className="space-y-2">
-                {filteredProducts.map((product) => (
+                {pagedProducts.map((product) => (
                   <div
                     key={product.id}
                     className={`tm-panel flex items-center gap-3 px-4 py-3 transition-shadow hover:shadow-sm ${
@@ -1136,14 +1151,17 @@ export default function ProductsDashboardPage() {
                       aria-label={`Select ${product.name}`}
                     />
 
-                    {/* Image */}
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                      {product.image_url ? (
-                        <img src={product.image_url} alt="" className="h-full w-full rounded-lg object-cover" />
-                      ) : (
+                    {/* Image — fixed square so H/V photos stay equal */}
+                    {product.image_url ? (
+                      <span className="tm-thumb">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={product.image_url} alt="" loading="lazy" decoding="async" />
+                      </span>
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
                         <PackageIcon />
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Info */}
                     <div className="min-w-0 flex-1">
@@ -1212,6 +1230,33 @@ export default function ProductsDashboardPage() {
                   </div>
                 ))}
               </div>
+
+              {filteredProducts.length > PRODUCT_PAGE_SIZE && (
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Page {productSafePage} of {productTotalPages} · {filteredProducts.length} products
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={productSafePage <= 1}
+                      onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+                    >
+                      ← Prev
+                    </button>
+                    <button
+                      type="button"
+                      disabled={productSafePage >= productTotalPages}
+                      onClick={() => setListPage((p) => Math.min(productTotalPages, p + 1))}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </section>
         )}

@@ -19,6 +19,8 @@ import { toPkWhatsAppDigits } from "@/lib/phoneFormat";
 
 type StatusFilter = "all" | OrderStatus;
 
+const PAGE_SIZE = 20;
+
 function formatMoney(n: number) {
   return `Rs. ${Number(n || 0).toLocaleString()}`;
 }
@@ -47,6 +49,7 @@ export default function MerchantOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [billOrder, setBillOrder] = useState<Order | null>(null);
 
   useEffect(() => {
@@ -122,6 +125,17 @@ export default function MerchantOrdersPage() {
     });
   }, [orders, filter, query]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, safePage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, query]);
+
   const counts = useMemo(() => {
     const base: Record<string, number> = { all: orders.length };
     for (const o of orders) {
@@ -170,7 +184,7 @@ export default function MerchantOrdersPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
             Order Desk
           </p>
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+          <h1 className="tm-font-display text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
             {shop?.name ?? "Your store"} — Orders
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
@@ -221,8 +235,9 @@ export default function MerchantOrdersPage() {
           </p>
         </div>
       ) : (
+        <>
         <div className="space-y-3">
-          {filtered.map((order) => {
+          {paged.map((order) => {
             const itemCount = order.items_json?.length ?? 0;
             return (
               <article
@@ -311,6 +326,33 @@ export default function MerchantOrdersPage() {
             );
           })}
         </div>
+
+        {filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Page {safePage} of {totalPages} · {filtered.length} orders
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+              >
+                ← Prev
+              </button>
+              <button
+                type="button"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       {billOrder && shop && (

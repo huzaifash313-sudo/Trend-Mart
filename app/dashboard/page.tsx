@@ -330,10 +330,10 @@ export default function DashboardOverviewPage() {
       <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
               Merchant dashboard
             </p>
-            <h1 className="truncate text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+            <h1 className="tm-font-display truncate text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
               {activeShop?.name ?? "Overview"}
             </h1>
           </div>
@@ -459,19 +459,20 @@ export default function DashboardOverviewPage() {
                     </div>
                   </div>
 
-                  {/* Photo preview strip */}
+                  {/* Photo preview strip — fixed square thumbs (H/V source safe) */}
                   <div className="flex items-center gap-1.5 px-4 pb-3">
                     {productPreviews.length > 0 ? (
                       <>
                         {productPreviews.map((src, i) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            key={i}
-                            src={getSafeImageUrl(src, "product")}
-                            alt=""
-                            className="h-12 w-12 rounded-lg object-cover ring-1 ring-zinc-200 dark:ring-zinc-700"
-                            loading="lazy"
-                          />
+                          <span key={i} className="tm-thumb">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={getSafeImageUrl(src, "product")}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </span>
                         ))}
                         <span className="ml-1 text-xs font-semibold text-zinc-400">
                           +{Math.max(0, products.length - productPreviews.length)} more
@@ -537,19 +538,20 @@ export default function DashboardOverviewPage() {
                     </div>
                   </div>
 
-                  {/* Photo preview strip */}
+                  {/* Photo preview strip — same square crop as products */}
                   <div className="flex items-center gap-1.5 px-4 pb-3">
                     {dealPreviews.length > 0 ? (
                       <>
                         {dealPreviews.map((src, i) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            key={i}
-                            src={getSafeImageUrl(src, "product")}
-                            alt=""
-                            className="h-12 w-12 rounded-lg object-cover ring-1 ring-zinc-200 dark:ring-zinc-700"
-                            loading="lazy"
-                          />
+                          <span key={i} className="tm-thumb">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={getSafeImageUrl(src, "product")}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </span>
                         ))}
                         <span className="ml-1 text-xs font-semibold text-zinc-400">
                           +{Math.max(0, deals.length - dealPreviews.length)} more
