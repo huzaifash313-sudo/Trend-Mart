@@ -2150,8 +2150,8 @@ html.dark .tm-sponsored-cta {
 .tm-stories-tray-title {
   margin: 0;
   font-family: var(--font-display, var(--font-sans));
-  font-size: 0.95rem;
-  font-weight: 750;
+  font-size: 1.2rem;
+  font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.02em;
   color: var(--tm-text-strong);
