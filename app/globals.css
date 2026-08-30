@@ -2289,6 +2289,31 @@ html.dark .tm-story-ring-label {
     linear-gradient(to top, rgba(5, 10, 20, 0.35) 0%, transparent 40%);
 }
 
+/* Tablet / laptop: cap height so the reel fits one screen with breathing room.
+   Mobile keeps full-width 16:9 — unchanged below 641px. */
+@media (min-width: 641px) {
+  .tm-brand-showcase {
+    align-items: center;
+  }
+  .tm-brand-video {
+    --tm-brand-video-h: min(38dvh, 400px);
+    width: min(100%, calc(var(--tm-brand-video-h) * 16 / 9));
+    height: var(--tm-brand-video-h);
+    max-height: var(--tm-brand-video-h);
+    margin-inline: auto;
+  }
+}
+@media (min-width: 1024px) {
+  .tm-brand-video {
+    --tm-brand-video-h: min(44dvh, 460px);
+  }
+}
+@media (min-width: 1280px) {
+  .tm-brand-video {
+    --tm-brand-video-h: min(48dvh, 500px);
+  }
+}
+
 .tm-brand-carousel {
   position: relative;
   overflow: hidden;
