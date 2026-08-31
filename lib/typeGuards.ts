@@ -368,6 +368,7 @@ export const storySchema = z.object({
   caption: z.string().max(80).nullish().transform((v) => v ?? undefined),
   expires_at: z.string().datetime().nullish().transform((v) => v ?? undefined),
   created_at: z.string().datetime().nullish().transform((v) => v ?? undefined),
+  view_count: z.number().int().nonnegative().nullish().transform((v) => v ?? undefined),
 });
 
 export type StoryValidated = z.infer<typeof storySchema>;

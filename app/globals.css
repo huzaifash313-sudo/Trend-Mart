@@ -2361,7 +2361,7 @@ h2.tm-stories-tray-title {
   max-width: none;
   margin-inline: -0.75rem;
   padding: 0.15rem 0.75rem 0.35rem;
-  min-height: 5.1rem;
+  min-height: 6.1rem;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -2624,6 +2624,59 @@ html.dark .tm-story-count--mine {
 }
 html.dark .tm-story-ring-label {
   color: color-mix(in srgb, var(--tm-text-strong) 88%, transparent);
+}
+.tm-story-ring-label--mine {
+  font-weight: 700;
+  color: var(--tm-accent-soft, #059669);
+}
+html.dark .tm-story-ring-label--mine {
+  color: #34d399;
+}
+
+.tm-story-views-label {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.52rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--tm-muted, #71717a);
+  margin-top: -0.1rem;
+}
+html.dark .tm-story-views-label {
+  color: #a1a1aa;
+}
+
+/* Own story stays pinned at the start of the horizontal tray */
+.tm-story-item--mine {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: linear-gradient(
+    90deg,
+    var(--tm-bg) 0%,
+    var(--tm-bg) 82%,
+    color-mix(in srgb, var(--tm-bg) 0%, transparent) 100%
+  );
+  padding-right: 0.55rem;
+  margin-right: 0.15rem;
+}
+.tm-story-item--mine::after {
+  content: "";
+  position: absolute;
+  right: 0.15rem;
+  top: 0.35rem;
+  bottom: 1.55rem;
+  width: 1px;
+  background: color-mix(in srgb, var(--tm-border, #e4e4e7) 85%, transparent);
+  pointer-events: none;
+}
+html.dark .tm-story-item--mine::after {
+  background: color-mix(in srgb, #52525b 70%, transparent);
 }
 
 .tm-story-skel {

@@ -108,6 +108,13 @@ async function fetchActiveStories(supabase: AnonClient): Promise<Story[]> {
     if (!withShop.error && withShop.data) {
       return (withShop.data as Record<string, unknown>[]).map((row) => {
         const shop = row.shops as Record<string, unknown> | null | undefined;
+        const rawViews = row.view_count;
+        const viewCount =
+          typeof rawViews === "number"
+            ? rawViews
+            : typeof rawViews === "string"
+              ? Number(rawViews) || 0
+              : 0;
         return {
           id: String(row.id),
           shop_id: String(row.shop_id),
@@ -115,6 +122,7 @@ async function fetchActiveStories(supabase: AnonClient): Promise<Story[]> {
           caption: (row.caption as string | null) ?? null,
           created_at: (row.created_at as string | undefined) ?? undefined,
           expires_at: (row.expires_at as string | undefined) ?? undefined,
+          view_count: viewCount,
           shop_name: (shop?.name as string | null) ?? null,
           shop_logo_url: (shop?.logo_url as string | null) ?? null,
           shop_latitude: typeof shop?.latitude === "number" ? (shop.latitude as number) : null,

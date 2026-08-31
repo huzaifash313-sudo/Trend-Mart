@@ -505,6 +505,8 @@ export interface Story {
   /** Stories expire after 24 hours */
   expires_at?: string;
   created_at?: string;
+  /** Unique viewers who opened this story (denormalized). */
+  view_count?: number | null;
   /** Joined from shops — shown on tray + viewer header */
   shop_name?: string | null;
   shop_logo_url?: string | null;

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Story, StoryQuota } from "@/types";
 import { getStoriesQuota } from "@/types";
 import { logError } from "@/services/errorService";
+import { getOrCreateStoryViewerKey } from "@/lib/storyViewed";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,13 @@ interface StoryShopJoin {
 function mapStoryRow(row: Record<string, unknown>): Story {
   const shop = (row.shops as StoryShopJoin | StoryShopJoin[] | null | undefined);
   const s = Array.isArray(shop) ? shop[0] : shop;
+  const rawViews = row.view_count;
+  const viewCount =
+    typeof rawViews === "number"
+      ? rawViews
+      : typeof rawViews === "string"
+        ? Number(rawViews) || 0
+        : 0;
   return {
     id: String(row.id),
     shop_id: String(row.shop_id),
@@ -49,6 +57,7 @@ function mapStoryRow(row: Record<string, unknown>): Story {
     caption: (row.caption as string | null) ?? null,
     created_at: (row.created_at as string | undefined) ?? undefined,
     expires_at: (row.expires_at as string | undefined) ?? undefined,
+    view_count: viewCount,
     shop_name: s?.name ?? null,
     shop_logo_url: s?.logo_url ?? null,
     shop_latitude: typeof s?.latitude === "number" ? s.latitude : null,
@@ -228,5 +237,37 @@ export async function deleteStory(
   } catch (err) {
     logError(err, { module: "storyService.deleteStory", meta: { storyId } });
     return { success: false, error: toError(err) };
+  }
+}
+
+/**
+ * Record a unique story view. Prefer auth uid when signed in; otherwise a
+ * stable anonymous device key. Returns the updated view_count (or existing
+ * count on duplicate). Best-effort — never throws to the UI.
+ */
+export async function recordStoryView(
+  storyId: string,
+  viewerKeyHint?: string | null,
+): Promise<number | null> {
+  if (!storyId) return null;
+  try {
+    const supabase = createClient();
+    let key = viewerKeyHint?.trim() ?? "";
+    if (key.length < 8) {
+      const { data: auth } = await supabase.auth.getUser();
+      key = getOrCreateStoryViewerKey(auth.user?.id ?? null);
+    }
+    if (key.length < 8) return null;
+
+    const { data, error } = await supabase.rpc("record_story_view", {
+      p_story_id: storyId,
+      p_viewer_key: key,
+    });
+    if (error) throw error;
+    const n = typeof data === "number" ? data : Number(data);
+    return Number.isFinite(n) ? n : null;
+  } catch (err) {
+    logError(err, { module: "storyService.recordStoryView", meta: { storyId } });
+    return null;
   }
 }

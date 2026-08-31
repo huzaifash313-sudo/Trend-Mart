@@ -8,9 +8,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { Story } from "@/types";
-import { fetchActiveStories, deleteStory } from "@/services/storyService";
+import { fetchActiveStories, deleteStory, recordStoryView } from "@/services/storyService";
 import { getSafeImageUrl } from "@/services/storageService";
-import { markStoryViewed, sortStoriesUnseenFirst } from "@/lib/storyViewed";
+import { markStoryViewed, sortStoriesUnseenFirst, formatStoryViewCount } from "@/lib/storyViewed";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/Toast";
 
@@ -40,6 +40,15 @@ function ShoppingBagIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
@@ -121,6 +130,15 @@ export default function StoriesViewer({
   const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(!storiesProp?.length);
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
+  /** Local view counts so the badge updates live after a successful ping. */
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    for (const s of storiesProp ?? []) {
+      if (s.id) init[s.id] = Math.max(0, Number(s.view_count) || 0);
+    }
+    return init;
+  });
+  const recordedViewsRef = useRef<Set<string>>(new Set());
 
   const storiesRef = useRef<Story[]>([]);
   const currentIndexRef = useRef(initialIndex);
@@ -168,12 +186,20 @@ export default function StoriesViewer({
     }
   }, []);
 
-  /* Seed once from parent list, or fetch if none passed */
   useEffect(() => {
     if (storiesProp && storiesProp.length > 0) {
       setStories(storiesProp);
       setCurrentIndex(Math.min(Math.max(0, initialIndex), storiesProp.length - 1));
       setLoading(false);
+      setViewCounts((prev) => {
+        const next = { ...prev };
+        for (const s of storiesProp) {
+          if (!s.id) continue;
+          const incoming = Math.max(0, Number(s.view_count) || 0);
+          next[s.id] = Math.max(next[s.id] ?? 0, incoming);
+        }
+        return next;
+      });
       return;
     }
 
@@ -185,6 +211,13 @@ export default function StoriesViewer({
           const sorted = sortStoriesUnseenFirst(result.data);
           setStories(sorted);
           setCurrentIndex(Math.min(Math.max(0, initialIndex), Math.max(0, sorted.length - 1)));
+          setViewCounts(() => {
+            const init: Record<string, number> = {};
+            for (const s of sorted) {
+              if (s.id) init[s.id] = Math.max(0, Number(s.view_count) || 0);
+            }
+            return init;
+          });
         }
       } catch {
         /* empty */
@@ -200,11 +233,23 @@ export default function StoriesViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Mark current story as viewed */
+  /* Mark current story as viewed (local "seen") + ping unique view count.
+   * Merchants viewing their own story do NOT increment the counter. */
   useEffect(() => {
     const story = stories[currentIndex];
-    if (story?.id) markStoryViewed(story.id);
-  }, [stories, currentIndex]);
+    if (!story?.id) return;
+    markStoryViewed(story.id);
+
+    const isOwn = Boolean(myShopId && story.shop_id === myShopId);
+    if (isOwn) return;
+    if (recordedViewsRef.current.has(story.id)) return;
+    recordedViewsRef.current.add(story.id);
+
+    void recordStoryView(story.id).then((count) => {
+      if (typeof count !== "number") return;
+      setViewCounts((prev) => ({ ...prev, [story.id]: count }));
+    });
+  }, [stories, currentIndex, myShopId]);
 
   /* Delete the merchant's OWN story from the viewer (WhatsApp-style) */
   const handleDeleteOwnStory = useCallback(async () => {
@@ -377,6 +422,10 @@ export default function StoriesViewer({
 
   const current = stories[currentIndex];
   const shopLabel = current?.shop_name?.trim() || "TrendsMart Store";
+  const isOwnStory = Boolean(myShopId && current?.shop_id === myShopId);
+  const viewCount = current
+    ? viewCounts[current.id] ?? Math.max(0, Number(current.view_count) || 0)
+    : 0;
   const initial = shopLabel.charAt(0).toUpperCase();
 
   return (
@@ -423,9 +472,22 @@ export default function StoriesViewer({
             ))}
           </div>
 
-          {/* Story counter */}
-          <div className="absolute bottom-20 left-4 z-20 rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/85 backdrop-blur-sm">
-            {currentIndex + 1} / {stories.length}
+          {/* Story counter + view count */}
+          <div className="absolute bottom-20 left-4 z-20 flex items-center gap-2">
+            <div className="rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/85 backdrop-blur-sm">
+              {currentIndex + 1} / {stories.length}
+            </div>
+            <div
+              className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur-sm"
+              title={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
+              aria-label={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
+            >
+              <EyeIcon />
+              <span>
+                {formatStoryViewCount(viewCount)}
+                {isOwnStory ? (viewCount === 1 ? " view" : " views") : ""}
+              </span>
+            </div>
           </div>
 
           {/* Header — shop name */}

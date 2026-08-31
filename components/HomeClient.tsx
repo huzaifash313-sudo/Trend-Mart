@@ -19,6 +19,7 @@ import { SHOP_CATEGORIES } from "@/types";
 import {
   sortStoriesUnseenFirst,
   getViewedStoryIds,
+  formatStoryViewCount,
 } from "@/lib/storyViewed";
 import { toggleFavorite as toggleFav, getAllFavorites } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
@@ -124,7 +125,7 @@ function StoryRing({
   );
 }
 
-/** Merchant "Your story" ring — Instagram-style: avatar/story thumb + tiny add. */
+/** Merchant "Your story" ring — sticky first in tray so own stories stay easy to open. */
 function MyStoryRingButton({
   shop,
   stories,
@@ -147,6 +148,10 @@ function MyStoryRingButton({
     storyThumb || shop.logo_url || lead?.shop_logo_url || null;
   const initial = shop.name?.trim()?.charAt(0).toUpperCase() || "S";
   const hasLiveStories = stories.length > 0;
+  const totalViews = stories.reduce(
+    (sum, s) => sum + Math.max(0, Number(s.view_count) || 0),
+    0,
+  );
 
   const avatar = thumbUrl ? (
     <Image
@@ -168,14 +173,16 @@ function MyStoryRingButton({
   );
 
   return (
-    <div className="tm-story-item">
+    <div className="tm-story-item tm-story-item--mine">
       <div className="tm-story-item-frame">
         <button
           type="button"
           onClick={() => (hasLiveStories ? onView() : onAdd())}
           className="tm-story-item-hit"
           aria-label={
-            hasLiveStories ? "Preview your live story" : "Add your store story"
+            hasLiveStories
+              ? `Preview your live stor${stories.length === 1 ? "y" : "ies"}${totalViews > 0 ? `, ${totalViews} views` : ""}`
+              : "Add your store story"
           }
         >
           {hasLiveStories ? (
@@ -208,7 +215,15 @@ function MyStoryRingButton({
           +
         </button>
       </div>
-      <span className="tm-story-ring-label">Your story</span>
+      <span className="tm-story-ring-label tm-story-ring-label--mine">
+        {hasLiveStories ? "Your story" : "Add story"}
+      </span>
+      {hasLiveStories ? (
+        <span className="tm-story-views-label" aria-hidden>
+          {formatStoryViewCount(totalViews)}{" "}
+          {totalViews === 1 ? "view" : "views"}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -368,13 +383,15 @@ function HomeClient({
 
   const storiesQuery = useStories(initialStories.length > 0 ? { initialData: initialStories } : undefined);
   const [storiesVersion, setStoriesVersion] = useState(0);
-  /** Merchant's own active stories — shown in the "Your story" ring so they
-   *  can confirm a posted story is live (their stories are hidden from the
-   *  public tray by design). */
-  const myStories = useMemo(
-    () => (storiesQuery.data ?? EMPTY_STORIES).filter((s) => s.shop_id === myShopId),
-    [storiesQuery.data, myShopId],
-  );
+  /** Merchant's own active stories — always first in the tray (sticky ring).
+   *  Newest first so the latest post is the ring thumbnail. */
+  const myStories = useMemo(() => {
+    if (!myShopId) return EMPTY_STORIES;
+    return (storiesQuery.data ?? EMPTY_STORIES)
+      .filter((s) => s.shop_id === myShopId)
+      .slice()
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+  }, [storiesQuery.data, myShopId]);
   const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
   // Hydration-safe viewed tracking: SSR + first client render agree on "all
   // unseen", then the effect fills real seen state from localStorage.
@@ -716,6 +733,10 @@ function HomeClient({
               const initial = label.charAt(0).toUpperCase() || "?";
               const startIndex = storyGroups.slice(0, gIdx).reduce((n, g) => n + g.length, 0);
               const firstUnseenInGroup = group.findIndex((s) => !viewedStoryIds.has(s.id));
+              const groupViews = group.reduce(
+                (sum, s) => sum + Math.max(0, Number(s.view_count) || 0),
+                0,
+              );
               return (
                 <button
                   key={first.id}
@@ -727,7 +748,7 @@ function HomeClient({
                     setStoryViewerOpen(true);
                   }}
                   className="tm-story-item"
-                  aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : `, ${group.length - seenCount} unviewed`}`}
+                  aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : `, ${group.length - seenCount} unviewed`}, ${groupViews} views`}
                 >
                   <div className="tm-story-item-frame">
                     <StoryRing
@@ -759,6 +780,10 @@ function HomeClient({
                     ) : null}
                   </div>
                   <span className="tm-story-ring-label">{label}</span>
+                  <span className="tm-story-views-label" aria-hidden>
+                    {formatStoryViewCount(groupViews)}{" "}
+                    {groupViews === 1 ? "view" : "views"}
+                  </span>
                 </button>
               );
             })

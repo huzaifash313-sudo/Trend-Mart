@@ -5,6 +5,7 @@
 import type { Story } from "@/types";
 
 const STORAGE_KEY = "trendsmart_viewed_stories";
+const VIEWER_KEY_STORAGE = "trendsmart_story_viewer_key";
 /** Keep viewed IDs roughly for story lifetime (24h) + buffer */
 const MAX_AGE_MS = 36 * 60 * 60 * 1000;
 
@@ -35,6 +36,36 @@ function writeMap(map: ViewedMap): void {
   } catch {
     /* no-op */
   }
+}
+
+/**
+ * Stable anonymous viewer id for unique story-view counting.
+ * Prefer auth uid when available (passed in); otherwise a local UUID.
+ */
+export function getOrCreateStoryViewerKey(authUserId?: string | null): string {
+  if (authUserId && authUserId.length >= 8) return authUserId;
+  if (typeof window === "undefined") return "";
+  try {
+    const existing = localStorage.getItem(VIEWER_KEY_STORAGE);
+    if (existing && existing.length >= 8) return existing;
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `anon-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(VIEWER_KEY_STORAGE, id);
+    return id;
+  } catch {
+    return `anon-${Date.now().toString(36)}`;
+  }
+}
+
+/** Compact view count for badges (12 → "12", 1200 → "1.2k"). */
+export function formatStoryViewCount(count: number | null | undefined): string {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n < 1000) return String(n);
+  if (n < 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  if (n < 1_000_000) return `${Math.round(n / 1000)}k`;
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
 }
 
 export function isStoryViewed(storyId: string): boolean {

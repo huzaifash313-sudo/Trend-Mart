@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.stories (
   shop_id     uuid NOT NULL REFERENCES public.shops(id) ON DELETE CASCADE,
   image_url   text,
   caption     text DEFAULT '',
+  view_count  integer NOT NULL DEFAULT 0,
   created_at  timestamptz DEFAULT now(),
   /** Stories are shown for 24 hours, then hidden via the RLS policy below */
   expires_at  timestamptz DEFAULT (now() + interval '24 hours')
