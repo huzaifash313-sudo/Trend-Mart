@@ -67,6 +67,8 @@ const DEMO_AD_ID_PREFIX = "f0000001-";
 function isDemoAdId(id: string): boolean {
   return id.startsWith(DEMO_AD_ID_PREFIX);
 }
+
+const HOLD_MS = 5000;
 const SLIDE_MS = 520;
 const GAP_PX = 12;
 
