@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Enable Realtime + Customer Order Tracking SELECT policy
+-- TrendsMart — Enable Realtime + Customer Order Tracking SELECT policy
 -- =============================================================================
 -- Two fixes that make the live notification/tracking system actually work:
 --

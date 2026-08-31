@@ -142,7 +142,7 @@ interface GeoRadiusFilterProps {
 /*  Persistence (scope + radius survive refresh)                               */
 /* -------------------------------------------------------------------------- */
 
-const PREFS_KEY = "trendmart_geo_filter_prefs_v1";
+const PREFS_KEY = "trendsmart_geo_filter_prefs_v1";
 
 interface GeoFilterPrefs {
   scope: GeoScope;

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Merchant Verification / Super-Admin Approval Queue            */
+/*  TrendsMart — Merchant Verification / Super-Admin Approval Queue            */
 /*                                                                             */
 /*  Introduces a distinct `verification_status` on shops, separate from       */
 /*  `is_live` (which merchants control themselves to open/close for          */

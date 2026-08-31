@@ -163,7 +163,7 @@ export default function BecomeMerchantPage() {
 
       // Invalidate storefront cache so the new shop shows up on the homepage.
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("trendmart:shops-updated"));
+        window.dispatchEvent(new Event("trendsmart:shops-updated"));
       }
 
       addToast("Store created — welcome to your merchant dashboard!", "success");
@@ -321,7 +321,7 @@ export default function BecomeMerchantPage() {
               className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-emerald-600"
             />
             <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              I want to open a merchant store on TrendMart (I can still shop as a customer from the homepage).
+              I want to open a merchant store on TrendsMart (I can still shop as a customer from the homepage).
             </span>
           </label>
           {errors.confirmSwitch ? (
@@ -336,7 +336,7 @@ export default function BecomeMerchantPage() {
               className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-emerald-600"
             />
             <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              I agree to TrendMart&apos;s{" "}
+              I agree to TrendsMart&apos;s{" "}
               <Link href="/legal/merchant-guidelines" target="_blank" className="font-medium text-emerald-600 underline">
                 Merchant Security Guidelines
               </Link>{" "}

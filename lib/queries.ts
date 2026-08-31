@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Storefront React Query Hooks                                   */
+/*  TrendsMart — Storefront React Query Hooks                                   */
 /*                                                                             */
 /*  Thin adapters over the existing service layer (`services/*`). Every        */
 /*  service returns `{ success, data } | { success, error }`; we unwrap that   */

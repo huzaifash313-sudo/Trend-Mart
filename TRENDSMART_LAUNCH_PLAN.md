@@ -1,4 +1,4 @@
-# TrendMart — Launch Plan, Changes & Full Accounting (Ek Hi File)
+# TrendsMart — Launch Plan, Changes & Full Accounting (Ek Hi File)
 
 > Updated: 2026-08-29 · Ye file sab kuch cover karti hai: jo changes kiye, subscription + ads ka poora hisab, future systems, aur paid-stories ka decision.
 
@@ -9,7 +9,7 @@
 
 | #   | Change                                                                                                                                                                      | File                                         | Maqsad / Kyon                                                                                                                                                                                                                      |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **AI crawlers allowed** (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, Bing Copilot, CCBot…)                                                                           | `app/robots.ts`                              | Pehle robots.txt **saare AI bots ko block** kar raha tha — ab ChatGPT/Claude/Perplexity TrendMart padh kar link de sakte hain (aapki SEO requirement). Private routes (dashboard/admin/orders) sab agents ke liye band rehte hain. |
+| 1   | **AI crawlers allowed** (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, Bing Copilot, CCBot…)                                                                           | `app/robots.ts`                              | Pehle robots.txt **saare AI bots ko block** kar raha tha — ab ChatGPT/Claude/Perplexity TrendsMart padh kar link de sakte hain (aapki SEO requirement). Private routes (dashboard/admin/orders) sab agents ke liye band rehte hain. |
 | 2   | **Homepage scalable** — public catalog (shops + stories) 5-min `unstable_cache` me; guests ab `getUser()` call skip karte hain                                              | `lib/homeData.ts`                            | Pehle har request par Supabase 300-row query + auth call hoti thi. Ab 1,000s concurrent hits cache se serve hoti hain.                                                                                                             |
 | 3   | **Shop SEO strong** — LocalBusiness JSON-LD ab server-render hota hai **geo coordinates** (lat/lng), schema type (Restaurant/GroceryStore), WhatsApp number, hours ke saath | `app/shop/[id]/layout.tsx`, `page.tsx`       | "burger near Peoples Colony Gujranwala" jaisi local search me rank karne ka sabse bada signal. Google ab raw HTML me structured data dekhta hai.                                                                                   |
 | 4   | **Product pages ko SEO mila** — pehle `/p/[code]` par zero title/canonical/schema tha. Ab server metadata + Product JSON-LD (price, availability, rating, seller)           | naya `app/p/[code]/layout.tsx`               | Ye aapke sabse zyada crawled URLs hain (sitemap me hain) — ab rich snippets mil sakti hain.                                                                                                                                        |
@@ -31,7 +31,7 @@
 **Code:** `services/subscriptionService.ts` · Tables: `merchant_subscriptions`, `billing_invoices`, `subscription_audit_log`
 
 ### Asli model (aapka — ab code me fix kar diya)
-- **Zero commission** — TrendMart har merchant ke orders ka koi % NAHI leta.
+- **Zero commission** — TrendsMart har merchant ke orders ka koi % NAHI leta.
 - **Ek hi fee** — **Rs 1,000/month** (sabhi merchants ke liye).
 - **Koi product limit nahi** — effectively unlimited (code me 100k soft cap).
 - **Koi storage limit nahi** — effectively unlimited (100 GB soft cap).
@@ -39,13 +39,13 @@
 - **Sabko same best features** — koi feature tier nahi; free trial wale ko bhi full features.
 
 ### Code me kaise implement hai
-- `TRENDMART_MONTHLY_FEE_PKR = 1000`
-- `TRENDMART_COMMISSION_PCT = 0`
-- `TRENDMART_FREE_TRIAL_DAYS = 30`
-- `TRENDMART_MAX_PRODUCTS = 100_000` (soft cap — asli dukaan kabhi nahi bharti)
-- `TRENDMART_MAX_STORAGE_MB = 100_000` (soft cap)
-- `TRENDMART_ALL_FEATURES` — full list (storefront, WhatsApp orders, advanced analytics, coupons, stories, CSV, inventory, variants, invoices, API, white-label, priority support)
-- `SUBSCRIPTION_TIERS` me `free_trial` → Rs 0 + 30-din trial; `starter/pro/enterprise` teeno → **same "TrendMart Standard" Rs 1,000/mo, 0% commission, unlimited, full features**. (Enum 4 values is liye rakha hai ke DB me legacy rows `'starter'/'pro'/'enterprise'` bhi theek kaam karein.)
+- `TRENDSMART_MONTHLY_FEE_PKR = 1000`
+- `TRENDSMART_COMMISSION_PCT = 0`
+- `TRENDSMART_FREE_TRIAL_DAYS = 30`
+- `TRENDSMART_MAX_PRODUCTS = 100_000` (soft cap — asli dukaan kabhi nahi bharti)
+- `TRENDSMART_MAX_STORAGE_MB = 100_000` (soft cap)
+- `TRENDSMART_ALL_FEATURES` — full list (storefront, WhatsApp orders, advanced analytics, coupons, stories, CSV, inventory, variants, invoices, API, white-label, priority support)
+- `SUBSCRIPTION_TIERS` me `free_trial` → Rs 0 + 30-din trial; `starter/pro/enterprise` teeno → **same "TrendsMart Standard" Rs 1,000/mo, 0% commission, unlimited, full features**. (Enum 4 values is liye rakha hai ke DB me legacy rows `'starter'/'pro'/'enterprise'` bhi theek kaam karein.)
 
 ### Invoice ka hisab (formula)
 ```
@@ -90,7 +90,7 @@ Free trial ke mahine me: invoice 0 (waived). Uske baad har mahine: **Rs 1,000 fl
 
 ### Platform ads
 
-Admin khud "house ads" bana sakta hai (`shop_id = NULL`, pre-approved) — e.g. TrendMart promotions.
+Admin khud "house ads" bana sakta hai (`shop_id = NULL`, pre-approved) — e.g. TrendsMart promotions.
 
 ---
 
@@ -133,7 +133,7 @@ Admin khud "house ads" bana sakta hai (`shop_id = NULL`, pre-approved) — e.g. 
 | **Story viewer me "Delete my story"** — merchant apni story viewer me hi delete kar sakta hai (confirm ke saath), like WhatsApp status | `components/StoriesViewer.tsx` |
 | **Story viewer me time-ago badge** (5m · 2h · 1d) — WhatsApp jaisa | `components/StoriesViewer.tsx` |
 | Homepage se `myShopId` StoriesViewer ko pass hota hai taake delete sirf apni stories par aaye | `components/HomeClient.tsx` |
-| (Pehle se) Stories unlimited + free; posting par homepage tray instantly refresh (`trendmart:stories-updated` event) | `services/storyService.ts`, `HomeClient.tsx` |
+| (Pehle se) Stories unlimited + free; posting par homepage tray instantly refresh (`trendsmart:stories-updated` event) | `services/storyService.ts`, `HomeClient.tsx` |
 
 ### Story flow (ab kaise chalta hai)
 1. Merchant bottom-nav ka **+** dabata hai → action sheet → **New Story**.

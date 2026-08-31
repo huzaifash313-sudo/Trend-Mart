@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Custom signup (step 2): verify the 6-digit code                */
+/*  TrendsMart — Custom signup (step 2): verify the 6-digit code                */
 /*  POST /api/auth/verify-otp                                                   */
 /*                                                                             */
 /*  Checks the submitted code against the stored hash (constant-time, with     */

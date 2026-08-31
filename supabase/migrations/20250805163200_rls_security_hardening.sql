@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — RLS Security Hardening & Multi-Tenant Data Isolation Audit
+-- TrendsMart — RLS Security Hardening & Multi-Tenant Data Isolation Audit
 -- 
 -- COMPREHENSIVE SECURITY AUDIT MIGRATION — Addresses all data leakage vectors:
 --   1. Locks down orders.orders_public_select_by_phone → prevents mass scraping

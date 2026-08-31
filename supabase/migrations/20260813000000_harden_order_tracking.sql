@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Harden guest "Track Order by ID" (closes a single-order PII leak)
+-- TrendsMart — Harden guest "Track Order by ID" (closes a single-order PII leak)
 -- =============================================================================
 -- `track_order_by_id(p_order_id)` was granted to `anon` and returned the full
 -- order (customer name, phone, items, notes) to anyone who knew an order UUID.

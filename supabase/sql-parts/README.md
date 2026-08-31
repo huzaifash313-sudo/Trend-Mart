@@ -1,4 +1,4 @@
-﻿# TrendMart — schema parts (fix for Failed to fetch)
+﻿# TrendsMart — schema parts (fix for Failed to fetch)
 
 `Failed to fetch (api.supabase.com)` usually means the **dashboard request timed out** or the network dropped — not always bad SQL. The full `RUN_THIS_IN_SUPABASE_SQL_EDITOR.sql` is too heavy for one paste.
 

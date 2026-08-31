@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Supabase Realtime WebSocket Channel Manager                    */
+/*  TrendsMart — Supabase Realtime WebSocket Channel Manager                    */
 /*                                                                             */
 /*  Provides typed subscriptions for:                                          */
 /*   - Order inserts/updates (merchant dashboard live feed)                    */

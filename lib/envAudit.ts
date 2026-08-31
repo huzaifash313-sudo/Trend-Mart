@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Production Environment Variable Audit & Security Validator      */
+/*  TrendsMart — Production Environment Variable Audit & Security Validator      */
 /*  PROMPT 5: Ensures all private database keys, API secrets, and storage       */
 /*            credentials remain strictly server-side with zero client-side      */
 /*            exposure. Runs at build time and optionally at startup.            */
@@ -364,7 +364,7 @@ export function formatAuditReport(result: EnvAuditResult): string {
 
   lines.push("");
   lines.push("═══════════════════════════════════════════════════════");
-  lines.push("  TrendMart — Environment Variable Security Audit");
+  lines.push("  TrendsMart — Environment Variable Security Audit");
   lines.push("═══════════════════════════════════════════════════════");
   lines.push("");
 
@@ -441,11 +441,11 @@ export function generateEnvExample(): string {
     "NODE_ENV=development",
     "NEXT_PUBLIC_APP_URL=http://localhost:3000",
     "NEXT_PUBLIC_SITE_URL=http://localhost:3000",
-    "NEXT_PUBLIC_SITE_NAME=TrendMart",
+    "NEXT_PUBLIC_SITE_NAME=TrendsMart",
     "NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY=",
     "SUPABASE_SERVICE_ROLE_KEY=",
-    "SUPABASE_STORAGE_BUCKET=trendmart-media",
+    "SUPABASE_STORAGE_BUCKET=trendsmart-media",
     "",
     "# optional",
     "DATABASE_URL=",

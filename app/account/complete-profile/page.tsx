@@ -223,7 +223,7 @@ export default function CompleteProfilePage() {
         <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-4">
           <div>
             <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400">
-              Welcome to TrendMart
+              Welcome to TrendsMart
             </p>
             <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
               Complete your profile

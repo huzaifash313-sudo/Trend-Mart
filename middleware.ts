@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Next.js Middleware                                             */
+/*  TrendsMart — Next.js Middleware                                             */
 /*  Auth session refresh | Route protection | Security headers | Rate limiting  */
 /*  Multi-Tenant Role-Based Access Control (RBAC)                              */
 /*  PROMPT 1: HARDENED — Strict session validation, sanitized tokens,          */
@@ -25,7 +25,7 @@ import {
 bootstrapDistributedRateLimiter();
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TRENDMART MIDDLEWARE — v2.0 FIXED
+// TRENDSMART MIDDLEWARE — v2.0 FIXED
 // Fix: Reordered session refresh BEFORE auth checks to prevent stale-cache
 //      redirects. Added comprehensive debug logging. Unverified users can now
 //      access /dashboard with a warning instead of being completely blocked.
@@ -38,7 +38,7 @@ function authDebug(message: string, data?: Record<string, unknown>): void {
   if (!DEBUG_AUTH) return;
   const timestamp = new Date().toISOString();
   console.log(
-    `[TrendMart MW ${timestamp}] ${message}`,
+    `[TrendsMart MW ${timestamp}] ${message}`,
     data ? JSON.stringify(data) : "",
   );
 }
@@ -85,7 +85,7 @@ async function checkRateLimit(request: NextRequest): Promise<boolean> {
     });
     return result.allowed;
   } catch {
-    console.warn("[TrendMart MW] Rate limiter error — allowing as failsafe");
+    console.warn("[TrendsMart MW] Rate limiter error — allowing as failsafe");
     return true;
   }
 }

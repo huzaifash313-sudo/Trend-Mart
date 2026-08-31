@@ -1,19 +1,19 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Dynamic SEO Metadata & OpenGraph Pipeline                      */
+/*  TrendsMart — Dynamic SEO Metadata & OpenGraph Pipeline                      */
 /* -------------------------------------------------------------------------- */
 
 import type { Metadata } from "next";
 
-const SITE_NAME = "TrendMart";
+const SITE_NAME = "TrendsMart";
 const SITE_DESCRIPTION =
   "Discover local shops across Pakistan. Browse products & deals, place orders via WhatsApp, and support small businesses near you.";
 export const SITE_BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trend-marts.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
 const OG_IMAGE_DEFAULT = `${SITE_BASE_URL}/og-default.png`;
-const TWITTER_HANDLE = "@trendmartpk";
+const TWITTER_HANDLE = "@trendsmartpk";
 
 const DEFAULT_KEYWORDS = [
-  "TrendMart",
+  "TrendsMart",
   "local shopping Pakistan",
   "WhatsApp ordering",
   "hyperlocal marketplace",
@@ -275,7 +275,7 @@ export function generateDashboardMetadata(): Metadata {
 export function generateAuthMetadata(): Metadata {
   return {
     title: `Sign In`,
-    description: "Sign in to your TrendMart account.",
+    description: "Sign in to your TrendsMart account.",
     robots: { index: false, follow: false },
   };
 }

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Migrate: Add announcement column to shops (Prompt 97)         */
+/*  TrendsMart — Migrate: Add announcement column to shops (Prompt 97)         */
 /* -------------------------------------------------------------------------- */
 
 -- Add an optional announcement text column for merchant promotional banners

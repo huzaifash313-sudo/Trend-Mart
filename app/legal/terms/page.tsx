@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions — TrendMart",
-  description: "The terms and conditions governing use of the TrendMart marketplace.",
+  title: "Terms & Conditions — TrendsMart",
+  description: "The terms and conditions governing use of the TrendsMart marketplace.",
   robots: { index: true, follow: true },
 };
 
@@ -13,15 +13,15 @@ export default function TermsPage() {
       <LegalSection heading="1. Acceptance of Terms">
         <p>
           By creating an account, browsing shops, placing an order, or registering a store on
-          TrendMart (&quot;the Platform&quot;), you agree to be bound by these Terms &amp; Conditions.
+          TrendsMart (&quot;the Platform&quot;), you agree to be bound by these Terms &amp; Conditions.
           If you do not agree, please do not use the Platform.
         </p>
       </LegalSection>
 
-      <LegalSection heading="2. What TrendMart Is">
+      <LegalSection heading="2. What TrendsMart Is">
         <p>
-          TrendMart is a hyper-local multi-vendor marketplace that connects customers with
-          independent merchants (&quot;Sellers&quot;) in their area. TrendMart provides the technology —
+          TrendsMart is a hyper-local multi-vendor marketplace that connects customers with
+          independent merchants (&quot;Sellers&quot;) in their area. TrendsMart provides the technology —
           storefronts, product listings, search, cart, and WhatsApp-based order routing — but each
           Seller is solely responsible for the products or services they list, their pricing,
           stock availability, order fulfillment, and delivery.
@@ -44,7 +44,7 @@ export default function TermsPage() {
             <>
               <strong>Merchants</strong> must complete store registration with business name and
               WhatsApp/phone number. New stores go live immediately after email verification
-              (auto-approved). TrendMart may later introduce a Super-Admin approval queue and may
+              (auto-approved). TrendsMart may later introduce a Super-Admin approval queue and may
               still suspend stores that violate these Terms.
             </>,
           ]}
@@ -57,10 +57,10 @@ export default function TermsPage() {
 
       <LegalSection heading="4. Orders & Payments">
         <p>
-          Orders placed through TrendMart are compiled and sent to the relevant merchant (via
+          Orders placed through TrendsMart are compiled and sent to the relevant merchant (via
           WhatsApp and/or the in-app order system). Payment terms (cash on delivery, bank transfer,
           or other methods) are agreed directly between the customer and the merchant unless stated
-          otherwise on the storefront. TrendMart is not a party to the sale contract between buyer
+          otherwise on the storefront. TrendsMart is not a party to the sale contract between buyer
           and seller and does not guarantee product quality, availability, or delivery timelines.
         </p>
       </LegalSection>
@@ -72,7 +72,7 @@ export default function TermsPage() {
           <a href="/legal/merchant-guidelines" className="font-medium text-emerald-600 underline dark:text-emerald-400">
             Merchant Security Guidelines
           </a>{" "}
-          at all times. TrendMart reserves the right to suspend or remove any store that violates
+          at all times. TrendsMart reserves the right to suspend or remove any store that violates
           these Terms, engages in fraudulent activity, or receives repeated verified complaints.
         </p>
       </LegalSection>
@@ -83,15 +83,15 @@ export default function TermsPage() {
             "Listing counterfeit, stolen, illegal, or prohibited goods.",
             "Manipulating reviews, ratings, or analytics.",
             "Scraping, reverse-engineering, or attacking Platform infrastructure.",
-            "Impersonating another person, shop, or the TrendMart team.",
+            "Impersonating another person, shop, or the TrendsMart team.",
           ]}
         />
       </LegalSection>
 
       <LegalSection heading="7. Limitation of Liability">
         <p>
-          TrendMart is provided on an &quot;as is&quot; and &quot;as available&quot; basis. To the
-          maximum extent permitted by law, TrendMart is not liable for indirect, incidental, or
+          TrendsMart is provided on an &quot;as is&quot; and &quot;as available&quot; basis. To the
+          maximum extent permitted by law, TrendsMart is not liable for indirect, incidental, or
           consequential damages arising from your use of the Platform, transactions with merchants,
           or third-party services (e.g., WhatsApp, payment providers, delivery riders).
         </p>

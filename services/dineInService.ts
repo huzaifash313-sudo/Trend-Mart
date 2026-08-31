@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Dine-In Ordering Service (QR Table Ordering, Phase 1)          */
+/*  TrendsMart — Dine-In Ordering Service (QR Table Ordering, Phase 1)          */
 /*                                                                             */
 /*  Thin, RLS-aware helpers used by the customer scan page, the kitchen        */
 /*  board and the merchant tables dashboard. Order creation itself runs on     */

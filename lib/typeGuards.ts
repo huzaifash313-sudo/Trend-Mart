@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Runtime Type Guards & Schema Validation (Prompt 1)              */
+/*  TrendsMart — Runtime Type Guards & Schema Validation (Prompt 1)              */
 /*                                                                             */
 /*  Comprehensive Zod-based type validation for all data models crossing       */
 /*  client-server boundaries. Eliminates implicit `any`, enforces strict        */

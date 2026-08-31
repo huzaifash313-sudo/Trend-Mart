@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Jest Setup (Prompt 3)                                          */
+/*  TrendsMart — Jest Setup (Prompt 3)                                          */
 /*  Global test environment configuration for React Testing Library            */
 /* -------------------------------------------------------------------------- */
 

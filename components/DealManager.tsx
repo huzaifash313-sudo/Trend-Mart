@@ -83,7 +83,7 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
 
   const notify = () => {
     onChanged?.();
-    window.dispatchEvent(new Event("trendmart:deals-updated"));
+    window.dispatchEvent(new Event("trendsmart:deals-updated"));
   };
 
   const applyProduct = (productId: string) => {

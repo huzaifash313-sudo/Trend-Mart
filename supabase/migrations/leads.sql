@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Customer Inquiry & Direct Chat Lead Table
+-- TrendsMart — Customer Inquiry & Direct Chat Lead Table
 -- Captures metadata on every WhatsApp inquiry / booking button click.
 -- =============================================================================
 

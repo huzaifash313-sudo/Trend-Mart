@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Strict Order Ownership
+-- TrendsMart — Strict Order Ownership
 -- =============================================================================
 -- Closes the last order-data exposure paths so an order is ONLY ever returned
 -- to someone with a genuine relationship to it:

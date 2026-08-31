@@ -383,7 +383,7 @@ export default function BottomNav() {
       : session && isMerchant
         ? "Open product tools"
         : session
-          ? "Open your store on TrendMart"
+          ? "Open your store on TrendsMart"
           : "Sign in to open a store";
 
   const sideTabClass = (active: boolean) =>

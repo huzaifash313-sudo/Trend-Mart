@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart - FULL DATABASE INITIALIZATION (single master file, run once in Supabase)
+-- TrendsMart - FULL DATABASE INITIALIZATION (single master file, run once in Supabase)
 -- =============================================================================
 -- COMBINED on 2026-08-20 from:
 --   1. RUN_THIS_IN_SUPABASE_SQL_EDITOR.sql            (comprehensive base)
@@ -59,7 +59,7 @@ DROP FUNCTION IF EXISTS public.track_orders_by_phone(text);
 DROP FUNCTION IF EXISTS public.track_order_by_id(uuid);
 
 -- =============================================================================
--- TrendMart — COMPLETE DATABASE SETUP (single file, run once in Supabase)
+-- TrendsMart — COMPLETE DATABASE SETUP (single file, run once in Supabase)
 -- =============================================================================
 --
 -- HOW TO USE
@@ -3220,7 +3220,7 @@ BEGIN
       'promotional_ads','user_profiles'
     );
 
-  RAISE NOTICE '✅ TrendMart database setup complete! % / 30 expected tables exist.', table_count;
+  RAISE NOTICE '✅ TrendsMart database setup complete! % / 30 expected tables exist.', table_count;
 
   IF missing_rls IS NOT NULL THEN
     RAISE WARNING '⚠️ The following tables have RLS DISABLED: %', missing_rls;
@@ -3425,7 +3425,7 @@ ON CONFLICT (category, slug) DO NOTHING;
 -- >>> APPENDED MIGRATION: 20260413000000_launch_readiness_hardening.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Launch Readiness Hardening (WhatsApp-First Soft Launch)
+-- TrendsMart — Launch Readiness Hardening (WhatsApp-First Soft Launch)
 -- =============================================================================
 -- This migration is idempotent and safe to re-run. It fixes four concrete,
 -- provable production bugs found during a full RLS/security audit:
@@ -3808,7 +3808,7 @@ CREATE INDEX IF NOT EXISTS idx_products_deal_expires_at
 -- >>> APPENDED MIGRATION: 20260811000000_reviews_hardening_and_order_user.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Review hardening + order buyer identity
+-- TrendsMart — Review hardening + order buyer identity
 -- - Auth-only reviews, locked profile name, merchant replies
 -- - Purchase + IP anti-spam columns
 -- - customer_user_id on orders for verified-purchase checks
@@ -4133,7 +4133,7 @@ COMMIT;
 -- =============================================================================
 -- >>> APPENDED MIGRATION: 20260811120000_shops_slug.sql
 -- =============================================================================
--- TrendMart: persist SEO-friendly shop slugs for share / QR / deep links
+-- TrendsMart: persist SEO-friendly shop slugs for share / QR / deep links
 -- Safe to re-run.
 
 ALTER TABLE public.shops
@@ -4371,7 +4371,7 @@ REVOKE ALL ON public.email_verification_otps FROM anon, authenticated;
 -- >>> APPENDED MIGRATION: 20260813000000_harden_order_tracking.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Harden guest "Track Order by ID" (closes a single-order PII leak)
+-- TrendsMart — Harden guest "Track Order by ID" (closes a single-order PII leak)
 -- =============================================================================
 -- `track_order_by_id(p_order_id)` was granted to `anon` and returned the full
 -- order (customer name, phone, items, notes) to anyone who knew an order UUID.
@@ -4439,7 +4439,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260814000000_notifications_realtime_and_customer_tracking.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Enable Realtime + Customer Order Tracking SELECT policy
+-- TrendsMart — Enable Realtime + Customer Order Tracking SELECT policy
 -- =============================================================================
 -- Two fixes that make the live notification/tracking system actually work:
 --
@@ -4518,7 +4518,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260814010000_atomic_coupon_usage.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Atomic coupon usage increment (closes a TOCTOU race)
+-- TrendsMart — Atomic coupon usage increment (closes a TOCTOU race)
 -- =============================================================================
 -- Previously /api/orders did: SELECT usage_count → UPDATE usage_count = used+1.
 -- Two concurrent orders could both read the same count and both write the same
@@ -4561,7 +4561,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260814020000_order_money_and_stock.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Order money-breakdown columns + atomic product stock deduction
+-- TrendsMart — Order money-breakdown columns + atomic product stock deduction
 -- =============================================================================
 -- Two fixes:
 --
@@ -4683,7 +4683,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260814030000_order_idempotency_and_status_flow.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Order idempotency + server-side status transition enforcement
+-- TrendsMart — Order idempotency + server-side status transition enforcement
 -- =============================================================================
 -- Two fixes:
 --
@@ -4761,7 +4761,7 @@ DROP FUNCTION IF EXISTS public.track_order_by_id(uuid);
 -- >>> APPENDED MIGRATION: 20260815000000_add_shop_whatsapp_to_tracking.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Expose shop WhatsApp number to order-tracking lookups
+-- TrendsMart — Expose shop WhatsApp number to order-tracking lookups
 -- =============================================================================
 -- The guest "Contact Merchant" button on /orders/tracking was building a blank
 -- wa.me link because the tracking RPCs only returned `shop_name`, not the shop's
@@ -4869,7 +4869,7 @@ COMMIT;
 -- =============================================================================
 -- >>> APPENDED MIGRATION: 20260817000000_products_is_pinned.sql
 -- =============================================================================
--- TrendMart — merchant "pin to top" for products.
+-- TrendsMart — merchant "pin to top" for products.
 -- Adds an is_pinned flag so a store owner can pin products to the top of
 -- their storefront (and their own manage view). Idempotent.
 
@@ -4883,7 +4883,7 @@ CREATE INDEX IF NOT EXISTS idx_products_shop_pinned
 -- =============================================================================
 -- >>> APPENDED MIGRATION: 20260817010000_shops_sensitive_info_updated_at.sql
 -- =============================================================================
--- TrendMart — sensitive shop info change tracking.
+-- TrendsMart — sensitive shop info change tracking.
 -- Merchants may change the store name / phone numbers once per week (enforced
 -- in the app + confirmed with the account password). This column records when
 -- that last happened. Location and all other fields are always free.
@@ -4896,7 +4896,7 @@ ALTER TABLE public.shops
 -- =============================================================================
 -- >>> APPENDED MIGRATION: 20260817020000_product_short_codes.sql
 -- =============================================================================
--- TrendMart: product short codes for direct, compact product deep links.
+-- TrendsMart: product short codes for direct, compact product deep links.
 -- Each product gets an 8-char URL-safe code used in WhatsApp order messages:
 --   https://<origin>/p/<short_code>
 -- instead of the long `shop/{slug}#product-{uuid}` store link.
@@ -4953,7 +4953,7 @@ END $$;
 -- =============================================================================
 -- >>> APPENDED MIGRATION: 20260818000000_user_profile_location.sql
 -- =============================================================================
--- TrendMart: persist the customer's precise location captured at signup so
+-- TrendsMart: persist the customer's precise location captured at signup so
 -- checkout and the profile page can auto-fill name / phone / address / pin.
 -- Safe / idempotent — run once in Supabase SQL Editor.
 
@@ -4977,7 +4977,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260818010000_strict_order_ownership.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Strict Order Ownership
+-- TrendsMart — Strict Order Ownership
 -- =============================================================================
 -- Closes the last order-data exposure paths so an order is ONLY ever returned
 -- to someone with a genuine relationship to it:
@@ -5136,7 +5136,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260819010000_fix_promotional_ads_grants.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Fix promotional_ads REST permissions + storage bucket safety
+-- TrendsMart — Fix promotional_ads REST permissions + storage bucket safety
 -- =============================================================================
 -- Symptoms:
 --   • GET  /rest/v1/promotional_ads?select=*  → 400 / 403
@@ -5187,8 +5187,8 @@ $$;
 --    panel uploads ad banners to the "ads" folder inside this bucket).
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-  'trendmart-media',
-  'trendmart-media',
+  'trendsmart-media',
+  'trendsmart-media',
   TRUE,
   5242880,
   ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/avif']
@@ -5198,22 +5198,22 @@ ON CONFLICT (id) DO NOTHING;
 DROP POLICY IF EXISTS "Public read access" ON storage.objects;
 CREATE POLICY "Public read access"
   ON storage.objects FOR SELECT
-  USING (bucket_id = 'trendmart-media');
+  USING (bucket_id = 'trendsmart-media');
 
 DROP POLICY IF EXISTS "Authenticated users can upload" ON storage.objects;
 CREATE POLICY "Authenticated users can upload"
   ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'trendmart-media' AND auth.role() = 'authenticated');
+  WITH CHECK (bucket_id = 'trendsmart-media' AND auth.role() = 'authenticated');
 
 DROP POLICY IF EXISTS "Owners can update their files" ON storage.objects;
 CREATE POLICY "Owners can update their files"
   ON storage.objects FOR UPDATE
-  USING (bucket_id = 'trendmart-media' AND auth.uid() = owner);
+  USING (bucket_id = 'trendsmart-media' AND auth.uid() = owner);
 
 DROP POLICY IF EXISTS "Owners can delete their files" ON storage.objects;
 CREATE POLICY "Owners can delete their files"
   ON storage.objects FOR DELETE
-  USING (bucket_id = 'trendmart-media' AND auth.uid() = owner);
+  USING (bucket_id = 'trendsmart-media' AND auth.uid() = owner);
 
 -- 3) Refresh PostgREST's schema cache so the new grants are honoured and the
 --    ads↔shops relationship (if you ever need the embed again) is picked up
@@ -5227,7 +5227,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260819020000_db_notifications.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Persistent In-App Notification System (DB-backed bell)
+-- TrendsMart — Persistent In-App Notification System (DB-backed bell)
 -- =============================================================================
 -- Replaces the fragile localStorage-only client notifications with a durable
 -- `notifications` table. Server-side triggers create rows for:
@@ -5516,7 +5516,7 @@ COMMIT;
 -- >>> APPENDED MIGRATION: 20260820000000_review_reminder_notifications.sql
 -- =============================================================================
 -- =============================================================================
--- TrendMart — Delivered Order → Review Reminder (in-app bell notification)
+-- TrendsMart — Delivered Order → Review Reminder (in-app bell notification)
 -- =============================================================================
 -- When a merchant marks an order "Delivered", the buyer gets a dedicated
 -- in-app notification inviting them to rate the shop. The review popup opens
@@ -6110,7 +6110,7 @@ BEGIN
     WHERE table_schema = 'public' AND table_name = t
   );
 
-  RAISE NOTICE '[OK] TrendMart init complete: % / % expected tables exist.', found_count, array_length(expected, 1);
+  RAISE NOTICE '[OK] TrendsMart init complete: % / % expected tables exist.', found_count, array_length(expected, 1);
   IF missing IS NOT NULL THEN
     RAISE WARNING '[WARN] Missing tables: %', missing;
   ELSE

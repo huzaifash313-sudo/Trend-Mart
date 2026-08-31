@@ -153,7 +153,7 @@ function SignupPageInner() {
         addToast(
           signupValues.role === "merchant"
             ? "Merchant account created! Set up your store next."
-            : "Account created! Welcome to TrendMart.",
+            : "Account created! Welcome to TrendsMart.",
           "success",
         );
         goAfterAuth(result.role);
@@ -198,7 +198,7 @@ function SignupPageInner() {
         addToast(
           pendingRole === "merchant"
             ? "Email verified! Set up your store next."
-            : "Email verified! Welcome to TrendMart.",
+            : "Email verified! Welcome to TrendsMart.",
           "success",
         );
         goAfterAuth(signIn.role ?? pendingRole);
@@ -213,7 +213,7 @@ function SignupPageInner() {
       recordLegalAcceptance(user.id, ["terms", "privacy"]);
       await claimSignupRole(pendingRole);
       await syncContactProfileFromMetadata(user);
-      addToast("Email verified! Welcome to TrendMart.", "success");
+      addToast("Email verified! Welcome to TrendsMart.", "success");
       goAfterAuth(pendingRole);
       return;
     }
@@ -238,7 +238,7 @@ function SignupPageInner() {
         >
           <Link href="/" className="inline-block">
             <h1 className="text-3xl font-bold tracking-tight text-white">
-              TrendMart
+              TrendsMart
             </h1>
           </Link>
           <motion.p
@@ -259,7 +259,7 @@ function SignupPageInner() {
           transition={{ delay: 0.6, duration: 0.6 }}
         >
               <h2 className="mb-4 text-4xl font-bold leading-tight text-white">
-                Join TrendMart today.
+                Join TrendsMart today.
               </h2>
               <p className="max-w-md text-emerald-100/80 leading-relaxed">
                 Shop local as a customer — or open your store as a merchant.
@@ -297,7 +297,7 @@ function SignupPageInner() {
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
         >
-          &copy; {new Date().getFullYear()} TrendMart. Built for local commerce.
+          &copy; {new Date().getFullYear()} TrendsMart. Built for local commerce.
         </motion.p>
       </div>
 
@@ -313,7 +313,7 @@ function SignupPageInner() {
           <div className="mb-8 text-center lg:hidden">
             <Link href="/">
               <h1 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                TrendMart
+                TrendsMart
               </h1>
             </Link>
           </div>
@@ -330,7 +330,7 @@ function SignupPageInner() {
                 Create an Account
               </h2>
               <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Start your journey with TrendMart today.
+                Start your journey with TrendsMart today.
               </p>
             </motion.div>
 

@@ -68,8 +68,8 @@ export default function RecentlyViewedPage() {
 
   useEffect(() => {
     const onScopeChange = () => setScopeVersion((v) => v + 1);
-    window.addEventListener("trendmart:scope-change", onScopeChange);
-    return () => window.removeEventListener("trendmart:scope-change", onScopeChange);
+    window.addEventListener("trendsmart:scope-change", onScopeChange);
+    return () => window.removeEventListener("trendsmart:scope-change", onScopeChange);
   }, []);
 
   useEffect(() => {

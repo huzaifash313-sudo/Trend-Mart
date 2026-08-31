@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — "My Requests" ticket status list                               */
+/*  TrendsMart — "My Requests" ticket status list                               */
 /*  Shows the signed-in user's own support tickets with their current stage    */
 /*  (Open / In Progress / Resolved / Closed), wired to the same statuses the   */
 /*  admin updates in Admin → Support Inbox.                                    */

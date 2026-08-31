@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Secure API Response Caching Layer                               */
+/*  TrendsMart — Secure API Response Caching Layer                               */
 /*                                                                             */
 /*  PROMPT 5: Performance Optimization — Safe caching layers with               */
 /*            response payload compression, TTL-based invalidation,            */

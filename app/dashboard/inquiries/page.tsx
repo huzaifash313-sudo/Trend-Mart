@@ -178,7 +178,7 @@ export default function MerchantInquiriesPage() {
                   <div className="flex flex-wrap gap-2">
                     {phone ? (
                       <a
-                        href={`https://wa.me/${phone}?text=${encodeURIComponent(`Salam ${row.customer_name || ""}! Regarding your message on TrendMart…`)}`}
+                        href={`https://wa.me/${phone}?text=${encodeURIComponent(`Salam ${row.customer_name || ""}! Regarding your message on TrendsMart…`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shared Variant Pricing Helper                                  */
+/*  TrendsMart — Shared Variant Pricing Helper                                  */
 /*                                                                             */
 /*  Single source of truth for computing the unit price of a product when a    */
 /*  variant label (e.g. "Color: Red · Size: L") is selected. Supports two      */

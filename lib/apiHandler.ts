@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Centralised API Wrapper & Error Handler                        */
+/*  TrendsMart — Centralised API Wrapper & Error Handler                        */
 /*  Standardises try-catch blocks across all service functions, automatically   */
 /*  intercepts Supabase database errors, and returns clean typed response       */
 /*  objects { data, error } to keep component code lightweight and predictable. */

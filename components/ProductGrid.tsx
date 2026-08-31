@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Compact Product Grid                                          */
+/*  TrendsMart — Compact Product Grid                                          */
 /* -------------------------------------------------------------------------- */
 
 "use client";
@@ -265,7 +265,9 @@ const ProductCard = memo(function ProductCard({
         if (t?.closest("button, a, input, textarea, select, label")) return;
         handleCardClick();
       }}
-      className="tm-product-card group flex scroll-mt-24 cursor-pointer flex-col overflow-hidden"
+      className={`tm-product-card group flex scroll-mt-24 cursor-pointer flex-col overflow-hidden${
+        compact ? " tm-product-card--compact" : ""
+      }`}
       role="button"
       tabIndex={0}
       aria-label={`View ${product.name}`}
@@ -382,7 +384,7 @@ const ProductCard = memo(function ProductCard({
           </p>
         ) : null}
 
-        <div className="tm-product-footer flex flex-col gap-1.5">
+        <div className={`tm-product-footer flex flex-col ${compact ? "gap-1" : "gap-1.5"}`}>
           {/* Price — full width so it never collapses into a vertical stack */}
           <div className="min-w-0">
             <p

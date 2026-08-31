@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — One-time onboarding flag (per account, not per device)
+-- TrendsMart — One-time onboarding flag (per account, not per device)
 -- =============================================================================
 -- The full-screen 3-step welcome wizard used to be gated by a localStorage key
 -- per device. On a shared phone with multiple accounts, or after clearing site

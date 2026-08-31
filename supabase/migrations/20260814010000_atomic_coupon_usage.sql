@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Atomic coupon usage increment (closes a TOCTOU race)
+-- TrendsMart — Atomic coupon usage increment (closes a TOCTOU race)
 -- =============================================================================
 -- Previously /api/orders did: SELECT usage_count → UPDATE usage_count = used+1.
 -- Two concurrent orders could both read the same count and both write the same

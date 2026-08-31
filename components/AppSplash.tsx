@@ -17,7 +17,7 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  *
  * Beat (deliberately slow + smooth so it never feels rushed):
  *   1) Logo pops in centered on the green/seagreen stage
- *   2) Logo rises + shrinks while "TrendMart" reveals letter-by-letter
+ *   2) Logo rises + shrinks while "TrendsMart" reveals letter-by-letter
  *   3) Three value lines slide in one by one
  *   4) Hold for reading while home data prefetches — if it's not ready yet a
  *      small loading pill appears instead of a dead wait
@@ -126,7 +126,7 @@ function stageTiming(): StageTiming {
   return STAGE_MS;
 }
 
-/* Short, human value intro — no page mockups, just "what TrendMart is". */
+/* Short, human value intro — no page mockups, just "what TrendsMart is". */
 const FEATURES = [
   { icon: "🛍️", title: "Local shops nearby", subtitle: "Discover trusted stores in your area" },
   { icon: "💬", title: "Order on WhatsApp", subtitle: "Direct chat with the shop — no confusion" },
@@ -298,7 +298,7 @@ export default function AppSplash() {
       className={`tm-splash tm-splash--${phase}`}
       data-phase={phase}
       role="dialog"
-      aria-label="Welcome to TrendMart"
+      aria-label="Welcome to TrendsMart"
       aria-live="polite"
     >
       <div className="tm-splash-glow" aria-hidden="true" />
@@ -309,7 +309,7 @@ export default function AppSplash() {
           <span className="tm-splash-logo" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendmart-mark.png?v=10"
+              src="/trendsmart-mark.png?v=10"
               alt=""
               width={88}
               height={88}
@@ -319,7 +319,7 @@ export default function AppSplash() {
             />
           </span>
           <h1 className="tm-splash-title">
-            {"TrendMart".split("").map((ch, i) => (
+            {"TrendsMart".split("").map((ch, i) => (
               <span
                 key={i}
                 className="tm-splash-title-letter"

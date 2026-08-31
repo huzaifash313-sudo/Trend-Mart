@@ -4,7 +4,7 @@ import { useState } from "react";
 import LegalPageLayout from "@/components/LegalPageLayout";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — FAQ & New Merchant Guide                                     */
+/*  TrendsMart — FAQ & New Merchant Guide                                     */
 /*  Interactive accordion covering both customer questions and a step-by-step */
 /*  onboarding guide for new business owners (per .cursorrules §8).           */
 /* -------------------------------------------------------------------------- */
@@ -21,7 +21,7 @@ const CUSTOMER_FAQS: FaqItem[] = [
   },
   {
     q: "How do I place an order?",
-    a: "Create an account and verify your email, add items to your cart, tap Checkout, enter your delivery details, share your live location (required for the rider), and confirm. TrendMart saves the order, then you tap Open WhatsApp to send it to the shop. The shop only sees the WhatsApp message after that tap. Each item includes a TrendMart link so the shop can open the exact product.",
+    a: "Create an account and verify your email, add items to your cart, tap Checkout, enter your delivery details, share your live location (required for the rider), and confirm. TrendsMart saves the order, then you tap Open WhatsApp to send it to the shop. The shop only sees the WhatsApp message after that tap. Each item includes a TrendsMart link so the shop can open the exact product.",
   },
   {
     q: "Why can't I see a shop that I know exists nearby?",
@@ -52,7 +52,7 @@ const MERCHANT_FAQS: FaqItem[] = [
   },
   {
     q: "How do I pause a product without deleting it?",
-    a: "Each product has an In Stock / Out of Stock (or Not available) toggle. TrendMart does not track unit counts — merchants sell both in-store and online, so quantity would be wrong. Toggle off to pause selling without deleting the item.",
+    a: "Each product has an In Stock / Out of Stock (or Not available) toggle. TrendsMart does not track unit counts — merchants sell both in-store and online, so quantity would be wrong. Toggle off to pause selling without deleting the item.",
   },
   {
     q: "How do I control which customers can order from me?",
@@ -60,7 +60,7 @@ const MERCHANT_FAQS: FaqItem[] = [
   },
   {
     q: "How do I show a discount badge on a product?",
-    a: "When adding or editing a product, expand \"optional details\" and set an Original Price higher than your selling Price. TrendMart automatically calculates and displays a \"% OFF\" badge.",
+    a: "When adding or editing a product, expand \"optional details\" and set an Original Price higher than your selling Price. TrendsMart automatically calculates and displays a \"% OFF\" badge.",
   },
   {
     q: "How do I get a QR code for my shop?",

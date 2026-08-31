@@ -1,5 +1,5 @@
 # =============================================================================
-# TrendMart — Automated CI/CD Security Scanning Pipeline
+# TrendsMart — Automated CI/CD Security Scanning Pipeline
 # PROMPT 5: Automated security scanning using npm audit gates, secret detection,
 #           and static code analysis to intercept builds containing critical
 #           vulnerabilities before production deployment.
@@ -98,14 +98,14 @@ jobs:
           # Full history only on schedule; shallow on PR/push keeps this job ~seconds
           fetch-depth: ${{ github.event_name == 'schedule' && 0 || 1 }}
 
-      - name: Run TrendMart secret scanner
+      - name: Run TrendsMart secret scanner
         run: |
           echo "🔍 Scanning for hardcoded secrets and tokens..."
           node -e "
           const fs = require('fs');
           const path = require('path');
 
-          // Secret patterns from TrendMart security headers module
+          // Secret patterns from TrendsMart security headers module
           const PATTERNS = [
             { name: 'Supabase Service Role Key', regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, severity: 'critical' },
             { name: 'AWS Access Key', regex: /AKIA[0-9A-Z]{16}/, severity: 'critical' },
@@ -347,7 +347,7 @@ jobs:
       - name: Security Gate Summary
         run: |
           echo "============================================"
-          echo "  🛡️  TRENDMART SECURITY GATE — PASSED"
+          echo "  🛡️  TRENDSMART SECURITY GATE — PASSED"
           echo "============================================"
           echo ""
           echo "✅ npm Audit / Secret Scan / ESLint SAST / TypeScript"

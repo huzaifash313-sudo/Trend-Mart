@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shared offer/clock ticker                                      */
+/*  TrendsMart — Shared offer/clock ticker                                      */
 /*                                                                             */
 /*  Dozens of shop cards each used to run their own setInterval for offer      */
 /*  rotation and countdown timers (hundreds of live intervals on the homepage). */

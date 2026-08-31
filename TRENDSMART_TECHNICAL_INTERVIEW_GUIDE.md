@@ -1,4 +1,4 @@
-# TrendMart — Technical Architecture & Interview Guide
+# TrendsMart — Technical Architecture & Interview Guide
 
 > Yeh file technical hai — stack, architecture, design decisions, aur har major concept (kya, kahan, kaise, kyun) ki explanation. Interview ki tayari ke liye perfect. Har section ke end mein "Agar pooche" wale jawab hain jo aap khud ke words mein bata sakte hain.
 
@@ -28,7 +28,7 @@
 | **Upstash/Redis** (optional) | Distributed rate limiting | In-memory fallback available |
 | **Jest + Testing Library** | Unit/component tests | Cart, guards, sanitization, phone format tests |
 
-**Deployment:** Vercel (`trend-marts.vercel.app`), GitHub Actions CI/CD.
+**Deployment:** Vercel (`trendsmart.pk`), GitHub Actions CI/CD.
 
 ---
 
@@ -53,7 +53,7 @@
 │  Postgres DB (~40 tables) + RLS policies             │
 │  Auth (custom email-OTP flow)                        │
 │  Realtime (orders, products, notifications...)       │
-│  Storage bucket: trendmart-media                     │
+│  Storage bucket: trendsmart-media                     │
 │  Security DEFINER RPCs (get_my_role, is_admin...)    │
 └─────────────────────────────────────────────────────┘
    Integrations: Resend(EMAIL) · Cloudinary · WebPush(VAPID)
@@ -250,7 +250,7 @@
 
 ## 13. Deployment & CI/CD
 
-- **Vercel** — production `https://trend-marts.vercel.app`.
+- **Vercel** — production `https://trendsmart.pk`.
 - **GitHub Actions** (`.github/workflows/deploy.yml`):
   1. `quality-gate`: tsc --noEmit, eslint, depcheck.
   2. `build`: `next build --turbopack`.
@@ -280,7 +280,7 @@
 ## 15. Interview Q&A (Ready Jawab)
 
 **Q: "Tell me about this project."**
-> "TrendMart ek hyper-local multi-vendor marketplace hai. Next.js 16 + Supabase par bana hai. Customers local shops browse karte hain aur WhatsApp ke zariye order karte hain. Main architecture: guest browsing bina login, email-OTP authentication, role-based dashboards (customer/merchant/admin), geo-radius filtering, fuzzy Urdu-aware search, multi-layer discount system (markdown, deals, coupons, variants), merchant dashboard with products/deals/orders/dine-in/analytics/ads, aur PWA + realtime notifications."
+> "TrendsMart ek hyper-local multi-vendor marketplace hai. Next.js 16 + Supabase par bana hai. Customers local shops browse karte hain aur WhatsApp ke zariye order karte hain. Main architecture: guest browsing bina login, email-OTP authentication, role-based dashboards (customer/merchant/admin), geo-radius filtering, fuzzy Urdu-aware search, multi-layer discount system (markdown, deals, coupons, variants), merchant dashboard with products/deals/orders/dine-in/analytics/ads, aur PWA + realtime notifications."
 
 **Q: "Why Next.js?"**
 > "App Router, React Server Components, built-in API routes, image optimization, SEO (robots/sitemap/metadata), aur PWA-ready. Full-stack ek hi codebase — 3 alag roles ke dashboards shared components se."

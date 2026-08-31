@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Merchant Discount Coupon & Promotional Code Engine            */
+/*  TrendsMart — Merchant Discount Coupon & Promotional Code Engine            */
 /*  Prompt 2: Full coupon CRUD dashboard with validation preview              */
 /* -------------------------------------------------------------------------- */
 
@@ -244,7 +244,7 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
         setShowForm(false);
         loadCoupons();
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("trendmart:coupons-updated"));
+          window.dispatchEvent(new Event("trendsmart:coupons-updated"));
         }
       } else {
         setSubmitStatus({ type: "error", message: result.error });
@@ -271,7 +271,7 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
           prev.map((c) => (c.id === couponId ? { ...c, is_active: currentActive } : c)),
         );
       } else if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("trendmart:coupons-updated"));
+        window.dispatchEvent(new Event("trendsmart:coupons-updated"));
       }
     } catch {
       // Rollback
@@ -291,7 +291,7 @@ export default function CouponManager({ shopId }: CouponManagerProps) {
       if (!result.success) {
         setCoupons(previous);
       } else if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("trendmart:coupons-updated"));
+        window.dispatchEvent(new Event("trendsmart:coupons-updated"));
       }
     } catch {
       setCoupons(previous);

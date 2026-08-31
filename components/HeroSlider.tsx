@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Interactive Storefront Banner Carousel & Promotional Slider    */
+/*  TrendsMart — Interactive Storefront Banner Carousel & Promotional Slider    */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Automatic slide transitions with configurable interval                  */

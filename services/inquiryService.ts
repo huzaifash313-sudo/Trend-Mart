@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Customer Inquiry / Chat History Service (Prompt 74)            */
+/*  TrendsMart — Customer Inquiry / Chat History Service (Prompt 74)            */
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";

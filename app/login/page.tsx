@@ -177,7 +177,7 @@ function LoginPageInner() {
         >
           <Link href="/" className="inline-block">
             <h1 className="text-3xl font-bold tracking-tight text-white">
-              TrendMart
+              TrendsMart
             </h1>
           </Link>
           <motion.p
@@ -236,7 +236,7 @@ function LoginPageInner() {
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
         >
-          &copy; {new Date().getFullYear()} TrendMart. Built for local commerce.
+          &copy; {new Date().getFullYear()} TrendsMart. Built for local commerce.
         </motion.p>
       </div>
 
@@ -252,7 +252,7 @@ function LoginPageInner() {
           <div className="mb-8 text-center lg:hidden">
             <Link href="/">
               <h1 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                TrendMart
+                TrendsMart
               </h1>
             </Link>
           </div>

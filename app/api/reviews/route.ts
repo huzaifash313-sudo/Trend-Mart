@@ -29,7 +29,7 @@ function clientIp(request: NextRequest): string {
 }
 
 function hashIp(ip: string): string {
-  const salt = process.env.REVIEW_IP_SALT || "trendmart-review-ip";
+  const salt = process.env.REVIEW_IP_SALT || "trendsmart-review-ip";
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
 }
 

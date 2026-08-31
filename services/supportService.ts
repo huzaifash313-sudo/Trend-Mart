@@ -1,6 +1,6 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Platform Support Desk Service                                 */
-/*  Handles the platform-wide "Contact TrendMart Support" ticket system,      */
+/*  TrendsMart — Platform Support Desk Service                                 */
+/*  Handles the platform-wide "Contact TrendsMart Support" ticket system,      */
 /*  distinct from per-shop customer inquiries (services/inquiryService.ts).   */
 /* -------------------------------------------------------------------------- */
 

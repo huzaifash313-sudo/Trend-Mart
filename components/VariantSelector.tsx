@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Advanced Product Variants & Color/Size Matrix                   */
+/*  TrendsMart — Advanced Product Variants & Color/Size Matrix                   */
 /*                                                                             */
 /*  Designed for Boutique/Garments merchants:                                  */
 /*   - Color swatches with visual indicators                                  */

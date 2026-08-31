@@ -76,7 +76,7 @@ export default function NotificationsPage() {
     }
     if (permission === "granted") {
       setPushStatus(
-        localStorage.getItem("trendmart_push_subscribed") === "true" ? "on" : "off",
+        localStorage.getItem("trendsmart_push_subscribed") === "true" ? "on" : "off",
       );
       return;
     }
@@ -85,7 +85,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("trendmart_notifications");
+      const saved = localStorage.getItem("trendsmart_notifications");
       if (saved) {
         const parsed = JSON.parse(saved) as Record<string, boolean>;
         setToggles(
@@ -117,7 +117,7 @@ export default function NotificationsPage() {
       updated.forEach((t) => {
         prefs[t.key] = t.enabled;
       });
-      localStorage.setItem("trendmart_notifications", JSON.stringify(prefs));
+      localStorage.setItem("trendsmart_notifications", JSON.stringify(prefs));
       return updated;
     });
   }, []);

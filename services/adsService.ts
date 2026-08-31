@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Promotional Ads / Sponsored Banners Service                    */
+/*  TrendsMart — Promotional Ads / Sponsored Banners Service                    */
 /*                                                                             */
 /*  Merchants request a paid homepage banner slot; requests default to       */
 /*  'pending' and only become publicly visible once a Super-Admin approves    */
@@ -44,7 +44,7 @@ function sanitizeAdForm(form: PromotionalAdFormData) {
     link_url: sanitizeAdLink(form.link_url) || "/",
     badge_label: form.badge_label ? sanitizeText(form.badge_label).slice(0, 24) : null,
     placement: (
-      ["homepage_feed", "deals_top", "products_top"].includes(form.placement)
+      ["homepage_feed", "store_top", "deals_top", "products_top"].includes(form.placement)
         ? form.placement
         : "homepage_top"
     ) as PromoAdPlacement,
@@ -53,9 +53,10 @@ function sanitizeAdForm(form: PromotionalAdFormData) {
   };
 }
 
-/** The three main storefront pages merchants can advertise on. */
+/** All merchant-facing storefront pages (used by "All pages" bulk request). */
 export const PAGE_AD_PLACEMENTS: PromoAdPlacement[] = [
   "homepage_top",
+  "store_top",
   "deals_top",
   "products_top",
 ];
@@ -72,13 +73,21 @@ export function resolveAdPlacements(choice: AdPlacementChoice): PromoAdPlacement
  */
 export async function fetchActiveAds(
   placement: PromoAdPlacement = "homepage_top",
+  shopId?: string | null,
 ): Promise<ServiceResult<PromotionalAd[]>> {
   const supabase = createClient();
   try {
-    const { data, error } = await supabase
-      .from("promotional_ads")
-      .select("*")
-      .eq("placement", placement)
+    if (placement === "store_top" && !shopId) {
+      return { success: true, data: [] };
+    }
+
+    let query = supabase.from("promotional_ads").select("*").eq("placement", placement);
+
+    if (placement === "store_top" && shopId) {
+      query = query.eq("shop_id", shopId);
+    }
+
+    const { data, error } = await query
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false })
       .limit(12);
@@ -86,7 +95,7 @@ export async function fetchActiveAds(
     if (error) throw error;
     return { success: true, data: (data as PromotionalAd[]) ?? [] };
   } catch (err) {
-    logError(err, { module: "adsService.fetchActiveAds", meta: { placement } });
+    logError(err, { module: "adsService.fetchActiveAds", meta: { placement, shopId } });
     return { success: false, error: toError(err) };
   }
 }

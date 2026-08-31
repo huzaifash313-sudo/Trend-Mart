@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Role Service                                                   */
+/*  TrendsMart — Role Service                                                   */
 /*  Provides role lookup utilities for middleware, server components,          */
 /*  and client-side RBAC checks.                                              */
 /* -------------------------------------------------------------------------- */

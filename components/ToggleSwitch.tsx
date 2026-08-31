@@ -3,7 +3,7 @@
 import { type FC, useId, useCallback } from "react";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Professional pill toggle                                       */
+/*  TrendsMart — Professional pill toggle                                       */
 /*  Circle thumb fits flush; springy slide + soft scale animation.             */
 /* -------------------------------------------------------------------------- */
 

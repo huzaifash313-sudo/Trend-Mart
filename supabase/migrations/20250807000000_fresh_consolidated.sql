@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — FRESH Consolidated Master Schema
+-- TrendsMart — FRESH Consolidated Master Schema
 -- PROMPT: Clean slate with all tables, RLS, indexes, seed data
 -- Drop everything and recreate without losing existing auth.users
 -- =============================================================================

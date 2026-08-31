@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Support Ticket Submit + Email Notify                          */
+/*  TrendsMart — Support Ticket Submit + Email Notify                          */
 /*  POST /api/support/notify                                                  */
 /*                                                                             */
 /*  Creates the support_tickets row (server-side) and sends confirmation /    */
@@ -161,11 +161,11 @@ export async function POST(request: NextRequest) {
 
     const confirmationResult = await sendEmail({
       to: email,
-      subject: "We received your message — TrendMart Support",
+      subject: "We received your message — TrendsMart Support",
       html: emailShell(
         "We've got your message!",
         `<p>Hi ${name},</p>
-         <p>Thanks for reaching out to TrendMart Support. Here's a copy of what you sent us:</p>
+         <p>Thanks for reaching out to TrendsMart Support. Here's a copy of what you sent us:</p>
          <blockquote style="margin:16px 0;padding:12px 16px;background:#f4f4f5;border-radius:8px;color:#3f3f46;">
            <strong>${subject}</strong><br/>${message}
          </blockquote>

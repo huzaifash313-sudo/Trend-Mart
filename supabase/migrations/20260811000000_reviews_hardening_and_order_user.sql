@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Review hardening + order buyer identity
+-- TrendsMart — Review hardening + order buyer identity
 -- - Auth-only reviews, locked profile name, merchant replies
 -- - Purchase + IP anti-spam columns
 -- - customer_user_id on orders for verified-purchase checks

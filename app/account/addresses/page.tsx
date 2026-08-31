@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Customer Profile & Delivery Address Book Management             */
+/*  TrendsMart — Customer Profile & Delivery Address Book Management             */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Save multiple delivery addresses (Home, Office, Other)                  */

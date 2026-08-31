@@ -1,12 +1,12 @@
-# TrendMart — Poora App Ka Simple Guide (Features, Flow aur Policies)
+# TrendsMart — Poora App Ka Simple Guide (Features, Flow aur Policies)
 
-> Yeh file bilkul simple aur asaan zuban mein likhi gayi hai. Koi bhi isay parh kar samajh sakta hai ke TrendMart kya karta hai, kaise kaam karta hai, aur kya kya features hain. Technical baatein isme nahi hain — sirf app ka kaam aur flow.
+> Yeh file bilkul simple aur asaan zuban mein likhi gayi hai. Koi bhi isay parh kar samajh sakta hai ke TrendsMart kya karta hai, kaise kaam karta hai, aur kya kya features hain. Technical baatein isme nahi hain — sirf app ka kaam aur flow.
 
 ---
 
-## 1. TrendMart kya hai?
+## 1. TrendsMart kya hai?
 
-TrendMart ek **hyper-local multi-vendor marketplace** hai — matlab ek app jisme bahut saare local shops/dukanen (grocery, food, boutique, electronics, cosmetics waghera) apna online store bana sakti hain, aur customers apne ilaqay ke qareeb ki dukano se products browse kar ke **WhatsApp ke zariye order** kar sakte hain.
+TrendsMart ek **hyper-local multi-vendor marketplace** hai — matlab ek app jisme bahut saare local shops/dukanen (grocery, food, boutique, electronics, cosmetics waghera) apna online store bana sakti hain, aur customers apne ilaqay ke qareeb ki dukano se products browse kar ke **WhatsApp ke zariye order** kar sakte hain.
 
 **Sabse bari baat:** Payment app ke andar nahi hoti. Order WhatsApp par merchant ko jata hai, aur paisa **delivery ke waqt cash / bank transfer** hota hai. Isliye ise "WhatsApp Ordering System" kehte hain.
 
@@ -256,10 +256,10 @@ Yeh wo chizein hain jo ya to bani nahi ya abhi complete nahi — agar koi pooche
 
 ---
 
-## 10. 30-Second Summary (Agar koi pooche "TrendMart kya hai?")
+## 10. 30-Second Summary (Agar koi pooche "TrendsMart kya hai?")
 
-> "TrendMart ek hyper-local marketplace hai jahan local shops apni dukan online bana leti hain. Customer qareeb ki dukan se products dekh kar WhatsApp ke zariye order karta hai — payment delivery par hoti hai. App me guest browsing, email-OTP signup, geo radius filters, fuzzy search, deals/coupons/discounts, merchant dashboard (products, orders, kitchen/dine-in, analytics), ads, QR codes, subscriptions, aur ek super-admin panel hai. Backend Supabase par hai jisme proper security (RLS) aur realtime notifications hain."
+> "TrendsMart ek hyper-local marketplace hai jahan local shops apni dukan online bana leti hain. Customer qareeb ki dukan se products dekh kar WhatsApp ke zariye order karta hai — payment delivery par hoti hai. App me guest browsing, email-OTP signup, geo radius filters, fuzzy search, deals/coupons/discounts, merchant dashboard (products, orders, kitchen/dine-in, analytics), ads, QR codes, subscriptions, aur ek super-admin panel hai. Backend Supabase par hai jisme proper security (RLS) aur realtime notifications hain."
 
 ---
 
-*Yeh file app ke features aur flow ki non-technical explanation hai. Technical details ke liye `TRENDMART_TECHNICAL_INTERVIEW_GUIDE.md` dekhen.*
+*Yeh file app ke features aur flow ki non-technical explanation hai. Technical details ke liye `TRENDSMART_TECHNICAL_INTERVIEW_GUIDE.md` dekhen.*

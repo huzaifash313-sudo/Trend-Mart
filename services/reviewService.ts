@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Review Service (Supabase)                                     */
+/*  TrendsMart — Review Service (Supabase)                                     */
 /*                                                                             */
 /*  PROMPT 3: HARDENED — Strict string sanitization for review text,           */
 /*                       numeric bounds validation for star ratings (1-5),     */
@@ -156,10 +156,10 @@ function getSessionKey(): string {
   if (typeof window === "undefined") return `server-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   try {
     // Use existing Supabase session or generate a stable anonymous key
-    const stored = sessionStorage.getItem("trendmart_review_session");
+    const stored = sessionStorage.getItem("trendsmart_review_session");
     if (stored) return stored;
     const key = `review-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    sessionStorage.setItem("trendmart_review_session", key);
+    sessionStorage.setItem("trendsmart_review_session", key);
     return key;
   } catch {
     return `review-${Date.now()}`;

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Short product link codes                                       */
+/*  TrendsMart — Short product link codes                                       */
 /*                                                                            */
 /*  Generates compact, URL-safe codes used for direct product deep links       */
 /*  (e.g. `https://…/p/AbCd1234`) instead of long `shop/{slug}#product-{uuid}` */

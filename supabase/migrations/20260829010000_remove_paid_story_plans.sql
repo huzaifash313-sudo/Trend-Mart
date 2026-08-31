@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Remove Paid Story Plans (Stories are FREE & Unlimited)
+-- TrendsMart — Remove Paid Story Plans (Stories are FREE & Unlimited)
 -- -----------------------------------------------------------------------------
 -- Business decision (confirmed 2026-08-29): stories are a free engagement
 -- feature for every shop — there are NO paid story plans, ever. The old

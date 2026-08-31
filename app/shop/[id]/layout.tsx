@@ -44,7 +44,7 @@ async function loadShopMeta(idOrSlug: string) {
   }
 }
 
-/** Map TrendMart categories to Schema.org business types. */
+/** Map TrendsMart categories to Schema.org business types. */
 const CATEGORY_TO_SCHEMA_TYPE: Record<string, string> = {
   Food: "Restaurant",
   Grocery: "GroceryStore",
@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!shop) {
     return {
       title: "Shop",
-      description: "Browse this local store on TrendMart.",
+      description: "Browse this local store on TrendsMart.",
     };
   }
   return generateShopMetadata({

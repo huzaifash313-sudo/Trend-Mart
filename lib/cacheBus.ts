@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Storefront cache invalidation bus                              */
+/*  TrendsMart — Storefront cache invalidation bus                              */
 /*                                                                             */
 /*  Mutations live in `services/*` and are called directly from components,     */
 /*  NOT through React Query mutations — so nothing invalidates the cached       */

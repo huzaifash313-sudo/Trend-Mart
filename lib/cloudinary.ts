@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Cloudinary Image Engine                                        */
+/*  TrendsMart — Cloudinary Image Engine                                        */
 /*                                                                             */
 /*  Images uploaded by merchants/customers go to Cloudinary (global CDN +     */
 /*  auto-optimized delivery) with the URL stored in the DB. Existing images    */

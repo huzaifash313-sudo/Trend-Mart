@@ -1,4 +1,4 @@
-# TrendMart — Setup & Testing Guide
+# TrendsMart — Setup & Testing Guide
 
 > Ye guide batati hai ke naya setup (shops, products, images, variants, QR dine-in) kaise add karna hai, kaise test karna hai, aur merchant/customer dono side ka flow kya hai.
 
@@ -100,7 +100,7 @@ Demo merchant (`abdwhaw99@gmail.com`) ke paas ab **har category ki ek live shop*
 | Security & Surveillance | SecureVue | CCTV, Doorbell, Smart Lock |
 | Tech & IT | CodeWorks IT | Websites, PC Repair |
 | Personal Services | Prime Services | Salon (Stylist), Tutoring |
-| Others | TrendMart Essentials | Gift Hamper, Bottle (Capacity) |
+| Others | TrendsMart Essentials | Gift Hamper, Bottle (Capacity) |
 
 ### Dobara seed karna ho to
 Script repo mein nahi rakhi (one-off thi). Dobara chahiye to main wahi script bana kar chala doonga — bas bata dena.

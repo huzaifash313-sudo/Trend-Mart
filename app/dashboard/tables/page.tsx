@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — QR Table Manager (/dashboard/tables)                           */
+/*  TrendsMart — QR Table Manager (/dashboard/tables)                           */
 /*                                                                             */
 /*  Merchant side of dine-in ordering: create tables, each with its own QR     */
 /*  code, download a print-ready PDF per table, pause/delete tables.           */
@@ -249,7 +249,7 @@ export default function MerchantTablesPage() {
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
 
-      const shopName = (shop?.name ?? "TrendMart").slice(0, 28);
+      const shopName = (shop?.name ?? "TrendsMart").slice(0, 28);
       const shopLocation = (shop?.location ?? "").slice(0, 34);
       const shopPhone = shop?.whatsapp_number ?? "";
 
@@ -289,7 +289,7 @@ export default function MerchantTablesPage() {
       doc.text("Scan to view the menu & order from your table", pageW / 2, pageH - 12, { align: "center" });
       doc.setFontSize(7);
       doc.setTextColor(140);
-      doc.text("Powered by TrendMart", pageW / 2, pageH - 7, { align: "center" });
+      doc.text("Powered by TrendsMart", pageW / 2, pageH - 7, { align: "center" });
       doc.setTextColor(0);
 
       doc.save(`${table.name.toLowerCase().replace(/\s+/g, "-")}-qr.pdf`);

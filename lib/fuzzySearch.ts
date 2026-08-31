@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Fuzzy / tolerant search ranking                               */
+/*  TrendsMart — Fuzzy / tolerant search ranking                               */
 /*  exact → prefix → contains → token → phonetic → edit-distance              */
 /* -------------------------------------------------------------------------- */
 

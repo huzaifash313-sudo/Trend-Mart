@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Enterprise Data Integrity & FK Cascade Audit
+-- TrendsMart — Enterprise Data Integrity & FK Cascade Audit
 -- 
 -- Comprehensive migration that audits every table relationship across the
 -- platform, enforces strict foreign key rules, removes orphaned records,

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Super-Admin Console Layout                                    */
+/*  TrendsMart — Super-Admin Console Layout                                    */
 /*  Dedicated shell for /admin/* pages: sidebar navigation on desktop, a      */
 /*  compact top nav bar on mobile. The storefront chrome (Navbar / Footer /   */
 /*  BottomNav / CartBar) is suppressed for /admin routes via pathname checks  */
@@ -67,7 +67,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </span>
             <span>
               <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                TrendMart
+                TrendsMart
               </span>
               <span className="block text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 Super Admin
@@ -108,7 +108,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               → Storefront
             </Link>
             <p className="px-3 text-[0.65rem] text-zinc-400 dark:text-zinc-500">
-              TrendMart Super Admin v1.1
+              TrendsMart Super Admin v1.1
             </p>
           </div>
         </aside>

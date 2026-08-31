@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Route-scoped Error Boundary                                    */
+/*  TrendsMart — Route-scoped Error Boundary                                    */
 /*                                                                             */
 /*  The plain <ErrorBoundary> is a class component: once a child throws it     */
 /*  stays in its error state until the user manually retries or hard-refreshes.*/

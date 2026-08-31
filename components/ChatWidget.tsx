@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — AI Business Assistant Chat Widget                              */
+/*  TrendsMart — AI Business Assistant Chat Widget                              */
 /*                                                                             */
 /*  A floating chat bubble and expandable chat window that appears on          */
 /*  storefront pages. Customers can ask questions and the AI responds          */
@@ -306,7 +306,7 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
             </button>
           </div>
           <p className="mt-1.5 text-center text-[0.6rem] text-zinc-400 dark:text-zinc-500">
-            AI assistant for {shopName} • Powered by TrendMart
+            AI assistant for {shopName} • Powered by TrendsMart
           </p>
         </div>
       </div>

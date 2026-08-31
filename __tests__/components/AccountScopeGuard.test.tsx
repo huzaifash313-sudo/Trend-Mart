@@ -9,10 +9,10 @@ import AccountScopeGuard from "@/components/AccountScopeGuard";
 type AuthCallback = (event: string, session: { user: { id: string } } | null) => void;
 
 /** Namespaced keys — each account (and the guest) gets its own bucket. */
-const CART_KEY = "trendmart_cart";
-const ORDERS_KEY = "trendmart_orders";
-const FAVORITES_KEY = "trendmart_favorites";
-const SCOPE_KEY = "trendmart_scope_owner_v1";
+const CART_KEY = "trendsmart_cart";
+const ORDERS_KEY = "trendsmart_orders";
+const FAVORITES_KEY = "trendsmart_favorites";
+const SCOPE_KEY = "trendsmart_scope_owner_v1";
 
 const cartBucket = (uid: string | null) =>
   uid ? `${CART_KEY}:u_${uid}` : `${CART_KEY}:guest`;

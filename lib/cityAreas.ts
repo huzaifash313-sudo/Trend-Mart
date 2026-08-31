@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Curated city areas (mohallas / colonies / towns)               */
+/*  TrendsMart — Curated city areas (mohallas / colonies / towns)               */
 /*                                                                             */
 /*  Each area has an approximate pin so that selecting it moves the customer   */
 /*  location there and the proximity engine (shops / products / deals) filters */

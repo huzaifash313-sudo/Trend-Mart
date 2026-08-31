@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shared Input Sanitization & Validation Utilities               */
+/*  TrendsMart — Shared Input Sanitization & Validation Utilities               */
 /*  Used across all services to prevent XSS, SQL injection, CSV injection,     */
 /*  and path traversal attacks.                                                */
 /* -------------------------------------------------------------------------- */

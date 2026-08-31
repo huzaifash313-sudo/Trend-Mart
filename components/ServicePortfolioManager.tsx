@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Service Portfolio Manager (Prompt 4)                           */
+/*  TrendsMart — Service Portfolio Manager (Prompt 4)                           */
 /*                                                                             */
 /*  Dashboard module for service providers to manage their project portfolio.  */
 /*  Features:                                                                  */

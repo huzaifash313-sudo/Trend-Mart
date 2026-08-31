@@ -1,5 +1,5 @@
 -- ============================================================================
--- TrendMart: Merchant Delivery Radius (idempotent, additive)
+-- TrendsMart: Merchant Delivery Radius (idempotent, additive)
 --
 -- Ensures the shop geo-location columns and proximity helper functions exist
 -- regardless of whether `20250806050000_geo_radius_and_analytics_extensions.sql`

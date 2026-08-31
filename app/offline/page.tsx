@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "You're Offline — TrendMart",
+  title: "You're Offline — TrendsMart",
   robots: { index: false, follow: false },
 };
 
@@ -16,7 +16,7 @@ export default function OfflinePage() {
       <div className="mb-4 text-6xl">📡</div>
       <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">You&apos;re offline</h1>
       <p className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-        TrendMart couldn&apos;t reach the network. Check your connection — items already in your
+        TrendsMart couldn&apos;t reach the network. Check your connection — items already in your
         cart are safely saved on this device and will sync once you&apos;re back online.
       </p>
       {/* Intentional hard navigation (not next/link) — forces a real network

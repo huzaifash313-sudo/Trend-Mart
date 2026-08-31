@@ -1,4 +1,4 @@
-﻿-- TrendMart SQL part file — run in order in Supabase SQL Editor
+﻿-- TrendsMart SQL part file — run in order in Supabase SQL Editor
 -- If 'Failed to fetch (api.supabase.com)' appears: wait 10s, re-run THIS part only, or try another browser / disable VPN.
 
 -- #############################################################################

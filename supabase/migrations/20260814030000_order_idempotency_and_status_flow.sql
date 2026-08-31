@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Order idempotency + server-side status transition enforcement
+-- TrendsMart — Order idempotency + server-side status transition enforcement
 -- =============================================================================
 -- Two fixes:
 --

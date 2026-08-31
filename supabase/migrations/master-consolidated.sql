@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Consolidated Master Schema Migration
+-- TrendsMart — Consolidated Master Schema Migration
 -- =============================================================================
 -- Single comprehensive script covering ALL tables, columns, foreign keys,
 -- indexes, Row-Level Security (RLS) policies, helper functions, triggers,

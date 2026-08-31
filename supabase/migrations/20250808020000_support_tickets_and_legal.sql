@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Platform Support Desk & Legal Acceptance Tracking              */
+/*  TrendsMart — Platform Support Desk & Legal Acceptance Tracking              */
 /*                                                                             */
 /*  Adds:                                                                     */
 /*   1. support_tickets table — platform-wide contact/support inbox           */

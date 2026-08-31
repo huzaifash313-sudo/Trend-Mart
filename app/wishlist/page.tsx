@@ -78,7 +78,7 @@ type WishlistTab = "shops" | "products";
 function showToast(message: string, type: "info" | "error" = "info"): void {
   try {
     window.dispatchEvent(
-      new CustomEvent("trendmart:toast", {
+      new CustomEvent("trendsmart:toast", {
         detail: { type, message, duration: 3000 },
       }),
     );
@@ -89,7 +89,7 @@ function showToast(message: string, type: "info" | "error" = "info"): void {
 
 function buildWhatsAppCheckoutMessage(item: FavoriteItem): string {
   const lines: string[] = [];
-  lines.push(`Hi! I'm interested in *${item.name}* from your TrendMart store.`);
+  lines.push(`Hi! I'm interested in *${item.name}* from your TrendsMart store.`);
   if (item.shopName) lines.push(`\nI found this item in *${item.shopName}*.`);
   lines.push(`\nCan you share more details (price, availability, delivery)?`);
   lines.push(`\nItem ID: ${item.id}`);

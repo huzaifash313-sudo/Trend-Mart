@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Super Admin Centralized Dashboard (Prompt 1)                    */
+/*  TrendsMart — Super Admin Centralized Dashboard (Prompt 1)                    */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Monitor all registered merchants with verification status                */
@@ -46,7 +46,8 @@ import {
   createSubCategory,
   setSubCategoryActive,
 } from "@/services/subCategoryService";
-import type { PromotionalAd, PromotionalAdFormData } from "@/types";
+import type { PromotionalAd, PromotionalAdFormData, PromoAdPlacement } from "@/types";
+import { AD_PLACEMENT_LABELS, AD_PLACEMENT_OPTIONS } from "@/types";
 import {
   fetchAllAdsForAdmin,
   reviewAd,
@@ -2317,6 +2318,28 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setPlatformAdForm((f) => ({ ...f, link_url: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
                   />
+                  <label className="block">
+                    <span className="mb-1 block text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
+                      Placement *
+                    </span>
+                    <select
+                      value={platformAdForm.placement}
+                      onChange={(e) =>
+                        setPlatformAdForm((f) => ({
+                          ...f,
+                          placement: e.target.value as PromoAdPlacement,
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+                    >
+                      {AD_PLACEMENT_OPTIONS.filter((o) => o.value !== "all_pages").map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                      <option value="homepage_feed">Home feed</option>
+                    </select>
+                  </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <label className="block">
                       <span className="mb-1 block text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">
@@ -2366,7 +2389,9 @@ export default function AdminDashboardPage() {
                       <img src={ad.image_url} alt={ad.title} className="h-14 w-24 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0" />
                       <div className="flex-grow min-w-[180px]">
                         <div className="font-medium text-zinc-900 dark:text-zinc-100">{ad.title}</div>
-                        <div className="text-xs text-zinc-500 mt-0.5">{ad.shop_name} · {ad.placement}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5">
+                          {ad.shop_name} · {AD_PLACEMENT_LABELS[ad.placement] ?? ad.placement}
+                        </div>
                         <div className="text-xs text-zinc-400 mt-0.5 truncate max-w-xs">→ {ad.link_url}</div>
                       </div>
                       <div className="flex gap-2">
@@ -2488,7 +2513,7 @@ export default function AdminDashboardPage() {
       {/* ── Footer Bar ──────────────────────────────────────────────── */}
       <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <div className="mx-auto max-w-7xl px-4 py-3 text-xs text-zinc-400 flex justify-between sm:px-6">
-          <span>TrendMart Super Admin v1.0</span>
+          <span>TrendsMart Super Admin v1.0</span>
           <span>Live monitoring active</span>
         </div>
       </div>

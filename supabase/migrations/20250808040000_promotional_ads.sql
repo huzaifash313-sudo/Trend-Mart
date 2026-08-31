@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Promotional Ads / Sponsored Banners Carousel                  */
+/*  TrendsMart — Promotional Ads / Sponsored Banners Carousel                  */
 /*                                                                             */
 /*  Per .cursorrules §7 "Promotional Ads Feature (Sponsored / Paid Ads        */
 /*  Carousel)": merchants can request a paid promotional banner slot that     */

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Service Provider Category Taxonomy & Infrastructure            */
+/*  TrendsMart — Service Provider Category Taxonomy & Infrastructure            */
 /*                                                                             */
 /*  Adds service-sector support alongside physical retail:                      */
 /*   1. New service categories in the taxonomy                                 */

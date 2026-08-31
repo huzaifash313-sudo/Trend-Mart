@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — One store per account (database-level enforcement)
+-- TrendsMart — One store per account (database-level enforcement)
 --
 -- Business rule: a single signup may own exactly ONE merchant store. The app
 -- layer already redirects merchants who open /account/become-merchant to their

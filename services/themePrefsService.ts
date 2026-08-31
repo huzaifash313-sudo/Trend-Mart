@@ -15,7 +15,7 @@ const DEFAULT_PREFS: StorefrontDisplayPrefs = {
 };
 
 function localKey(shopId: string): string {
-  return `trendmart_storefront_prefs_${shopId}`;
+  return `trendsmart_storefront_prefs_${shopId}`;
 }
 
 function readLocal(shopId: string): StorefrontDisplayPrefs | null {

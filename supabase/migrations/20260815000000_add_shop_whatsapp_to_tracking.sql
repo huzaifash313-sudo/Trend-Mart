@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Expose shop WhatsApp number to order-tracking lookups
+-- TrendsMart — Expose shop WhatsApp number to order-tracking lookups
 -- =============================================================================
 -- The guest "Contact Merchant" button on /orders/tracking was building a blank
 -- wa.me link because the tracking RPCs only returned `shop_name`, not the shop's

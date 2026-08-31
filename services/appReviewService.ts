@@ -1,7 +1,7 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — App Review Service (localStorage)                              */
+/*  TrendsMart — App Review Service (localStorage)                              */
 /*                                                                            */
-/*  Customers can rate the TrendMart app itself at any time, independent of   */
+/*  Customers can rate the TrendsMart app itself at any time, independent of   */
 /*  any shop order. Stored per-device in localStorage so it always works      */
 /*  offline and survives refreshes — same pattern as orders, wishlist and     */
 /*  theme prefs.                                                              */
@@ -13,7 +13,7 @@ export interface AppReview {
   updatedAt: string;
 }
 
-const STORAGE_KEY = "trendmart_app_review_v1";
+const STORAGE_KEY = "trendsmart_app_review_v1";
 
 const MAX_COMMENT_LENGTH = 500;
 

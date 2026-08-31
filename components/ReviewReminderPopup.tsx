@@ -206,11 +206,11 @@ export default function ReviewReminderPopup() {
       if (detail.orderId && isOrderDismissed(currentUserIdRef.current, detail.orderId)) return;
       openFor({ id: detail.shopId, name: detail.shopName || "the shop", orderId: detail.orderId });
     };
-    window.addEventListener("trendmart:order-update", onOrderUpdate);
+    window.addEventListener("trendsmart:order-update", onOrderUpdate);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("trendmart:order-update", onOrderUpdate);
+      window.removeEventListener("trendsmart:order-update", onOrderUpdate);
     };
   }, [maybeAutoOpen, openFor]);
 

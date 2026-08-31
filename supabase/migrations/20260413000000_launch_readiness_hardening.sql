@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Launch Readiness Hardening (WhatsApp-First Soft Launch)
+-- TrendsMart — Launch Readiness Hardening (WhatsApp-First Soft Launch)
 -- =============================================================================
 -- This migration is idempotent and safe to re-run. It fixes four concrete,
 -- provable production bugs found during a full RLS/security audit:

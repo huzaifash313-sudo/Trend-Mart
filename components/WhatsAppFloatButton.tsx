@@ -22,8 +22,8 @@ export default function WhatsAppFloatButton({
 
   const text = encodeURIComponent(
     shopName
-      ? `Hi! I'm interested in ${shopName} on TrendMart.`
-      : "Hi! I found you on TrendMart.",
+      ? `Hi! I'm interested in ${shopName} on TrendsMart.`
+      : "Hi! I found you on TrendsMart.",
   );
   const href = `https://wa.me/${wa}?text=${text}`;
 

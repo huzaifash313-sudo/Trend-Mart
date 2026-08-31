@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Product Order Modal                                            */
+/*  TrendsMart — Product Order Modal                                            */
 /*                                                                            */
 /*  Direct single-item WhatsApp checkout for a product (no cart step).         */
 /*  Mirrors DealCard's "Order" flow: seed the cart silently (so login/verify   */

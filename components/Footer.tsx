@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Global Footer                                                 */
+/*  TrendsMart — Global Footer                                                 */
 /*  Desktop: multi-column link grid. Mobile: compact 2-col links above the   */
 /*  fixed BottomNav (with safe padding so nothing sits under the bar).         */
 /* -------------------------------------------------------------------------- */
@@ -19,7 +19,7 @@ const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] 
     ],
   },
   {
-    heading: "Sell on TrendMart",
+    heading: "Sell on TrendsMart",
     links: [
       { href: "/dashboard", label: "Merchant Dashboard" },
       { href: "/faq#merchant", label: "New Merchant Guide" },
@@ -64,13 +64,13 @@ export default function Footer() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/trendmart-mark.png?v=10"
+            src="/trendsmart-mark.png?v=10"
             alt=""
             width={24}
             height={24}
             className="h-6 w-6 shrink-0 object-contain"
           />
-          TrendMart
+          TrendsMart
         </Link>
         <p className="mt-1.5 max-w-sm text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
           Your neighborhood, delivered. Local shops via WhatsApp.
@@ -99,7 +99,7 @@ export default function Footer() {
         </div>
 
         <p className="mt-4 border-t border-zinc-100 pt-3 text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-          &copy; {new Date().getFullYear()} TrendMart. All rights reserved.
+          &copy; {new Date().getFullYear()} TrendsMart. All rights reserved.
         </p>
       </div>
 
@@ -113,13 +113,13 @@ export default function Footer() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/trendmart-mark.png?v=10"
+                src="/trendsmart-mark.png?v=10"
                 alt=""
                 width={28}
                 height={28}
                 className="h-7 w-7 shrink-0 object-contain"
               />
-              TrendMart
+              TrendsMart
             </Link>
             <p className="mt-2 max-w-[16rem] text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
               Your neighborhood, delivered. Discover local shops and order directly via WhatsApp.
@@ -146,7 +146,7 @@ export default function Footer() {
           ))}
         </div>
         <div className="mt-6 border-t border-zinc-100 pt-4 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-          &copy; {new Date().getFullYear()} TrendMart. All rights reserved.
+          &copy; {new Date().getFullYear()} TrendsMart. All rights reserved.
         </div>
       </div>
     </footer>

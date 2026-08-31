@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Sub-Categories & Product Enhancements Migration
+-- TrendsMart — Sub-Categories & Product Enhancements Migration
 -- 
 -- Adds:
 --   1. sub_categories table with mandatory 'Others' entry per category

@@ -1,4 +1,4 @@
--- TrendMart: persist the customer's precise location captured at signup so
+-- TrendsMart: persist the customer's precise location captured at signup so
 -- checkout and the profile page can auto-fill name / phone / address / pin.
 -- Safe / idempotent — run once in Supabase SQL Editor.
 

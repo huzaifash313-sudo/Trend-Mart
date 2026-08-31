@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Advanced Query Performance Indexes (Prompt 4)                   */
+/*  TrendsMart — Advanced Query Performance Indexes (Prompt 4)                   */
 /*                                                                             */
 /*  Strategic indexes on frequently queried columns to minimize execution       */
 /*  time under high concurrency loads.                                          */

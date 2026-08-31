@@ -1,11 +1,11 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Browsing History Service (localStorage)                        */
+/*  TrendsMart — Browsing History Service (localStorage)                        */
 /*  Automatically tracks up to the last 5 viewed shop profiles and products.   */
 /* -------------------------------------------------------------------------- */
 
 import { scopedKey } from "@/lib/clientScope";
 
-const STORAGE_BASE = "trendmart_history";
+const STORAGE_BASE = "trendsmart_history";
 const MAX_ITEMS = 5;
 
 function storageKey(): string {

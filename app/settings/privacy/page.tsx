@@ -51,13 +51,13 @@ export default function PrivacyPage() {
       // history, orders, behaviour memory) — never another account's.
       clearCurrentScopeData();
       // Legacy flat keys + device-level caches from older builds.
-      localStorage.removeItem("trendmart_favorites");
-      localStorage.removeItem("trendmart_cart");
-      localStorage.removeItem("trendmart_history");
-      localStorage.removeItem("trendmart_orders");
-      localStorage.removeItem("trendmart_active_shop");
-      localStorage.removeItem("trendmart_notifications");
-      localStorage.removeItem("trendmart_location");
+      localStorage.removeItem("trendsmart_favorites");
+      localStorage.removeItem("trendsmart_cart");
+      localStorage.removeItem("trendsmart_history");
+      localStorage.removeItem("trendsmart_orders");
+      localStorage.removeItem("trendsmart_active_shop");
+      localStorage.removeItem("trendsmart_notifications");
+      localStorage.removeItem("trendsmart_location");
       addToast("Local data cleared successfully!", "success");
     } catch {
       addToast("Failed to clear local data.", "error");
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
             <div>
               <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Your Data is Safe</p>
               <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-                TrendMart uses enterprise-grade security. Your personal information is encrypted and never shared with third parties.
+                TrendsMart uses enterprise-grade security. Your personal information is encrypted and never shared with third parties.
               </p>
             </div>
           </div>

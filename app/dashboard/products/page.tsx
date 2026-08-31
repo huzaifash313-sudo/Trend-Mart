@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Enterprise Product & Inventory Management Engine              */
+/*  TrendsMart — Enterprise Product & Inventory Management Engine              */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Multi-attribute variant management (color swatches, clothing sizes)     */
@@ -67,7 +67,7 @@ import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 /** Tell the storefront cache a product changed (invalidate marketplace/home). */
 function emitProductsChanged() {
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("trendmart:products-updated"));
+    window.dispatchEvent(new Event("trendsmart:products-updated"));
   }
 }
 
@@ -220,7 +220,7 @@ export default function ProductsDashboardPage() {
         const myShops = result.data.filter((s) => s.owner_id === userId);
         setShops(myShops);
         if (myShops.length > 0 && !activeShopId) {
-          const saved = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendmart_active_shop")) : null;
+          const saved = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendsmart_active_shop")) : null;
           const match = saved ? myShops.find(s => s.id === saved) : null;
           setActiveShopId(match?.id ?? myShops[0].id);
         }
@@ -919,7 +919,7 @@ export default function ProductsDashboardPage() {
               {form.variantGroups.length > 0 && (
                 <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
                   Variants save with this product. Use the <strong>In Stock / Out of Stock</strong> toggle —
-                  TrendMart does not track numeric stock quantities.
+                  TrendsMart does not track numeric stock quantities.
                 </p>
               )}
 

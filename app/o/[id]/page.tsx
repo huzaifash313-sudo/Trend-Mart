@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Single-Link Order Summary (/o/[id])                           */
+/*  TrendsMart — Single-Link Order Summary (/o/[id])                           */
 /*                                                                            */
 /*  The one clean link inside a WhatsApp order message. Groups every item     */
 /*  (name, variant, qty, price) plus shop identity and the running total so   */
@@ -167,7 +167,7 @@ function OrderSummaryInner({ id }: { id: string }) {
       {/* Brand strip */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 py-1.5 text-center">
         <span className="text-[0.65rem] font-bold uppercase tracking-widest text-white">
-          TrendMart · Order Summary
+          TrendsMart · Order Summary
         </span>
       </div>
 
@@ -211,7 +211,7 @@ function OrderSummaryInner({ id }: { id: string }) {
               {order.shop_name}
             </p>
             <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-              📍 {order.shop_location || "TrendMart shop"}
+              📍 {order.shop_location || "TrendsMart shop"}
             </p>
           </div>
           <span className="shrink-0 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
@@ -331,7 +331,7 @@ function OrderSummaryInner({ id }: { id: string }) {
         <p className="mt-6 text-center text-[0.65rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
           This page shows order items only — customer contact details are never shared here.
           <br />
-          Sent via <span className="font-semibold text-emerald-600 dark:text-emerald-400">TrendMart</span> — Your Local Shopping Hub
+          Sent via <span className="font-semibold text-emerald-600 dark:text-emerald-400">TrendsMart</span> — Your Local Shopping Hub
         </p>
       </div>
     </div>

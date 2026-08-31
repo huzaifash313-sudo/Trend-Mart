@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { registerQueryClient, invalidateStorefrontData } from "@/lib/cacheBus";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Global React Query Provider                                    */
+/*  TrendsMart — Global React Query Provider                                    */
 /*                                                                             */
 /*  Server state (shops, products, deals, stories, coupons) is cached here so  */
 /*  refetches never blank the UI: stale data is shown while fresh data loads   */
@@ -16,16 +16,16 @@ import { registerQueryClient, invalidateStorefrontData } from "@/lib/cacheBus";
 /**
  * Listens for the app's mutation-complete events and invalidates the whole
  * storefront cache. This centralizes cache freshness — any code that finishes
- * a write just dispatches the matching `trendmart:*` event, and every page's
+ * a write just dispatches the matching `trendsmart:*` event, and every page's
  * React Query data (shops, products, deals, stories, coupons, shop detail)
  * refetches in the background.
  */
 const STOREFRONT_EVENTS = [
-  "trendmart:shops-updated",
-  "trendmart:products-updated",
-  "trendmart:stories-updated",
-  "trendmart:deals-updated",
-  "trendmart:coupons-updated",
+  "trendsmart:shops-updated",
+  "trendsmart:products-updated",
+  "trendsmart:stories-updated",
+  "trendsmart:deals-updated",
+  "trendsmart:coupons-updated",
 ] as const;
 
 function StorefrontCacheListener() {

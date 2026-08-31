@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Sub-Category Management Service                                */
+/*  TrendsMart — Sub-Category Management Service                                */
 /*  Fetches sub-categories with mandatory 'Others' fallback per category.       */
 /* -------------------------------------------------------------------------- */
 

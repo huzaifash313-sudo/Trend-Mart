@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Service Booking & WhatsApp Inquiry Modal (Prompt 3)             */
+/*  TrendsMart — Service Booking & WhatsApp Inquiry Modal (Prompt 3)             */
 /*                                                                             */
 /*  Specialized booking flow for service providers. Features:                   */
 /*   - Select service packages from the provider's offerings                   */
@@ -136,7 +136,7 @@ function buildServiceWhatsAppMessage(
 ): string {
   const selected = packages.filter(p => selectedPackageIds.has(p.id));
   const lines: string[] = [
-    `🔧 *Service Booking via TrendMart*`,
+    `🔧 *Service Booking via TrendsMart*`,
     ``,
     `🏪 *Provider:* ${shopName}`,
     `📍 *Location:* ${shopLocation}`,
@@ -182,7 +182,7 @@ function buildServiceWhatsAppMessage(
 
   lines.push(``);
   lines.push(`──────────────────────────`);
-  lines.push(`_Sent via TrendMart — Your Local Service Hub_`);
+  lines.push(`_Sent via TrendsMart — Your Local Service Hub_`);
   lines.push(`_🕐 ${new Date().toLocaleString("en-PK", { dateStyle: "full", timeStyle: "short" })}_`);
 
   return lines.join("\n");

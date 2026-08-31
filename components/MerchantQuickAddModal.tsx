@@ -115,7 +115,7 @@ export default function MerchantQuickAddModal() {
       addToast("Product saved.", "success");
       resetProduct();
       closeQuickAdd();
-      window.dispatchEvent(new Event("trendmart:products-updated"));
+      window.dispatchEvent(new Event("trendsmart:products-updated"));
     } else {
       addToast(result.error, "error");
     }
@@ -137,7 +137,7 @@ export default function MerchantQuickAddModal() {
       setStoryImage("");
       setStoryCaption("");
       closeQuickAdd();
-      window.dispatchEvent(new Event("trendmart:stories-updated"));
+      window.dispatchEvent(new Event("trendsmart:stories-updated"));
     } else {
       addToast(result.error, "error");
     }
@@ -270,7 +270,7 @@ export default function MerchantQuickAddModal() {
               shopCategory={shopCategory}
               onCreated={() => {
                 closeQuickAdd();
-                window.dispatchEvent(new Event("trendmart:products-updated"));
+                window.dispatchEvent(new Event("trendsmart:products-updated"));
               }}
               onToast={(msg, variant) => addToast(msg, variant)}
             />

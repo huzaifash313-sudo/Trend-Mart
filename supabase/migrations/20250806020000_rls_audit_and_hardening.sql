@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — RLS Security Audit & Hardening (Prompt 3)
+-- TrendsMart — RLS Security Audit & Hardening (Prompt 3)
 --
 -- This migration performs a comprehensive review of all existing RLS policies
 -- and applies hard security patches to eliminate:

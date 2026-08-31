@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Story Service Layer                                           */
+/*  TrendsMart — Story Service Layer                                           */
 /*  Handles 24-hour merchant story operations.                                */
 /* -------------------------------------------------------------------------- */
 

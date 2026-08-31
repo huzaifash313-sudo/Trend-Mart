@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Notification & Order Status Lifecycle Service (Prompt 4)       */
+/*  TrendsMart — Notification & Order Status Lifecycle Service (Prompt 4)       */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Strict order lifecycle: Pending->Processing->Dispatched->Delivered     */
@@ -262,7 +262,7 @@ async function broadcastOrderUpdate(
   // subscription. Emitting a toast here produced duplicate/stacked toasts.
   if (typeof window !== "undefined") {
     window.dispatchEvent(
-      new CustomEvent("trendmart:order-update", {
+      new CustomEvent("trendsmart:order-update", {
         detail: notification,
       }),
     );
@@ -368,7 +368,7 @@ export function subscribeToOrderUpdates(
           // Also dispatch global event
           if (typeof window !== "undefined") {
             window.dispatchEvent(
-              new CustomEvent("trendmart:order-update", {
+              new CustomEvent("trendsmart:order-update", {
                 detail: notification,
               }),
             );
@@ -495,7 +495,7 @@ export function subscribeToShopOrderUpdates(
 
         if (typeof window !== "undefined") {
           window.dispatchEvent(
-            new CustomEvent("trendmart:toast", {
+            new CustomEvent("trendsmart:toast", {
               detail: {
                 type: "info",
                 message: `🆕 New order from ${notification.customerName} — #${notification.orderId.slice(0, 8)}`,

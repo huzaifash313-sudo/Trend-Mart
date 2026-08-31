@@ -12,7 +12,7 @@ import {
 } from "react";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Real‑Time Dynamic Theme, Font Scale & Grid Layout Engine       */
+/*  TrendsMart — Real‑Time Dynamic Theme, Font Scale & Grid Layout Engine       */
 /*                                                                             */
 /*  Features:                                                                   */
 /*   - Dark / Light / System theme mode with instant CSS toggle               */
@@ -67,8 +67,8 @@ interface ThemeContextValue extends ThemePreferences {
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 
-const STORAGE_KEY = "trendmart_theme_prefs_v4";
-const LEGACY_STORAGE_KEY = "trendmart_theme_prefs_v3";
+const STORAGE_KEY = "trendsmart_theme_prefs_v4";
+const LEGACY_STORAGE_KEY = "trendsmart_theme_prefs_v3";
 
 const DEFAULT_PREFS: Omit<ThemePreferences, "resolved"> = {
   mode: "light",

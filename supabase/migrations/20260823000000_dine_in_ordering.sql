@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Dine-In Ordering (QR Table Ordering) — Phase 1
+-- TrendsMart — Dine-In Ordering (QR Table Ordering) — Phase 1
 -- =============================================================================
 -- Adds the QR-table self-ordering layer on top of the existing marketplace:
 --   1. `dine_in_tables` — merchant-managed tables, each with a unique QR token.

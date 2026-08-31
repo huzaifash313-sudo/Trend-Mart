@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Analytics Service (Real-Time Tracking Pipeline)                 */
+/*  TrendsMart — Analytics Service (Real-Time Tracking Pipeline)                 */
 /*                                                                             */
 /*  Overhauled with:                                                           */
 /*   - Real-time Supabase Realtime channel subscriptions for live metrics     */
@@ -129,10 +129,10 @@ export function endPageViewTimer(shopId: string): number {
 /** Simple session ID (persisted in sessionStorage for the tab lifetime). */
 function getSessionId(): string {
   if (typeof window === "undefined") return "server";
-  let sid = sessionStorage.getItem("trendmart_session_id");
+  let sid = sessionStorage.getItem("trendsmart_session_id");
   if (!sid) {
     sid = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    sessionStorage.setItem("trendmart_session_id", sid);
+    sessionStorage.setItem("trendsmart_session_id", sid);
   }
   return sid;
 }
@@ -140,7 +140,7 @@ function getSessionId(): string {
 // ─── Event Logging (Public — Fire-and-Forget) ─────────────────────────────────
 
 const SHOP_VIEW_DEDUPE_MS = 45 * 60 * 1000; // 45 minutes per visitor per shop
-const SHOP_VIEW_STORAGE_PREFIX = "trendmart_shop_view_at_";
+const SHOP_VIEW_STORAGE_PREFIX = "trendsmart_shop_view_at_";
 
 function recentlyLoggedShopView(shopId: string): boolean {
   if (typeof window === "undefined") return false;

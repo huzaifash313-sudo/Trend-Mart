@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Sanitization Utility Tests (Prompt 3)                          */
+/*  TrendsMart — Sanitization Utility Tests (Prompt 3)                          */
 /*  Tests XSS prevention, SQL injection guards, CSV injection, path traversal */
 /* -------------------------------------------------------------------------- */
 

@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  TrendMart — Dynamic Sitemap Generator (Enhanced SEO)                       */
+/*  TrendsMart — Dynamic Sitemap Generator (Enhanced SEO)                       */
 /*                                                                             */
 /*  Automatically indexes:                                                     */
 /*   - All live shop storefront pages with high priority                       */
@@ -21,7 +21,7 @@ export const revalidate = 3600; // 1 hour — Next.js ISR revalidation
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trend-marts.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
 
 function createSupabase() {
   return createClient(

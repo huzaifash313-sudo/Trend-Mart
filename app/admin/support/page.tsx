@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Admin Support Ticket Inbox                                    */
+/*  TrendsMart — Admin Support Ticket Inbox                                    */
 /*  Lets Super-Admins review and resolve platform-wide support tickets        */
 /*  submitted via the public /support desk. Gated by middleware (/admin/*).   */
 /* -------------------------------------------------------------------------- */

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Sub-Categories API Endpoint                                    */
+/*  TrendsMart — Sub-Categories API Endpoint                                    */
 /*  GET /api/sub-categories?category=<main_category>                           */
 /*                                                                             */
 /*  PROMPT 5: Enhanced with secure caching layer, response sanitization,       */

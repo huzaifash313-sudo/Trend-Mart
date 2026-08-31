@@ -1,4 +1,4 @@
-🛒 TrendMart — Master Feature & Requirements Documentation
+🛒 TrendsMart — Master Feature & Requirements Documentation
 Platform Type: Hyper-Local Multi-Vendor Marketplace & WhatsApp Ordering System
 Target Goal: Production-Ready E-Commerce Ecosystem
 1. Core Access & User Roles Architecture
@@ -61,11 +61,11 @@ o	Monetization: Iska maqsad platform ke liye monthly subscription ya paid ad pla
 •	PWA (Progressive Web App) & Offline Support:
 o	Kese Kaam Karega: App ko PWA standard par build kiya jayega taake users aur merchants isko apne mobile par bina Play Store ke "Add to Home Screen" karke ek native app ki tarah smooth chala sakein, sath hi chote-mote network drops par basic functionality offline bhi maintain rahe.
 8. Communications, Branding & Legal Compliance
-•	Branded Email Infrastructure: Replacing default Supabase system emails with custom domain SMTP (e.g., via Resend or SendGrid) so all transactional emails (OTP, order confirmations, notifications) originate from official TrendMart domain addresses.
+•	Branded Email Infrastructure: Replacing default Supabase system emails with custom domain SMTP (e.g., via Resend or SendGrid) so all transactional emails (OTP, order confirmations, notifications) originate from official TrendsMart domain addresses.
 •	Mandatory Terms & Conditions / Policies Acceptance on Registration:
 o	Kese Kaam Karega: Jab bhi koi naya customer ya merchant sign up karega, toh registration form ke andar "Terms & Conditions", "Privacy Policy", aur "Merchant Security Guidelines" ke check-boxes mandatory honge (jab tak user agree nahi karega, account create nahi hoga), jisse legal protection poori tarah secure rahegi.
 •	Support, Legal Policies & Guidance Systems:
-o	Direct Support Desk: Built-in contact and support system enabling customers and merchants to raise inquiries or directly connect with the TrendMart platform team.
+o	Direct Support Desk: Built-in contact and support system enabling customers and merchants to raise inquiries or directly connect with the TrendsMart platform team.
 o	FAQ & New Business Owner Guide: Dedicated sections and interactive help systems to educate and guide new merchants on setting up digital stores.
 o	Legal & Security Policies: Dedicated pages for Terms & Conditions, Privacy Policy, Merchant Security Guidelines, and Refund/Order policies.
 9. UI Theme Engine & Customization

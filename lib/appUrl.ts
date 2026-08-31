@@ -3,7 +3,7 @@
  * Ensures verification emails never silently fall back to a stale Supabase
  * Site URL of `http://localhost:3000` when the app is running in production.
  */
-const PRODUCTION_FALLBACK = "https://trend-marts.vercel.app";
+const PRODUCTION_FALLBACK = "https://trendsmart.pk";
 
 function normalizeOrigin(raw: string): string | null {
   const trimmed = raw.trim();

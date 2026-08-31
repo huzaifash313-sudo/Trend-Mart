@@ -252,7 +252,7 @@ async function searchNominatim(
         signal,
         headers: {
           Accept: "application/json",
-          "User-Agent": "TrendMart/1.0 (https://trend-marts.vercel.app)",
+          "User-Agent": "TrendsMart/1.0 (https://trendsmart.pk)",
         },
       },
     );

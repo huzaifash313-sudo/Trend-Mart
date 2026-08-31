@@ -142,7 +142,7 @@ export default function DashboardNavbar() {
       <div className="mx-auto flex h-12 max-w-6xl items-center gap-3 px-4">
         {/* Logo */}
         <Link href="/" className="shrink-0 text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-          TrendMart
+          TrendsMart
         </Link>
 
         {/* Dashboard label */}
@@ -159,7 +159,7 @@ export default function DashboardNavbar() {
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-3 sm:text-sm"
-            aria-label="View my store on TrendMart"
+            aria-label="View my store on TrendsMart"
           >
             <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />

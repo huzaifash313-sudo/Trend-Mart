@@ -62,7 +62,7 @@ export default function NewProductPage() {
         if (myShops.length > 0) {
           const saved =
             typeof window !== "undefined"
-              ? localStorage.getItem(scopedKey("trendmart_active_shop"))
+              ? localStorage.getItem(scopedKey("trendsmart_active_shop"))
               : null;
           const match = saved ? myShops.find((s) => s.id === saved) : null;
           setActiveShopId(match?.id ?? myShops[0].id);
@@ -110,7 +110,7 @@ export default function NewProductPage() {
               onChange={(val) => {
                 setActiveShopId(val);
                 if (val) {
-                  localStorage.setItem(scopedKey("trendmart_active_shop"), val);
+                  localStorage.setItem(scopedKey("trendsmart_active_shop"), val);
                 }
               }}
               options={shops.map((s) => ({ value: s.id, label: s.name }))}

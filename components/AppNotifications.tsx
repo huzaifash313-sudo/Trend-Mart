@@ -125,7 +125,7 @@ function AutoSubscribeWebPush() {
 
       // SECURITY/UX: only auto-subscribe when permission is ALREADY granted.
       // Never call requestPermission() outside a user gesture — the browser
-      // silently suppresses it and the "trendmart_push_subscribed" flag alone
+      // silently suppresses it and the "trendsmart_push_subscribed" flag alone
       // must not trigger a prompt.
       if (permission === "granted") {
         await subscribeToPushNotifications();

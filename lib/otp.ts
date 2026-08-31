@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Email OTP core (server-only, pure + Node crypto)               */
+/*  TrendsMart — Email OTP core (server-only, pure + Node crypto)               */
 /*                                                                             */
 /*  Generates and verifies the custom 6-digit email verification codes that    */
 /*  replace Supabase's default magic-link confirmation email. Codes are never  */
@@ -41,7 +41,7 @@ export function isValidOtpFormat(code: string): boolean {
  */
 export function hashOtp(code: string, email: string, secret: string): string {
   const normalizedEmail = email.trim().toLowerCase();
-  return createHmac("sha256", secret || "trendmart-otp-fallback-secret")
+  return createHmac("sha256", secret || "trendsmart-otp-fallback-secret")
     .update(`${normalizedEmail}:${code}`)
     .digest("hex");
 }
@@ -108,7 +108,7 @@ export function resendCooldownRemainingMs(
 export function otpEmailBody(code: string): string {
   const spaced = code.split("").join("&nbsp;&nbsp;");
   return `
-    <p>Welcome to TrendMart! Use the verification code below to finish creating your account:</p>
+    <p>Welcome to TrendsMart! Use the verification code below to finish creating your account:</p>
     <div style="margin:24px 0;text-align:center;">
       <span style="display:inline-block;padding:16px 28px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;font-size:30px;font-weight:700;letter-spacing:6px;color:#047857;font-family:'Courier New',monospace;">
         ${spaced}

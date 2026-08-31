@@ -1,5 +1,5 @@
 -- ============================================================================
--- TrendMart: Geo-Radius, Analytics Extensions & Chat Logs Migration
+-- TrendsMart: Geo-Radius, Analytics Extensions & Chat Logs Migration
 -- Prompt 2: Geo-Radius Store Filtering
 -- Prompt 3: AI Chat Widget (chat logs table)
 -- Prompt 4: Advanced Analytics (sales_events, daily snapshots)

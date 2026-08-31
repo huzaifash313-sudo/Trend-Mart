@@ -74,8 +74,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       addToast(message, variant, duration ?? 8000);
     };
 
-    window.addEventListener("trendmart:toast", handler);
-    return () => window.removeEventListener("trendmart:toast", handler);
+    window.addEventListener("trendsmart:toast", handler);
+    return () => window.removeEventListener("trendsmart:toast", handler);
   }, [addToast]);
 
   return (

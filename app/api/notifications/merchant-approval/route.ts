@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Merchant Verification/Suspension Email Notification            */
+/*  TrendsMart — Merchant Verification/Suspension Email Notification            */
 /*  POST /api/notifications/merchant-approval                                 */
 /*                                                                             */
 /*  Fired (fire-and-forget) from the Super-Admin dashboard when a merchant's   */
@@ -45,21 +45,21 @@ export async function POST(request: Request) {
     const result = verified
       ? await sendEmail({
           to: email,
-          subject: `${shopName} is now live on TrendMart 🎉`,
+          subject: `${shopName} is now live on TrendsMart 🎉`,
           html: emailShell(
             "Your store is live!",
             `<p>Great news — <strong>${shopName}</strong> has been verified and is now visible to
-             customers on TrendMart.</p>
+             customers on TrendsMart.</p>
              <p>Head to your dashboard to add products, set your delivery radius, and start
              receiving orders.</p>`,
           ),
         })
       : await sendEmail({
           to: email,
-          subject: `${shopName} has been suspended on TrendMart`,
+          subject: `${shopName} has been suspended on TrendsMart`,
           html: emailShell(
             "Your store has been suspended",
-            `<p><strong>${shopName}</strong> is currently hidden from customers on TrendMart.</p>
+            `<p><strong>${shopName}</strong> is currently hidden from customers on TrendsMart.</p>
              <p>If you believe this is a mistake, please contact our support team and we'll help
              resolve it as quickly as possible.</p>`,
           ),

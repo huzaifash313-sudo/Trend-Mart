@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Dine-In Order Tracking (/orders/[id]?table=<token>)            */
+/*  TrendsMart — Dine-In Order Tracking (/orders/[id]?table=<token>)            */
 /*                                                                             */
 /*  Standalone live-status page for a QR table order. The table token must be  */
 /*  present in the URL — it is the proof the viewer belongs to that table.     */
@@ -30,7 +30,7 @@ export default function DineInOrderTrackingPage({ params }: { params: Promise<{ 
           </p>
           <div className="mt-4">
             <Link href="/" className="text-xs font-semibold text-emerald-600 underline">
-              Go to TrendMart home
+              Go to TrendsMart home
             </Link>
           </div>
         </div>
@@ -44,7 +44,7 @@ export default function DineInOrderTrackingPage({ params }: { params: Promise<{ 
         <DineInOrderTracker orderId={id} tableToken={tableToken} />
         <div className="text-center">
           <Link href="/" className="text-xs font-semibold text-emerald-600 underline">
-            Browse other shops on TrendMart
+            Browse other shops on TrendsMart
           </Link>
         </div>
       </div>

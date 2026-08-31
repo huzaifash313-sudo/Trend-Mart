@@ -1,4 +1,4 @@
--- TrendMart: product short codes for direct, compact product deep links.
+-- TrendsMart: product short codes for direct, compact product deep links.
 -- Each product gets an 8-char URL-safe code used in WhatsApp order messages:
 --   https://<origin>/p/<short_code>
 -- instead of the long `shop/{slug}#product-{uuid}` store link.

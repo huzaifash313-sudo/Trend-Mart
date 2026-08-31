@@ -648,7 +648,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
               className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-emerald-600 focus:ring-1 focus:ring-emerald-500 dark:border-zinc-600"
             />
             <span className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-              I agree to TrendMart&apos;s{" "}
+              I agree to TrendsMart&apos;s{" "}
               <Link href="/legal/terms" target="_blank" className="font-medium text-emerald-600 underline underline-offset-2 hover:text-emerald-700 dark:text-emerald-400">
                 Terms &amp; Conditions
               </Link>{" "}

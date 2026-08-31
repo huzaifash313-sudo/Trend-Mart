@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Production Telemetry & Performance Monitoring (Prompt 5)        */
+/*  TrendsMart — Production Telemetry & Performance Monitoring (Prompt 5)        */
 /*                                                                             */
 /*  Comprehensive telemetry pipeline integrating:                               */
 /*   - Structured error logging with Sentry/Vercel Analytics fallback          */

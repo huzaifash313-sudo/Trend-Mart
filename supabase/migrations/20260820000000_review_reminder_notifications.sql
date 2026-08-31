@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Delivered Order → Review Reminder (in-app bell notification)
+-- TrendsMart — Delivered Order → Review Reminder (in-app bell notification)
 -- =============================================================================
 -- When a merchant marks an order "Delivered", the buyer gets a dedicated
 -- in-app notification inviting them to rate the shop. The review popup opens

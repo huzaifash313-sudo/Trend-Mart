@@ -1,14 +1,14 @@
 import type { MetadataRoute } from "next";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — PWA Web App Manifest                                          */
+/*  TrendsMart — PWA Web App Manifest                                          */
 /*  Square teal-plate icons (mark contain, no stretch) for home-screen.       */
 /* -------------------------------------------------------------------------- */
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "TrendMart — Local Shopping, Instant WhatsApp Orders",
-    short_name: "TrendMart",
+    name: "TrendsMart — Local Shopping, Instant WhatsApp Orders",
+    short_name: "TrendsMart",
     description:
       "Discover live local shops, browse products, and place orders directly via WhatsApp.",
     start_url: "/",

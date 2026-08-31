@@ -29,7 +29,7 @@ type OnboardingVariant = "guest" | "customer" | "merchant";
 const GUEST_STEPS: OnboardingStep[] = [
   {
     icon: "🛒",
-    title: "Welcome to TrendMart",
+    title: "Welcome to TrendsMart",
     subtitle:
       "Your neighbourhood marketplace — browse local shops, compare deals, and order straight on WhatsApp with fast delivery.",
   },
@@ -339,7 +339,7 @@ export default function OnboardingWizard() {
       className="tm-onboarding-layer fixed inset-0 z-[9000] flex flex-col overflow-hidden"
       role="dialog"
       aria-modal="true"
-      aria-label="Welcome to TrendMart"
+      aria-label="Welcome to TrendsMart"
     >
       {/* Full-screen brand backdrop */}
       <div
@@ -358,14 +358,14 @@ export default function OnboardingWizard() {
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendmart-mark.png?v=10"
+              src="/trendsmart-mark.png?v=10"
               alt=""
               width={36}
               height={36}
               className="rounded-xl bg-white/95 object-contain p-1 shadow-lg shadow-black/20"
             />
             <span className="text-lg font-bold tracking-tight text-white">
-              TrendMart
+              TrendsMart
             </span>
           </div>
           {/* Progress */}

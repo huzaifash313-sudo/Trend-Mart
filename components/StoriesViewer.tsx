@@ -233,7 +233,7 @@ export default function StoriesViewer({
       setProgress(0);
       setStories(remaining);
       setCurrentIndex(nextIndex);
-      window.dispatchEvent(new Event("trendmart:stories-updated"));
+      window.dispatchEvent(new Event("trendsmart:stories-updated"));
       addToast("Story deleted.", "success");
     } else {
       addToast(result.error, "error");
@@ -376,7 +376,7 @@ export default function StoriesViewer({
   }
 
   const current = stories[currentIndex];
-  const shopLabel = current?.shop_name?.trim() || "TrendMart Store";
+  const shopLabel = current?.shop_name?.trim() || "TrendsMart Store";
   const initial = shopLabel.charAt(0).toUpperCase();
 
   return (

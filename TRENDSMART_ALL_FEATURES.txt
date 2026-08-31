@@ -1,10 +1,10 @@
 ================================================================================
-  TRENDMART — COMPLETE PROJECT FEATURES DOCUMENT
+  TRENDSMART — COMPLETE PROJECT FEATURES DOCUMENT
   Hyper-Local Multi-Vendor Marketplace & WhatsApp Ordering System
 ================================================================================
   File type     : Project features inventory (.txt)
-  Generated for : TrendMart codebase (as implemented in the app)
-  Live site     : https://trend-marts.vercel.app
+  Generated for : TrendsMart codebase (as implemented in the app)
+  Live site     : https://trendsmart.pk
   Stack         : Next.js 16 · React 19 · TypeScript · Supabase · Tailwind CSS 4
 ================================================================================
 
@@ -13,7 +13,7 @@
 1. PLATFORM OVERVIEW
 --------------------------------------------------------------------------------
 
-TrendMart ek hyper-local multi-vendor marketplace hai jahan:
+TrendsMart ek hyper-local multi-vendor marketplace hai jahan:
   • Customers nearby shops browse karte hain aur WhatsApp par order bhejte hain.
   • Merchants apni dukaan, products, delivery area, aur orders manage karte hain.
   • Super-Admin platform ko approve/moderate/analytics se control karta hai.
@@ -461,8 +461,8 @@ Yeh cheezen code mein hain lekin poori production polish / external config chahi
 Production ke liye zaruri env (examples):
   NEXT_PUBLIC_SUPABASE_URL
   NEXT_PUBLIC_SUPABASE_ANON_KEY
-  NEXT_PUBLIC_SITE_URL=https://trend-marts.vercel.app
-  NEXT_PUBLIC_APP_URL=https://trend-marts.vercel.app
+  NEXT_PUBLIC_SITE_URL=https://trendsmart.pk
+  NEXT_PUBLIC_APP_URL=https://trendsmart.pk
   (optional) RESEND_API_KEY, UPSTASH_REDIS_*, SENTRY_*
 
 
@@ -498,6 +498,6 @@ Production ke liye zaruri env (examples):
 
 
 ================================================================================
-  END OF DOCUMENT — TrendMart Features Inventory
-  Is file ko project root par rakha gaya hai: TRENDMART_ALL_FEATURES.txt
+  END OF DOCUMENT — TrendsMart Features Inventory
+  Is file ko project root par rakha gaya hai: TRENDSMART_ALL_FEATURES.txt
 ================================================================================

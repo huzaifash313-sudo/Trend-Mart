@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Kitchen Board (/dashboard/kitchen)                             */
+/*  TrendsMart — Kitchen Board (/dashboard/kitchen)                             */
 /*                                                                             */
 /*  Merchant side of dine-in ordering: every QR-table order lands here in      */
 /*  real time, grouped by table. One tap Accept → Preparing → Ready → Served.  */

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Real-Time Customer Order Status Tracking Service               */
+/*  TrendsMart — Real-Time Customer Order Status Tracking Service               */
 /*                                                                             */
 /*  Allows customers to query orders by phone number or order reference ID.    */
 /*  Returns color-coded status with full lifecycle timelines.                  */

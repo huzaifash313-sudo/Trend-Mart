@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — High-Performance Image Optimization & CDN Compression Pipeline */
+/*  TrendsMart — High-Performance Image Optimization & CDN Compression Pipeline */
 /*  Client-side compression, WebP conversion, thumbnail generation,            */
 /*  file-size validation, and Supabase Storage bucket upload.                  */
 /* -------------------------------------------------------------------------- */
@@ -314,7 +314,7 @@ export function quickValidate(file: File | null): string | null {
  * Validate a bucket name against the allowed storage bucket list.
  * Prevents bucket enumeration / bucket-swapping attacks.
  */
-const ALLOWED_BUCKETS = ["images", "trendmart-media", "shop-assets"] as const;
+const ALLOWED_BUCKETS = ["images", "trendsmart-media", "shop-assets"] as const;
 
 export function validateBucket(bucket: string): string {
   const safe = sanitizePathSegment(bucket, 30);

@@ -110,6 +110,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.themealdb.com",
       },
+      // Demo seed product photos (StockSnap CDN).
+      {
+        protocol: "https",
+        hostname: "cdn.stocksnap.io",
+      },
     ],
     // Aggressive caching for optimized images
     formats: ["image/avif", "image/webp"],
@@ -461,7 +466,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "2mb",
       allowedOrigins: isProd
-        ? ["trend-marts.vercel.app", "trendmart.com"]
+        ? ["trendsmart.pk", "www.trendsmart.pk", "trend-marts.vercel.app"]
         : ["localhost:3000"],
     },
   },

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Branded Transactional Email (Resend)                          */
+/*  TrendsMart — Branded Transactional Email (Resend)                          */
 /*                                                                             */
 /*  SERVER-ONLY. Never import this from a "use client" component — it reads   */
 /*  the RESEND_API_KEY secret and must only run inside API routes / server    */
@@ -7,7 +7,7 @@
 /*                                                                             */
 /*  Setup:                                                                    */
 /*   1. Create a Resend account (https://resend.com) and verify your sending  */
-/*      domain (e.g. trendmart.pk).                                          */
+/*      domain (e.g. trendsmart.pk).                                          */
 /*   2. Set RESEND_API_KEY and EMAIL_FROM in your environment variables.      */
 /*   3. Until RESEND_API_KEY is configured, all sends are safely no-op'd and  */
 /*      logged — the rest of the app continues to function normally.         */
@@ -49,11 +49,11 @@ function isConfigured(): boolean {
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const client = getResendClient();
-  const fromAddress = process.env.EMAIL_FROM || "TrendMart <notifications@trendmart.pk>";
+  const fromAddress = process.env.EMAIL_FROM || "TrendsMart <notifications@trendsmart.pk>";
 
   if (!client) {
     console.warn(
-      "[TrendMart Email] RESEND_API_KEY is not configured — skipping email send. " +
+      "[TrendsMart Email] RESEND_API_KEY is not configured — skipping email send. " +
         `Would have sent "${input.subject}" to ${Array.isArray(input.to) ? input.to.join(", ") : input.to}.`,
     );
     return { success: false, error: "Email is not configured on this deployment." };
@@ -91,7 +91,7 @@ export function emailShell(title: string, bodyHtml: string): string {
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="background-color:#059669;padding:24px 32px;">
-                <span style="color:#ffffff;font-size:20px;font-weight:700;">TrendMart</span>
+                <span style="color:#ffffff;font-size:20px;font-weight:700;">TrendsMart</span>
               </td>
             </tr>
             <tr>
@@ -103,7 +103,7 @@ export function emailShell(title: string, bodyHtml: string): string {
             <tr>
               <td style="padding:20px 32px;background-color:#fafafa;border-top:1px solid #f4f4f5;">
                 <p style="margin:0;font-size:11px;color:#a1a1aa;">
-                  &copy; ${new Date().getFullYear()} TrendMart. Your neighborhood, delivered.
+                  &copy; ${new Date().getFullYear()} TrendsMart. Your neighborhood, delivered.
                 </p>
               </td>
             </tr>

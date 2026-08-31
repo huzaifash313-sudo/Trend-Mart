@@ -322,7 +322,7 @@ export default function CustomerAccountPage() {
         {/* Become merchant — proper store registration (not instant role flip) */}
         <section className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
           <h2 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
-            Want to sell on TrendMart?
+            Want to sell on TrendsMart?
           </h2>
           <p className="mt-1 text-xs text-emerald-800/80 dark:text-emerald-300/80">
             Register your store with name, category, and WhatsApp — then open the merchant dashboard.

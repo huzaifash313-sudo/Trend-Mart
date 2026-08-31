@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode } from
 import ShopReviewsModal from "@/components/ShopReviewsModal";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shop Reviews Modal Provider                                    */
+/*  TrendsMart — Shop Reviews Modal Provider                                    */
 /*  Global host so any component (shop cards, shop header, product pages…)      */
 /*  can open the reviews popup with a single call.                             */
 /* -------------------------------------------------------------------------- */

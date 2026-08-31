@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Orders / Lead Tracking Table (Enhanced — Prompt 62)
+-- TrendsMart — Orders / Lead Tracking Table (Enhanced — Prompt 62)
 -- =============================================================================
 
 DROP POLICY IF EXISTS "orders_public_insert" ON public.orders;

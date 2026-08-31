@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Homepage server-side data                                      */
+/*  TrendsMart — Homepage server-side data                                      */
 /*                                                                             */
 /*  Server Component support for the storefront: fetches the core homepage     */
 /*  datasets (public shops + active stories) on the server so the first paint  */

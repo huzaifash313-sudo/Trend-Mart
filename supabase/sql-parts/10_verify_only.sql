@@ -1,4 +1,4 @@
-﻿-- TrendMart SQL part file — run in order in Supabase SQL Editor
+﻿-- TrendsMart SQL part file — run in order in Supabase SQL Editor
 -- If 'Failed to fetch (api.supabase.com)' appears: wait 10s, re-run THIS part only, or try another browser / disable VPN.
 
 -- #############################################################################
@@ -41,7 +41,7 @@ BEGIN
       'promotional_ads','user_profiles'
     );
 
-  RAISE NOTICE '✅ TrendMart database setup complete! % / 30 expected tables exist.', table_count;
+  RAISE NOTICE '✅ TrendsMart database setup complete! % / 30 expected tables exist.', table_count;
 
   IF missing_rls IS NOT NULL THEN
     RAISE WARNING '⚠️ The following tables have RLS DISABLED: %', missing_rls;

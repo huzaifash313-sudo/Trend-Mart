@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@/types";
@@ -68,6 +69,11 @@ import { type StoreManageAction } from "@/components/StoreManageActions";
 import KebabMenu, { type KebabMenuItem } from "@/components/KebabMenu";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { deleteCoupon } from "@/services/couponService";
+
+const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
+  ssr: false,
+  loading: () => null,
+});
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -311,8 +317,8 @@ function ShopDetailInner({ id }: { id: string }) {
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
     };
-    window.addEventListener("trendmart:products-updated", refresh);
-    return () => window.removeEventListener("trendmart:products-updated", refresh);
+    window.addEventListener("trendsmart:products-updated", refresh);
+    return () => window.removeEventListener("trendsmart:products-updated", refresh);
   }, [id, queryClient]);
 
   const promoBannerSegments = useMemo(() => {
@@ -441,10 +447,10 @@ function ShopDetailInner({ id }: { id: string }) {
     };
     load();
     const onDealsUpdated = () => load();
-    window.addEventListener("trendmart:deals-updated", onDealsUpdated);
+    window.addEventListener("trendsmart:deals-updated", onDealsUpdated);
     return () => {
       cancelled = true;
-      window.removeEventListener("trendmart:deals-updated", onDealsUpdated);
+      window.removeEventListener("trendsmart:deals-updated", onDealsUpdated);
     };
   }, [isOwner, resolvedShopId]);
 
@@ -740,7 +746,7 @@ function ShopDetailInner({ id }: { id: string }) {
         addToast("Deal deleted.", "success");
         queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
         queryClient.invalidateQueries({ queryKey: ["deals"] });
-        window.dispatchEvent(new Event("trendmart:deals-updated"));
+        window.dispatchEvent(new Event("trendsmart:deals-updated"));
       } else {
         addToast(res.error, "error");
       }
@@ -770,7 +776,7 @@ function ShopDetailInner({ id }: { id: string }) {
         addToast(nextPinned ? "Deal pinned to top." : "Deal unpinned.", "success");
         queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
         queryClient.invalidateQueries({ queryKey: ["deals"] });
-        window.dispatchEvent(new Event("trendmart:deals-updated"));
+        window.dispatchEvent(new Event("trendsmart:deals-updated"));
       } else {
         setOwnerDeals((prev) =>
           prev.map((d) =>
@@ -817,7 +823,7 @@ function ShopDetailInner({ id }: { id: string }) {
       if (res.success) {
         setProducts((prev) => prev.filter((p) => p.id !== product.id));
         addToast("Product deleted.", "success");
-        window.dispatchEvent(new Event("trendmart:products-updated"));
+        window.dispatchEvent(new Event("trendsmart:products-updated"));
       } else {
         addToast(res.error ?? "Failed to delete product.", "error");
       }
@@ -846,7 +852,7 @@ function ShopDetailInner({ id }: { id: string }) {
       }
       addToast(open ? "Store is now open." : "Store is now closed.", "success");
       queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
-      window.dispatchEvent(new Event("trendmart:shops-updated"));
+      window.dispatchEvent(new Event("trendsmart:shops-updated"));
     },
     [shop, supabase, addToast, queryClient, id],
   );
@@ -877,7 +883,7 @@ function ShopDetailInner({ id }: { id: string }) {
         setCoupons((prev) => prev.filter((c) => c.id !== couponId));
         addToast("Coupon deleted.", "success");
         queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
-        window.dispatchEvent(new Event("trendmart:coupons-updated"));
+        window.dispatchEvent(new Event("trendsmart:coupons-updated"));
       } else {
         addToast(res.error, "error");
       }
@@ -1333,6 +1339,12 @@ function ShopDetailInner({ id }: { id: string }) {
         {/* Catalog — retail always; service shops also when they have products */}
         {showProductCatalog && (
           <section className="space-y-3">
+            <PromoAdsCarousel
+              placement="store_top"
+              shopId={shop.id}
+              showViewAll={false}
+              className="mb-1"
+            />
             <SubCategoryPills
               mainCategory={shop.category}
               selectedId={activeSubCategoryId}

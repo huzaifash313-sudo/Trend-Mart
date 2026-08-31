@@ -92,7 +92,7 @@ function BrandMark({ size = 34 }: { size?: number }) {
     <span className="tm-navbar-logo" aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/trendmart-mark.png?v=10"
+        src="/trendsmart-mark.png?v=10"
         alt=""
         width={size}
         height={size}
@@ -139,10 +139,10 @@ export default function Navbar() {
             <HamburgerIcon />
           </button>
 
-          <Link href="/" className="tm-navbar-brand" aria-label="TrendMart home">
+          <Link href="/" className="tm-navbar-brand" aria-label="TrendsMart home">
             <BrandMark />
             <span className="tm-navbar-wordmark">
-              {"TrendMart".split("").map((ch, i) => (
+              {"TrendsMart".split("").map((ch, i) => (
                 <span
                   key={i}
                   className="tm-navbar-wordmark-letter"

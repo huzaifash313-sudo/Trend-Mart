@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Customer Lead Generation Service                               */
+/*  TrendsMart — Customer Lead Generation Service                               */
 /*  Captures WhatsApp inquiry/booking clicks and manages follow-up logging.    */
 /* -------------------------------------------------------------------------- */
 

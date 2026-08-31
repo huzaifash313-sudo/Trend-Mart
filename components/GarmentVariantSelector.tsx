@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Boutique Garment Color & Size Variant Matrix                    */
+/*  TrendsMart — Boutique Garment Color & Size Variant Matrix                    */
 /*                                                                             */
 /*  A specialized product variation management component for boutique/ apparel */
 /*  merchants and customers alike:                                             */

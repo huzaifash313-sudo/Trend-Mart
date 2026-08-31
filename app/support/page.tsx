@@ -10,9 +10,9 @@ import type { SupportTicketCategory, SupportTicketFormData } from "@/types";
 import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Platform Support Desk                                        */
+/*  TrendsMart — Platform Support Desk                                        */
 /*  Public contact/ticket form for customers & merchants to reach the        */
-/*  TrendMart team directly (distinct from per-shop WhatsApp inquiries).      */
+/*  TrendsMart team directly (distinct from per-shop WhatsApp inquiries).      */
 /* -------------------------------------------------------------------------- */
 
 const CATEGORY_OPTIONS: { value: SupportTicketCategory; label: string }[] = [
@@ -77,7 +77,7 @@ export default function SupportPage() {
                 How it works
               </p>
               <p className="mt-2 text-sm text-zinc-800 dark:text-zinc-200">
-                Submit the form — your ticket reaches the TrendMart team and Admin Support Inbox.
+                Submit the form — your ticket reaches the TrendsMart team and Admin Support Inbox.
                 We keep staff contacts private (no public email or phone on this page).
               </p>
             </div>

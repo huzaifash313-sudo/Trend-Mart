@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Discount Coupons & Promo Codes Table
+-- TrendsMart — Discount Coupons & Promo Codes Table
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.coupons (

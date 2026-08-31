@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Coupon / Promo Code Service                                    */
+/*  TrendsMart — Coupon / Promo Code Service                                    */
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";

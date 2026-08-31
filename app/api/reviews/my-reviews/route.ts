@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — My Reviews (GET /api/reviews/my-reviews)                       */
+/*  TrendsMart — My Reviews (GET /api/reviews/my-reviews)                       */
 /*                                                                            */
 /*  Powers the "Give Your Review" entry on the customer account portal.       */
 /*  Returns (for the signed-in customer):                                     */

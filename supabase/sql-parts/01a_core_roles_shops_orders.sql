@@ -1,4 +1,4 @@
-﻿-- TrendMart: 01a_core_roles_shops_orders.sql
+﻿-- TrendsMart: 01a_core_roles_shops_orders.sql
 -- Run in Supabase SQL Editor. If Failed to fetch: refresh, wait, retry this file only.
 
 BEGIN;

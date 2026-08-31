@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
 
 export const metadata: Metadata = {
-  title: "Refund & Order Policy — TrendMart",
-  description: "TrendMart's refund, cancellation, and order dispute policy.",
+  title: "Refund & Order Policy — TrendsMart",
+  description: "TrendsMart's refund, cancellation, and order dispute policy.",
   robots: { index: true, follow: true },
 };
 
@@ -23,7 +23,7 @@ export default function RefundPolicyPage() {
         <p>
           Because payment is arranged directly between the customer and the merchant (e.g., cash on
           delivery or bank transfer), refunds are processed by the merchant according to their own
-          store policy. TrendMart facilitates dispute resolution but does not hold customer funds
+          store policy. TrendsMart facilitates dispute resolution but does not hold customer funds
           and cannot directly issue refunds on a merchant&apos;s behalf.
         </p>
       </LegalSection>
@@ -33,7 +33,7 @@ export default function RefundPolicyPage() {
           items={[
             "Inspect your order upon delivery whenever possible.",
             "Contact the merchant within 24 hours of delivery for damaged, incorrect, or missing items, including photos where relevant.",
-            "If the merchant is unresponsive after 48 hours, escalate the issue to TrendMart Support with your order details.",
+            "If the merchant is unresponsive after 48 hours, escalate the issue to TrendsMart Support with your order details.",
           ]}
         />
       </LegalSection>

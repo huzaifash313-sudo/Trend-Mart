@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Dynamic Category-Based Store Themes & Layouts                  */
+/*  TrendsMart — Dynamic Category-Based Store Themes & Layouts                  */
 /*                                                                             */
 /*  Each shop category receives a distinct visual identity:                    */
 /*   - Garments/Boutique: elegant image galleries, variant showcases          */

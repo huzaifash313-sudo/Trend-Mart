@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — RLS Policy Audit & Reinforcement
+-- TrendsMart — RLS Policy Audit & Reinforcement
 -- Run in Supabase SQL Editor to verify/enforce correct RLS policies.
 -- =============================================================================
 

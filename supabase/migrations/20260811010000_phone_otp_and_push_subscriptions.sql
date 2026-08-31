@@ -40,3 +40,5 @@ CREATE POLICY "push_subscriptions_delete_own"
   ON public.push_subscriptions FOR DELETE
   TO authenticated
   USING (auth.uid() = user_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.push_subscriptions TO authenticated;

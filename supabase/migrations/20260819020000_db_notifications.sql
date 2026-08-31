@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Persistent In-App Notification System (DB-backed bell)
+-- TrendsMart — Persistent In-App Notification System (DB-backed bell)
 -- =============================================================================
 -- Replaces the fragile localStorage-only client notifications with a durable
 -- `notifications` table. Server-side triggers create rows for:

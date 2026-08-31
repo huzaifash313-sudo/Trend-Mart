@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Merchant dashboard nav polish                                  */
+/*  TrendsMart — Merchant dashboard nav polish                                  */
 /*                                                                             */
 /*  Prefetches the common dashboard routes so taps feel instant, and paints a  */
 /*  thin teal progress bar while the App Router is still swapping pages.       */

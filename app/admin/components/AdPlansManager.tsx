@@ -12,7 +12,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import type { AdPlan, AdPlanFormData, PromoAdPlacement } from "@/types";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Ad Pricing Plans Manager (Super-Admin Ads tab)                 */
+/*  TrendsMart — Ad Pricing Plans Manager (Super-Admin Ads tab)                 */
 /*  Admin can add/edit plan pricing, toggle availability, and delete plans.    */
 /*  These plans power the pricing picker merchants see when requesting ads.    */
 /* -------------------------------------------------------------------------- */
@@ -171,6 +171,7 @@ export default function AdPlansManager() {
                 className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
               >
                 <option value="homepage_top">Home page</option>
+                <option value="store_top">Store page</option>
                 <option value="deals_top">Deals page</option>
                 <option value="products_top">Products page</option>
                 <option value="homepage_feed">Home feed</option>

@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Custom Select Dropdown                                         */
+/*  TrendsMart — Custom Select Dropdown                                         */
 /*                                                                            */
 /*  A fully custom, accessible dropdown that replaces the native <select>.    */
 /*  Drop-in friendly: accepts `options`, `value`, and `onChange` (string      */

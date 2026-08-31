@@ -1,4 +1,4 @@
--- TrendMart: persist SEO-friendly shop slugs for share / QR / deep links
+-- TrendsMart: persist SEO-friendly shop slugs for share / QR / deep links
 -- Safe to re-run.
 
 ALTER TABLE public.shops

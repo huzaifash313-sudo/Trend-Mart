@@ -15,7 +15,7 @@ import { formatRelativeTime } from "@/lib/formatters";
 import { paginateReviews, REVIEW_PAGE_SIZE } from "@/lib/reviewRules";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shop Reviews Modal                                             */
+/*  TrendsMart — Shop Reviews Modal                                             */
 /*  Global popup opened from shop cards: summary + distribution + all reviews  */
 /*  (scrollable) + write-a-review form for customers with a delivered order.   */
 /* -------------------------------------------------------------------------- */

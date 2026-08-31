@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Inventory Variant Matrix & Stock Alert System (Prompt 2)       */
+/*  TrendsMart — Inventory Variant Matrix & Stock Alert System (Prompt 2)       */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Multi-attribute variant management (size, color, material, etc.)        */

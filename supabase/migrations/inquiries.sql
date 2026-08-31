@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Customer Inquiry / Chat History Table
+-- TrendsMart — Customer Inquiry / Chat History Table
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.customer_inquiries (

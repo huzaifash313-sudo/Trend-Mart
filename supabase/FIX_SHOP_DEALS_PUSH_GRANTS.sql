@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Fix shop_deals + push_subscriptions REST permissions
+-- TrendsMart — Fix shop_deals + push_subscriptions REST permissions
 -- =============================================================================
 -- Symptoms:
 --   • GET /rest/v1/shop_deals?select=*&is_active=eq.true → 404 (Not Found)

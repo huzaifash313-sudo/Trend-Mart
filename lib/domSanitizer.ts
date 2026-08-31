@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Client-Side DOM Sanitization Pipeline (DOMPurify)               */
+/*  TrendsMart — Client-Side DOM Sanitization Pipeline (DOMPurify)               */
 /*  PROMPT 3: Comprehensive client-side sanitization and output-encoding        */
 /*           pipeline across all user-generated content injection vectors.      */
 /* -------------------------------------------------------------------------- */
@@ -11,7 +11,7 @@ import DOMPurify from "dompurify";
 type Purifier = ReturnType<typeof DOMPurify>;
 
 /**
- * Default DOMPurify configuration for TrendMart.
+ * Default DOMPurify configuration for TrendsMart.
  * Intentionally restrictive: no scripts, iframes, objects, embeds,
  * forms, inputs, links, styles, or event handlers.
  */

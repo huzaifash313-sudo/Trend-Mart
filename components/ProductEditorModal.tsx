@@ -159,7 +159,7 @@ export default function ProductEditorModal({
 
       if (result.success) {
         addToast(isEdit ? "Product updated." : "Product added.", "success");
-        window.dispatchEvent(new Event("trendmart:products-updated"));
+        window.dispatchEvent(new Event("trendsmart:products-updated"));
         onSaved();
       } else {
         addToast(result.error ?? "Failed to save product.", "error");

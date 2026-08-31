@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Comprehensive Input Validation & Sanitization Suite (Zod)      */
+/*  TrendsMart — Comprehensive Input Validation & Sanitization Suite (Zod)      */
 /*                                                                             */
 /*  Covers every user-facing input across the platform:                        */
 /*   - Shop creation & editing (including social links, business hours)       */

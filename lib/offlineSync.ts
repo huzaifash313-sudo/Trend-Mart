@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Offline State Sync & Conflict Resolution Engine (Prompt 2)       */
+/*  TrendsMart — Offline State Sync & Conflict Resolution Engine (Prompt 2)       */
 /*                                                                             */
 /*  Advanced offline-first synchronization layer for:                           */
 /*   - Multi-item shopping cart                                                 */
@@ -126,7 +126,7 @@ const userPreferencesSchema = z.object({
 // ─── Default Configurations ───────────────────────────────────────────────────
 
 const DEFAULT_CART_CONFIG: SyncConfig = {
-  namespace: "trendmart_cart_sync",
+  namespace: "trendsmart_cart_sync",
   maxRetries: 5,
   retryBaseDelayMs: 1000,
   retryMaxDelayMs: 30_000,
@@ -135,7 +135,7 @@ const DEFAULT_CART_CONFIG: SyncConfig = {
 };
 
 const DEFAULT_WISHLIST_CONFIG: SyncConfig = {
-  namespace: "trendmart_wishlist_sync",
+  namespace: "trendsmart_wishlist_sync",
   maxRetries: 3,
   retryBaseDelayMs: 500,
   retryMaxDelayMs: 15_000,
@@ -255,7 +255,7 @@ function safeLocalSet(key: string, value: string): boolean {
     try {
       // Remove sync-related keys first (least critical for offline experience)
       const keysToRemove = Object.keys(localStorage).filter(
-        (k) => k.startsWith("trendmart_") && k !== key && !k.includes("cart") && !k.includes("prefs"),
+        (k) => k.startsWith("trendsmart_") && k !== key && !k.includes("cart") && !k.includes("prefs"),
       );
       for (const k of keysToRemove.slice(0, 20)) {
         localStorage.removeItem(k);
@@ -346,7 +346,7 @@ export class OfflineSyncEngine<T extends { id: string }> {
   /** Load persisted entities from localStorage into memory */
   initialize(): void {
     const stored = safeLocalGet<Array<SyncableEntity<T>>>(
-      `trendmart_${this.config.namespace}_entities`,
+      `trendsmart_${this.config.namespace}_entities`,
       z.array(syncableEntitySchema) as z.ZodType<Array<SyncableEntity<T>>>,
     );
 
@@ -587,14 +587,14 @@ export class OfflineSyncEngine<T extends { id: string }> {
     }
 
     const json = JSON.stringify(all);
-    safeLocalSet(`trendmart_${this.config.namespace}_entities`, json);
+    safeLocalSet(`trendsmart_${this.config.namespace}_entities`, json);
   }
 
   /**
    * Handle storage events from other tabs to keep state synchronized.
    */
   private handleStorageEvent = (event: StorageEvent): void => {
-    if (event.key === `trendmart_${this.config.namespace}_entities` && event.newValue) {
+    if (event.key === `trendsmart_${this.config.namespace}_entities` && event.newValue) {
       try {
         const parsed: unknown = JSON.parse(event.newValue);
         if (Array.isArray(parsed)) {
@@ -655,7 +655,7 @@ export function createWishlistSyncEngine(): OfflineSyncEngine<SyncableData> {
 class PreferencesManager {
   private static instance: PreferencesManager | null = null;
   private prefs: UserPreferences;
-  private readonly storageKey = "trendmart_user_preferences";
+  private readonly storageKey = "trendsmart_user_preferences";
 
   private constructor() {
     this.prefs = this.load();
@@ -754,7 +754,7 @@ export function broadcastSyncEvent(eventType: string, payload?: Record<string, u
   if (typeof window === "undefined") return;
 
   const message = JSON.stringify({
-    _trendmart_sync_event: true,
+    _trendsmart_sync_event: true,
     type: eventType,
     payload: payload ?? {},
     timestamp: Date.now(),
@@ -762,9 +762,9 @@ export function broadcastSyncEvent(eventType: string, payload?: Record<string, u
 
   // Use localStorage as an event bus (storage event fires in other tabs)
   try {
-    localStorage.setItem("trendmart_sync_broadcast", message);
+    localStorage.setItem("trendsmart_sync_broadcast", message);
     // Immediately remove so the next broadcast still fires the event
-    localStorage.removeItem("trendmart_sync_broadcast");
+    localStorage.removeItem("trendsmart_sync_broadcast");
   } catch {
     // Storage unavailable — no-op
   }
@@ -780,10 +780,10 @@ export function onSyncEvent(
   if (typeof window === "undefined") return () => { /* noop */ };
 
   const handler = (event: StorageEvent) => {
-    if (event.key === "trendmart_sync_broadcast" && event.newValue) {
+    if (event.key === "trendsmart_sync_broadcast" && event.newValue) {
       try {
         const parsed: Record<string, unknown> = JSON.parse(event.newValue);
-        if (parsed._trendmart_sync_event && typeof parsed.type === "string") {
+        if (parsed._trendsmart_sync_event && typeof parsed.type === "string") {
           callback(parsed.type, (parsed.payload as Record<string, unknown>) ?? {});
         }
       } catch {

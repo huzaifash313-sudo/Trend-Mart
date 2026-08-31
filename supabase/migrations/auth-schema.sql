@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart Auth Migration — Run AFTER schema.sql
+-- TrendsMart Auth Migration — Run AFTER schema.sql
 -- Paste into Supabase SQL Editor: https://supabase.com/dashboard
 -- =============================================================================
 

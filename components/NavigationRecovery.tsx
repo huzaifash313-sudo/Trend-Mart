@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Client Navigation Recovery Watchdog                            */
+/*  TrendsMart — Client Navigation Recovery Watchdog                            */
 /*                                                                             */
 /*  Symptom it fixes: occasionally the Next.js client router silently dies —   */
 /*  a link click never changes the URL, every navigation seems to do nothing,  */

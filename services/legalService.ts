@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Legal Acceptance Audit Trail Service                          */
+/*  TrendsMart — Legal Acceptance Audit Trail Service                          */
 /*  Records that a user explicitly agreed to required legal documents         */
 /*  (Terms & Conditions, Privacy Policy, Merchant Security Guidelines) at     */
 /*  registration time. Fire-and-forget — never blocks the signup/registration */

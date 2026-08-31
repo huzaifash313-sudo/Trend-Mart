@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Health Monitoring & Diagnostic Service (Prompt 99)            */
+/*  TrendsMart — Health Monitoring & Diagnostic Service (Prompt 99)            */
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";

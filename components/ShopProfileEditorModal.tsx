@@ -195,7 +195,7 @@ export default function ShopProfileEditorModal({
             )}. Those changes were skipped.`,
             "info",
           );
-          window.dispatchEvent(new Event("trendmart:shops-updated"));
+          window.dispatchEvent(new Event("trendsmart:shops-updated"));
           onSaved();
         } else {
           setError(result.error);
@@ -245,7 +245,7 @@ export default function ShopProfileEditorModal({
 
       if (result.success) {
         addToast("Store profile updated.", "success");
-        window.dispatchEvent(new Event("trendmart:shops-updated"));
+        window.dispatchEvent(new Event("trendsmart:shops-updated"));
         onSaved();
       } else {
         setError(result.error);

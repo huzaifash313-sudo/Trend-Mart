@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Customer Behaviour Memory (local, privacy-first)              */
+/*  TrendsMart — Customer Behaviour Memory (local, privacy-first)              */
 /*                                                                             */
 /*  Powers personalization without a server round-trip:                       */
 /*    - Recently viewed products (a horizontal "pick up where you left off")  */
@@ -18,9 +18,9 @@
 import { sanitizeLight, truncate, sanitizeNumeric } from "@/lib/sanitization";
 import { scopedKey } from "@/lib/clientScope";
 
-const RECENT_VIEWS_BASE = "trendmart_recent_views_v1";
-const SEARCH_HISTORY_BASE = "trendmart_search_history_v1";
-const CATEGORY_AFFINITY_BASE = "trendmart_category_affinity_v1";
+const RECENT_VIEWS_BASE = "trendsmart_recent_views_v1";
+const SEARCH_HISTORY_BASE = "trendsmart_search_history_v1";
+const CATEGORY_AFFINITY_BASE = "trendsmart_category_affinity_v1";
 
 function recentViewsKey(): string {
   return scopedKey(RECENT_VIEWS_BASE);

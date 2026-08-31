@@ -467,7 +467,7 @@ export default function DashboardSettingsPage() {
         addToast("Store settings saved successfully.", "success");
         // Invalidate the storefront cache so homepage/cards reflect changes.
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("trendmart:shops-updated"));
+          window.dispatchEvent(new Event("trendsmart:shops-updated"));
         }
       } else {
         addToast(result.error, "error");
@@ -540,7 +540,7 @@ export default function DashboardSettingsPage() {
           </Link>
           <div className="min-w-0 flex-1">
             <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-              TrendMart merchant
+              TrendsMart merchant
             </p>
             <h1 className="truncate text-base font-bold text-zinc-950 dark:text-zinc-50">
               Store settings
@@ -587,7 +587,7 @@ export default function DashboardSettingsPage() {
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
                 {form.is_live
-                  ? "Your dukaan is live on TrendMart. Customers can browse and place orders."
+                  ? "Your dukaan is live on TrendsMart. Customers can browse and place orders."
                   : "Your dukaan is hidden from customers while you make changes."}
               </p>
             </div>
@@ -862,7 +862,7 @@ export default function DashboardSettingsPage() {
               {saving ? "Saving settings..." : "Save store settings"}
             </button>
             <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500 md:block">
-              Changes sync to TrendMart and take effect on your storefront after save.
+              Changes sync to TrendsMart and take effect on your storefront after save.
             </p>
           </div>
         </div>

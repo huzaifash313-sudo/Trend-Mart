@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Multi-Vendor Commission & Subscription Tier Management         */
+/*  TrendsMart — Multi-Vendor Commission & Subscription Tier Management         */
 /*  Manages merchant billing cycles, free trial quotas, subscription statuses  */
 /*  (active, grace_period, suspended), and automated access checks.            */
 /* -------------------------------------------------------------------------- */
@@ -20,7 +20,7 @@ function toError(err: unknown): string {
 /**
  * Subscription tiers available to merchants.
  *
- * TrendMart runs a SINGLE-Plan model (confirmed business decision):
+ * TrendsMart runs a SINGLE-Plan model (confirmed business decision):
  *   • ZERO commission for every merchant (no % cut on orders).
  *   • One flat monthly fee: Rs 1,000/month.
  *   • NO product limits, NO storage limits — every shop is effectively unlimited.
@@ -56,22 +56,22 @@ export interface TierConfig {
 /* ── Single-Plan constants ─────────────────────────────────────────────── */
 
 /** Flat monthly fee for every paid merchant — Rs 1,000. */
-export const TRENDMART_MONTHLY_FEE_PKR = 1000;
+export const TRENDSMART_MONTHLY_FEE_PKR = 1000;
 
-/** Zero commission — TrendMart never takes a % of merchant orders. */
-export const TRENDMART_COMMISSION_PCT = 0;
+/** Zero commission — TrendsMart never takes a % of merchant orders. */
+export const TRENDSMART_COMMISSION_PCT = 0;
 
 /** Free trial length — 1 month (30 days). */
-export const TRENDMART_FREE_TRIAL_DAYS = 30;
+export const TRENDSMART_FREE_TRIAL_DAYS = 30;
 
 /** Effectively unlimited product count (100k is beyond any real shop). */
-export const TRENDMART_MAX_PRODUCTS = 100_000;
+export const TRENDSMART_MAX_PRODUCTS = 100_000;
 
 /** Effectively unlimited storage (100 GB). */
-export const TRENDMART_MAX_STORAGE_MB = 100_000;
+export const TRENDSMART_MAX_STORAGE_MB = 100_000;
 
 /** The full best-feature set — granted to EVERY merchant (paid or trial). */
-export const TRENDMART_ALL_FEATURES = [
+export const TRENDSMART_ALL_FEATURES = [
   "basic_storefront",
   "whatsapp_orders",
   "advanced_analytics",
@@ -87,12 +87,12 @@ export const TRENDMART_ALL_FEATURES = [
 ] as const;
 
 /** Single paid plan (Rs 1,000/mo, 0% commission, unlimited, best features). */
-export const TRENDMART_PAID_PLAN: Omit<TierConfig, "name" | "free_trial_days"> = {
-  commission_rate_pct: TRENDMART_COMMISSION_PCT,
-  max_products: TRENDMART_MAX_PRODUCTS,
-  monthly_fee_pkr: TRENDMART_MONTHLY_FEE_PKR,
-  features: [...TRENDMART_ALL_FEATURES],
-  max_storage_mb: TRENDMART_MAX_STORAGE_MB,
+export const TRENDSMART_PAID_PLAN: Omit<TierConfig, "name" | "free_trial_days"> = {
+  commission_rate_pct: TRENDSMART_COMMISSION_PCT,
+  max_products: TRENDSMART_MAX_PRODUCTS,
+  monthly_fee_pkr: TRENDSMART_MONTHLY_FEE_PKR,
+  features: [...TRENDSMART_ALL_FEATURES],
+  max_storage_mb: TRENDSMART_MAX_STORAGE_MB,
   priority_support: true,
 };
 
@@ -103,27 +103,27 @@ export const TRENDMART_PAID_PLAN: Omit<TierConfig, "name" | "free_trial_days"> =
 export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierConfig> = {
   free_trial: {
     name: "Free Trial (1 Month)",
-    commission_rate_pct: TRENDMART_COMMISSION_PCT,
-    max_products: TRENDMART_MAX_PRODUCTS,
+    commission_rate_pct: TRENDSMART_COMMISSION_PCT,
+    max_products: TRENDSMART_MAX_PRODUCTS,
     monthly_fee_pkr: 0,
-    free_trial_days: TRENDMART_FREE_TRIAL_DAYS,
-    features: [...TRENDMART_ALL_FEATURES],
-    max_storage_mb: TRENDMART_MAX_STORAGE_MB,
+    free_trial_days: TRENDSMART_FREE_TRIAL_DAYS,
+    features: [...TRENDSMART_ALL_FEATURES],
+    max_storage_mb: TRENDSMART_MAX_STORAGE_MB,
     priority_support: true,
   },
   starter: {
-    ...TRENDMART_PAID_PLAN,
-    name: "TrendMart Standard",
+    ...TRENDSMART_PAID_PLAN,
+    name: "TrendsMart Standard",
     free_trial_days: 0,
   },
   pro: {
-    ...TRENDMART_PAID_PLAN,
-    name: "TrendMart Standard",
+    ...TRENDSMART_PAID_PLAN,
+    name: "TrendsMart Standard",
     free_trial_days: 0,
   },
   enterprise: {
-    ...TRENDMART_PAID_PLAN,
-    name: "TrendMart Standard",
+    ...TRENDSMART_PAID_PLAN,
+    name: "TrendsMart Standard",
     free_trial_days: 0,
   },
 };

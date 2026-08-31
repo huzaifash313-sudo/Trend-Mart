@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Dedicated Cart Page (/cart)                                     */
+/*  TrendsMart — Dedicated Cart Page (/cart)                                     */
 /*                                                                             */
 /*  A full-screen view of the cart (the bottom CartBar is a compact peek).     */
 /*  Cart state is client-side (localStorage via the Zustand store), so this    */

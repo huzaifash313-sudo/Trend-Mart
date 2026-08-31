@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Confirm & Prompt Dialog Provider                               */
+/*  TrendsMart — Confirm & Prompt Dialog Provider                               */
 /*                                                                            */
 /*  Replaces native window.confirm() / window.alert() / window.prompt() with  */
 /*  styled, theme-aware modals. Exposes promise-based helpers via a hook so   */

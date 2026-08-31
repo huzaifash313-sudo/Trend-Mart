@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Merchant Promotional Ad Requests                              */
+/*  TrendsMart — Merchant Promotional Ad Requests                              */
 /*                                                                             */
 /*  Lets a merchant request a sponsored homepage banner slot. Requests always */
 /*  start as "pending" and only appear on the storefront once a Super-Admin   */
@@ -270,7 +270,7 @@ export default function MerchantAdsPage() {
               <MegaphoneIcon /> Ads
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Feature {shopName || "your store"} on the home, deals, or products page.
+              Feature {shopName || "your store"} on home, store, deals, or products — or all pages at once.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -293,7 +293,7 @@ export default function MerchantAdsPage() {
         </div>
 
         <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-          Pick a pricing plan below, submit your creative, and the TrendMart team will review it
+          Pick a pricing plan below, submit your creative, and the TrendsMart team will review it
           before it goes live — usually within 24 hours. Payment is coordinated separately.
         </div>
 
@@ -337,7 +337,7 @@ export default function MerchantAdsPage() {
                 <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                   Where should this ad appear? *
                 </label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {AD_PLACEMENT_OPTIONS.map((opt) => (
                     <label
                       key={opt.value}

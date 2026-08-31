@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Formatting Utilities                                            */
+/*  TrendsMart — Formatting Utilities                                            */
 /*  Centralised currency, price, and locale-aware display formatters.           */
 /*  All hardcoded price strings across product catalogs, dashboard tables,     */
 /*  and shop cards should reference these functions for consistent display.     */
@@ -85,7 +85,7 @@ export function formatPrice(
 }
 
 /**
- * Format a price with the short "Rs." prefix used across TrendMart UI.
+ * Format a price with the short "Rs." prefix used across TrendsMart UI.
  * This is the standard formatter for PKR prices shown in product cards,
  * dashboard tables, and order summaries.
  *

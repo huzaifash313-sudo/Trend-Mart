@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Cart Store (Zustand + persist)                                 */
+/*  TrendsMart — Cart Store (Zustand + persist)                                 */
 /*                                                                             */
 /*  Replaces the old CartContext with a Zustand store so cart state is always  */
 /*  available (persisted to localStorage) and components can subscribe         */
@@ -343,7 +343,7 @@ export const useCartStore = create<CartState>()(
           if (typeof window !== "undefined") {
             useCartStore.persist.clearStorage();
             // Legacy flat key from pre-namespacing builds.
-            localStorage.removeItem("trendmart_cart");
+            localStorage.removeItem("trendsmart_cart");
           }
         } catch {
           /* ignore */
@@ -351,7 +351,7 @@ export const useCartStore = create<CartState>()(
       },
     }),
     {
-      name: "trendmart_cart",
+      name: "trendsmart_cart",
       storage: createJSONStorage(() => {
         if (typeof window === "undefined") {
           // SSR-safe no-op storage — hydration only happens on the client.
@@ -362,7 +362,7 @@ export const useCartStore = create<CartState>()(
           } as unknown as Storage;
         }
         // Per-account storage: every read/write targets the current account's
-        // namespaced key (`trendmart_cart:u_<id>` or `trendmart_cart:guest`)
+        // namespaced key (`trendsmart_cart:u_<id>` or `trendsmart_cart:guest`)
         // so switching accounts never leaks or overwrites another account.
         const scoped = {
           getItem: (name: string) => {
@@ -455,8 +455,8 @@ export function refreshCartForScope(): void {
  */
 export function migrateGuestCartToUserBucket(userId: string): void {
   if (typeof window === "undefined" || !userId) return;
-  const guestKey = scopedKeyFor("trendmart_cart", "guest");
-  const userKey = scopedKeyFor("trendmart_cart", `u_${userId}`);
+  const guestKey = scopedKeyFor("trendsmart_cart", "guest");
+  const userKey = scopedKeyFor("trendsmart_cart", `u_${userId}`);
   try {
     const guestRaw = window.localStorage.getItem(guestKey);
     if (guestRaw === null) return;

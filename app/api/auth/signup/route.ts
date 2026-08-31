@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Custom signup (step 1): create unconfirmed user + email code   */
+/*  TrendsMart — Custom signup (step 1): create unconfirmed user + email code   */
 /*  POST /api/auth/signup                                                       */
 /*                                                                             */
 /*  Replaces Supabase's default magic-link confirmation email. We create the   */

@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Account Scope Guard                                            */
+/*  TrendsMart — Account Scope Guard                                            */
 /*                                                                             */
 /*  Buyer / merchant data that lives in the browser (cart, local "recent       */
 /*  orders" history, anonymous wishlist, browsing history, active shop,        */
@@ -37,7 +37,7 @@ import { migrateGuestFavoritesToUserBucket } from "@/services/wishlistService";
  *  per-account namespaced versions (…:<uid>) are left untouched. */
 function clearLegacySharedKeys(): void {
   if (typeof window === "undefined") return;
-  for (const key of ["trendmart_notif_history_v2", "tm_review_dismissed_orders_v1"]) {
+  for (const key of ["trendsmart_notif_history_v2", "tm_review_dismissed_orders_v1"]) {
     try {
       localStorage.removeItem(key);
     } catch {
@@ -55,12 +55,12 @@ function adoptGuestData(userId: string): void {
   migrateGuestCartToUserBucket(userId);
   void migrateGuestFavoritesToUserBucket(userId);
   // History / orders / active shop / behaviour memory — same hand-off.
-  adoptGuestBucket("trendmart_history", userId);
-  adoptGuestBucket("trendmart_orders", userId);
-  adoptGuestBucket("trendmart_active_shop", userId);
-  adoptGuestBucket("trendmart_recent_views_v1", userId);
-  adoptGuestBucket("trendmart_search_history_v1", userId);
-  adoptGuestBucket("trendmart_category_affinity_v1", userId);
+  adoptGuestBucket("trendsmart_history", userId);
+  adoptGuestBucket("trendsmart_orders", userId);
+  adoptGuestBucket("trendsmart_active_shop", userId);
+  adoptGuestBucket("trendsmart_recent_views_v1", userId);
+  adoptGuestBucket("trendsmart_search_history_v1", userId);
+  adoptGuestBucket("trendsmart_category_affinity_v1", userId);
 }
 
 export default function AccountScopeGuard() {

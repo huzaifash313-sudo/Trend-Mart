@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Strict Order Tracking API (GET /api/orders/track)              */
+/*  TrendsMart — Strict Order Tracking API (GET /api/orders/track)              */
 /*                                                                            */
 /*  Server-side "Trace Order" entry point used by the order-tracking service. */
 /*                                                                            */

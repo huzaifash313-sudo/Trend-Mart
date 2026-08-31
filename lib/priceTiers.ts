@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Quantity Price Tier Helpers                                    */
+/*  TrendsMart — Quantity Price Tier Helpers                                    */
 /*                                                                             */
 /*  Two bulk-pricing modes, both optional and chosen per product:              */
 /*                                                                             */

@@ -4,7 +4,7 @@
 
 import type { Story } from "@/types";
 
-const STORAGE_KEY = "trendmart_viewed_stories";
+const STORAGE_KEY = "trendsmart_viewed_stories";
 /** Keep viewed IDs roughly for story lifetime (24h) + buffer */
 const MAX_AGE_MS = 36 * 60 * 60 * 1000;
 

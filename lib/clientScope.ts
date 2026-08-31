@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Client Identity Scope (per-account local data isolation)        */
+/*  TrendsMart — Client Identity Scope (per-account local data isolation)        */
 /*                                                                             */
 /*  Buyer / merchant data that lives in the browser (cart, wishlist, browsing   */
 /*  history, local order history, active shop, behaviour memory) must NEVER     */
@@ -10,21 +10,21 @@
 /* -------------------------------------------------------------------------- */
 
 /** Key that remembers the last account that owned this device's local data. */
-const SCOPE_OWNER_KEY = "trendmart_scope_owner_v1";
+const SCOPE_OWNER_KEY = "trendsmart_scope_owner_v1";
 
 /** Base keys that were historically stored flat (device-wide) and are now
  *  namespaced per account. Kept in one place so migration + clearing share it. */
 const SCOPED_BASE_KEYS = [
-  "trendmart_cart",
-  "trendmart_favorites",
-  "trendmart_favorites_count",
-  "trendmart_wishlist_seen_at",
-  "trendmart_history",
-  "trendmart_orders",
-  "trendmart_active_shop",
-  "trendmart_recent_views_v1",
-  "trendmart_search_history_v1",
-  "trendmart_category_affinity_v1",
+  "trendsmart_cart",
+  "trendsmart_favorites",
+  "trendsmart_favorites_count",
+  "trendsmart_wishlist_seen_at",
+  "trendsmart_history",
+  "trendsmart_orders",
+  "trendsmart_active_shop",
+  "trendsmart_recent_views_v1",
+  "trendsmart_search_history_v1",
+  "trendsmart_category_affinity_v1",
 ] as const;
 
 /** Non-UUID ids are tolerated (e.g. tests); anything unsafe is stripped. */
@@ -52,7 +52,7 @@ export function getScopeOwner(): string | null {
   return cachedOwner;
 }
 
-/** Update the owning account. Dispatches a `trendmart:scope-change` event so
+/** Update the owning account. Dispatches a `trendsmart:scope-change` event so
  *  subscribers (e.g. the cart store) can rehydrate from the new account's key. */
 export function setScopeOwner(owner: string | null): void {
   const normalized = normalizeOwner(owner);
@@ -66,7 +66,7 @@ export function setScopeOwner(owner: string | null): void {
     }
     try {
       window.dispatchEvent(
-        new CustomEvent("trendmart:scope-change", { detail: { owner: normalized } }),
+        new CustomEvent("trendsmart:scope-change", { detail: { owner: normalized } }),
       );
     } catch {
       /* ignore */

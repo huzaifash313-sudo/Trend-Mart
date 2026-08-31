@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Atomic Order Placement & Variant Stock Deduction Service       */
+/*  TrendsMart — Atomic Order Placement & Variant Stock Deduction Service       */
 /*  Prompt 1: ACID-compliant checkout with inventory race-condition prevention  */
 /* -------------------------------------------------------------------------- */
 

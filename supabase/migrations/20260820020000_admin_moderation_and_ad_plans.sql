@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Admin Moderation + Ad Pricing Plans                           */
+/*  TrendsMart — Admin Moderation + Ad Pricing Plans                           */
 /*                                                                             */
 /*  1) User moderation: `is_banned` flag on user_profiles + a fast SECURITY    */
 /*     DEFINER RPC for middleware/checkout ban enforcement.                    */

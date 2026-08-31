@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Public Order Summary RPC
+-- TrendsMart — Public Order Summary RPC
 -- =============================================================================
 -- Powers the single-link order summary page (`/o/[id]`). A WhatsApp order
 -- message previously carried one deep-link per item (messy for 10-15 item

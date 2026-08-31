@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Analytics / Views Tracking Table
+-- TrendsMart — Analytics / Views Tracking Table
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.analytics_logs (

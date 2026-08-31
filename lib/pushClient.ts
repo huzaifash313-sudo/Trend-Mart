@@ -83,12 +83,12 @@ export async function subscribeToPushNotifications(): Promise<
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
       console.warn(
-        `[TrendMart] push subscribe failed (${res.status}): ${bodyText}`,
+        `[TrendsMart] push subscribe failed (${res.status}): ${bodyText}`,
       );
       return { ok: false, reason: "failed" };
     }
     try {
-      localStorage.setItem("trendmart_push_subscribed", "true");
+      localStorage.setItem("trendsmart_push_subscribed", "true");
     } catch {
       /* ignore */
     }
@@ -121,7 +121,7 @@ export async function unsubscribeFromPushNotifications(): Promise<
       }).catch(() => undefined);
     }
     try {
-      localStorage.removeItem("trendmart_push_subscribed");
+      localStorage.removeItem("trendsmart_push_subscribed");
     } catch {
       /* ignore */
     }

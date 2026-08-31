@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Unlimited Free Stories (Instagram / TikTok / Snapchat-style)
+-- TrendsMart — Unlimited Free Stories (Instagram / TikTok / Snapchat-style)
 -- -----------------------------------------------------------------------------
 -- Business decision: every shop may now post as many active stories as it wants
 -- instead of being capped at 1, to boost merchant engagement and storefront

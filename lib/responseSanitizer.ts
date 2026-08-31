@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — API Response Sanitizer                                          */
+/*  TrendsMart — API Response Sanitizer                                          */
 /*                                                                             */
 /*  PROMPT 5: Strips sensitive merchant data (internal tokens, private          */
 /*            credentials, PII) from public-facing API responses before        */

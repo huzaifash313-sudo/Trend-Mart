@@ -421,11 +421,11 @@ function HomeClient({
       queryClient.invalidateQueries({ queryKey: ["stories"] });
     const onDealsUpdated = () =>
       queryClient.invalidateQueries({ queryKey: ["deals"] });
-    window.addEventListener("trendmart:stories-updated", onStoriesUpdated);
-    window.addEventListener("trendmart:deals-updated", onDealsUpdated);
+    window.addEventListener("trendsmart:stories-updated", onStoriesUpdated);
+    window.addEventListener("trendsmart:deals-updated", onDealsUpdated);
     return () => {
-      window.removeEventListener("trendmart:stories-updated", onStoriesUpdated);
-      window.removeEventListener("trendmart:deals-updated", onDealsUpdated);
+      window.removeEventListener("trendsmart:stories-updated", onStoriesUpdated);
+      window.removeEventListener("trendsmart:deals-updated", onDealsUpdated);
     };
   }, [queryClient]);
 

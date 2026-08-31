@@ -1,7 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Service-Role Admin Client                                     */
+/*  TrendsMart — Service-Role Admin Client                                     */
 /*                                                                             */
 /*  SERVER-ONLY, NEVER import from a "use client" file or expose to the       */
 /*  browser bundle. Bypasses Row Level Security — use only for narrowly       */

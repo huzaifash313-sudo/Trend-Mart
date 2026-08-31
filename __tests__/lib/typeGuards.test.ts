@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Type Guards & Schema Validation Tests (Prompt 3)               */
+/*  TrendsMart — Type Guards & Schema Validation Tests (Prompt 3)               */
 /*  Tests Zod schemas, runtime type guards, and input validation              */
 /* -------------------------------------------------------------------------- */
 

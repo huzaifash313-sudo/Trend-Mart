@@ -1,4 +1,4 @@
--- TrendMart: TikTok on shops + customer avatar on user_profiles
+-- TrendsMart: TikTok on shops + customer avatar on user_profiles
 -- Run once in Supabase SQL Editor (safe / idempotent).
 
 ALTER TABLE public.shops

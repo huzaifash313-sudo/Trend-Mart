@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Order money-breakdown columns + atomic product stock deduction
+-- TrendsMart — Order money-breakdown columns + atomic product stock deduction
 -- =============================================================================
 -- Two fixes:
 --

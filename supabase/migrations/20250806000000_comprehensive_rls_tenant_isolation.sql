@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Comprehensive Multi-Tenant RLS Security Hardening (Prompt 1)
+-- TrendsMart — Comprehensive Multi-Tenant RLS Security Hardening (Prompt 1)
 -- 
 -- GUARANTEES strict tenant isolation across:
 --   shops, products, orders, inventory_variants, customer_inquiries,

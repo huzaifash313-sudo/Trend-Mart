@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — CSP Nonce Generator & Security Header Utilities                 */
+/*  TrendsMart — CSP Nonce Generator & Security Header Utilities                 */
 /*  PROMPT 4: Configures enterprise-grade Content Security Policy (CSP),       */
 /*           strict Transport Security (HSTS), X-Frame-Options, and             */
 /*           X-Content-Type-Options headers in the Next.js deployment.          */

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Category Management Service                                    */
+/*  TrendsMart — Category Management Service                                    */
 /*  Dynamic category metadata, icons, and item counts from Supabase.            */
 /* -------------------------------------------------------------------------- */
 

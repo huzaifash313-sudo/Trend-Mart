@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Centralised Error Logging & Monitoring Utility                 */
+/*  TrendsMart — Centralised Error Logging & Monitoring Utility                 */
 /*  Structured wrapper for catching, formatting, and safely logging errors      */
 /*  across all service layers without crashing the client application.          */
 /* -------------------------------------------------------------------------- */
@@ -141,7 +141,7 @@ export function logError(err: unknown, ctx: ErrorContext): FormattedError {
   // 2. Console output — grouped for readability in DevTools
   const style = "color: #e00; font-weight: bold;";
   console.groupCollapsed(
-    `%c[TrendMart Error] %c${entry.module}`,
+    `%c[TrendsMart Error] %c${entry.module}`,
     style,
     "color: inherit;",
   );

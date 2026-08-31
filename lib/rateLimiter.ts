@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — API Route Rate Limiter & Request Throttling Utility             */
+/*  TrendsMart — API Route Rate Limiter & Request Throttling Utility             */
 /*  PROMPT 4: Protects backend endpoints against automated spam, brute-force   */
 /*            requests, and denial-of-service vulnerabilities.                 */
 /*                                                                            */

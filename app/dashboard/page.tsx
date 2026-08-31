@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Merchant Overview (Dashboard home)                            */
+/*  TrendsMart — Merchant Overview (Dashboard home)                            */
 /*                                                                             */
 /*  A glanceable, merchant-friendly hub. The two hero cards — Products and     */
 /*  Deals — show live counts + photo previews and deep-link straight into the  */
@@ -120,7 +120,7 @@ export default function DashboardOverviewPage() {
         if (result.data.length > 0 && !activeShopId) {
           const saved =
             typeof window !== "undefined"
-              ? localStorage.getItem(scopedKey("trendmart_active_shop"))
+              ? localStorage.getItem(scopedKey("trendsmart_active_shop"))
               : null;
           const match = saved ? result.data.find((s) => s.id === saved) : null;
           setActiveShopId(match?.id ?? result.data[0].id);
@@ -163,7 +163,7 @@ export default function DashboardOverviewPage() {
   const selectShop = useCallback((id: string) => {
     setActiveShopId(id);
     if (typeof window !== "undefined") {
-      localStorage.setItem(scopedKey("trendmart_active_shop"), id);
+      localStorage.setItem(scopedKey("trendsmart_active_shop"), id);
     }
   }, []);
 
@@ -320,7 +320,7 @@ export default function DashboardOverviewPage() {
         </h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
           You don&apos;t have a store yet. Create one to start listing products and
-          receiving orders on TrendMart.
+          receiving orders on TrendsMart.
         </p>
         <Link
           href="/account/become-merchant"

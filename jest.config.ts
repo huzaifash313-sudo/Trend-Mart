@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Jest Configuration (Prompt 3)                                   */
+/*  TrendsMart — Jest Configuration (Prompt 3)                                   */
 /*  TypeScript-first test runner with JSDOM environment for React components   */
 /* -------------------------------------------------------------------------- */
 

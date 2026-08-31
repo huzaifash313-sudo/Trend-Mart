@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — WhatsApp-First Checkout & Dynamic Message Payload Builder      */
+/*  TrendsMart — WhatsApp-First Checkout & Dynamic Message Payload Builder      */
 /*                                                                             */
 /*  Elite-grade WhatsApp checkout modal tailored for direct merchant           */
 /*  communication. Features:                                                   */
@@ -292,7 +292,7 @@ function buildWhatsAppMessage(
   const siteOrigin = getPublicAppUrl().replace(/\/$/, "");
 
   const lines: string[] = [
-    `🛒 *New Order via TrendMart*`,
+    `🛒 *New Order via TrendsMart*`,
     ``,
     `🏪 *Shop:* ${safeShopName}`,
     `📍 *Shop area:* ${safeLocation}`,
@@ -383,7 +383,7 @@ function buildWhatsAppMessage(
 
   lines.push(``);
   lines.push(`──────────────────────────`);
-  lines.push(`_Sent via TrendMart — Your Local Shopping Hub_`);
+  lines.push(`_Sent via TrendsMart — Your Local Shopping Hub_`);
   lines.push(`_🕐 ${safeTimestamp}_`);
 
   return lines.join("\n");
@@ -1151,7 +1151,7 @@ export default function WhatsAppCheckoutModal({
         status: "Pending",
       });
 
-      // Build WhatsApp message (TrendMart product links + Maps pin)
+      // Build WhatsApp message (TrendsMart product links + Maps pin)
       const whatsappText = buildWhatsAppMessage(
         shop,
         resolvedItems,

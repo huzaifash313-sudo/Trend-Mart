@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Inventory Monitoring & Low Stock Alerts                        */
+/*  TrendsMart — Inventory Monitoring & Low Stock Alerts                        */
 /*                                                                             */
 /*  PROMPT 4: HARDENED — Real-time stock status toggles ('In Stock',           */
 /*                       'Out of Stock', with quantity counters), strict       */

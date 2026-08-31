@@ -19,7 +19,7 @@ const SUPABASE_ANON_KEY = process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
 export function createClient() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(
-      "TrendMart is not fully configured yet. Please try again shortly.",
+      "TrendsMart is not fully configured yet. Please try again shortly.",
     );
   }
 

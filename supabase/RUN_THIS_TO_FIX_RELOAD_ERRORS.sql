@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — QUICK FIX for the console errors you see on every reload
+-- TrendsMart — QUICK FIX for the console errors you see on every reload
 -- =============================================================================
 -- This fixes exactly the 6 errors below. It is deliberately SMALL so the
 -- Supabase SQL Editor does not time out ("Failed to fetch (api.supabase.com)").

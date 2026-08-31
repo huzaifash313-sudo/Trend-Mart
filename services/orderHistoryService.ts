@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Client-Side Order History Tracker (localStorage)                */
+/*  TrendsMart — Client-Side Order History Tracker (localStorage)                */
 /*  (Prompt 1) All records are sanitized before storage to prevent XSS.         */
 /* -------------------------------------------------------------------------- */
 
@@ -27,12 +27,12 @@ export interface LocalOrderRecord {
 }
 
 // The orders page (`app/orders/page.tsx`) reads this key. It previously read
-// `trendmart_orders` while this service wrote `trendmart_order_history` — the
+// `trendsmart_orders` while this service wrote `trendsmart_order_history` — the
 // two were disconnected. We now write the same key the reader expects.
 // The key is namespaced per account so one account's order history can never
 // appear for another account on the same device.
-const STORAGE_BASE = "trendmart_orders";
-const LEGACY_STORAGE_KEY = "trendmart_order_history";
+const STORAGE_BASE = "trendsmart_orders";
+const LEGACY_STORAGE_KEY = "trendsmart_order_history";
 
 function storageKey(): string {
   return scopedKey(STORAGE_BASE);

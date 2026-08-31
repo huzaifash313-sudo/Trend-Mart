@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Fulfilment Modes (Pickup + Delivery Toggle)
+-- TrendsMart — Fulfilment Modes (Pickup + Delivery Toggle)
 -- =============================================================================
 -- Merchants can pause individual order channels without touching the rest of
 -- their store:

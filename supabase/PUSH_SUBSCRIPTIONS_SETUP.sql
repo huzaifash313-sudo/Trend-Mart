@@ -1,4 +1,4 @@
--- TrendMart: push_subscriptions (run once in Supabase SQL Editor if missing)
+-- TrendsMart: push_subscriptions (run once in Supabase SQL Editor if missing)
 -- Source: supabase/migrations/20260811010000_phone_otp_and_push_subscriptions.sql
 
 CREATE TABLE IF NOT EXISTS public.push_subscriptions (
@@ -41,6 +41,11 @@ CREATE POLICY "push_subscriptions_delete_own"
   ON public.push_subscriptions FOR DELETE
   TO authenticated
   USING (auth.uid() = user_id);
+
+-- Required — without this PostgREST returns permission errors and /api/push/subscribe 500s.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.push_subscriptions TO authenticated;
+
+NOTIFY pgrst, 'reload schema';
 
 -- Optional: enable Realtime for live in-app order bells
 -- ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;

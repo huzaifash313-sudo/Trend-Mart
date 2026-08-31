@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Dynamic SEO & Open Graph Social Sharing Architecture           */
+/*  TrendsMart — Dynamic SEO & Open Graph Social Sharing Architecture           */
 /*                                                                             */
 /*  Complementary to lib/metadata.ts — this module focuses on:                 */
 /*   - Individual product view SEO metadata                                   */
@@ -18,11 +18,11 @@ import type { Product, Shop } from "@/types";
 /*  Constants                                                                 */
 /* -------------------------------------------------------------------------- */
 
-const SITE_NAME = "TrendMart";
+const SITE_NAME = "TrendsMart";
 const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trend-marts.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
 const OG_IMAGE_DEFAULT = `${BASE_URL}/og-default.png`;
-const TWITTER_HANDLE = "@trendmartpk";
+const TWITTER_HANDLE = "@trendsmartpk";
 
 /* -------------------------------------------------------------------------- */
 /*  OG Image URL Builders                                                     */
@@ -258,7 +258,7 @@ export function generateShopMetadataExtended({
     parts.push(`${productCount} products available.`);
   }
 
-  parts.push("Order via WhatsApp on TrendMart.");
+  parts.push("Order via WhatsApp on TrendsMart.");
   const desc = parts.join(" ");
 
   const ogImage = buildShopOgImageUrl(shop);
@@ -455,7 +455,7 @@ export function buildProductKeywords(
   }
 
   // Platform keywords
-  keywords.push("TrendMart", "online shopping", "WhatsApp order", "local shops Pakistan");
+  keywords.push("TrendsMart", "online shopping", "WhatsApp order", "local shops Pakistan");
 
   // Deduplicate
   return [...new Set(keywords)];
@@ -469,7 +469,7 @@ export function buildShopKeywords(
 ): string[] {
   const keywords: string[] = [
     shop.name.toLowerCase(),
-    "TrendMart",
+    "TrendsMart",
     "online shopping Pakistan",
     "WhatsApp order",
     "local store",

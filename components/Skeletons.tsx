@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Reusable Skeleton Loading Components                          */
+/*  TrendsMart — Reusable Skeleton Loading Components                          */
 /* -------------------------------------------------------------------------- */
 
 /** A single shop card skeleton (used in grids). */

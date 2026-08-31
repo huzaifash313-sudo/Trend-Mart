@@ -33,8 +33,8 @@ export async function sendPushToUser(
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
   const privateKey = process.env.VAPID_PRIVATE_KEY!;
   // A valid VAPID subject is required by the Web Push spec. Default to a
-  // real TrendMart address rather than an invalid .local placeholder.
-  const subject = process.env.VAPID_SUBJECT || "mailto:support@trendmart.pk";
+  // real TrendsMart address rather than an invalid .local placeholder.
+  const subject = process.env.VAPID_SUBJECT || "mailto:support@trendsmart.pk";
 
   webPush.setVapidDetails(subject, publicKey, privateKey);
 

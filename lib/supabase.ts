@@ -13,7 +13,7 @@ function getEnv(key: string): string {
     if (typeof window === "undefined") {
       // Server-side: warn so logs capture the missing var
       console.warn(
-        `[TrendMart] Environment variable ${key} is missing or empty. ` +
+        `[TrendsMart] Environment variable ${key} is missing or empty. ` +
         `Supabase queries will fail with a clear error until it is set.`,
       );
     }

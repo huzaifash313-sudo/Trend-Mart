@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Direct Product Page (`/p/[code]`)                             */
+/*  TrendsMart — Direct Product Page (`/p/[code]`)                             */
 /*                                                                            */
 /*  A standalone, image-first product page opened by the short links in        */
 /*  WhatsApp order messages. Resolves a short code (or a product UUID) to a    */

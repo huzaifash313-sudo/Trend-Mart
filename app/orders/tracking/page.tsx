@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Real-Time Customer Order Status Tracking Portal                */
+/*  TrendsMart — Real-Time Customer Order Status Tracking Portal                */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Phone number or order reference ID lookup                              */
@@ -210,7 +210,7 @@ interface RecentSearch {
   label: string;
 }
 
-const RECENT_SEARCHES_KEY = "trendmart_recent_tracking_searches";
+const RECENT_SEARCHES_KEY = "trendsmart_recent_tracking_searches";
 const MAX_RECENT = 5;
 
 // ─── Recent Searches Helpers ────────────────────────────────────────────────

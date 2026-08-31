@@ -1,4 +1,4 @@
-# 🛒 TrendMart — Complete Feature, Mechanism & Strategy Documentation
+# 🛒 TrendsMart — Complete Feature, Mechanism & Strategy Documentation
 
 > **Platform:** Hyper-Local Multi-Vendor Marketplace + WhatsApp Ordering System
 > **Goal:** Production-Ready E-Commerce Ecosystem (Pakistan-focused, PKR)
@@ -99,7 +99,7 @@
 ### ⚙️ Kese Kaam Karta Hai
 1. **Homepage data** — React Query hooks (`useShops`, `useStories`, `useDeals`, `useShopCoupons`) data fetch karte hain; `fuzzyFilterAndRank` client-side search, `filterShopsByProximity` geo-radius filtering.
 2. **Personalization** — `getTopAffinityCategories` localStorage se user ki browsing history parh kar categories ko re-order karta hai.
-3. **Cross-tab sync** — `trendmart:stories-updated` / `deals-updated` window events caches invalidate karte hain, taake do tabs mein data stale na ho.
+3. **Cross-tab sync** — `trendsmart:stories-updated` / `deals-updated` window events caches invalidate karte hain, taake do tabs mein data stale na ho.
 4. **Infinite scroll** — IntersectionObserver sentinel + server cursor pagination (48 per page), "Nearest" sort haversine distance se re-sort karta hai.
 
 ### 🎯 Strategy
@@ -161,7 +161,7 @@
 ## 6. Cart, Checkout & WhatsApp Order Flow
 
 ### ⚙️ Kese Kaam Karta Hai — Cart (`store/cartStore.ts`)
-1. **Zustand + persist** — cart state `trendmart_cart` localStorage mein save hota hai; SSR par no-op storage (hydration safe).
+1. **Zustand + persist** — cart state `trendsmart_cart` localStorage mein save hota hai; SSR par no-op storage (hydration safe).
 2. **Sanitize-on-merge** — localStorage se load karte waqt har item `sanitizeCartItem` se guzarta hai (HTML strip, price/quantity clamp, URL validation) — corrupted/hacked localStorage crash nahi karta.
 3. **Unique cart ID** — `productId + variant + notes` key se same product different variant/notes alag cart lines hain.
 4. **Per-shop grouping** — cart items shop_id ke hisaab se grouped; checkout per-shop hota hai (multi-shop carts hain lekin har shop ka order alag WhatsApp message).
@@ -205,7 +205,7 @@
 ### Features & Mechanism
 | Feature | Kese kaam karta hai |
 |---|---|
-| **Products engine** | CRUD + sub-category + markdown pricing + multi-image + variants + in-stock toggle; list search/filter/sort; bulk actions (available/out-of-stock/% discount/delete); CSV import/export. `trendmart:products-updated` cross-tab sync. |
+| **Products engine** | CRUD + sub-category + markdown pricing + multi-image + variants + in-stock toggle; list search/filter/sort; bulk actions (available/out-of-stock/% discount/delete); CSV import/export. `trendsmart:products-updated` cross-tab sync. |
 | **Batch creator** | Desktop single-line table / mobile stacked cards, "+5 Rows", per-row images, seeds sub-categories via API, `bulkCreateProducts`. |
 | **Inventory matrix** | `inventory_variants` relational rows + JSONB variants; auto SKU `PROD-{id}-{GROUP}-{OPTION}`; low-stock thresholds; Realtime live sync `subscribeToInventory`; dirty-tracking batch save; alert severity (healthy/low/critical/out). |
 | **Order desk** | Realtime new-order sound/toast; status transitions; search; WhatsApp customer contact; itemized breakdown. |
@@ -356,7 +356,7 @@
    - `orders` → merchant ko naya order (sound + toast)
    - `customer_inquiries` → merchant inbox
    - customer ko order-status updates (`subscribeToCustomerOrders`)
-2. **Web Audio chime + `trendmart:toast` bridge** + unread badge + mute toggle + localStorage history (50 items) + slide-out panel.
+2. **Web Audio chime + `trendsmart:toast` bridge** + unread badge + mute toggle + localStorage history (50 items) + slide-out panel.
 3. **Web Push** (`lib/webPush.ts`) — VAPID keys, per-send 10s timeout, **404/410 subscriptions auto-deleted** (dead endpoints cleanup). `/api/push/notify-order` sirf owning merchant/customer ko allow karta hai aur status DB se authoritative read karta hai.
 4. **Order placement** — `/api/orders` success par merchant + customer dono ko OS push.
 5. **Auto-registration** — `AutoSubscribeWebPush` sirf tab jab permission already granted ho (kabhi bina gesture ke prompt nahi).
@@ -388,7 +388,7 @@
 ## 17. Theme Engine & Appearance
 
 ### ⚙️ Kese Kaam Karta Hai
-1. **Pre-paint bootstrap** — `layout.tsx` mein inline `THEME_BOOTSTRAP` script first paint se PEHLE `trendmart_theme_prefs_v4` parh kar CSS variables set karta hai (dark/light class, font scale, grid layout, card style) — **no flash of wrong theme**.
+1. **Pre-paint bootstrap** — `layout.tsx` mein inline `THEME_BOOTSTRAP` script first paint se PEHLE `trendsmart_theme_prefs_v4` parh kar CSS variables set karta hai (dark/light class, font scale, grid layout, card style) — **no flash of wrong theme**.
 2. **ThemeContext** — live toggle `useTheme`, localStorage persistence.
 3. **Font scaling** — 14–20px slider, CSS variables se live apply.
 4. **Grid/card styles** — custom grid layout options + card styling prefs.

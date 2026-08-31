@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Email OTP server helpers (service-role, server-only)           */
+/*  TrendsMart — Email OTP server helpers (service-role, server-only)           */
 /*                                                                             */
 /*  Shared logic for the /api/auth/* routes: finding an auth user by email and */
 /*  issuing + emailing a fresh verification code. Never import from client.    */
@@ -80,7 +80,7 @@ export async function issueAndSendOtp(
 
   const sent = await sendEmail({
     to: normalized,
-    subject: "Your TrendMart verification code",
+    subject: "Your TrendsMart verification code",
     html: emailShell("Verify your email", otpEmailBody(code)),
   });
 

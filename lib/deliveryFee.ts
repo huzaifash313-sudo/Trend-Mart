@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shared Delivery Fee Helper                                     */
+/*  TrendsMart — Shared Delivery Fee Helper                                     */
 /*                                                                             */
 /*  THE single source of truth for delivery-charge calculation. Both the       */
 /*  client checkout modal and the server-side /api/orders route call this, so  */

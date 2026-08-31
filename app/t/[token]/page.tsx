@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — QR Table Scan & Order Page (/t/[token])                        */
+/*  TrendsMart — QR Table Scan & Order Page (/t/[token])                        */
 /*                                                                             */
 /*  The zero-friction dine-in flow: scan → table auto-detected → browse menu  */
 /*  → order in ~30 seconds with NO sign-up. Live status follows in the        */
@@ -438,7 +438,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
     <div className="min-h-screen bg-zinc-50 pb-28 dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-zinc-100 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]/90">
-        {/* TrendMart brand pill — trust signal on every scanned QR */}
+        {/* TrendsMart brand pill — trust signal on every scanned QR */}
         <div className="mx-auto flex max-w-md items-center justify-center bg-gradient-to-r from-emerald-600 to-teal-600 py-1">
           <span className="flex items-center gap-1 text-[0.6rem] font-bold uppercase tracking-widest text-white">
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -446,7 +446,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
               <path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9" />
               <path d="M9 21V9h6v12" />
             </svg>
-            TrendMart · QR Dine-in
+            TrendsMart · QR Dine-in
           </span>
         </div>
 

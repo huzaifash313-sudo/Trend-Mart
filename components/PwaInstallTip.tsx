@@ -19,7 +19,7 @@ declare global {
  */
 export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void }) {
   const [visible, setVisible] = useState(false);
-  const [hint, setHint] = useState("Add TrendMart to your home screen for a faster app-like experience.");
+  const [hint, setHint] = useState("Add TrendsMart to your home screen for a faster app-like experience.");
   const [canPrompt, setCanPrompt] = useState(false);
   const [installing, setInstalling] = useState(false);
 
@@ -42,7 +42,7 @@ export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void })
     if (isIOS) {
       setHint("iPhone: Share → Add to Home Screen for the full app feel.");
     } else if (isAndroid) {
-      setHint("Tap Install to add TrendMart to your home screen.");
+      setHint("Tap Install to add TrendsMart to your home screen.");
     }
 
     const syncPrompt = () => {
@@ -99,7 +99,7 @@ export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void })
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">Install TrendMart</p>
+          <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">Install TrendsMart</p>
           <p className="mt-0.5 text-[11px] leading-snug text-emerald-800/80 dark:text-emerald-300/80">
             {hint}
           </p>

@@ -1,10 +1,10 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Professional Order Bill / Thermal Receipt                      */
+/*  TrendsMart — Professional Order Bill / Thermal Receipt                      */
 /*                                                                            */
 /*  Generates a professional 80mm thermal-printer receipt for ANY order —      */
-/*  dine-in, delivery or pickup — with TrendMart + shop branding, itemised     */
+/*  dine-in, delivery or pickup — with TrendsMart + shop branding, itemised     */
 /*  lines, fees, discounts and totals.                                         */
 /*                                                                            */
 /*  Printing: "Print Bill" calls window.print(); @media print CSS hides        */
@@ -206,7 +206,7 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
             <div>
               <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Order Bill</h2>
               <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">
-                Thermal 80mm · TrendMart + {shopBrand}
+                Thermal 80mm · TrendsMart + {shopBrand}
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -252,7 +252,7 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
               {/* ── Brand header ─────────────────────────────────────── */}
               <div className="text-center">
                 <p className="text-[15px] font-bold tracking-tight text-emerald-700">
-                  🛒 TRENDMART
+                  🛒 TRENDSMART
                 </p>
                 <p className="mt-0.5 text-[8px] uppercase tracking-[0.3em] text-zinc-400">
                   Order Receipt · Tax Invoice
@@ -384,10 +384,10 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
                   Thank you for ordering from {shopBrand}!
                 </p>
                 <p>
-                  {shop.slug ? `trendmart.shop/${shop.slug}` : "Powered by TrendMart"}
+                  {shop.slug ? `trendsmart.shop/${shop.slug}` : "Powered by TrendsMart"}
                 </p>
                 {printed ? (
-                  <p className="text-[8px] text-zinc-400">— Printed via TrendMart —</p>
+                  <p className="text-[8px] text-zinc-400">— Printed via TrendsMart —</p>
                 ) : null}
               </div>
             </div>

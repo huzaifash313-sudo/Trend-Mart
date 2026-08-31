@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  TrendMart — Optimized robots.txt (AI-Assistant Friendly)                  */
+/*  TrendsMart — Optimized robots.txt (AI-Assistant Friendly)                  */
 /*                                                                             */
 /*  SEO strategy: maximum discoverability across BOTH classic search engines  */
 /*  (Google / Bing / Yandex) AND AI assistants / answer engines (ChatGPT,     */
@@ -9,7 +9,7 @@ import type { MetadataRoute } from "next";
 /*                                                                             */
 /*  AI crawlers are deliberately ALLOWED to index the public marketplace:      */
 /*  when someone asks an assistant "best burger deals near Peoples Colony,     */
-/*  Gujranwala", the assistant can read shop/product pages and cite TrendMart  */
+/*  Gujranwala", the assistant can read shop/product pages and cite TrendsMart  */
 /*  with a link. Security is preserved because only public storefront routes   */
 /*  are crawlable — private areas stay disallowed for every agent.             */
 /*                                                                             */
@@ -22,7 +22,7 @@ import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
   const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://trend-marts.vercel.app";
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
 
   // Private areas — never crawlable by any agent.
   const PRIVATE_PATHS = [

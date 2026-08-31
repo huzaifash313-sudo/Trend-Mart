@@ -6,7 +6,7 @@ import { getPublicAppUrl } from "@/lib/appUrl";
 import { getShopPath } from "@/lib/shopSlug";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Downloadable Shop QR Code Generator                           */
+/*  TrendsMart — Downloadable Shop QR Code Generator                           */
 /* -------------------------------------------------------------------------- */
 
 interface ShopQrCodeProps {
@@ -69,7 +69,7 @@ async function buildDownloadPng(
   ctx.font = "600 36px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const label = shopName.trim() || "TrendMart Shop";
+  const label = shopName.trim() || "TrendsMart Shop";
   ctx.fillText(
     label.length > 40 ? `${label.slice(0, 37)}…` : label,
     canvas.width / 2,
@@ -121,7 +121,7 @@ export default function ShopQrCode({ shopId, shopName }: ShopQrCodeProps) {
     try {
       const png = await buildDownloadPng(storeUrl, shopName);
       const link = document.createElement("a");
-      link.download = `trendmart-${slugifyFilename(shopName)}-qr.png`;
+      link.download = `trendsmart-${slugifyFilename(shopName)}-qr.png`;
       link.href = png;
       link.rel = "noopener";
       document.body.appendChild(link);

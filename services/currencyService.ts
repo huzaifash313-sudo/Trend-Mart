@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Multi-Currency & Currency Conversion Utility                   */
+/*  TrendsMart — Multi-Currency & Currency Conversion Utility                   */
 /*                                                                             */
 /*  Lightweight service for:                                                   */
 /*   - Currency symbol mapping for regional retail buyers (PKR, USD, EUR,     */
@@ -549,7 +549,7 @@ export function getUserPreferredCurrency(): SupportedCurrency {
 
   // Check localStorage for saved preference
   try {
-    const saved = localStorage.getItem("trendmart_preferred_currency");
+    const saved = localStorage.getItem("trendsmart_preferred_currency");
     if (saved && SUPPORTED_CURRENCIES.includes(saved as SupportedCurrency)) {
       return saved as SupportedCurrency;
     }
@@ -598,7 +598,7 @@ export function getUserPreferredCurrency(): SupportedCurrency {
 export function saveUserPreferredCurrency(currency: SupportedCurrency): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem("trendmart_preferred_currency", currency);
+    localStorage.setItem("trendsmart_preferred_currency", currency);
   } catch {
     // localStorage may be unavailable
   }

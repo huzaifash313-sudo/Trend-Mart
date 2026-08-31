@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Story Subscription Quotas + Pricing Plans (soft-launch model)
+-- TrendsMart — Story Subscription Quotas + Pricing Plans (soft-launch model)
 -- -----------------------------------------------------------------------------
 -- Philosophy: "help merchants, never harm a business."
 --   • Every shop gets a free story slot (quota = 1) — no one is ever blocked.

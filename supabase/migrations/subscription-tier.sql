@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Multi-Vendor Commission & Subscription Tier Management Tables
+-- TrendsMart — Multi-Vendor Commission & Subscription Tier Management Tables
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.merchant_subscriptions (

@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — COMPLETE DATABASE SETUP (single file, run once in Supabase)
+-- TrendsMart — COMPLETE DATABASE SETUP (single file, run once in Supabase)
 -- =============================================================================
 --
 -- HOW TO USE
@@ -3026,7 +3026,7 @@ BEGIN
       'promotional_ads','user_profiles'
     );
 
-  RAISE NOTICE '✅ TrendMart database setup complete! % / 30 expected tables exist.', table_count;
+  RAISE NOTICE '✅ TrendsMart database setup complete! % / 30 expected tables exist.', table_count;
 
   IF missing_rls IS NOT NULL THEN
     RAISE WARNING '⚠️ The following tables have RLS DISABLED: %', missing_rls;

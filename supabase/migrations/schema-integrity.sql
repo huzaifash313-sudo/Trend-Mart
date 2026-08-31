@@ -1,5 +1,5 @@
 /* =============================================================================
- * TrendMart — Schema Integrity & Foreign Key Cascade Audit (Prompt 4)
+ * TrendsMart — Schema Integrity & Foreign Key Cascade Audit (Prompt 4)
  *
  * This migration ensures all foreign-key relationships across the entire
  * platform have proper `ON DELETE CASCADE` rules configured, preventing

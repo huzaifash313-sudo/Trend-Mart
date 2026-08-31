@@ -1,5 +1,5 @@
 ================================================================================
-TrendMart — Full Project Cost Guide (Secure Web + PWA + Future App)
+TrendsMart — Full Project Cost Guide (Secure Web + PWA + Future App)
 ================================================================================
 Currency notes: prices change often. Figures below are approximate USD (with
 rough PKR band at ~280 PKR/USD for planning). Always check live pricing pages.
@@ -16,7 +16,7 @@ LEGEND
 ================================================================================
 
 A) Domain name (MUST)
-   - trendmart.pk / .com / .store
+   - trendsmart.pk / .com / .store
    - Typical: $10–$20 / year (~PKR 3,000–6,000)
    - Where money goes: Namecheap, Cloudflare Registrar, GoDaddy, NIC.pk
    - Why: branded emails, trust, SEO, PWA install identity

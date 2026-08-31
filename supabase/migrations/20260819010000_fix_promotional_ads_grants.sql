@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Fix promotional_ads REST permissions + storage bucket safety
+-- TrendsMart — Fix promotional_ads REST permissions + storage bucket safety
 -- =============================================================================
 -- Symptoms:
 --   • GET  /rest/v1/promotional_ads?select=*  → 400 / 403
@@ -50,8 +50,8 @@ $$;
 --    panel uploads ad banners to the "ads" folder inside this bucket).
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-  'trendmart-media',
-  'trendmart-media',
+  'trendsmart-media',
+  'trendsmart-media',
   TRUE,
   5242880,
   ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/avif']
@@ -61,22 +61,22 @@ ON CONFLICT (id) DO NOTHING;
 DROP POLICY IF EXISTS "Public read access" ON storage.objects;
 CREATE POLICY "Public read access"
   ON storage.objects FOR SELECT
-  USING (bucket_id = 'trendmart-media');
+  USING (bucket_id = 'trendsmart-media');
 
 DROP POLICY IF EXISTS "Authenticated users can upload" ON storage.objects;
 CREATE POLICY "Authenticated users can upload"
   ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'trendmart-media' AND auth.role() = 'authenticated');
+  WITH CHECK (bucket_id = 'trendsmart-media' AND auth.role() = 'authenticated');
 
 DROP POLICY IF EXISTS "Owners can update their files" ON storage.objects;
 CREATE POLICY "Owners can update their files"
   ON storage.objects FOR UPDATE
-  USING (bucket_id = 'trendmart-media' AND auth.uid() = owner);
+  USING (bucket_id = 'trendsmart-media' AND auth.uid() = owner);
 
 DROP POLICY IF EXISTS "Owners can delete their files" ON storage.objects;
 CREATE POLICY "Owners can delete their files"
   ON storage.objects FOR DELETE
-  USING (bucket_id = 'trendmart-media' AND auth.uid() = owner);
+  USING (bucket_id = 'trendsmart-media' AND auth.uid() = owner);
 
 -- 3) Refresh PostgREST's schema cache so the new grants are honoured and the
 --    ads↔shops relationship (if you ever need the embed again) is picked up

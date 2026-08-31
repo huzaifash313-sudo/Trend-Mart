@@ -4,7 +4,7 @@ import { absoluteUrl } from "@/lib/metadata";
 
 type Props = { params: Promise<{ code: string }> };
 
-const SITE_NAME = "TrendMart";
+const SITE_NAME = "TrendsMart";
 
 interface ProductMetaRow {
   id: string;
@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!product?.name) {
     return {
       title: "Product",
-      description: "Browse this product on TrendMart.",
+      description: "Browse this product on TrendsMart.",
       robots: { index: false, follow: false },
     };
   }
@@ -85,7 +85,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = product.name;
   const desc =
     product.description?.trim() ||
-    `${product.name} — available at ${shopName}${shopLocation ? ` in ${shopLocation}` : ""}. Order via WhatsApp on TrendMart.`;
+    `${product.name} — available at ${shopName}${shopLocation ? ` in ${shopLocation}` : ""}. Order via WhatsApp on TrendsMart.`;
   const image = productImageUrl(product);
   const url = absoluteUrl(
     `/p/${product.short_code?.trim() || product.id}`,
@@ -118,7 +118,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${title} — ${SITE_NAME}`,
       description: desc,
       images: image ? [image] : [],
-      site: "@trendmartpk",
+      site: "@trendsmartpk",
     },
   };
 }

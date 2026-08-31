@@ -11,7 +11,7 @@ function requireEnv(key: string): string {
   const value = process.env[key];
   if (!value || value.trim().length === 0) {
     throw new Error(
-      `[TrendMart Middleware] Missing required configuration (${key}). ` +
+      `[TrendsMart Middleware] Missing required configuration (${key}). ` +
       `Please complete the platform setup.`,
     );
   }

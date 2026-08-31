@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Product Service Layer                                         */
+/*  TrendsMart — Product Service Layer                                         */
 /*  All product-related Supabase operations in one place.                      */
 /* -------------------------------------------------------------------------- */
 
@@ -25,7 +25,7 @@ function toError(err: unknown): string {
   return toServiceError(err);
 }
 
-/** Core columns that exist on every TrendMart products table. */
+/** Core columns that exist on every TrendsMart products table. */
 const PRODUCT_CORE_KEYS = [
   "name",
   "description",

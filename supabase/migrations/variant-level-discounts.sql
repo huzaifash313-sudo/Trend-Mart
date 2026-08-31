@@ -1,5 +1,5 @@
 -- ============================================================================
--- TrendMart — Per-Variant Original Prices (compare-at / strikethrough)
+-- TrendsMart — Per-Variant Original Prices (compare-at / strikethrough)
 -- ----------------------------------------------------------------------------
 -- Problem: products with variants only carried ONE `original_price` at the
 -- product level. When a customer picked a pricier option (e.g. Large pizza at

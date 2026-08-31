@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — DB-Backed In-App Notification Engine                           */
+/*  TrendsMart — DB-Backed In-App Notification Engine                           */
 /*                                                                             */
 /*  The `public.notifications` table (populated by server-side triggers) is    */
 /*  the durable source of truth. This provider:                                */
@@ -35,8 +35,8 @@ import {
   type AppNotification,
 } from "@/services/notificationService";
 
-const HISTORY_KEY_PREFIX = "trendmart_notif_history_v2";
-const PREFS_KEY = "trendmart_notifications";
+const HISTORY_KEY_PREFIX = "trendsmart_notif_history_v2";
+const PREFS_KEY = "trendsmart_notifications";
 
 /**
  * Notification history is cached per ACCOUNT, never per device. On a shared
@@ -247,7 +247,7 @@ export function NotificationListenerProvider({
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem("trendmart_notifications_muted");
+        const stored = localStorage.getItem("trendsmart_notifications_muted");
         if (stored === "true") setIsMuted(true);
       } catch {
         /* ignore */
@@ -260,7 +260,7 @@ export function NotificationListenerProvider({
       const next = !prev;
       if (typeof window !== "undefined") {
         try {
-          localStorage.setItem("trendmart_notifications_muted", String(next));
+          localStorage.setItem("trendsmart_notifications_muted", String(next));
         } catch {
           /* ignore */
         }
@@ -300,7 +300,7 @@ export function NotificationListenerProvider({
       }
       if (typeof window !== "undefined") {
         window.dispatchEvent(
-          new CustomEvent("trendmart:toast", {
+          new CustomEvent("trendsmart:toast", {
             detail: {
               type: "info",
               message: `${NOTIF_EMOJI[notif.type] ?? "🔔"} ${notif.title}`,

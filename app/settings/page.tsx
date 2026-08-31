@@ -282,7 +282,7 @@ export default function SettingsPage() {
         {/* ── About ────────────────────────────────────────────────── */}
         <section aria-label="About">
           <p className="text-center text-[0.65rem] text-zinc-400 dark:text-zinc-500">
-            TrendMart v1.0 · Built for local commerce 🇵🇰
+            TrendsMart v1.0 · Built for local commerce 🇵🇰
           </p>
         </section>
       </main>

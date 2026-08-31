@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Persistent Wishlist / Favorites Service                        */
+/*  TrendsMart — Persistent Wishlist / Favorites Service                        */
 /*                                                                             */
 /*  PROMPT 2: HARDENED — Robust input validation, duplicate-checking logic,    */
 /*                       race-condition safeguards, null-reference prevention, */
@@ -127,16 +127,16 @@ function sanitizeTimestamp(ts: unknown): number {
 
 /** Per-account key — each account (and the guest) keeps its own wishlist. */
 function favoritesKey(): string {
-  return scopedKey("trendmart_favorites");
+  return scopedKey("trendsmart_favorites");
 }
 
 function favoritesCountKey(): string {
-  return scopedKey("trendmart_favorites_count");
+  return scopedKey("trendsmart_favorites_count");
 }
 
 /** Keys used to read/write the "guest" bucket during sign-in hand-off. */
 function guestFavoritesKey(): string {
-  return scopedKeyFor("trendmart_favorites", "guest");
+  return scopedKeyFor("trendsmart_favorites", "guest");
 }
 
 /**
@@ -633,7 +633,7 @@ export async function getFavoriteCount(): Promise<number> {
 }
 
 /** Per-account key — last time the user opened the wishlist page (badge cleared). */
-const WISHLIST_SEEN_AT_KEY = "trendmart_wishlist_seen_at";
+const WISHLIST_SEEN_AT_KEY = "trendsmart_wishlist_seen_at";
 
 function wishlistSeenKey(): string {
   return scopedKey(WISHLIST_SEEN_AT_KEY);
@@ -959,7 +959,7 @@ async function pushFavoritesToDb(
 export async function migrateGuestFavoritesToUserBucket(userId: string): Promise<void> {
   if (typeof window === "undefined" || !userId) return;
   const guestKey = guestFavoritesKey();
-  const userKey = scopedKeyFor("trendmart_favorites", `u_${userId}`);
+  const userKey = scopedKeyFor("trendsmart_favorites", `u_${userId}`);
 
   let guestItems: FavoriteItem[] = [];
   try {
@@ -1000,12 +1000,12 @@ export async function migrateGuestFavoritesToUserBucket(userId: string): Promise
     const merged = deduplicateLocalItems(Array.from(byKey.values()));
     localStorage.setItem(userKey, JSON.stringify(merged));
     localStorage.setItem(
-      scopedKeyFor("trendmart_favorites_count", `u_${userId}`),
+      scopedKeyFor("trendsmart_favorites_count", `u_${userId}`),
       String(merged.length),
     );
     localStorage.removeItem(guestKey);
     try {
-      localStorage.removeItem(scopedKeyFor("trendmart_favorites_count", "guest"));
+      localStorage.removeItem(scopedKeyFor("trendsmart_favorites_count", "guest"));
     } catch {
       /* ignore */
     }

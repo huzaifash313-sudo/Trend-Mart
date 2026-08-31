@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart Schema Migration
+-- TrendsMart Schema Migration
 -- Run this in the Supabase SQL Editor (https://supabase.com/dashboard)
 -- =============================================================================
 

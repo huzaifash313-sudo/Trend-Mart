@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Super-Admin Moderation Service                                 */
+/*  TrendsMart — Super-Admin Moderation Service                                 */
 /*  Customer list + ban management, per-shop drill-down data, and ad pricing   */
 /*  plan CRUD. All reads/writes are gated by admin RLS policies on the         */
 /*  affected tables (user_profiles, products, orders, ad_plans).               */

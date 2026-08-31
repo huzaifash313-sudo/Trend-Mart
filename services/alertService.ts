@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Automated Low-Stock Alert & Notification Service               */
+/*  TrendsMart — Automated Low-Stock Alert & Notification Service               */
 /*                                                                             */
 /*  Continuously evaluates product inventory thresholds against active stock   */
 /*  counts across all variants. Powers real-time notification badges in the    */

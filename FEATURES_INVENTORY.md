@@ -1,4 +1,4 @@
-# 🧾 TrendMart — Features Inventory (Kya Hai / Kya Nahi Hai)
+# 🧾 TrendsMart — Features Inventory (Kya Hai / Kya Nahi Hai)
 
 > **Status note:** This inventory is historical and is superseded for current status by the live codebase and `.cursorrules` requirements. Current operational rules: phone SMS OTP is disabled (email verification only), merchants are auto-approved/live on store creation, and product stock is strictly In Stock / Out of Stock only (no numeric stock counts).
 
@@ -172,7 +172,7 @@
 ## 📁 FILE STRUCTURE (Current)
 
 ```
-trendmart/
+trendsmart/
 ├── app/
 │   ├── auth/
 │   │   ├── page.tsx                  ✅ Sign In / Sign Up page

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Geo-Radius & Proximity Filtering Service                       */
+/*  TrendsMart — Geo-Radius & Proximity Filtering Service                       */
 /*                                                                             */
 /*  Handles:                                                                    */
 /*   - Customer geolocation (browser API)                                      */
@@ -141,7 +141,7 @@ export function cityNamesMatch(a: string, b: string): boolean {
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_DISTANCE_KM = 50;
-const LOCATION_CACHE_KEY = "trendmart_user_location_v2";
+const LOCATION_CACHE_KEY = "trendsmart_user_location_v2";
 /** Re-detect location after 30 minutes (GPS). Manual/cached persists indefinitely. */
 const GPS_CACHE_MAX_AGE_MS = 1_800_000; // 30 min
 
@@ -327,7 +327,7 @@ export function locationErrorMessage(code: LocationDetectErrorCode): string {
   }
 }
 
-const LEGACY_SESSION_LOCATION_KEY = "trendmart_user_location";
+const LEGACY_SESSION_LOCATION_KEY = "trendsmart_user_location";
 
 /**
  * Read cached coordinates only (no GPS prompt).
@@ -1160,7 +1160,7 @@ export async function reverseGeocode(
       signal: controller.signal,
       headers: {
         Accept: "application/json",
-        "User-Agent": "TrendMart/1.0 (https://trend-marts.vercel.app)",
+        "User-Agent": "TrendsMart/1.0 (https://trendsmart.pk)",
       },
     });
     clearTimeout(timeout);

@@ -1,4 +1,4 @@
-﻿-- TrendMart: 01c_core_functions_triggers_grants.sql
+﻿-- TrendsMart: 01c_core_functions_triggers_grants.sql
 -- Run in Supabase SQL Editor. If Failed to fetch: refresh, wait, retry this file only.
 
 BEGIN;

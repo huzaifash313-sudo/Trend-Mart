@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Automated Database Maintenance, Backup Cron & Data Archival
+-- TrendsMart — Automated Database Maintenance, Backup Cron & Data Archival
 -- =============================================================================
 --
 -- This script implements:

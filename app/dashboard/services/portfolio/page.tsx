@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Service Portfolio Dashboard Page (Prompt 4)                     */
+/*  TrendsMart — Service Portfolio Dashboard Page (Prompt 4)                     */
 /*                                                                             */
 /*  Dedicated dashboard page where electricians, AC technicians, camera        */
 /*  installers, and other service professionals can manage their before/after  */

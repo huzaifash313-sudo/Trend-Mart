@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Enterprise-Grade Audit Logging & Admin Activity Tracker
+-- TrendsMart — Enterprise-Grade Audit Logging & Admin Activity Tracker
 -- Centralized platform audit log for super administrators.
 -- =============================================================================
 

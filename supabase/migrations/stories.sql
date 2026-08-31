@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Stories Table Migration
+-- TrendsMart — Stories Table Migration
 -- Run in Supabase SQL Editor
 -- =============================================================================
 

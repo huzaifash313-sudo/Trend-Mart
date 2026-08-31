@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Sentry Error Monitoring & Performance Telemetry                */
+/*  TrendsMart — Sentry Error Monitoring & Performance Telemetry                */
 /*                                                                             */
 /*  Integrates with Sentry for:                                                */
 /*   - Real-time exception tracking with source maps                           */

@@ -29,7 +29,7 @@ loadEnvLocal();
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const email = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "admin@trendmart.app").trim().toLowerCase();
+const email = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "admin@trendsmart.app").trim().toLowerCase();
 const password = process.env.ADMIN_BOOTSTRAP_PASSWORD ?? "Trend@123";
 
 if (!url || !serviceKey) {
@@ -83,7 +83,7 @@ async function upsertProfile(userId) {
     headers: { ...adminHeaders, Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({
       user_id: userId,
-      full_name: "TrendMart Admin",
+      full_name: "TrendsMart Admin",
       phone: "",
       address: "",
       updated_at: new Date().toISOString(),
@@ -110,7 +110,7 @@ async function main() {
         app_metadata: { ...(user.app_metadata ?? {}), role: "admin" },
         user_metadata: {
           ...(user.user_metadata ?? {}),
-          full_name: "TrendMart Admin",
+          full_name: "TrendsMart Admin",
           role: "admin",
         },
       }),
@@ -127,7 +127,7 @@ async function main() {
         password,
         email_confirm: true,
         app_metadata: { provider: "email", providers: ["email"], role: "admin" },
-        user_metadata: { full_name: "TrendMart Admin", role: "admin" },
+        user_metadata: { full_name: "TrendsMart Admin", role: "admin" },
       }),
     });
     if (!res.ok) throw new Error(`createUser failed (${res.status}): ${await res.text()}`);

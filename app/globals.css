@@ -3124,7 +3124,41 @@ html.dark .tm-geo-reset:hover {
   content: "";
   display: block;
   width: 100%;
-  padding-bottom: 75%;
+  padding-bottom: 68%;
+}
+
+/* Compact cards (marketplace /products feed, store catalog) — shorter image + tighter body */
+.tm-product-card--compact .tm-product-media::before {
+  padding-bottom: 58%;
+}
+.tm-product-card--compact .tm-product-body {
+  padding: 0.2rem 0.32rem 0.24rem;
+  gap: 0.08rem;
+}
+@media (min-width: 640px) {
+  .tm-product-card--compact .tm-product-body {
+    padding: 0.22rem 0.36rem 0.26rem;
+  }
+}
+.tm-product-card--compact .tm-product-title {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  min-height: auto;
+}
+.tm-product-card--compact .tm-product-footer {
+  margin-top: 0;
+}
+.tm-product-card--compact .tm-product-actions {
+  padding-top: 0.12rem;
+  border-top-color: transparent;
+}
+.tm-product-card--compact .tm-product-offer-strip {
+  height: 1.25rem;
+}
+@media (min-width: 1024px) {
+  .tm-product-card--compact {
+    contain-intrinsic-size: 200px 320px;
+  }
 }
 html.dark .tm-product-media {
   background: linear-gradient(160deg, #042f2e 0%, #0f172a 100%);
@@ -4406,7 +4440,7 @@ html.tm-first-paint .tm-boot-splash {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Logo starts dead-center, then the whole stage rises once "TrendMart"
+  /* Logo starts dead-center, then the whole stage rises once "TrendsMart"
      reveals — matches the requested "logo center → rise + shrink" beat. */
   transform: translateY(0);
   transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);

@@ -104,7 +104,7 @@ function MyReviewsModal({
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  // App review (rate the TrendMart app itself — always available)
+  // App review (rate the TrendsMart app itself — always available)
   const [appRating, setAppRating] = useState(0);
   const [appComment, setAppComment] = useState("");
   const [appReview, setAppReview] = useState<AppReview | null>(() => {
@@ -119,7 +119,7 @@ function MyReviewsModal({
     }
     const saved = saveAppReview(appRating, appComment);
     setAppReview(saved);
-    addToast("Thanks for rating TrendMart!", "success");
+    addToast("Thanks for rating TrendsMart!", "success");
   };
 
   const handleOverlayClick = useCallback(
@@ -340,10 +340,10 @@ function MyReviewsModal({
             </section>
           ) : null}
 
-          {/* Rate the TrendMart app — always available, no order needed */}
+          {/* Rate the TrendsMart app — always available, no order needed */}
           <section className="space-y-2.5">
             <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-              Rate the TrendMart app
+              Rate the TrendsMart app
             </h4>
             <div className="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
               {appReview ? (
@@ -377,7 +377,7 @@ function MyReviewsModal({
                 value={appComment}
                 onChange={(e) => setAppComment(e.target.value)}
                 maxLength={500}
-                placeholder="What do you think about TrendMart? (optional)"
+                placeholder="What do you think about TrendsMart? (optional)"
                 className="mt-2.5 w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
               <button
@@ -388,7 +388,7 @@ function MyReviewsModal({
                 {appReview ? "Update app rating" : "Submit app rating"}
               </button>
               <p className="mt-2 text-[0.65rem] text-zinc-400">
-                This rating is for the TrendMart app itself — you can update it anytime.
+                This rating is for the TrendsMart app itself — you can update it anytime.
               </p>
             </div>
           </section>

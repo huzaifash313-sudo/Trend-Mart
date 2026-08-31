@@ -1,4 +1,4 @@
--- TrendMart — merchant "pin to top" for products.
+-- TrendsMart — merchant "pin to top" for products.
 -- Adds an is_pinned flag so a store owner can pin products to the top of
 -- their storefront (and their own manage view). Idempotent.
 

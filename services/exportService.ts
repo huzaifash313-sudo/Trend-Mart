@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Automated CSV Sales & Inventory Data Export Service            */
+/*  TrendsMart — Automated CSV Sales & Inventory Data Export Service            */
 /*  Prompt 5: Comprehensive client-side CSV export with sales history,         */
 /*           order reports, inventory levels, and merchant accounting data.     */
 /* -------------------------------------------------------------------------- */
@@ -397,7 +397,7 @@ export function generateInventoryReport(products: Product[]): string {
   const now = new Date().toLocaleString("en-PK");
   const lines: string[] = [
     "═════════════════════════════════════",
-    "   TRENDMART INVENTORY REPORT",
+    "   TRENDSMART INVENTORY REPORT",
     `   Generated: ${now}`,
     "═════════════════════════════════════",
     "",
@@ -443,7 +443,7 @@ export function generateInventoryReport(products: Product[]): string {
 
   lines.push("");
   lines.push("═════════════════════════════════════");
-  lines.push("   End of Report – TrendMart");
+  lines.push("   End of Report – TrendsMart");
 
   return lines.join("\n");
 }
@@ -673,7 +673,7 @@ export async function downloadAllMerchantData(
   shopName?: string,
 ): Promise<void> {
   // Sanitize shop name for filenames
-  const safeName = shopName ? sanitizePathSegment(shopName.toLowerCase(), 60) : "trendmart";
+  const safeName = shopName ? sanitizePathSegment(shopName.toLowerCase(), 60) : "trendsmart";
 
   // Small delay between downloads to prevent browser blocking
   downloadProductsCSV(products, safeName);

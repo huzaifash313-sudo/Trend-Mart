@@ -1,4 +1,4 @@
-﻿-- TrendMart: 01b_core_wishlists_coupons_audit.sql
+﻿-- TrendsMart: 01b_core_wishlists_coupons_audit.sql
 -- Run in Supabase SQL Editor. If Failed to fetch: refresh, wait, retry this file only.
 
 BEGIN;

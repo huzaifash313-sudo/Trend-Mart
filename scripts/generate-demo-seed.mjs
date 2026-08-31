@@ -1,6 +1,6 @@
 /* eslint-disable */
 // =============================================================================
-// TrendMart — Demo Seed Generator
+// TrendsMart — Demo Seed Generator
 // -----------------------------------------------------------------------------
 // Generates `supabase/migrations/demo-seed-data.sql` with:
 //   • 7 demo shops (2 restaurants, grocery, bakery, desi food, toys, clothing)
@@ -46,7 +46,7 @@ function saveOvCache() {
   }
 }
 
-const OV_UA = "trendmart-demo-seed/1.0 (image search)";
+const OV_UA = "trendsmart-demo-seed/1.0 (image search)";
 
 /** True when the URL actually returns an image (avoids broken/hotlink-blocked links). */
 async function imageIsOk(url) {
@@ -1110,7 +1110,7 @@ function jsonArr(a) {
 function buildSql() {
   const L = [];
   L.push("-- ============================================================================");
-  L.push("-- TrendMart — DEMO SEED DATA (generated — do not edit by hand)");
+  L.push("-- TrendsMart — DEMO SEED DATA (generated — do not edit by hand)");
   L.push("--   • 7 demo shops   • ~600 products   • ~56 weekly deals   • 7 merchants + 3 customers");
   L.push("-- Safe to re-run (deterministic UUIDs; shops/products/deals UPSERT in place).");
   L.push("-- Self-contained: creates every account it needs (no clean-slate required).");
@@ -1121,16 +1121,16 @@ function buildSql() {
 
   // 1) All test accounts required by the seed (merchant1-7 + customer1-3)
   const ACCOUNTS = [
-    { id: MERCHANTS.m1, email: "merchant1@trendmart.pk", name: "Ali Hassan", phone: "0301-5551001", role: "merchant" },
-    { id: MERCHANTS.m2, email: "merchant2@trendmart.pk", name: "Fatima Noor", phone: "0301-5551002", role: "merchant" },
-    { id: MERCHANTS.m3, email: "merchant3@trendmart.pk", name: "Usman Tariq", phone: "0301-5551003", role: "merchant" },
-    { id: MERCHANTS.m4, email: "merchant4@trendmart.pk", name: "Zainab Iqbal", phone: "0301-5551004", role: "merchant" },
-    { id: MERCHANTS.m5, email: "merchant5@trendmart.pk", name: "Hamza Sheikh", phone: "0301-5551005", role: "merchant" },
-    { id: MERCHANTS.m6, email: "merchant6@trendmart.pk", name: "Ayesha Khan", phone: "0301-5551006", role: "merchant" },
-    { id: MERCHANTS.m7, email: "merchant7@trendmart.pk", name: "Omar Farooq", phone: "0301-5551007", role: "merchant" },
-    { id: "c0000000-0000-4000-8000-000000000001", email: "customer1@trendmart.pk", name: "Ahmed Raza", phone: "0300-1234001", role: "customer" },
-    { id: "c0000000-0000-4000-8000-000000000002", email: "customer2@trendmart.pk", name: "Sana Malik", phone: "0300-1234002", role: "customer" },
-    { id: "c0000000-0000-4000-8000-000000000003", email: "customer3@trendmart.pk", name: "Bilal Khan", phone: "0300-1234003", role: "customer" },
+    { id: MERCHANTS.m1, email: "merchant1@trendsmart.pk", name: "Ali Hassan", phone: "0301-5551001", role: "merchant" },
+    { id: MERCHANTS.m2, email: "merchant2@trendsmart.pk", name: "Fatima Noor", phone: "0301-5551002", role: "merchant" },
+    { id: MERCHANTS.m3, email: "merchant3@trendsmart.pk", name: "Usman Tariq", phone: "0301-5551003", role: "merchant" },
+    { id: MERCHANTS.m4, email: "merchant4@trendsmart.pk", name: "Zainab Iqbal", phone: "0301-5551004", role: "merchant" },
+    { id: MERCHANTS.m5, email: "merchant5@trendsmart.pk", name: "Hamza Sheikh", phone: "0301-5551005", role: "merchant" },
+    { id: MERCHANTS.m6, email: "merchant6@trendsmart.pk", name: "Ayesha Khan", phone: "0301-5551006", role: "merchant" },
+    { id: MERCHANTS.m7, email: "merchant7@trendsmart.pk", name: "Omar Farooq", phone: "0301-5551007", role: "merchant" },
+    { id: "c0000000-0000-4000-8000-000000000001", email: "customer1@trendsmart.pk", name: "Ahmed Raza", phone: "0300-1234001", role: "customer" },
+    { id: "c0000000-0000-4000-8000-000000000002", email: "customer2@trendsmart.pk", name: "Sana Malik", phone: "0300-1234002", role: "customer" },
+    { id: "c0000000-0000-4000-8000-000000000003", email: "customer3@trendsmart.pk", name: "Bilal Khan", phone: "0300-1234003", role: "customer" },
   ];
   L.push("-- ── 1) Test accounts required by this seed (merchant1-7 + customer1-3) ──");
   L.push("--    Self-contained: runs without the clean-slate file. All password: Trend@123");
@@ -1335,7 +1335,7 @@ async function resolveAllImages() {
 // ── main ─────────────────────────────────────────────────────────────────────
 async function main() {
   const fresh = process.argv.includes("--fresh");
-  console.log("TrendMart demo seed generator" + (fresh ? "  [--fresh: re-searching all images]" : ""));
+  console.log("TrendsMart demo seed generator" + (fresh ? "  [--fresh: re-searching all images]" : ""));
   expandCatalogs();
   loadOvCache();
   if (fresh) {

@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Revenue Trend Chart (last N days)                              */
+/*  TrendsMart — Revenue Trend Chart (last N days)                              */
 /*  Renders a 14-day revenue/order trend for the Super-Admin overview.        */
 /* -------------------------------------------------------------------------- */
 

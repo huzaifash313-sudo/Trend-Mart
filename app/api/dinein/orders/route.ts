@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Dine-In Order Placement (POST /api/dinein/orders)              */
+/*  TrendsMart — Dine-In Order Placement (POST /api/dinein/orders)              */
 /*                                                                             */
 /*  The zero-friction checkout for QR table ordering. Unlike POST /api/orders  */
 /*  (delivery) this route deliberately requires NO sign-in and NO email        */

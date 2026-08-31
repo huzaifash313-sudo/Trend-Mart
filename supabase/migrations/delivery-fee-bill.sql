@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Delivery Fee & Order Bill Breakdown (idempotent)
+-- TrendsMart — Delivery Fee & Order Bill Breakdown (idempotent)
 -- ----------------------------------------------------------------------------
 -- Ensures every order row can store the exact money breakdown so bills and
 -- the /o/ order summary show the delivery fee properly:

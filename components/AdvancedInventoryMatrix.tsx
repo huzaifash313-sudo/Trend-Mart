@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Advanced Variant-Aware Multi-Attribute Inventory Matrix        */
+/*  TrendsMart — Advanced Variant-Aware Multi-Attribute Inventory Matrix        */
 /*  (Prompt 3)                                                                 */
 /*                                                                             */
 /*  Features:                                                                  */

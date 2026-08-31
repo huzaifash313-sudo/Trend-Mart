@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — CLEAN SLATE + TEST ACCOUNTS
+-- TrendsMart — CLEAN SLATE + TEST ACCOUNTS
 -- -----------------------------------------------------------------------------
 -- Wipes ALL marketplace/business data (shops, products, orders, stories, ads,
 -- reviews, wishlists, analytics, notifications, …) and ALL existing signups.
@@ -10,16 +10,16 @@
 -- 🔑 ALL accounts share the password:  Trend@123
 --
 -- CUSTOMERS (role: customer)
---   customer1@trendmart.pk  (Ahmed Raza)
---   customer2@trendmart.pk  (Sana Malik)
---   customer3@trendmart.pk  (Bilal Khan)
+--   customer1@trendsmart.pk  (Ahmed Raza)
+--   customer2@trendsmart.pk  (Sana Malik)
+--   customer3@trendsmart.pk  (Bilal Khan)
 --
 -- MERCHANTS (role: merchant — build your store from the dashboard)
---   merchant1@trendmart.pk  (Ali Hassan)
---   merchant2@trendmart.pk  (Fatima Noor)
---   merchant3@trendmart.pk  (Usman Tariq)
---   merchant4@trendmart.pk  (Zainab Iqbal)
---   merchant5@trendmart.pk  (Hamza Sheikh)
+--   merchant1@trendsmart.pk  (Ali Hassan)
+--   merchant2@trendsmart.pk  (Fatima Noor)
+--   merchant3@trendsmart.pk  (Usman Tariq)
+--   merchant4@trendsmart.pk  (Zainab Iqbal)
+--   merchant5@trendsmart.pk  (Hamza Sheikh)
 --
 -- NOTE: sub_categories + pricing catalogs (ad_plans/story_plans) are reference
 -- data, not store data — they're preserved so product forms keep working.
@@ -66,35 +66,35 @@ INSERT INTO auth.users
    raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 VALUES
   ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-4000-8000-000000000001',
-   'authenticated', 'authenticated', 'customer1@trendmart.pk',
+   'authenticated', 'authenticated', 'customer1@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Ahmed Raza"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-4000-8000-000000000002',
-   'authenticated', 'authenticated', 'customer2@trendmart.pk',
+   'authenticated', 'authenticated', 'customer2@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Sana Malik"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-4000-8000-000000000003',
-   'authenticated', 'authenticated', 'customer3@trendmart.pk',
+   'authenticated', 'authenticated', 'customer3@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Bilal Khan"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'd0000000-0000-4000-8000-000000000001',
-   'authenticated', 'authenticated', 'merchant1@trendmart.pk',
+   'authenticated', 'authenticated', 'merchant1@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Ali Hassan"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'd0000000-0000-4000-8000-000000000002',
-   'authenticated', 'authenticated', 'merchant2@trendmart.pk',
+   'authenticated', 'authenticated', 'merchant2@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Fatima Noor"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'd0000000-0000-4000-8000-000000000003',
-   'authenticated', 'authenticated', 'merchant3@trendmart.pk',
+   'authenticated', 'authenticated', 'merchant3@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Usman Tariq"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'd0000000-0000-4000-8000-000000000004',
-   'authenticated', 'authenticated', 'merchant4@trendmart.pk',
+   'authenticated', 'authenticated', 'merchant4@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Zainab Iqbal"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'd0000000-0000-4000-8000-000000000005',
-   'authenticated', 'authenticated', 'merchant5@trendmart.pk',
+   'authenticated', 'authenticated', 'merchant5@trendsmart.pk',
    crypt('Trend@123', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}', '{"full_name":"Hamza Sheikh"}', now(), now())
 ON CONFLICT DO NOTHING;
@@ -104,28 +104,28 @@ INSERT INTO auth.identities
   (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
 VALUES
   ('c0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
-   '{"sub":"c0000000-0000-4000-8000-000000000001","email":"customer1@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"c0000000-0000-4000-8000-000000000001","email":"customer1@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'c0000000-0000-4000-8000-000000000001', now(), now(), now()),
   ('c0000000-0000-4000-8000-000000000002', 'c0000000-0000-4000-8000-000000000002',
-   '{"sub":"c0000000-0000-4000-8000-000000000002","email":"customer2@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"c0000000-0000-4000-8000-000000000002","email":"customer2@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'c0000000-0000-4000-8000-000000000002', now(), now(), now()),
   ('c0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000003',
-   '{"sub":"c0000000-0000-4000-8000-000000000003","email":"customer3@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"c0000000-0000-4000-8000-000000000003","email":"customer3@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'c0000000-0000-4000-8000-000000000003', now(), now(), now()),
   ('d0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001',
-   '{"sub":"d0000000-0000-4000-8000-000000000001","email":"merchant1@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"d0000000-0000-4000-8000-000000000001","email":"merchant1@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'd0000000-0000-4000-8000-000000000001', now(), now(), now()),
   ('d0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000002',
-   '{"sub":"d0000000-0000-4000-8000-000000000002","email":"merchant2@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"d0000000-0000-4000-8000-000000000002","email":"merchant2@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'd0000000-0000-4000-8000-000000000002', now(), now(), now()),
   ('d0000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000003',
-   '{"sub":"d0000000-0000-4000-8000-000000000003","email":"merchant3@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"d0000000-0000-4000-8000-000000000003","email":"merchant3@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'd0000000-0000-4000-8000-000000000003', now(), now(), now()),
   ('d0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000004',
-   '{"sub":"d0000000-0000-4000-8000-000000000004","email":"merchant4@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"d0000000-0000-4000-8000-000000000004","email":"merchant4@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'd0000000-0000-4000-8000-000000000004', now(), now(), now()),
   ('d0000000-0000-4000-8000-000000000005', 'd0000000-0000-4000-8000-000000000005',
-   '{"sub":"d0000000-0000-4000-8000-000000000005","email":"merchant5@trendmart.pk","email_verified":true,"phone_verified":false}',
+   '{"sub":"d0000000-0000-4000-8000-000000000005","email":"merchant5@trendsmart.pk","email_verified":true,"phone_verified":false}',
    'email', 'd0000000-0000-4000-8000-000000000005', now(), now(), now())
 ON CONFLICT DO NOTHING;
 

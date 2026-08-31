@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Merchant Financial Ledger & Cash Flow Tracker                  */
+/*  TrendsMart — Merchant Financial Ledger & Cash Flow Tracker                  */
 /*                                                                             */
 /*  Features:                                                                  */
 /*   - Record cash received (manual entries)                                   */
@@ -241,7 +241,7 @@ export default function FinancesPage() {
       if (result.success) {
         const myShops = result.data.filter((s) => s.owner_id === userId);
         setAllShops(myShops);
-        const savedId = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendmart_active_shop")) : null;
+        const savedId = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendsmart_active_shop")) : null;
         if (savedId && myShops.some((s) => s.id === savedId)) {
           setActiveShopId(savedId);
         } else if (myShops.length > 0) {

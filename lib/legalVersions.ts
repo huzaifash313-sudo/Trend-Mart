@@ -1,7 +1,7 @@
 import type { LegalDocument } from "@/services/legalService";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Legal Document Versioning                                      */
+/*  TrendsMart — Legal Document Versioning                                      */
 /*                                                                             */
 /*  Bump the version for a document here whenever its page content changes    */
 /*  materially. Logged-in users who accepted an older version will see the    */

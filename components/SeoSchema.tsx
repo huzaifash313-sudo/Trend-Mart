@@ -1,7 +1,7 @@
 import React from "react";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — JSON-LD Structured Data for SEO (Prompt 75)                    */
+/*  TrendsMart — JSON-LD Structured Data for SEO (Prompt 75)                    */
 /*  Implements LocalBusiness and Product schemas for rich snippets.             */
 /* -------------------------------------------------------------------------- */
 
@@ -56,7 +56,7 @@ export function LocalBusinessSchema({
     };
   }
   if (shopCategory) {
-    // Map trendmart categories to Schema.org types
+    // Map trendsmart categories to Schema.org types
     const categoryMap: Record<string, string> = {
       Food: "FoodEstablishment",
       Grocery: "GroceryStore",

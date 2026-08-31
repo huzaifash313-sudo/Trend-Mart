@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Distributed Rate-Limiting Adapter (Redis / High-Performance)    */
+/*  TrendsMart — Distributed Rate-Limiting Adapter (Redis / High-Performance)    */
 /*  PROMPT 2: Robust, distributed rate-limiting and request-throttling          */
 /*           middleware using Redis or high-performance memory stores           */
 /*           at the Next.js API gateway level.                                  */
@@ -51,7 +51,7 @@ export class DistributedRateLimiter {
       try {
         return await this.redisSlidingWindowCheck(redisKey, resolvedConfig);
       } catch {
-        console.warn("[TrendMart] Redis rate limiter failed, using in-memory fallback.");
+        console.warn("[TrendsMart] Redis rate limiter failed, using in-memory fallback.");
       }
     }
 
@@ -347,11 +347,11 @@ export function bootstrapDistributedRateLimiter(): void {
   try {
     configureDistributedRateLimiter(createUpstashRestStore(url, token));
     console.info(
-      "[TrendMart] Distributed rate limiter engaged (Upstash REST).",
+      "[TrendsMart] Distributed rate limiter engaged (Upstash REST).",
     );
   } catch (err) {
     console.warn(
-      "[TrendMart] Failed to initialise distributed rate limiter — using in-memory fallback.",
+      "[TrendsMart] Failed to initialise distributed rate limiter — using in-memory fallback.",
       err instanceof Error ? err.message : String(err),
     );
   }

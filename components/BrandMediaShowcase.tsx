@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Brand promo video (homepage)                                  */
+/*  TrendsMart — Brand promo video (homepage)                                  */
 /*                                                                            */
 /*  Promo reel: muted autoplay loop while in view. Image carousel removed.    */
 /* -------------------------------------------------------------------------- */
@@ -58,7 +58,7 @@ function BrandVideo() {
         loop
         playsInline
         preload="metadata"
-        aria-label="TrendMart brand promo"
+        aria-label="TrendsMart brand promo"
         onError={() => setFailed(true)}
       />
       <div className="tm-brand-video-glow" aria-hidden />
@@ -73,7 +73,7 @@ export default function BrandMediaShowcase({
 }) {
   return (
     <section
-      aria-label="TrendMart highlights"
+      aria-label="TrendsMart highlights"
       className={`tm-brand-showcase ${className}`.trim()}
     >
       <BrandVideo />

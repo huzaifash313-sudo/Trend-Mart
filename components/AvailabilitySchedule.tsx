@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Service Provider Availability & Working Hours Toggle (Prompt 5) */
+/*  TrendsMart — Service Provider Availability & Working Hours Toggle (Prompt 5) */
 /*                                                                             */
 /*  Lets service professionals configure working days, active time slots,      */
 /*  and emergency availability flags. Also used on the public storefront to    */

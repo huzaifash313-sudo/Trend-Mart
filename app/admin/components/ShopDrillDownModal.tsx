@@ -11,7 +11,7 @@ import {
 import type { AdminMerchantRecord, Product, Order } from "@/types";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Per-Shop Drill-Down Modal (Super-Admin)                        */
+/*  TrendsMart — Per-Shop Drill-Down Modal (Super-Admin)                        */
 /*  Opens from the Merchants table: QR code, product list, recent orders,      */
 /*  and a quick storefront link for any merchant on the platform.              */
 /* -------------------------------------------------------------------------- */

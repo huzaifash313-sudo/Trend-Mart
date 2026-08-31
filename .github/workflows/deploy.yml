@@ -1,5 +1,5 @@
 # =============================================================================
-# TrendMart — Elite-Grade Production CI/CD Pipeline
+# TrendsMart — Elite-Grade Production CI/CD Pipeline
 # =============================================================================
 # 
 # Pipeline stages:
@@ -13,7 +13,7 @@
 # Exit code 0 = clean build. Any failure blocks deployment.
 # =============================================================================
 
-name: TrendMart CI/CD — Build, Lint, Test & Deploy
+name: TrendsMart CI/CD — Build, Lint, Test & Deploy
 
 on:
   push:
@@ -164,7 +164,7 @@ jobs:
         if: ${{ secrets.VERCEL_TOKEN != '' }}
         run: |
           echo "✅ Deployed successfully to Vercel Production!"
-          echo "🌐 URL: https://trend-marts.vercel.app"
+          echo "🌐 URL: https://trendsmart.pk"
 
   # ===========================================================================
   # JOB 4: Sentry Release Tracking & Source Maps

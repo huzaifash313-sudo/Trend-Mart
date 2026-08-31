@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shop Service Layer                                            */
+/*  TrendsMart — Shop Service Layer                                            */
 /*  All shop-related Supabase operations in one place.                         */
 /* -------------------------------------------------------------------------- */
 
@@ -701,7 +701,7 @@ export async function createShop(
       return {
         success: false,
         error:
-          "You already own a store on TrendMart — only one store is allowed per account. Open it from your dashboard.",
+          "You already own a store on TrendsMart — only one store is allowed per account. Open it from your dashboard.",
       };
     }
 

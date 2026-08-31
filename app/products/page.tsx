@@ -223,14 +223,14 @@ function ProductsPageInner() {
   // Invalidate cached queries when merchants publish/update in other tabs.
   useEffect(() => {
     const onDeals = () => queryClient.invalidateQueries({ queryKey: ["deals"] });
-    window.addEventListener("trendmart:deals-updated", onDeals);
-    return () => window.removeEventListener("trendmart:deals-updated", onDeals);
+    window.addEventListener("trendsmart:deals-updated", onDeals);
+    return () => window.removeEventListener("trendsmart:deals-updated", onDeals);
   }, [queryClient]);
 
   useEffect(() => {
     const onCoupons = () => queryClient.invalidateQueries({ queryKey: ["coupons"] });
-    window.addEventListener("trendmart:coupons-updated", onCoupons);
-    return () => window.removeEventListener("trendmart:coupons-updated", onCoupons);
+    window.addEventListener("trendsmart:coupons-updated", onCoupons);
+    return () => window.removeEventListener("trendsmart:coupons-updated", onCoupons);
   }, [queryClient]);
 
   const syncUrl = useCallback(

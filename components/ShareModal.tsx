@@ -72,7 +72,7 @@ interface ShareModalProps {
 
 export default function ShareModal({
   title,
-  description = "Check out this shop on TrendMart!",
+  description = "Check out this shop on TrendsMart!",
   url,
   whatsappMessage,
   onClose,

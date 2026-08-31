@@ -164,7 +164,7 @@ export default function MerchantOrdersPage() {
       return;
     }
     const msg = encodeURIComponent(
-      `Salam ${order.customer_name || ""}! Your TrendMart order (${order.id.slice(0, 8)}) is ${order.status}.`,
+      `Salam ${order.customer_name || ""}! Your TrendsMart order (${order.id.slice(0, 8)}) is ${order.status}.`,
     );
     window.open(`https://wa.me/${digits}?text=${msg}`, "_blank", "noopener,noreferrer");
   };

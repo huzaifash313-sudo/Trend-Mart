@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     if (shop?.owner_id) {
       await sendPushToUser(shop.owner_id, {
-        title: event === "new" ? "New TrendMart order" : `Order ${status}`,
+        title: event === "new" ? "New TrendsMart order" : `Order ${status}`,
         body:
           event === "new"
             ? `${order.customer_name || "Customer"} placed an order${amount ? ` — ${amount}` : ""} at ${shop.name || "your shop"}.`
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         });
       } else {
         await sendPushToUser(order.customer_user_id, {
-          title: event === "new" ? "Order placed on TrendMart" : `Order update: ${status}`,
+          title: event === "new" ? "Order placed on TrendsMart" : `Order update: ${status}`,
           body:
             event === "new"
               ? `Your order at ${shop?.name || "the shop"} was received${amount ? ` (${amount})` : ""}.`

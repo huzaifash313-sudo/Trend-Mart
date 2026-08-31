@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Sponsored / Promotional Ads Shelf (Homepage)                  */
+/*  TrendsMart — Sponsored / Promotional Ads Shelf (Homepage)                  */
 /*                                                                             */
 /*  Premium auto-scrolling sponsored banner shelf. Uses the exact same         */
 /*  carousel engine + visual language as the home "Featured deals" strip       */
@@ -33,7 +33,11 @@ import type { PromotionalAd, PromoAdPlacement } from "@/types";
 
 interface PromoAdsCarouselProps {
   placement?: PromoAdPlacement;
+  /** Required for store-page ads — only shows banners tied to this shop. */
+  shopId?: string | null;
   className?: string;
+  /** Hide the "View all" link (e.g. on individual store pages). */
+  showViewAll?: boolean;
 }
 
 const HOLD_MS = 5000;
@@ -165,9 +169,11 @@ function SponsoredCard({
 function SponsoredShelf({
   ads,
   className = "",
+  showViewAll = true,
 }: {
   ads: PromotionalAd[];
   className?: string;
+  showViewAll?: boolean;
 }) {
   const count = ads.length;
   const perView = usePerView();
@@ -318,9 +324,11 @@ function SponsoredShelf({
           <p className="tm-home-deals-kicker">Spotlight</p>
           <h2 className="tm-home-deals-title truncate">Sponsored</h2>
         </div>
-        <Link href="/products" className="tm-home-deals-all shrink-0">
-          View all
-        </Link>
+        {showViewAll ? (
+          <Link href="/products" className="tm-home-deals-all shrink-0">
+            View all
+          </Link>
+        ) : null}
       </div>
 
       <div className="tm-home-deals-stage relative">
@@ -427,7 +435,9 @@ function SponsoredShelf({
 
 export default function PromoAdsCarousel({
   placement = "homepage_top",
+  shopId = null,
   className = "",
+  showViewAll = true,
 }: PromoAdsCarouselProps) {
   const [ads, setAds] = useState<PromotionalAd[]>([]);
   const [loading, setLoading] = useState(true);
@@ -440,7 +450,7 @@ export default function PromoAdsCarousel({
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const result = await fetchActiveAds(placement);
+      const result = await fetchActiveAds(placement, shopId);
       if (!cancelled && result.success) {
         const all = result.data;
         setAds(myShopId ? all.filter((ad) => ad.shop_id !== myShopId) : all);
@@ -449,7 +459,7 @@ export default function PromoAdsCarousel({
     }
     load();
     return () => { cancelled = true; };
-  }, [placement, myShopId]);
+  }, [placement, shopId, myShopId]);
 
   // Fire one impression ping per ad, the first time it's loaded on this page view.
   useEffect(() => {
@@ -468,5 +478,5 @@ export default function PromoAdsCarousel({
   // every page load.
   if (loading) return null;
 
-  return <SponsoredShelf ads={ads} className={className} />;
+  return <SponsoredShelf ads={ads} className={className} showViewAll={showViewAll} />;
 }

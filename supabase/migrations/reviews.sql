@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Customer Reviews & Ratings Table
+-- TrendsMart — Customer Reviews & Ratings Table
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS public.reviews (

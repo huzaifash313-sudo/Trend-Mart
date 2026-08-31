@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
 
 export const metadata: Metadata = {
-  title: "Merchant Security Guidelines — TrendMart",
-  description: "Security and conduct guidelines every TrendMart merchant must follow.",
+  title: "Merchant Security Guidelines — TrendsMart",
+  description: "Security and conduct guidelines every TrendsMart merchant must follow.",
   robots: { index: true, follow: true },
 };
 
@@ -14,7 +14,7 @@ export default function MerchantGuidelinesPage() {
         <p>
           When you register a store with a verified email, it goes live on the
           marketplace immediately — there is no Super-Admin approval wait. Keep
-          your store details accurate (name, category, WhatsApp, logo). TrendMart
+          your store details accurate (name, category, WhatsApp, logo). TrendsMart
           may still suspend stores that violate these guidelines without notice.
         </p>
       </LegalSection>
@@ -52,7 +52,7 @@ export default function MerchantGuidelinesPage() {
         <LegalList
           items={[
             "Respond to customer inquiries and orders promptly and professionally.",
-            "Do not use customer contact information obtained through TrendMart for unsolicited marketing outside the platform.",
+            "Do not use customer contact information obtained through TrendsMart for unsolicited marketing outside the platform.",
             "Update order status (Pending → Processing → Dispatched → Delivered) promptly so customers can track their order.",
           ]}
         />
@@ -69,7 +69,7 @@ export default function MerchantGuidelinesPage() {
       <LegalSection heading="7. Enforcement">
         <p>
           Violations of these guidelines may result in a warning, temporary suspension (store hidden
-          from customers), or permanent removal from the Platform, at TrendMart&apos;s sole
+          from customers), or permanent removal from the Platform, at TrendsMart&apos;s sole
           discretion. Serious violations (fraud, counterfeit goods, harassment) may be reported to
           relevant authorities.
         </p>

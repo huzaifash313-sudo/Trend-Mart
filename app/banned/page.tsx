@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Account Banned                                                 */
+/*  TrendsMart — Account Banned                                                 */
 /*  Shown to customers/merchants whose account was restricted by a Super-Admin */
 /*  (User moderation → Ban). They can still browse the public storefront.      */
 /* -------------------------------------------------------------------------- */
@@ -44,7 +44,7 @@ export default function BannedPage() {
           Account suspended
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-          Your TrendMart account has been suspended by the platform team. You can
+          Your TrendsMart account has been suspended by the platform team. You can
           still browse shops and products, but you won&apos;t be able to place
           orders or use your dashboard.
         </p>

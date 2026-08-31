@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Custom 404 (not-found)                                        */
+/*  TrendsMart — Custom 404 (not-found)                                        */
 /*  Replaces Next's unstyled default with a branded, actionable page.         */
 /* -------------------------------------------------------------------------- */
 

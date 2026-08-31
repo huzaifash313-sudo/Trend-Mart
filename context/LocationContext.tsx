@@ -35,7 +35,7 @@ import { getCityAreas } from "@/lib/cityAreas";
 /* -------------------------------------------------------------------------- */
 
 /** Only attempt auto-detect once per page session (not repeatedly). */
-const AUTO_DETECT_KEY = "trendmart_location_autodetect_attempted_v2";
+const AUTO_DETECT_KEY = "trendsmart_location_autodetect_attempted_v2";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */

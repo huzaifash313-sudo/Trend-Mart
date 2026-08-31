@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Visual Category Grid Component                                 */
+/*  TrendsMart — Visual Category Grid Component                                 */
 /*                                                                             */
 /*  Renders sleek, modern grid cards for category navigation with:             */
 /*   - Mobile: compact horizontal scrolling pills with gradient icon circles   */

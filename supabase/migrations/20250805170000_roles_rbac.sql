@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Multi-Tenant Role-Based Access Control (RBAC) Schema
+-- TrendsMart — Multi-Tenant Role-Based Access Control (RBAC) Schema
 -- =============================================================================
 -- Defines role types and user-role assignments for:
 --   - customer:     Buyers browsing shops and placing orders

@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Full Schema Migration (Cumulative)
+-- TrendsMart — Full Schema Migration (Cumulative)
 -- Run in Supabase SQL Editor for initial setup or migration reset.
 -- =============================================================================
 

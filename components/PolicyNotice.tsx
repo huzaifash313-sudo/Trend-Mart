@@ -23,7 +23,7 @@ const AUDIT_FETCH_TIMEOUT_MS = 8_000;
 const AUDIT_WRITE_TIMEOUT_MS = 10_000;
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Versioned Policy-Update Notice                                 */
+/*  TrendsMart — Versioned Policy-Update Notice                                 */
 /*                                                                             */
 /*  When Terms / Privacy / Merchant Guidelines change (their version in       */
 /*  `lib/legalVersions.ts` is bumped), logged-in users who accepted an older  */
@@ -211,7 +211,7 @@ export default function PolicyNotice() {
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
             Please review the updated documents below. By continuing to use
-            TrendMart, you agree to the revised policies.
+            TrendsMart, you agree to the revised policies.
           </p>
 
           <div className="mt-5 space-y-2 text-left">

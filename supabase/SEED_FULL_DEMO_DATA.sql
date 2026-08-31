@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — FULL RESET + DEMO TEST DATA (run AFTER RUN_ALL_IN_ONE_20260820.sql)
+-- TrendsMart — FULL RESET + DEMO TEST DATA (run AFTER RUN_ALL_IN_ONE_20260820.sql)
 -- =============================================================================
 -- WHAT THIS DOES
 --   1. Deletes EVERY existing account (auth.users) and wipes ALL public tables.

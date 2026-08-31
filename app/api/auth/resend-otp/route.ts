@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Custom signup: resend the 6-digit code                         */
+/*  TrendsMart — Custom signup: resend the 6-digit code                         */
 /*  POST /api/auth/resend-otp                                                   */
 /*                                                                             */
 /*  Re-issues a verification code (with a per-email cooldown) for an account    */

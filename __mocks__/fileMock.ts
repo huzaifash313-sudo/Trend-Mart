@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — File Mock for Jest (Prompt 3)                                  */
+/*  TrendsMart — File Mock for Jest (Prompt 3)                                  */
 /*  Returns an empty string for image/file imports in tests                   */
 /* -------------------------------------------------------------------------- */
 

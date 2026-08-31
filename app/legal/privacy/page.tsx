@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — TrendMart",
-  description: "How TrendMart collects, uses, and protects your personal data.",
+  title: "Privacy Policy — TrendsMart",
+  description: "How TrendsMart collects, uses, and protects your personal data.",
   robots: { index: true, follow: true },
 };
 
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
 
       <LegalSection heading="6. Cookies & Local Storage">
         <p>
-          TrendMart uses local storage/session storage to persist your cart, theme preference, and
+          TrendsMart uses local storage/session storage to persist your cart, theme preference, and
           location selection between visits. These are functional, not third-party advertising
           cookies.
         </p>

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Server-Side Order Placement (POST /api/orders)                */
+/*  TrendsMart — Server-Side Order Placement (POST /api/orders)                */
 /*                                                                             */
 /*  The single trusted entry point for creating orders. Replaces the previous  */
 /*  client-side insert (which trusted client-supplied prices and could never   */
@@ -887,7 +887,7 @@ export async function POST(request: Request) {
   }
 
   // 13. SOFT stock deduction — advisory, never blocks checkout.
-  //     TrendMart is a WhatsApp-first marketplace: the merchant is the human
+  //     TrendsMart is a WhatsApp-first marketplace: the merchant is the human
   //     gatekeeper who confirms/declines each order in WhatsApp. Digital stock
   //     is only a rough guide (merchants also sell walk-in), so we NEVER reject
   //     an order over a stock number. Instead:
@@ -1082,14 +1082,14 @@ export async function POST(request: Request) {
   void (async () => {
     if (shopRow.owner_id) {
       await sendPushToUser(shopRow.owner_id, {
-        title: "New TrendMart order",
+        title: "New TrendsMart order",
         body: `${customerName} placed an order — ${amountLabel} at ${shopName}.`,
         url: "/dashboard/orders",
         tag: `order-${order.id}`,
       });
     }
     await sendPushToUser(user.id, {
-      title: "Order placed on TrendMart",
+      title: "Order placed on TrendsMart",
       body: `Your order at ${shopName} was received (${amountLabel}).`,
       url: `/orders/tracking?orderId=${encodeURIComponent(order.id)}`,
       tag: `order-${order.id}-customer`,

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Shared Legal/Policy Page Shell                                */
+/*  TrendsMart — Shared Legal/Policy Page Shell                                */
 /*  Consistent header, last-updated date, and prose styling for all legal     */
 /*  and support-adjacent static pages (Terms, Privacy, Guidelines, etc.)      */
 /* -------------------------------------------------------------------------- */
@@ -61,7 +61,7 @@ export default function LegalPageLayout({
           href="/"
           className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
         >
-          ← Back to TrendMart
+          ← Back to TrendsMart
         </Link>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">

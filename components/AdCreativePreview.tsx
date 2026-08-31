@@ -1,7 +1,7 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Ad Creative Live Preview                                       */
+/*  TrendsMart — Ad Creative Live Preview                                       */
 /*                                                                             */
 /*  Renders an exact mirror of the homepage "Sponsored" card (the same         */
 /*  tm-sponsored-* classes used by PromoAdsCarousel) so admins/merchants see   */

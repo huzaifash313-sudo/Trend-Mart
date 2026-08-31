@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — AI Business Assistant Chatbot API Route                         */
+/*  TrendsMart — AI Business Assistant Chatbot API Route                         */
 /*                                                                             */
 /*  POST /api/chat                                                              */
 /*  Body: { message: string, shopId: string, sessionId?: string }              */
@@ -191,7 +191,7 @@ function generateResponse(
 ): string {
   switch (intent) {
     case "greeting":
-      return `👋 *Salam! Welcome to ${context.name}* on TrendMart! 🛍️\n\nWe're a *${context.category}* shop based in *${context.location}*. How can I help you today?\n\nHere's what I can do:\n• Tell you about our products & prices\n• Share our business hours\n• Help with ordering & delivery\n• Provide our contact details`;
+      return `👋 *Salam! Welcome to ${context.name}* on TrendsMart! 🛍️\n\nWe're a *${context.category}* shop based in *${context.location}*. How can I help you today?\n\nHere's what I can do:\n• Tell you about our products & prices\n• Share our business hours\n• Help with ordering & delivery\n• Provide our contact details`;
 
     case "product_inquiry":
       if (context.products.length === 0) {
@@ -232,7 +232,7 @@ function generateResponse(
       return `📍 *${context.name}* is located in *${context.location}*\n\nWe serve customers in the ${context.location} area. For deliveries outside this zone, please contact us on WhatsApp to discuss options.\n\n📞 WhatsApp: +${context.whatsapp}`;
 
     case "order_booking":
-      return `🛒 *Ready to Order from ${context.name}?*\n\nHere's how it works on TrendMart:\n1️⃣ Browse our products on the shop page\n2️⃣ Tap any product to add it to your cart\n3️⃣ Review your order and tap "Order via WhatsApp"\n4️⃣ We'll receive your order and confirm!\n\n📞 WhatsApp: +${context.whatsapp}\n\n💡 You can also message us directly to place a custom order!`;
+      return `🛒 *Ready to Order from ${context.name}?*\n\nHere's how it works on TrendsMart:\n1️⃣ Browse our products on the shop page\n2️⃣ Tap any product to add it to your cart\n3️⃣ Review your order and tap "Order via WhatsApp"\n4️⃣ We'll receive your order and confirm!\n\n📞 WhatsApp: +${context.whatsapp}\n\n💡 You can also message us directly to place a custom order!`;
 
     case "contact_info":
       return `📞 *Contact ${context.name}*\n\n• WhatsApp: +${context.whatsapp}\n• Location: ${context.location}\n• Category: ${context.category}\n\n💡 Feel free to message us anytime on WhatsApp for quick responses!`;

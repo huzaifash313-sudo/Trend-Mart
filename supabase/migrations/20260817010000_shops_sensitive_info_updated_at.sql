@@ -1,4 +1,4 @@
--- TrendMart — sensitive shop info change tracking.
+-- TrendsMart — sensitive shop info change tracking.
 -- Merchants may change the store name / phone numbers once per week (enforced
 -- in the app + confirmed with the account password). This column records when
 -- that last happened. Location and all other fields are always free.

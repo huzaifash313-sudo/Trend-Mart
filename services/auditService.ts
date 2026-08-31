@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendMart — Enterprise-Grade Audit Logging Service                         */
+/*  TrendsMart — Enterprise-Grade Audit Logging Service                         */
 /*  Centralized platform audit trail for super administrators.                 */
 /* -------------------------------------------------------------------------- */
 

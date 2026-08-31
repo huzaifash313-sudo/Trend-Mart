@@ -49,7 +49,7 @@ interface ErrorBoundaryState {
 function showErrorToast(message: string): void {
   try {
     window.dispatchEvent(
-      new CustomEvent("trendmart:toast", {
+      new CustomEvent("trendsmart:toast", {
         detail: {
           type: "error",
           message: message.length > 200 ? message.slice(0, 197) + "..." : message,

@@ -77,7 +77,7 @@ export default function DealEditorModal({ deal, onClose, onSaved }: DealEditorMo
 
       if (result.success) {
         addToast("Deal updated.", "success");
-        window.dispatchEvent(new Event("trendmart:deals-updated"));
+        window.dispatchEvent(new Event("trendsmart:deals-updated"));
         onSaved();
       } else {
         addToast(result.error, "error");

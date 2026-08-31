@@ -422,18 +422,18 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             href="/"
             onClick={onClose}
             className="inline-flex items-center gap-1.5 text-xl font-extrabold tracking-tight"
-            aria-label="TrendMart — Go to homepage"
+            aria-label="TrendsMart — Go to homepage"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendmart-mark.png?v=10"
+              src="/trendsmart-mark.png?v=10"
               alt=""
               width={32}
               height={32}
               className="h-8 w-8 shrink-0 object-contain"
             />
             <span className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent">
-              TrendMart
+              TrendsMart
             </span>
           </Link>
           <button
@@ -746,7 +746,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             {/* Footer branding */}
             <li className="pt-6">
               <p className="text-center text-[0.65rem] font-medium text-zinc-400 dark:text-zinc-500">
-                TrendMart — Local Shopping Platform
+                TrendsMart — Local Shopping Platform
               </p>
               <p className="mt-0.5 text-center text-[0.6rem] text-zinc-300 dark:text-zinc-600">
                 © {new Date().getFullYear()} All rights reserved

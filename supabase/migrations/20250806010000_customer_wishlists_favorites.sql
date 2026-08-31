@@ -1,5 +1,5 @@
 -- =============================================================================
--- TrendMart — Customer Wishlists & Favorite Stores (Prompt 2)
+-- TrendsMart — Customer Wishlists & Favorite Stores (Prompt 2)
 -- 
 -- Dedicated database tables for user bookmarks with secure RLS policies.
 -- Replaces localStorage with persistent, multi-device synchronised storage.

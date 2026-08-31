@@ -309,11 +309,11 @@ function DealsInner() {
   useEffect(() => {
     const onDeals = () => queryClient.invalidateQueries({ queryKey: ["deals"] });
     const onCoupons = () => queryClient.invalidateQueries({ queryKey: ["coupons"] });
-    window.addEventListener("trendmart:deals-updated", onDeals);
-    window.addEventListener("trendmart:coupons-updated", onCoupons);
+    window.addEventListener("trendsmart:deals-updated", onDeals);
+    window.addEventListener("trendsmart:coupons-updated", onCoupons);
     return () => {
-      window.removeEventListener("trendmart:deals-updated", onDeals);
-      window.removeEventListener("trendmart:coupons-updated", onCoupons);
+      window.removeEventListener("trendsmart:deals-updated", onDeals);
+      window.removeEventListener("trendsmart:coupons-updated", onCoupons);
     };
   }, [queryClient]);
 
