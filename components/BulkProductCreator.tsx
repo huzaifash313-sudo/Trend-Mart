@@ -22,6 +22,12 @@ import { normalizeProductGallery } from "@/lib/productImages";
 import { normalizeTiers } from "@/lib/priceTiers";
 import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 import CustomSelect from "@/components/CustomSelect";
+import {
+  cloneVariantGroups,
+  getVariantTemplates,
+  sanitizeVariantGroups,
+  type VariantTemplatePack,
+} from "@/lib/variantTemplates";
 
 export interface BulkProductCreatorProps {
   shopId: string;
@@ -160,6 +166,63 @@ export default function BulkProductCreator({
     setRows((prev) => prev.map((r) => ({ ...r, variants: [], price_tiers: [] })));
   }, []);
 
+  const categoryPacks = useMemo(
+    () => getVariantTemplates(shopCategory),
+    [shopCategory],
+  );
+
+  const applyPackToAllRows = useCallback(
+    (pack: VariantTemplatePack) => {
+      setRows((prev) => {
+        const next = prev.map((r) => ({
+          ...r,
+          variants: cloneVariantGroups(pack.groups),
+        }));
+        setExpandedVariants((exp) => {
+          const opened = { ...exp };
+          for (const r of next) opened[r.key] = true;
+          return opened;
+        });
+        return next;
+      });
+      onToast?.(
+        `"${pack.label}" options har row pe lag gaye — chips se hata / add kar lo.`,
+        "success",
+      );
+    },
+    [onToast],
+  );
+
+  const applyPackToEmptyRows = useCallback(
+    (pack: VariantTemplatePack) => {
+      const emptyCount = rows.filter((r) => r.variants.length === 0).length;
+      if (emptyCount === 0) {
+        onToast?.("Har row pe pehle se options hain.", "info");
+        return;
+      }
+      setRows((prev) => {
+        const next = prev.map((r) =>
+          r.variants.length > 0
+            ? r
+            : { ...r, variants: cloneVariantGroups(pack.groups) },
+        );
+        setExpandedVariants((exp) => {
+          const opened = { ...exp };
+          for (const r of next) {
+            if (r.variants.length > 0) opened[r.key] = true;
+          }
+          return opened;
+        });
+        return next;
+      });
+      onToast?.(
+        `"${pack.label}" ${emptyCount} empty row(s) pe lagaya.`,
+        "success",
+      );
+    },
+    [rows, onToast],
+  );
+
   const filledCount = useMemo(
     () => rows.filter((r) => r.name.trim() && Number(r.price) > 0).length,
     [rows],
@@ -216,7 +279,7 @@ export default function BulkProductCreator({
         is_available: true,
         category_id: shopCategory,
         sub_category_id: subId,
-        variants: r.variants.length > 0 ? r.variants : null,
+        variants: sanitizeVariantGroups(r.variants),
         price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
       });
     }
@@ -264,7 +327,7 @@ export default function BulkProductCreator({
             <span className="font-semibold text-teal-700 dark:text-teal-300">
               {shopCategory || "—"}
             </span>
-            {" · "}Ek line = ek product · har row mein options (Size/Color) aur 6 photos add kar sakte ho.
+            {" · "}Ek line = ek product · upar se Size/Color pack lagao, ya skip karo.
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -303,6 +366,40 @@ export default function BulkProductCreator({
           </button>
         </div>
       </div>
+
+      {/* Category option packs — one tap for every / empty rows */}
+      {shopCategory && categoryPacks.length > 0 ? (
+        <div className="rounded-xl border border-teal-200/80 bg-gradient-to-r from-teal-50/90 to-emerald-50/50 p-3 dark:border-teal-900/50 dark:from-teal-950/40 dark:to-emerald-950/20">
+          <p className="text-xs font-bold text-teal-900 dark:text-teal-200">
+            Quick options for {shopCategory}
+          </p>
+          <p className="mt-0.5 text-[11px] text-teal-800/80 dark:text-teal-300/80">
+            Ek tap — Size/Color/Portion waghera saari rows pe. Phir chips se jo nahi bechte woh hata do.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {categoryPacks.map((pack) => (
+              <div key={pack.id} className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => applyPackToAllRows(pack)}
+                  className="rounded-full bg-teal-700 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500"
+                  title={`${pack.hint} — apply to every row`}
+                >
+                  {pack.label} → all rows
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPackToEmptyRows(pack)}
+                  className="rounded-full border border-teal-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:bg-zinc-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                  title="Only rows that still have no options"
+                >
+                  Empty only
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {loadingSubs && (
         <p className="animate-pulse text-xs text-zinc-400">Loading sub-categories…</p>
@@ -449,6 +546,9 @@ export default function BulkProductCreator({
                       <VariantEditor
                         variants={row.variants}
                         onChange={(v) => updateRow(row.key, { variants: v })}
+                        shopCategory={shopCategory}
+                        basePrice={Number(row.price) || 0}
+                        compact
                       />
                       <PriceTierEditor
                         tiers={row.price_tiers}
@@ -599,6 +699,9 @@ export default function BulkProductCreator({
                   <VariantEditor
                     variants={row.variants}
                     onChange={(v) => updateRow(row.key, { variants: v })}
+                    shopCategory={shopCategory}
+                    basePrice={Number(row.price) || 0}
+                    compact
                   />
                   <PriceTierEditor
                     tiers={row.price_tiers}

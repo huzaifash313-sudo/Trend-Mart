@@ -912,6 +912,8 @@ export default function ProductsDashboardPage() {
                 <VariantEditor
                   variants={form.variantGroups}
                   onChange={(v) => setForm((f) => ({ ...f, variantGroups: v }))}
+                  shopCategory={activeShop?.category}
+                  basePrice={form.basePrice || 0}
                 />
               </div>
 

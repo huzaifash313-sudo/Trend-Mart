@@ -14,6 +14,7 @@ import {
   fuzzyFilterAndRank,
   FUZZY_MIN_SCORE,
 } from "@/lib/fuzzySearch";
+import { sanitizeVariantGroups } from "@/lib/variantTemplates";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ function buildProductRow(
     price: sanitized.price ?? 0,
     image_url: cover,
     is_available: sanitized.is_available ?? true,
-    variants: sanitized.variants ?? null,
+    variants: sanitizeVariantGroups(sanitized.variants),
   };
 
   if (!opts?.coreOnly) {
