@@ -228,7 +228,7 @@ function SponsoredShelfSkeleton({ className = "" }: { className?: string }) {
 function SponsoredShelf({
   ads,
   className = "",
-  showViewAll = true,
+  showViewAll = false,
   placement = "homepage_top",
   compact = false,
   sectionLabel,
@@ -502,7 +502,7 @@ export default function PromoAdsCarousel({
   placement = "homepage_top",
   shopId = null,
   className = "",
-  showViewAll = true,
+  showViewAll = false,
   compact = false,
   sectionLabel,
 }: PromoAdsCarouselProps) {

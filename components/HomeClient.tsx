@@ -796,7 +796,7 @@ function HomeClient({
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
-        <div className="tm-live-shops-heading mb-1.5">
+        <div className="tm-live-shops-heading mb-1">
           <div className="tm-live-shops-heading-main min-w-0">
             <h2 className="tm-live-shops-title">
               <span className="tm-live-shops-indicator" aria-hidden="true">

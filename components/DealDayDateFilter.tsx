@@ -56,7 +56,7 @@ function ClearIcon() {
   );
 }
 
-/** Weekday quick-picks + date picker — two clean rows. */
+/** Weekday quick-picks + date picker — tight pill row for mobile. */
 export default function DealDayDateFilter({
   selectedDateKey,
   onSelectDate,
@@ -96,13 +96,13 @@ export default function DealDayDateFilter({
   return (
     <section
       aria-label="Filter deals by day or date"
-      className="mb-1.5 rounded-2xl border border-zinc-100 bg-zinc-50/60 p-2.5 dark:border-zinc-800/80 dark:bg-zinc-900/40"
+      className="mb-0 rounded-xl border border-zinc-100 bg-zinc-50/60 px-2 py-1.5 dark:border-zinc-800/80 dark:bg-zinc-900/40"
     >
-      <h2 className="mb-2 text-sm font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
+      <h2 className="mb-1 text-[13px] font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
         Search deal by date/day
       </h2>
-      {/* Weekday chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1.5">
+      {/* Weekday pills */}
+      <div className="mb-1 flex items-center gap-1 overflow-x-auto scrollbar-none">
         {WEEKDAY_LABELS.map((label, weekday) => {
           const active = selectedWeekday === weekday && selectedDateKey != null;
           const nextKey = calendarKeys.find((k) => weekdayFromDateKey(k) === weekday);
@@ -114,9 +114,9 @@ export default function DealDayDateFilter({
               type="button"
               onClick={() => pickWeekday(weekday)}
               disabled={!nextKey}
-              className={`flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl transition-all ${
+              className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 transition-all ${
                 active
-                  ? "bg-amber-500 text-zinc-900 shadow-md shadow-amber-500/25"
+                  ? "bg-amber-500 text-zinc-900 shadow-sm shadow-amber-500/25"
                   : nextKey
                     ? "bg-white text-zinc-600 ring-1 ring-zinc-200/80 hover:bg-zinc-50 hover:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:ring-zinc-600"
                     : "cursor-not-allowed bg-zinc-100/60 text-zinc-300 ring-1 ring-zinc-100 dark:bg-zinc-900/60 dark:text-zinc-600 dark:ring-zinc-800"
@@ -124,9 +124,9 @@ export default function DealDayDateFilter({
               aria-pressed={active}
               title={chipDate ? `${label} · ${chipDate}` : `${label} — not in range`}
             >
-              <span className="text-[10px] font-bold leading-none">{label}</span>
+              <span className="text-[11px] font-bold leading-none">{label}</span>
               {nextKey ? (
-                <span className={`mt-0.5 text-[9px] font-medium leading-none ${active ? "text-zinc-800/70" : "text-zinc-400 dark:text-zinc-500"}`}>
+                <span className={`text-[10px] font-medium leading-none ${active ? "text-zinc-800/70" : "text-zinc-400 dark:text-zinc-500"}`}>
                   {Number(nextKey.slice(8, 10))}
                 </span>
               ) : null}
@@ -151,7 +151,7 @@ export default function DealDayDateFilter({
         <button
           type="button"
           onClick={openDatePicker}
-          className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${
+          className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-left transition-colors ${
             selectedDateKey
               ? "border-amber-200/80 bg-amber-50 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100"
               : "border-zinc-200/80 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600"
@@ -171,7 +171,7 @@ export default function DealDayDateFilter({
           <button
             type="button"
             onClick={() => onSelectDate(null)}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-zinc-400 ring-1 ring-zinc-200/80 transition-colors hover:bg-zinc-50 hover:text-zinc-600 dark:bg-zinc-800 dark:text-zinc-500 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-zinc-400 ring-1 ring-zinc-200/80 transition-colors hover:bg-zinc-50 hover:text-zinc-600 dark:bg-zinc-800 dark:text-zinc-500 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
             aria-label="Clear date filter"
           >
             <ClearIcon />

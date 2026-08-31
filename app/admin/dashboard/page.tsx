@@ -40,6 +40,7 @@ import { SHOP_CATEGORIES } from "@/types";
 import { deleteShop } from "@/services/shopService";
 import ImageUpload from "@/components/ImageUpload";
 import AdCreativePreview from "@/components/AdCreativePreview";
+import AdLinkTargetPicker from "@/components/AdLinkTargetPicker";
 import type { SubCategoryWithMeta } from "@/services/subCategoryService";
 import {
   fetchAllSubCategoriesGrouped,
@@ -2311,12 +2312,10 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setPlatformAdForm((f) => ({ ...f, subtitle: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
                   />
-                  <input
-                    type="text"
-                    placeholder="Link"
+                  <AdLinkTargetPicker
                     value={platformAdForm.link_url}
-                    onChange={(e) => setPlatformAdForm((f) => ({ ...f, link_url: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+                    onChange={(link_url) => setPlatformAdForm((f) => ({ ...f, link_url }))}
+                    allowAnyShop
                   />
                   <label className="block">
                     <span className="mb-1 block text-[0.65rem] font-semibold text-zinc-500 dark:text-zinc-400">

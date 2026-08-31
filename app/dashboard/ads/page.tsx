@@ -3,9 +3,10 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Merchant Promotional Ad Requests                              */
 /*                                                                             */
-/*  Lets a merchant request a sponsored homepage banner slot. Requests always */
-/*  start as "pending" and only appear on the storefront once a Super-Admin   */
-/*  approves them (see `services/adsService.ts` + the DB guard trigger).      */
+/*  Lets a merchant request a sponsored banner on home / deals / products /   */
+/*  store (or all pages). Pick a pricing plan, creative, and link target      */
+/*  (store, product, deal, or custom URL). Requests start as "pending" and    */
+/*  only go live after Super-Admin approval.                                  */
 /* -------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback, useMemo, type FormEvent } from "react";
@@ -16,6 +17,7 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import ImageUpload from "@/components/ImageUpload";
 import AdCreativePreview from "@/components/AdCreativePreview";
+import AdLinkTargetPicker from "@/components/AdLinkTargetPicker";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import {
   fetchShopAds,
@@ -283,7 +285,13 @@ export default function MerchantAdsPage() {
             {!showForm && (
               <button
                 type="button"
-                onClick={() => setShowForm(true)}
+                onClick={() => {
+                  setForm({
+                    ...EMPTY_FORM,
+                    link_url: shopId ? `/shop/${shopId}` : "",
+                  });
+                  setShowForm(true);
+                }}
                 className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
               >
                 <PlusIcon /> Request Ad Slot
@@ -293,8 +301,9 @@ export default function MerchantAdsPage() {
         </div>
 
         <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-          Pick a pricing plan below, submit your creative, and the TrendsMart team will review it
-          before it goes live — usually within 24 hours. Payment is coordinated separately.
+          Choose where the ad appears (Home, Deals, Products, Store, or All pages), pick a
+          pricing plan, link it to your store / a product / a deal, then submit. TrendsMart
+          admin reviews before it goes live — usually within 24 hours.
         </div>
 
         {/* ── Pricing plans ──────────────────────────────────────────────── */}
@@ -459,18 +468,12 @@ export default function MerchantAdsPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Link To *</label>
-              <input
-                type="text"
-                required
+              <AdLinkTargetPicker
                 value={form.link_url}
-                onChange={(e) => setForm((f) => ({ ...f, link_url: e.target.value }))}
-                placeholder={`/shop/${shopId}`}
-                className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                onChange={(link_url) => setForm((f) => ({ ...f, link_url }))}
+                shopId={shopId}
+                shopName={shopName}
               />
-              <p className="mt-1 text-xs text-zinc-400">
-                Usually your own store page: <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">/shop/{shopId}</code>
-              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
