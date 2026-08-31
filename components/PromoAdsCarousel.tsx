@@ -147,13 +147,14 @@ function SponsoredCard({
             quality={90}
             onError={() => setImgError(true)}
           />
-        ) : (
-          <div className="tm-sponsored-media-fallback flex h-full w-full items-center justify-center">
-            <span className="select-none text-3xl font-semibold tracking-tight text-white/35">
+        ) : null}
+        {!safeSrc ? (
+          <div className="absolute inset-0 tm-sponsored-media-fallback flex items-center justify-center">
+            <span className="select-none px-3 text-center text-2xl font-semibold tracking-tight text-white/35">
               {ad.title.charAt(0).toUpperCase()}
             </span>
           </div>
-        )}
+        ) : null}
         <span className={`tm-sponsored-badge absolute left-2.5 top-2.5 ${badgeVariantClass(ad.badge_label)}`}>
           {ad.badge_label?.trim() || "Sponsored"}
         </span>

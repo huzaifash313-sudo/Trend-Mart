@@ -24,7 +24,7 @@ SELECT * FROM (VALUES
   ('f0000001-0000-4000-8000-000000000001'::uuid, NULL::uuid,
     'TrendsMart — Your Neighborhood Marketplace',
     'Discover 600+ products from local Gujranwala shops',
-    'https://images.unsplash.com/photo-1607082348824-0a960f2a4b9d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=80',
     '/products', 'Featured', 'homepage_top', 'approved', true, 0, now()),
 
   ('f0000001-0000-4000-8000-000000000002'::uuid,
@@ -44,7 +44,7 @@ SELECT * FROM (VALUES
   ('f0000001-0000-4000-8000-000000000004'::uuid, NULL::uuid,
     'Browse Everything Near You',
     'Filter by category, distance, and best discounts',
-    'https://images.unsplash.com/photo-1607082348824-0a960f2a4b9d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=80',
     '/products', 'Sponsored', 'products_top', 'approved', true, 0, now()),
 
   ('f0000001-0000-4000-8000-000000000005'::uuid,
@@ -64,7 +64,7 @@ SELECT * FROM (VALUES
   ('f0000001-0000-4000-8000-000000000007'::uuid, NULL::uuid,
     'Today''s Best Deals',
     'Hand-picked discounts updated every morning',
-    'https://images.unsplash.com/photo-1607083206869-4c7672f72a1d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1200&q=80',
     '/deals', 'Featured', 'deals_top', 'approved', true, 0, now()),
 
   ('f0000001-0000-4000-8000-000000000008'::uuid,
@@ -116,6 +116,17 @@ ON CONFLICT (id) DO UPDATE SET
   is_active = EXCLUDED.is_active,
   sort_order = EXCLUDED.sort_order,
   updated_at = now();
+
+-- 4) Fix any previously seeded broken Unsplash URLs (404 photos)
+UPDATE public.promotional_ads
+SET image_url = 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=80',
+    updated_at = now()
+WHERE image_url LIKE '%photo-1607082348824%';
+
+UPDATE public.promotional_ads
+SET image_url = 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1200&q=80',
+    updated_at = now()
+WHERE image_url LIKE '%photo-1607083206869%';
 
 -- 3) Verify (should return 12 rows)
 SELECT placement, count(*) FROM public.promotional_ads

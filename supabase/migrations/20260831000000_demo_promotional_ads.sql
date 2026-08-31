@@ -24,7 +24,7 @@ INSERT INTO public.promotional_ads (
     NULL,
     'TrendsMart — Your Neighborhood Marketplace',
     'Discover 600+ products from local Gujranwala shops',
-    'https://images.unsplash.com/photo-1607082348824-0a960f2a4b9d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=80',
     '/products',
     'Featured',
     'homepage_top', 'approved', true, 0, now()
@@ -56,7 +56,7 @@ INSERT INTO public.promotional_ads (
     NULL,
     'Browse Everything Near You',
     'Filter by category, distance, and best discounts',
-    'https://images.unsplash.com/photo-1607082348824-0a960f2a4b9d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=80',
     '/products',
     'Sponsored',
     'products_top', 'approved', true, 0, now()
@@ -88,7 +88,7 @@ INSERT INTO public.promotional_ads (
     NULL,
     'Today''s Best Deals',
     'Hand-picked discounts updated every morning',
-    'https://images.unsplash.com/photo-1607083206869-4c7672f72a1d?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1200&q=80',
     '/deals',
     'Featured',
     'deals_top', 'approved', true, 0, now()
