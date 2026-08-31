@@ -12,6 +12,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
 import { createClient } from "@/lib/supabase/client";
+import { getPublicAppUrl } from "@/lib/appUrl";
 import {
   createTables,
   deleteTable,
@@ -139,10 +140,7 @@ export default function MerchantTablesPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [billOrder, setBillOrder] = useState<Order | null>(null);
 
-  const origin = useMemo(() => {
-    if (typeof window !== "undefined") return window.location.origin;
-    return "";
-  }, []);
+  const origin = useMemo(() => getPublicAppUrl(), []);
 
   /** Latest active (non-cancelled) dine-in order for a table. */
   const latestOrderFor = useCallback(

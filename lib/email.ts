@@ -7,13 +7,14 @@
 /*                                                                             */
 /*  Setup:                                                                    */
 /*   1. Create a Resend account (https://resend.com) and verify your sending  */
-/*      domain (e.g. trendsmart.pk).                                          */
+/*      domain (matching NEXT_PUBLIC_APP_URL).                                */
 /*   2. Set RESEND_API_KEY and EMAIL_FROM in your environment variables.      */
 /*   3. Until RESEND_API_KEY is configured, all sends are safely no-op'd and  */
 /*      logged — the rest of the app continues to function normally.         */
 /* -------------------------------------------------------------------------- */
 
 import { Resend } from "resend";
+import { getSupportMailbox } from "@/lib/appUrl";
 
 export interface SendEmailInput {
   to: string | string[];
@@ -41,6 +42,14 @@ function isConfigured(): boolean {
   return !!process.env.RESEND_API_KEY;
 }
 
+function defaultFromAddress(): string {
+  const mailbox = getSupportMailbox();
+  if (mailbox.endsWith("@localhost")) {
+    return "TrendsMart <onboarding@resend.dev>";
+  }
+  return `TrendsMart <${mailbox}>`;
+}
+
 /**
  * Send a branded transactional email via Resend.
  * Safe to call even when email isn't configured — returns a graceful
@@ -49,7 +58,7 @@ function isConfigured(): boolean {
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const client = getResendClient();
-  const fromAddress = process.env.EMAIL_FROM || "TrendsMart <notifications@trendsmart.pk>";
+  const fromAddress = process.env.EMAIL_FROM || defaultFromAddress();
 
   if (!client) {
     console.warn(

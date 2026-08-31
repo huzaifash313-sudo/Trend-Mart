@@ -3,12 +3,13 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Metadata } from "next";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 const SITE_NAME = "TrendsMart";
 const SITE_DESCRIPTION =
   "Discover local shops across Pakistan. Browse products & deals, place orders via WhatsApp, and support small businesses near you.";
-export const SITE_BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
+
+export const SITE_BASE_URL = getPublicAppUrl();
 const OG_IMAGE_DEFAULT = `${SITE_BASE_URL}/og-default.png`;
 const TWITTER_HANDLE = "@trendsmartpk";
 

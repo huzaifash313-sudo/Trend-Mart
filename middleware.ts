@@ -676,8 +676,54 @@ function buildRedirectWithLoopTracking(
   return response;
 }
 
+/** Canonical host from NEXT_PUBLIC_APP_URL / SITE_URL (no hardcoded domain). */
+function getCanonicalHostname(): string | null {
+  const raw =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "";
+  if (!raw.trim()) return null;
+  try {
+    const u = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    const host = u.hostname.replace(/^www\./, "");
+    if (!host || host === "localhost" || host === "127.0.0.1") return null;
+    if (host.endsWith(".vercel.app") || host.endsWith(".vercel.com")) return null;
+    return host;
+  } catch {
+    return null;
+  }
+}
+
+function shouldCanonicalHostRedirect(
+  hostname: string,
+  canonicalHost: string,
+): boolean {
+  if (!hostname || hostname === canonicalHost) return false;
+  if (hostname === "localhost" || hostname === "127.0.0.1") return false;
+  if (hostname === `www.${canonicalHost}`) return true;
+  if (hostname.endsWith(".vercel.app") || hostname.endsWith(".vercel.com")) {
+    return true;
+  }
+  return false;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostname = request.nextUrl.hostname;
+  const canonicalHost = getCanonicalHostname();
+
+  // ── Canonical domain (from NEXT_PUBLIC_APP_URL) ─────────────────────────
+  // Keep QR / auth / share links on the configured public host — never leave
+  // users on *.vercel.app or www after the custom domain is live.
+  if (
+    process.env.NODE_ENV === "production" &&
+    canonicalHost &&
+    shouldCanonicalHostRedirect(hostname, canonicalHost)
+  ) {
+    const target = request.nextUrl.clone();
+    target.protocol = "https:";
+    target.hostname = canonicalHost;
+    target.port = "";
+    return NextResponse.redirect(target, 308);
+  }
 
   authDebug(">>> REQUEST", { pathname, method: request.method });
 

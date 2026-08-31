@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 /**
  * Handles the email confirmation / magic-link callback from Supabase Auth.
@@ -20,10 +21,12 @@ function sanitizeRedirectPath(value: string | null | undefined): string | null {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   // SECURITY: `next` is user-controlled — never redirect to it raw.
   const safeNext = sanitizeRedirectPath(searchParams.get("next"));
+  // Prefer the official public origin so callbacks never land on *.vercel.app.
+  const origin = getPublicAppUrl();
 
   if (code) {
     const supabase = await createClient();
@@ -55,10 +58,6 @@ export async function GET(request: NextRequest) {
         redirectTo = safeNext ?? "/account";
       }
 
-      // SECURITY: always redirect to the request's own origin. Never trust the
-      // client-controlled `x-forwarded-host` header (host-header injection /
-      // open redirect). `origin` here comes from the request URL Next.js
-      // normalizes to the real public host behind the proxy.
       return NextResponse.redirect(`${origin}${redirectTo}`);
     }
   }

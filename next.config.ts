@@ -32,6 +32,33 @@ if (typeof window === "undefined") {
 const isProd = process.env.NODE_ENV === "production";
 const isCI = process.env.CI === "true";
 
+/** Public origin/host from env — never hardcode the production domain. */
+function resolvePublicAppOrigin(): string | null {
+  const raw =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "";
+  if (!raw.trim()) return null;
+  try {
+    const u = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    if (u.hostname.startsWith("www.")) u.hostname = u.hostname.slice(4);
+    if (
+      u.hostname === "localhost" ||
+      u.hostname === "127.0.0.1" ||
+      u.hostname.endsWith(".vercel.app") ||
+      u.hostname.endsWith(".vercel.com")
+    ) {
+      return null;
+    }
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+const PUBLIC_APP_ORIGIN = resolvePublicAppOrigin();
+const PUBLIC_APP_HOST = PUBLIC_APP_ORIGIN
+  ? new URL(PUBLIC_APP_ORIGIN).hostname
+  : null;
+
 const nextConfig: NextConfig = {
   // ── Environment Variables (explicitly inline NEXT_PUBLIC_* for client) ────
   // SECURITY: no hardcoded fallbacks here. A hardcoded Supabase URL/anon key
@@ -445,7 +472,12 @@ const nextConfig: NextConfig = {
 
   // ── Additional Redirects / Rewrites (production safety) ────────────────────
   async redirects() {
-    return [
+    const redirects: {
+      source: string;
+      destination: string;
+      permanent: boolean;
+      has?: { type: "host"; value: string }[];
+    }[] = [
       // Ensure trailing-slash consistency (remove trailing slashes)
       {
         source: "/:path+/",
@@ -453,6 +485,26 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
     ];
+
+    // Legacy Vercel / www → configured public origin (from NEXT_PUBLIC_APP_URL)
+    if (PUBLIC_APP_ORIGIN && PUBLIC_APP_HOST) {
+      redirects.push(
+        {
+          source: "/:path*",
+          has: [{ type: "host", value: "trend-marts.vercel.app" }],
+          destination: `${PUBLIC_APP_ORIGIN}/:path*`,
+          permanent: true,
+        },
+        {
+          source: "/:path*",
+          has: [{ type: "host", value: `www.${PUBLIC_APP_HOST}` }],
+          destination: `${PUBLIC_APP_ORIGIN}/:path*`,
+          permanent: true,
+        },
+      );
+    }
+
+    return redirects;
   },
 
   // ── Experimental Features ───────────────────────────────────────────────────
@@ -466,7 +518,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "2mb",
       allowedOrigins: isProd
-        ? ["trendsmart.pk", "www.trendsmart.pk", "trend-marts.vercel.app"]
+        ? PUBLIC_APP_HOST
+          ? [PUBLIC_APP_HOST, `www.${PUBLIC_APP_HOST}`]
+          : []
         : ["localhost:3000"],
     },
   },

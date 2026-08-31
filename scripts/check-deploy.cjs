@@ -1,4 +1,7 @@
-const base = "https://trend-marts.vercel.app";
+const base =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "http://localhost:3000";
 
 async function main() {
   const html = await (await fetch(base + "/products")).text();

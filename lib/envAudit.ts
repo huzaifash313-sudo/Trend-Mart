@@ -439,6 +439,7 @@ export function generateEnvExample(): string {
   return [
     "# mandatory",
     "NODE_ENV=development",
+    "# Production: set NEXT_PUBLIC_APP_URL to your live origin (never *.vercel.app)",
     "NEXT_PUBLIC_APP_URL=http://localhost:3000",
     "NEXT_PUBLIC_SITE_URL=http://localhost:3000",
     "NEXT_PUBLIC_SITE_NAME=TrendsMart",

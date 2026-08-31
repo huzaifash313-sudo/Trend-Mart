@@ -22,6 +22,7 @@ import {
   isValidLongitude,
   isValidCoordinate,
 } from "@/lib/geoCoords";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 export { isValidLatitude, isValidLongitude, isValidCoordinate };
 
@@ -1114,12 +1115,13 @@ export async function searchPlaces(
     }
 
     // Prefer same-origin API (server can use Google key safely)
+    // Browser: same-origin relative URL. Server: local API in dev, canonical host in prod.
     const base =
       typeof window !== "undefined"
         ? ""
-        : process.env.NEXT_PUBLIC_APP_URL ||
-          process.env.NEXT_PUBLIC_SITE_URL ||
-          "http://localhost:3000";
+        : process.env.NODE_ENV === "production"
+          ? getPublicAppUrl()
+          : "http://localhost:3000";
     const res = await fetch(`${base}/api/places/search?${params}`, {
       signal: opts?.signal,
       headers: { Accept: "application/json" },
@@ -1160,7 +1162,7 @@ export async function reverseGeocode(
       signal: controller.signal,
       headers: {
         Accept: "application/json",
-        "User-Agent": "TrendsMart/1.0 (https://trendsmart.pk)",
+        "User-Agent": `TrendsMart/1.0 (${getPublicAppUrl()})`,
       },
     });
     clearTimeout(timeout);

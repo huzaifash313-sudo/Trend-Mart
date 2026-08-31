@@ -29,7 +29,7 @@ loadEnvLocal();
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const email = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "admin@trendsmart.app").trim().toLowerCase();
+const email = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? "admin@trendsmart.pk").trim().toLowerCase();
 const password = process.env.ADMIN_BOOTSTRAP_PASSWORD ?? "Trend@123";
 
 if (!url || !serviceKey) {

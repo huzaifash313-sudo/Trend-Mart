@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isValidCoordinate } from "@/lib/geoCoords";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 export const runtime = "edge";
 
@@ -252,7 +253,7 @@ async function searchNominatim(
         signal,
         headers: {
           Accept: "application/json",
-          "User-Agent": "TrendsMart/1.0 (https://trendsmart.pk)",
+          "User-Agent": `TrendsMart/1.0 (${getPublicAppUrl()})`,
         },
       },
     );

@@ -13,14 +13,14 @@
 
 import type { Metadata } from "next";
 import type { Product, Shop } from "@/types";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                 */
 /* -------------------------------------------------------------------------- */
 
 const SITE_NAME = "TrendsMart";
-const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
+const BASE_URL = getPublicAppUrl();
 const OG_IMAGE_DEFAULT = `${BASE_URL}/og-default.png`;
 const TWITTER_HANDLE = "@trendsmartpk";
 

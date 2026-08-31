@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  TrendsMart — Optimized robots.txt (AI-Assistant Friendly)                  */
@@ -21,8 +22,7 @@ import type { MetadataRoute } from "next";
 /* ────────────────────────────────────────────────────────────────────────── */
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
+  const baseUrl = getPublicAppUrl();
 
   // Private areas — never crawlable by any agent.
   const PRIVATE_PATHS = [

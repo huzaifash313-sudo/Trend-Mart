@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
+import { getPublicAppUrl } from "@/lib/appUrl";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  TrendsMart — Dynamic Sitemap Generator (Enhanced SEO)                       */
@@ -20,8 +21,7 @@ export const revalidate = 3600; // 1 hour — Next.js ISR revalidation
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://trendsmart.pk";
+const BASE_URL = getPublicAppUrl();
 
 function createSupabase() {
   return createClient(

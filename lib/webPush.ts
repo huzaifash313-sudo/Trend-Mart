@@ -1,5 +1,6 @@
 import webPush from "web-push";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getVapidSubject } from "@/lib/appUrl";
 
 export interface PushPayload {
   title: string;
@@ -32,9 +33,7 @@ export async function sendPushToUser(
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
   const privateKey = process.env.VAPID_PRIVATE_KEY!;
-  // A valid VAPID subject is required by the Web Push spec. Default to a
-  // real TrendsMart address rather than an invalid .local placeholder.
-  const subject = process.env.VAPID_SUBJECT || "mailto:support@trendsmart.pk";
+  const subject = getVapidSubject();
 
   webPush.setVapidDetails(subject, publicKey, privateKey);
 
