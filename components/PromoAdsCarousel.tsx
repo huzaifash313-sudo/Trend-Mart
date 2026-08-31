@@ -39,17 +39,21 @@ interface PromoAdsCarouselProps {
   className?: string;
   /** Hide the "View all" link (e.g. on individual store pages). */
   showViewAll?: boolean;
+  /** Tighter shelf on homepage — 2 cards on small phones, shorter media slot via CSS. */
+  compact?: boolean;
+  /** Override section label (e.g. "Sponsored", "Featured"). */
+  sectionLabel?: string;
 }
 
 const PLACEMENT_SHELF: Record<
   PromoAdPlacement,
-  { kicker: string; title: string; viewAllHref: string }
+  { label: string; viewAllHref: string }
 > = {
-  homepage_top: { kicker: "Spotlight", title: "Sponsored", viewAllHref: "/products" },
-  homepage_feed: { kicker: "Discover", title: "Featured Near You", viewAllHref: "/products" },
-  products_top: { kicker: "Shop Now", title: "Featured Stores", viewAllHref: "/products" },
-  deals_top: { kicker: "Save More", title: "Hot Promotions", viewAllHref: "/deals" },
-  store_top: { kicker: "From This Store", title: "Store Highlights", viewAllHref: "/products" },
+  homepage_top: { label: "Sponsored", viewAllHref: "/products" },
+  homepage_feed: { label: "Featured", viewAllHref: "/products" },
+  products_top: { label: "Featured", viewAllHref: "/products" },
+  deals_top: { label: "Featured", viewAllHref: "/deals" },
+  store_top: { label: "Featured", viewAllHref: "/products" },
 };
 
 function badgeVariantClass(label?: string | null): string {
@@ -77,9 +81,9 @@ const GAP_PX = 12;
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** ~1 card on phone, 2 on tablet, 3 on laptop, 4 on wide desktop (deals shelf parity). */
-function usePerView() {
-  const [perView, setPerView] = useState(1);
+/** ~1 card on phone (2 when compact), 2 on tablet, 3+ on desktop. */
+function usePerView(compact = false) {
+  const [perView, setPerView] = useState(compact ? 2 : 1);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -89,12 +93,12 @@ function usePerView() {
       else if (w >= 1024) setPerView(3);
       else if (w >= 768) setPerView(3);
       else if (w >= 640) setPerView(2);
-      else setPerView(1);
+      else setPerView(compact ? 2 : 1);
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
+  }, [compact]);
 
   return perView;
 }
@@ -199,11 +203,8 @@ function SponsoredCard({
 function SponsoredShelfSkeleton({ className = "" }: { className?: string }) {
   return (
     <section aria-hidden="true" className={`tm-sponsored-shelf ${className}`}>
-      <div className="mb-1.5 flex items-end justify-between gap-3">
-        <div className="min-w-0 space-y-1.5">
-          <div className="h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-          <div className="h-5 w-28 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-        </div>
+      <div className="tm-sponsored-shelf-head">
+        <div className="h-3.5 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
       </div>
       <div className="flex gap-3 overflow-hidden">
         {Array.from({ length: 2 }).map((_, i) => (
@@ -229,14 +230,18 @@ function SponsoredShelf({
   className = "",
   showViewAll = true,
   placement = "homepage_top",
+  compact = false,
+  sectionLabel,
 }: {
   ads: PromotionalAd[];
   className?: string;
   showViewAll?: boolean;
   placement?: PromoAdPlacement;
+  compact?: boolean;
+  sectionLabel?: string;
 }) {
   const count = ads.length;
-  const perView = usePerView();
+  const perView = usePerView(compact);
   const canSlide = count > perView;
   const [index, setIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -378,14 +383,12 @@ function SponsoredShelf({
   };
 
   const shelf = PLACEMENT_SHELF[placement];
+  const label = sectionLabel?.trim() || shelf.label;
 
   return (
-    <section aria-label="Sponsored" className={`tm-sponsored-shelf ${className ?? ""}`}>
-      <div className="mb-1.5 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="tm-home-deals-kicker">{shelf.kicker}</p>
-          <h2 className="tm-home-deals-title truncate">{shelf.title}</h2>
-        </div>
+    <section aria-label={label} className={`tm-sponsored-shelf ${className ?? ""}`}>
+      <div className="tm-sponsored-shelf-head">
+        <h2 className="tm-sponsored-shelf-label truncate">{label}</h2>
         {showViewAll && placement !== "store_top" ? (
           <Link href={shelf.viewAllHref} className="tm-home-deals-all shrink-0">
             View all
@@ -500,6 +503,8 @@ export default function PromoAdsCarousel({
   shopId = null,
   className = "",
   showViewAll = true,
+  compact = false,
+  sectionLabel,
 }: PromoAdsCarouselProps) {
   const [ads, setAds] = useState<PromotionalAd[]>([]);
   const [loading, setLoading] = useState(true);
@@ -560,6 +565,8 @@ export default function PromoAdsCarousel({
       className={className}
       showViewAll={showViewAll}
       placement={placement}
+      compact={compact}
+      sectionLabel={sectionLabel}
     />
   );
 }
