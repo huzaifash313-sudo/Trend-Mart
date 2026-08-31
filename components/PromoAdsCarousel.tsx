@@ -27,6 +27,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { fetchActiveAds, pingAdImpression, pingAdClick } from "@/services/adsService";
+import { demoAdsEnabled, getDemoAdsForPlacement } from "@/lib/demoPromoAds";
 import { useMyShop } from "@/lib/queries";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
 import type { PromotionalAd, PromoAdPlacement } from "@/types";
@@ -511,16 +512,30 @@ export default function PromoAdsCarousel({
     async function load() {
       setLoading(true);
       const result = await fetchActiveAds(placement, shopId);
-      if (!cancelled && result.success) {
-        const all = result.data;
-        const hideOwnShop =
-          myShopId && placement !== "store_top";
-        setAds(hideOwnShop ? all.filter((ad) => ad.shop_id !== myShopId) : all);
+      if (cancelled) return;
+
+      const hideOwnShop = Boolean(myShopId && placement !== "store_top");
+
+      function applyFilter(list: PromotionalAd[]): PromotionalAd[] {
+        return hideOwnShop ? list.filter((ad) => ad.shop_id !== myShopId) : list;
       }
-      if (!cancelled) setLoading(false);
+
+      let resolved: PromotionalAd[] = [];
+      if (result.success) {
+        resolved = applyFilter(result.data);
+      }
+
+      if (resolved.length === 0 && demoAdsEnabled()) {
+        resolved = applyFilter(getDemoAdsForPlacement(placement, shopId));
+      }
+
+      setAds(resolved);
+      setLoading(false);
     }
-    load();
-    return () => { cancelled = true; };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [placement, shopId, myShopId]);
 
   // Fire one impression ping per ad, the first time it's loaded on this page view.

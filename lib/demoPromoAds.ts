@@ -195,21 +195,34 @@ export const DEMO_PROMO_ADS: PromotionalAd[] = [
 ];
 
 export function demoAdsEnabled(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_DEMO_ADS === "true" ||
-    (process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_DEMO_ADS !== "false")
-  );
+  // Demo ads show whenever the DB has no live ads for a placement.
+  // Opt out in production with NEXT_PUBLIC_DEMO_ADS=false once real ads are live.
+  return process.env.NEXT_PUBLIC_DEMO_ADS !== "false";
 }
 
 export function getDemoAdsForPlacement(
   placement: PromoAdPlacement,
   shopId?: string | null,
 ): PromotionalAd[] {
-  return DEMO_PROMO_ADS.filter((ad) => {
-    if (ad.placement !== placement) return false;
-    if (placement === "store_top") {
-      return shopId != null && ad.shop_id === shopId;
+  if (placement === "store_top") {
+    if (!shopId) return [];
+    const scoped = DEMO_PROMO_ADS.filter(
+      (ad) => ad.placement === "store_top" && ad.shop_id === shopId,
+    );
+    if (scoped.length > 0) {
+      return scoped.sort((a, b) => a.sort_order - b.sort_order);
     }
-    return true;
-  }).sort((a, b) => a.sort_order - b.sort_order);
+    // Any storefront gets sample highlights when no DB ads exist for that shop.
+    return DEMO_PROMO_ADS.filter((ad) => ad.placement === "store_top")
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((ad) => ({
+        ...ad,
+        id: `${ad.id}::${shopId}`,
+        shop_id: shopId,
+      }));
+  }
+
+  return DEMO_PROMO_ADS.filter((ad) => ad.placement === placement).sort(
+    (a, b) => a.sort_order - b.sort_order,
+  );
 }
