@@ -120,8 +120,14 @@ export default function Navbar() {
 
   const navigateToSearch = useCallback(() => router.push("/products"), [router]);
 
-  // The admin console has its own layout — never render storefront chrome there.
-  if (pathname === "/offline" || pathname.startsWith("/admin")) return null;
+  // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
+  if (
+    pathname === "/offline" ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/t/")
+  ) {
+    return null;
+  }
 
   return (
     <header className="tm-navbar-wrap">

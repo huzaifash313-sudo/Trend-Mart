@@ -2176,6 +2176,36 @@ html.dark .tm-sponsored-media-fallback {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
+.tm-sponsored-badge--hot {
+  color: #fff;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.tm-sponsored-badge--flash {
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.tm-sponsored-badge--featured {
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.tm-sponsored-badge--new {
+  color: #fff;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+}
+
+.tm-sponsored-badge--deal {
+  color: #fff;
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+}
+
+.tm-sponsored-badge--trusted {
+  color: #fff;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
 .tm-sponsored-body {
   gap: 0.3rem;
 }
@@ -5010,6 +5040,42 @@ html.dark .recharts-polar-grid line,
 html.dark .recharts-label-line {
   stroke: rgba(148, 163, 184, 0.2) !important;
 }
-html.dark .recharts-text {
-  fill: var(--tm-muted) !important;
+
+/* ── QR Dine-in standalone shell ─────────────────────────────────────────── */
+.tm-main:has(.tm-dine-in-shell) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.tm-dine-in-shell {
+  min-height: 100dvh;
+}
+
+.tm-dine-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tm-dine-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tm-dine-deal-card {
+  contain: layout style paint;
+}
+
+.tm-dine-menu-row {
+  contain: layout style;
+}
+
+.tm-dine-add-btn {
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-dine-scroll {
+    scroll-behavior: auto;
+  }
 }

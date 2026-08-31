@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { sanitizeText } from "@/lib/validations";
 import type { PromoAdPlacement, PromoAdStatus, PromotionalAd, PromotionalAdFormData, AdPlan, AdPlacementChoice } from "@/types";
+import { demoAdsEnabled, getDemoAdsForPlacement } from "@/lib/demoPromoAds";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -93,9 +94,18 @@ export async function fetchActiveAds(
       .limit(12);
 
     if (error) throw error;
-    return { success: true, data: (data as PromotionalAd[]) ?? [] };
+    const live = (data as PromotionalAd[]) ?? [];
+
+    if (live.length === 0 && demoAdsEnabled()) {
+      return { success: true, data: getDemoAdsForPlacement(placement, shopId) };
+    }
+
+    return { success: true, data: live };
   } catch (err) {
     logError(err, { module: "adsService.fetchActiveAds", meta: { placement, shopId } });
+    if (demoAdsEnabled()) {
+      return { success: true, data: getDemoAdsForPlacement(placement, shopId) };
+    }
     return { success: false, error: toError(err) };
   }
 }

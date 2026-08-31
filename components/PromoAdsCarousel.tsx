@@ -40,7 +40,33 @@ interface PromoAdsCarouselProps {
   showViewAll?: boolean;
 }
 
-const HOLD_MS = 5000;
+const PLACEMENT_SHELF: Record<
+  PromoAdPlacement,
+  { kicker: string; title: string; viewAllHref: string }
+> = {
+  homepage_top: { kicker: "Spotlight", title: "Sponsored", viewAllHref: "/products" },
+  homepage_feed: { kicker: "Discover", title: "Featured Near You", viewAllHref: "/products" },
+  products_top: { kicker: "Shop Now", title: "Featured Stores", viewAllHref: "/products" },
+  deals_top: { kicker: "Save More", title: "Hot Promotions", viewAllHref: "/deals" },
+  store_top: { kicker: "From This Store", title: "Store Highlights", viewAllHref: "/products" },
+};
+
+function badgeVariantClass(label?: string | null): string {
+  const l = (label ?? "Sponsored").toLowerCase();
+  if (l.includes("hot") || l.includes("combo")) return "tm-sponsored-badge--hot";
+  if (l.includes("limited") || l.includes("flash")) return "tm-sponsored-badge--flash";
+  if (l.includes("featured") || l.includes("pick")) return "tm-sponsored-badge--featured";
+  if (l.includes("new")) return "tm-sponsored-badge--new";
+  if (l.includes("sweet") || l.includes("deal")) return "tm-sponsored-badge--deal";
+  if (l.includes("trusted")) return "tm-sponsored-badge--trusted";
+  return "";
+}
+
+const DEMO_AD_ID_PREFIX = "f0000001-";
+
+function isDemoAdId(id: string): boolean {
+  return id.startsWith(DEMO_AD_ID_PREFIX);
+}
 const SLIDE_MS = 520;
 const GAP_PX = 12;
 
@@ -125,7 +151,7 @@ function SponsoredCard({
             </span>
           </div>
         )}
-        <span className="tm-sponsored-badge absolute left-2.5 top-2.5">
+        <span className={`tm-sponsored-badge absolute left-2.5 top-2.5 ${badgeVariantClass(ad.badge_label)}`}>
           {ad.badge_label?.trim() || "Sponsored"}
         </span>
       </div>
@@ -166,14 +192,44 @@ function SponsoredCard({
 /*  Shelf — hold-and-snap auto-scroll carousel (same engine as home deals)     */
 /* -------------------------------------------------------------------------- */
 
+function SponsoredShelfSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <section aria-hidden="true" className={`tm-sponsored-shelf ${className}`}>
+      <div className="mb-1.5 flex items-end justify-between gap-3">
+        <div className="min-w-0 space-y-1.5">
+          <div className="h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-5 w-28 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        </div>
+      </div>
+      <div className="flex gap-3 overflow-hidden">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div
+            key={i}
+            className="w-[calc((100%-12px)/2)] shrink-0 overflow-hidden rounded-[1.1rem] border border-zinc-100 bg-white dark:border-zinc-800 dark:bg-[color:var(--tm-surface)] sm:w-[calc((100%-24px)/3)]"
+          >
+            <div className="aspect-video animate-pulse bg-gradient-to-br from-teal-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-700" />
+            <div className="space-y-2 p-3">
+              <div className="h-3.5 w-4/5 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+              <div className="h-3 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+              <div className="h-3 w-16 animate-pulse rounded bg-emerald-100 dark:bg-emerald-950/40" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function SponsoredShelf({
   ads,
   className = "",
   showViewAll = true,
+  placement = "homepage_top",
 }: {
   ads: PromotionalAd[];
   className?: string;
   showViewAll?: boolean;
+  placement?: PromoAdPlacement;
 }) {
   const count = ads.length;
   const perView = usePerView();
@@ -317,15 +373,17 @@ function SponsoredShelf({
     window.setTimeout(() => setPaused(false), 5000);
   };
 
+  const shelf = PLACEMENT_SHELF[placement];
+
   return (
     <section aria-label="Sponsored" className={`tm-sponsored-shelf ${className ?? ""}`}>
       <div className="mb-1.5 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="tm-home-deals-kicker">Spotlight</p>
-          <h2 className="tm-home-deals-title truncate">Sponsored</h2>
+          <p className="tm-home-deals-kicker">{shelf.kicker}</p>
+          <h2 className="tm-home-deals-title truncate">{shelf.title}</h2>
         </div>
-        {showViewAll ? (
-          <Link href="/products" className="tm-home-deals-all shrink-0">
+        {showViewAll && placement !== "store_top" ? (
+          <Link href={shelf.viewAllHref} className="tm-home-deals-all shrink-0">
             View all
           </Link>
         ) : null}
@@ -405,7 +463,7 @@ function SponsoredShelf({
                     e.stopPropagation();
                     return;
                   }
-                  pingAdClick(ad.id);
+                  if (!isDemoAdId(ad.id)) pingAdClick(ad.id);
                 }}
               >
                 <SponsoredCard ad={ad} priority={i < perView} />
@@ -453,7 +511,9 @@ export default function PromoAdsCarousel({
       const result = await fetchActiveAds(placement, shopId);
       if (!cancelled && result.success) {
         const all = result.data;
-        setAds(myShopId ? all.filter((ad) => ad.shop_id !== myShopId) : all);
+        const hideOwnShop =
+          myShopId && placement !== "store_top";
+        setAds(hideOwnShop ? all.filter((ad) => ad.shop_id !== myShopId) : all);
       }
       if (!cancelled) setLoading(false);
     }
@@ -464,6 +524,7 @@ export default function PromoAdsCarousel({
   // Fire one impression ping per ad, the first time it's loaded on this page view.
   useEffect(() => {
     for (const ad of ads) {
+      if (isDemoAdId(ad.id)) continue;
       if (!pingedRef.current.has(ad.id)) {
         pingedRef.current.add(ad.id);
         pingAdImpression(ad.id);
@@ -473,10 +534,14 @@ export default function PromoAdsCarousel({
 
   if (!loading && ads.length === 0) return null;
 
-  // While ads load, render nothing — a pulsing skeleton that collapses into
-  // empty space when there are no live ads causes a visible layout glitch on
-  // every page load.
-  if (loading) return null;
+  if (loading) return <SponsoredShelfSkeleton className={className} />;
 
-  return <SponsoredShelf ads={ads} className={className} showViewAll={showViewAll} />;
+  return (
+    <SponsoredShelf
+      ads={ads}
+      className={className}
+      showViewAll={showViewAll}
+      placement={placement}
+    />
+  );
 }

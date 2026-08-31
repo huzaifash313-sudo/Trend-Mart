@@ -189,6 +189,7 @@ export default function CartBar() {
   if (
     pathname === "/offline" ||
     pathname.startsWith("/admin") ||
+    pathname.startsWith("/t/") ||
     pathname === "/login" ||
     pathname === "/signup" ||
     totalItems === 0 ||
