@@ -110,6 +110,99 @@ function StoryRing({
   );
 }
 
+/** Merchant "Your story" ring — Instagram-style: avatar/story thumb + tiny add. */
+function MyStoryRingButton({
+  shop,
+  stories,
+  brokenStoryImgs,
+  onBrokenStory,
+  onView,
+  onAdd,
+}: {
+  shop: { id: string; name: string; category: string; logo_url?: string | null };
+  stories: Story[];
+  brokenStoryImgs: Set<string>;
+  onBrokenStory: (id: string) => void;
+  onView: () => void;
+  onAdd: () => void;
+}) {
+  const lead = stories[0];
+  const storyThumb =
+    lead?.image_url && !brokenStoryImgs.has(lead.id) ? lead.image_url : null;
+  const thumbUrl =
+    storyThumb || shop.logo_url || lead?.shop_logo_url || null;
+  const initial = shop.name?.trim()?.charAt(0).toUpperCase() || "S";
+  const hasLiveStories = stories.length > 0;
+
+  const avatar = thumbUrl ? (
+    <Image
+      src={getSafeImageUrl(thumbUrl, "shop")}
+      alt=""
+      fill
+      className="object-cover"
+      sizes="3.5rem"
+      onError={() => {
+        if (lead?.id && storyThumb && thumbUrl === storyThumb) {
+          onBrokenStory(lead.id);
+        }
+      }}
+    />
+  ) : (
+    <div className="tm-avatar-fallback h-full w-full text-base font-bold">
+      {initial}
+    </div>
+  );
+
+  return (
+    <div className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5">
+      <div className="relative h-[3.55rem] w-[3.55rem]">
+        <button
+          type="button"
+          onClick={() => (hasLiveStories ? onView() : onAdd())}
+          className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          aria-label={
+            hasLiveStories ? "Preview your live story" : "Add your store story"
+          }
+        >
+          {hasLiveStories ? (
+            <StoryRing total={stories.length} seen={0}>
+              {avatar}
+            </StoryRing>
+          ) : (
+            <div className="relative h-[3.55rem] w-[3.55rem] rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
+              <div className="relative h-full w-full overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
+                {avatar}
+              </div>
+            </div>
+          )}
+        </button>
+
+        {stories.length > 1 ? (
+          <span className="pointer-events-none absolute -bottom-0.5 -left-0.5 z-[1] flex h-4 min-w-4 items-center justify-center rounded-full bg-zinc-800 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:bg-zinc-200 dark:text-zinc-900 dark:ring-zinc-950">
+            {stories.length}
+          </span>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd();
+          }}
+          className="absolute -right-0.5 -top-0.5 z-[2] flex h-[1.15rem] w-[1.15rem] shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[0.7rem] font-bold leading-none text-white shadow-sm ring-2 ring-white transition hover:bg-emerald-700 dark:ring-zinc-950"
+          aria-label="Add story"
+          title="Add story"
+        >
+          +
+        </button>
+      </div>
+      <span className="tm-story-ring-label w-full truncate text-center">
+        Your story
+      </span>
+    </div>
+  );
+}
+
 /** Shops rendered initially; "Show more" grows the grid without loading 300
  *  cards into the DOM on first paint (major Android perf win). */
 const PAGE_SIZE = 24;
@@ -243,6 +336,7 @@ function HomeClient({
             id: myShopQuery.data.id,
             category: myShopQuery.data.category,
             name: myShopQuery.data.name,
+            logo_url: myShopQuery.data.logo_url ?? null,
           }
         : null,
     [myShopQuery.data],
@@ -564,72 +658,22 @@ function HomeClient({
         </svg>
         <div className="tm-stories-tray-scroll -mx-3 flex gap-3 overflow-x-auto px-3 scrollbar-none">
           {myShop ? (
-            <div className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5">
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (myStories.length > 0) setMyStoryViewerOpen(true);
-                    else
-                      openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" });
-                  }}
-                  className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                  aria-label={
-                    myStories.length > 0
-                      ? "Preview your live story"
-                      : "Add your store story"
-                  }
-                >
-                  {myStories.length > 0 && myStories[0].image_url ? (
-                    <StoryRing total={myStories.length} seen={0}>
-                      {!brokenStoryImgs.has(myStories[0].id) ? (
-                        <Image
-                          src={getSafeImageUrl(myStories[0].image_url, "product")}
-                          alt=""
-                          fill
-                          className="object-cover"
-                          sizes="3.5rem"
-                          onError={() =>
-                            setBrokenStoryImgs((prev) => new Set(prev).add(myStories[0].id))
-                          }
-                        />
-                      ) : (
-                        <div className="tm-avatar-fallback h-full w-full text-base font-bold">
-                          {myShop.name?.trim()?.charAt(0).toUpperCase() || "S"}
-                        </div>
-                      )}
-                    </StoryRing>
-                  ) : (
-                    <div className="rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
-                      <div className="relative flex h-[3.2rem] w-[3.2rem] items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
-                        <span className="text-2xl font-bold leading-none text-emerald-600 dark:text-emerald-400">+</span>
-                      </div>
-                    </div>
-                  )}
-                </button>
-                {myStories.length > 1 ? (
-                  <span className="pointer-events-none absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
-                    {myStories.length}
-                  </span>
-                ) : null}
-                {myStories.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openQuickAdd({ shopId: myShop.id, shopCategory: myShop.category, tab: "story" })
-                    }
-                    className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold leading-none text-white ring-2 ring-white shadow-sm transition hover:bg-emerald-700 dark:ring-zinc-950"
-                    aria-label="Add story"
-                    title="Add story"
-                  >
-                    +
-                  </button>
-                ) : null}
-              </div>
-              <span className="tm-story-ring-label w-full truncate text-center">
-                Your story
-              </span>
-            </div>
+            <MyStoryRingButton
+              shop={myShop}
+              stories={myStories}
+              brokenStoryImgs={brokenStoryImgs}
+              onBrokenStory={(id) =>
+                setBrokenStoryImgs((prev) => new Set(prev).add(id))
+              }
+              onView={() => setMyStoryViewerOpen(true)}
+              onAdd={() =>
+                openQuickAdd({
+                  shopId: myShop.id,
+                  shopCategory: myShop.category,
+                  tab: "story",
+                })
+              }
+            />
           ) : null}
 
           {storiesQuery.isLoading ? (
