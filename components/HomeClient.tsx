@@ -547,7 +547,7 @@ function HomeClient({
   const visibleShops = displayShops.slice(0, visibleCount);
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-1 pb-3 md:px-4 md:py-3 md:pb-6">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-3 md:pb-6">
       {/* Stories tray — top of homepage, always reserved */}
       <section aria-label="Merchant stories" className="tm-stories-tray">
         <div className="tm-stories-tray-head">
@@ -788,10 +788,10 @@ function HomeClient({
         />
       )}
 
-      {/* ── Brand video + sponsored (compact on mobile so Live Shops peek above fold) ── */}
+      {/* ── Brand video + sponsored (original size, ~3% shorter on homepage) ── */}
       <div className="tm-home-hero-compact">
         <BrandMediaShowcase />
-        <PromoAdsCarousel placement="homepage_top" className="mb-0" compact />
+        <PromoAdsCarousel placement="homepage_top" />
       </div>
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}

@@ -2265,27 +2265,22 @@ html.dark .tm-sponsored-cta {
   min-height: 0;
 }
 .tm-stories-tray-head {
-  margin-bottom: 0.2rem;
-  padding-inline: 0.05rem;
+  margin-bottom: 0.35rem;
+  padding-inline: 0.1rem;
 }
 h2.tm-stories-tray-title {
   margin: 0;
   font-family: var(--font-display, var(--font-sans));
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
   color: var(--tm-text-strong);
 }
-@media (min-width: 640px) {
-  h2.tm-stories-tray-title {
-    font-size: 1.35rem;
-  }
-}
 .tm-stories-tray-scroll {
-  min-height: 3.65rem;
+  min-height: 4.1rem;
   align-items: flex-start;
-  padding-bottom: 0;
+  padding-bottom: 0.1rem;
 }
 .tm-story-ring-label {
   font-size: 0.62rem;
@@ -2333,114 +2328,42 @@ html.dark .tm-story-ring-label {
   aspect-ratio: 16 / 9;
 }
 
-/* Homepage mobile — shrink hero video + sponsored cards so ≥2 shop rows show on open */
-@media (max-width: 639px) {
-  .tm-home-hero-compact {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-  }
+/* Homepage hero — same layout as before, height trimmed ~3% only */
+.tm-home-hero-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.63rem;
+}
 
-  .tm-home-hero-compact .tm-brand-showcase {
-    gap: 0;
-  }
+.tm-home-hero-compact .tm-brand-video {
+  aspect-ratio: 16 / 8.73;
+}
 
+.tm-home-hero-compact .tm-sponsored-media::before {
+  padding-bottom: 54.56%;
+}
+
+.tm-home-hero-compact .tm-sponsored-card {
+  min-height: 8.35rem;
+}
+
+@media (min-width: 641px) {
   .tm-home-hero-compact .tm-brand-video {
-    aspect-ratio: 2.35 / 1;
-    max-height: 6.75rem;
-    border-radius: var(--tm-radius-xl);
-    box-shadow: var(--tm-shadow-md);
+    --tm-brand-video-h: min(36.9dvh, 388px);
+    width: min(100%, calc(var(--tm-brand-video-h) * 16 / 9));
+    height: var(--tm-brand-video-h);
+    max-height: var(--tm-brand-video-h);
+    margin-inline: auto;
   }
-
-  .tm-home-hero-compact .tm-sponsored-shelf-head {
-    margin-bottom: 0.25rem;
+}
+@media (min-width: 1024px) {
+  .tm-home-hero-compact .tm-brand-video {
+    --tm-brand-video-h: min(42.7dvh, 446px);
   }
-
-  .tm-home-hero-compact .tm-sponsored-shelf-label {
-    font-size: 0.75rem;
-  }
-
-  .tm-home-hero-compact .tm-home-deals-all {
-    font-size: 0.65rem;
-  }
-
-  .tm-home-hero-compact .tm-sponsored-media::before {
-    padding-bottom: 36%;
-  }
-
-  .tm-home-hero-compact .tm-sponsored-card {
-    min-height: 0;
-    border-radius: var(--tm-radius-xl);
-    box-shadow: var(--tm-shadow-md);
-  }
-
-  .tm-home-hero-compact .tm-sponsored-body {
-    padding: 0.4rem 0.55rem 0.45rem;
-    gap: 0.1rem;
-  }
-
-  .tm-home-hero-compact .tm-sponsored-title {
-    font-size: 0.76rem;
-    line-height: 1.2;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .tm-home-hero-compact .tm-sponsored-subtitle {
-    display: none;
-  }
-
-  .tm-home-hero-compact .tm-sponsored-cta {
-    padding-top: 0.1rem;
-    font-size: 0.66rem;
-  }
-
-  .tm-home-hero-compact .tm-sponsored-badge {
-    padding: 0.18rem 0.42rem;
-    font-size: 7px;
-    left: 0.4rem;
-    top: 0.4rem;
-  }
-
-  .tm-home-hero-compact .tm-home-deals-nav-btn {
-    height: 1.75rem;
-    width: 1.75rem;
-  }
-
-  .tm-home-hero-compact .tm-home-deals-nav-btn svg {
-    height: 0.85rem;
-    width: 0.85rem;
-  }
-
-  .tm-home-hero-compact .tm-home-deals-progress {
-    margin-top: 0.25rem;
-  }
-
-  /* Stories + category bar — reclaim a little vertical space */
-  .page-stack .tm-stories-tray-title {
-    font-size: 0.9375rem;
-  }
-
-  .page-stack .tm-stories-tray-head {
-    margin-bottom: 0.12rem;
-  }
-
-  .page-stack .tm-stories-tray-scroll {
-    min-height: 3.45rem;
-  }
-
-  .page-stack {
-    padding-top: 0.35rem;
-  }
-
-  .page-stack .tm-live-shops-heading {
-    margin-bottom: 0.35rem;
-  }
-
-  .page-stack .tm-live-shops-geo {
-    margin-bottom: 0.5rem;
+}
+@media (min-width: 1280px) {
+  .tm-home-hero-compact .tm-brand-video {
+    --tm-brand-video-h: min(46.6dvh, 485px);
   }
 }
 
