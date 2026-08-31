@@ -212,7 +212,7 @@ function SponsoredShelfSkeleton({ className = "" }: { className?: string }) {
             key={i}
             className="w-[calc((100%-12px)/2)] shrink-0 overflow-hidden rounded-[1.1rem] border border-zinc-100 bg-white dark:border-zinc-800 dark:bg-[color:var(--tm-surface)] sm:w-[calc((100%-24px)/3)]"
           >
-            <div className="aspect-video animate-pulse bg-gradient-to-br from-teal-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-700" />
+            <div className="tm-sponsored-media animate-pulse bg-gradient-to-br from-teal-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-700" />
             <div className="space-y-2 p-3">
               <div className="h-3.5 w-4/5 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
               <div className="h-3 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />

@@ -2123,7 +2123,7 @@ html.dark .tm-home-deals-progress-bar {
    home deals shell (header / arrows / progress) but its own card so platform
    ads keep a first-class, banner-friendly 16:9 creative slot. */
 .tm-sponsored-card {
-  min-height: 8.35rem;
+  min-height: 7.85rem;
   border-radius: var(--tm-radius-2xl);
   border: 1px solid color-mix(in srgb, var(--tm-text-strong) 8%, transparent);
   background: var(--tm-surface);
@@ -2154,8 +2154,8 @@ html.dark .tm-sponsored-card {
   content: "";
   display: block;
   width: 100%;
-  /* ~3% shorter than classic 16:9 (56.25%) */
-  padding-bottom: 54.5%;
+  /* ~8% shorter than classic 16:9 (56.25%) — full width, minor height trim */
+  padding-bottom: 51.5%;
 }
 html.dark .tm-sponsored-media {
   background: linear-gradient(160deg, #042f2e 0%, #0f172a 100%);
@@ -2222,7 +2222,8 @@ html.dark .tm-sponsored-media-fallback {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.05rem;
+  /* Tiny breathing room under Sponsored / Featured labels */
+  margin-bottom: 0.4rem;
   min-height: 0;
 }
 .tm-sponsored-shelf-label {
@@ -2334,24 +2335,24 @@ html.dark .tm-story-ring-label {
   aspect-ratio: 16 / 9;
 }
 
-/* Homepage hero — same layout as before, height trimmed ~3% only */
+/* Homepage hero — full width, height trimmed a touch more */
 .tm-home-hero-compact {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.4rem;
 }
 
 .tm-home-hero-compact .tm-brand-video {
-  aspect-ratio: 16 / 8.73;
+  aspect-ratio: 16 / 8.35;
 }
 
 .tm-home-hero-compact + section[aria-label="Live shops"] {
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
 }
 
 @media (min-width: 641px) {
   .tm-home-hero-compact .tm-brand-video {
-    --tm-brand-video-h: min(36.9dvh, 388px);
+    --tm-brand-video-h: min(35.2dvh, 372px);
     width: min(100%, calc(var(--tm-brand-video-h) * 16 / 9));
     height: var(--tm-brand-video-h);
     max-height: var(--tm-brand-video-h);
@@ -2360,12 +2361,12 @@ html.dark .tm-story-ring-label {
 }
 @media (min-width: 1024px) {
   .tm-home-hero-compact .tm-brand-video {
-    --tm-brand-video-h: min(42.7dvh, 446px);
+    --tm-brand-video-h: min(40.8dvh, 428px);
   }
 }
 @media (min-width: 1280px) {
   .tm-home-hero-compact .tm-brand-video {
-    --tm-brand-video-h: min(46.6dvh, 485px);
+    --tm-brand-video-h: min(44.5dvh, 465px);
   }
 }
 
