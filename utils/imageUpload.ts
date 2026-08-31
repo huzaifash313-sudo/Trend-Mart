@@ -232,7 +232,7 @@ export interface UploadOptions {
   file: File;
   folder: string;        // e.g., "products", "shops", "stories"
   fileId: string;        // unique identifier (product id, shop id, etc.)
-  bucket?: string;       // Supabase bucket name (default: "images")
+  bucket?: string;       // Supabase bucket name (default: "trendmart-media")
   maxWidth?: number;     // max output width (default: 1200)
   quality?: number;      // WebP quality 0-1 (default: 0.82)
 }
@@ -254,7 +254,7 @@ export async function uploadOptimizedImage(
       file,
       folder,
       fileId,
-      bucket = "images",
+      bucket = "trendmart-media",
       maxWidth = 1200,
       quality = OPTIMAL_QUALITY,
     } = options;
@@ -314,12 +314,17 @@ export function quickValidate(file: File | null): string | null {
  * Validate a bucket name against the allowed storage bucket list.
  * Prevents bucket enumeration / bucket-swapping attacks.
  */
-const ALLOWED_BUCKETS = ["images", "trendsmart-media", "shop-assets"] as const;
+const ALLOWED_BUCKETS = [
+  "trendmart-media",
+  "trendsmart-media", // legacy alias — prefer trendmart-media
+  "images",
+  "shop-assets",
+] as const;
 
 export function validateBucket(bucket: string): string {
   const safe = sanitizePathSegment(bucket, 30);
   if (!(ALLOWED_BUCKETS as readonly string[]).includes(safe)) {
-    return "images"; // Fallback to default bucket
+    return "trendmart-media";
   }
   return safe;
 }

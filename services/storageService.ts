@@ -26,7 +26,8 @@ function toError(err: unknown): string {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BUCKET_NAME = "trendsmart-media";
+/** Matches the live Supabase bucket id (kept as trendmart-media after rebrand). */
+const BUCKET_NAME = "trendmart-media";
 
 /**
  * Maximum allowed image file size in bytes (20 MB).
@@ -526,14 +527,16 @@ export function getPublicUrlSafe(path: string, fallbackUrl: string): string {
  * Extract the storage path from a Supabase public URL.
  *
  * Example:
- * "https://xxx.supabase.co/storage/v1/object/public/trendsmart-media/shops/uuid.jpg"
+ * "https://xxx.supabase.co/storage/v1/object/public/trendmart-media/shops/uuid.jpg"
  * → "shops/uuid.jpg"
  */
 export function extractPathFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     const segments = parsed.pathname.split("/");
-    const bucketIdx = segments.indexOf("trendsmart-media");
+    // Live bucket is trendmart-media; also accept the rebrand typo if any URLs exist.
+    let bucketIdx = segments.indexOf("trendmart-media");
+    if (bucketIdx === -1) bucketIdx = segments.indexOf("trendsmart-media");
     if (bucketIdx === -1) return null;
     return segments.slice(bucketIdx + 1).join("/");
   } catch {

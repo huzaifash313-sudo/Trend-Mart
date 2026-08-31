@@ -182,7 +182,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
     const path = `portfolio/${shopId}/${prefix}_${Date.now()}.${ext}`;
 
     const { error } = await supabase.storage
-      .from("product-images")
+      .from("trendmart-media")
       .upload(path, file, {
         cacheControl: "3600",
         upsert: false,
@@ -191,7 +191,7 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
     if (error) throw error;
 
     const { data: urlData } = supabase.storage
-      .from("product-images")
+      .from("trendmart-media")
       .getPublicUrl(path);
 
     return urlData.publicUrl;

@@ -445,7 +445,7 @@ export function generateEnvExample(): string {
     "NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY=",
     "SUPABASE_SERVICE_ROLE_KEY=",
-    "SUPABASE_STORAGE_BUCKET=trendsmart-media",
+    "SUPABASE_STORAGE_BUCKET=trendmart-media",
     "",
     "# optional",
     "DATABASE_URL=",

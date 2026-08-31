@@ -1,48 +1,60 @@
 -- =============================================================================
--- TrendsMart Storage Bucket Migration
--- Run in Supabase SQL Editor: https://supabase.com/dashboard/project/olbxprailtqjbxmkrbhe
+-- TrendsMart Storage Bucket
+-- Live bucket id is still "trendmart-media" (pre-rebrand name). Do not rename.
+-- Run in Supabase SQL Editor if the bucket / policies are missing.
 -- =============================================================================
 
--- Create a public storage bucket for shop logos and product images.
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-  'trendsmart-media',
-  'trendsmart-media',
-  TRUE,                          -- public access
-  5242880,                       -- 5 MB max file size
-  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']
+  'trendmart-media',
+  'trendmart-media',
+  TRUE,
+  5242880,
+  ARRAY[
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'image/avif',
+    'image/heic',
+    'image/heif',
+    'image/svg+xml'
+  ]
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Allow anyone to read files from the bucket
+DROP POLICY IF EXISTS "Public read access" ON storage.objects;
 CREATE POLICY "Public read access"
   ON storage.objects
   FOR SELECT
-  USING (bucket_id = 'trendsmart-media');
+  USING (bucket_id = 'trendmart-media');
 
--- Allow authenticated users to upload files
+DROP POLICY IF EXISTS "Authenticated users can upload" ON storage.objects;
 CREATE POLICY "Authenticated users can upload"
   ON storage.objects
   FOR INSERT
   WITH CHECK (
-    bucket_id = 'trendsmart-media'
+    bucket_id = 'trendmart-media'
     AND auth.role() = 'authenticated'
   );
 
--- Allow authenticated users to update their own files
+DROP POLICY IF EXISTS "Owners can update their files" ON storage.objects;
 CREATE POLICY "Owners can update their files"
   ON storage.objects
   FOR UPDATE
   USING (
-    bucket_id = 'trendsmart-media'
+    bucket_id = 'trendmart-media'
     AND auth.uid() = owner
   );
 
--- Allow authenticated users to delete their own files
+DROP POLICY IF EXISTS "Owners can delete their files" ON storage.objects;
 CREATE POLICY "Owners can delete their files"
   ON storage.objects
   FOR DELETE
   USING (
-    bucket_id = 'trendsmart-media'
+    bucket_id = 'trendmart-media'
     AND auth.uid() = owner
   );
