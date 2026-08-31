@@ -60,15 +60,22 @@ const EMPTY_COUPONS: Record<string, Coupon[]> = {};
  * WhatsApp/Instagram-style partial story ring. The gradient arc shrinks as more
  * of the shop's stories are viewed; the gray ring underneath shows the seen
  * portion. All-seen → fully gray, nothing-seen → full gradient.
+ *
+ * Gradient defs live INSIDE this SVG — external <defs> in a 0×0 svg break on
+ * mobile Safari. Ring geometry is CSS-locked so global svg { height:auto }
+ * and button { min:44px } cannot collapse or balloon the tray.
  */
 function StoryRing({
   total,
   seen,
   children,
+  gradId,
 }: {
   total: number;
   seen: number;
   children: ReactNode;
+  /** Unique per-mount id so multiple rings don't clash gradient urls. */
+  gradId: string;
 }) {
   const SIZE = 60;
   const STROKE = 2.5;
@@ -77,19 +84,28 @@ function StoryRing({
   const seenFrac = total > 0 ? Math.max(0, Math.min(seen / total, 1)) : 0;
   const unseenFrac = 1 - seenFrac;
   return (
-    <div className="relative h-[3.55rem] w-[3.55rem]">
+    <div className="tm-story-ring">
       <svg
-        className="absolute inset-0 h-full w-full -rotate-90"
+        className="tm-story-ring-svg"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
+        width={SIZE}
+        height={SIZE}
         aria-hidden="true"
       >
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#34d399" />
+            <stop offset="50%" stopColor="#2dd4bf" />
+            <stop offset="100%" stopColor="#059669" />
+          </linearGradient>
+        </defs>
         <circle
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={r}
           fill="none"
           strokeWidth={STROKE}
-          className="stroke-zinc-300 dark:stroke-zinc-600"
+          className="tm-story-ring-track"
         />
         <circle
           cx={SIZE / 2}
@@ -98,14 +114,12 @@ function StoryRing({
           fill="none"
           strokeWidth={STROKE}
           strokeLinecap="round"
-          stroke={unseenFrac > 0 ? "url(#tmStoryRingGrad)" : "none"}
+          stroke={unseenFrac > 0 ? `url(#${gradId})` : "none"}
           strokeDasharray={`${Math.max(unseenFrac * C - 1, 0)} ${C}`}
           style={{ opacity: unseenFrac > 0 ? 1 : 0 }}
         />
       </svg>
-      <div className="absolute inset-[3px] overflow-hidden rounded-full ring-2 ring-white dark:ring-zinc-950">
-        {children}
-      </div>
+      <div className="tm-story-ring-avatar">{children}</div>
     </div>
   );
 }
@@ -154,31 +168,29 @@ function MyStoryRingButton({
   );
 
   return (
-    <div className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5">
-      <div className="relative h-[3.55rem] w-[3.55rem]">
+    <div className="tm-story-item">
+      <div className="tm-story-item-frame">
         <button
           type="button"
           onClick={() => (hasLiveStories ? onView() : onAdd())}
-          className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          className="tm-story-item-hit"
           aria-label={
             hasLiveStories ? "Preview your live story" : "Add your store story"
           }
         >
           {hasLiveStories ? (
-            <StoryRing total={stories.length} seen={0}>
+            <StoryRing total={stories.length} seen={0} gradId="tmStoryGradMine">
               {avatar}
             </StoryRing>
           ) : (
-            <div className="relative h-[3.55rem] w-[3.55rem] rounded-full bg-gradient-to-tr from-emerald-500 via-teal-400 to-emerald-600 p-[2.5px]">
-              <div className="relative h-full w-full overflow-hidden rounded-full bg-white ring-2 ring-white dark:bg-zinc-900 dark:ring-zinc-950">
-                {avatar}
-              </div>
+            <div className="tm-story-ring tm-story-ring--add">
+              <div className="tm-story-ring-avatar">{avatar}</div>
             </div>
           )}
         </button>
 
         {stories.length > 1 ? (
-          <span className="pointer-events-none absolute -bottom-0.5 -left-0.5 z-[1] flex h-4 min-w-4 items-center justify-center rounded-full bg-zinc-800 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:bg-zinc-200 dark:text-zinc-900 dark:ring-zinc-950">
+          <span className="tm-story-count tm-story-count--mine" aria-hidden>
             {stories.length}
           </span>
         ) : null}
@@ -189,16 +201,14 @@ function MyStoryRingButton({
             e.stopPropagation();
             onAdd();
           }}
-          className="absolute -right-0.5 -top-0.5 z-[2] flex h-[1.15rem] w-[1.15rem] shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[0.7rem] font-bold leading-none text-white shadow-sm ring-2 ring-white transition hover:bg-emerald-700 dark:ring-zinc-950"
+          className="tm-story-add-btn icon-only"
           aria-label="Add story"
           title="Add story"
         >
           +
         </button>
       </div>
-      <span className="tm-story-ring-label w-full truncate text-center">
-        Your story
-      </span>
+      <span className="tm-story-ring-label">Your story</span>
     </div>
   );
 }
@@ -647,16 +657,7 @@ function HomeClient({
         <div className="tm-stories-tray-head">
           <h2 className="tm-stories-tray-title">Stories</h2>
         </div>
-        <svg width="0" height="0" className="absolute" aria-hidden="true">
-          <defs>
-            <linearGradient id="tmStoryRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#34d399" />
-              <stop offset="50%" stopColor="#2dd4bf" />
-              <stop offset="100%" stopColor="#059669" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div className="tm-stories-tray-scroll -mx-3 flex gap-3 overflow-x-auto px-3 scrollbar-none">
+        <div className="tm-stories-tray-scroll">
           {myShop ? (
             <MyStoryRingButton
               shop={myShop}
@@ -679,9 +680,9 @@ function HomeClient({
           {storiesQuery.isLoading ? (
             <>
               {[0, 1, 2].map((i) => (
-                <div key={i} className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5">
-                  <div className="h-[3.55rem] w-[3.55rem] animate-pulse rounded-full bg-zinc-300 dark:bg-zinc-700" />
-                  <div className="h-2 w-9 animate-pulse rounded bg-zinc-300 dark:bg-zinc-700" />
+                <div key={i} className="tm-story-item" aria-hidden>
+                  <div className="tm-story-skel" />
+                  <div className="tm-story-skel-label" />
                 </div>
               ))}
             </>
@@ -690,16 +691,16 @@ function HomeClient({
               type="button"
               onClick={handleDetectForStories}
               disabled={geoDetecting}
-              className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="tm-story-item"
               aria-label="Detect location to see nearby store stories"
             >
-              <div className="flex h-[3.55rem] w-[3.55rem] items-center justify-center rounded-full border-2 border-dashed border-zinc-400 bg-zinc-100 text-zinc-600 dark:border-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="tm-story-ring tm-story-ring--nearby">
+                <svg className="tm-story-nearby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
                   <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
                 </svg>
               </div>
-              <span className="tm-story-ring-label w-full text-center">
+              <span className="tm-story-ring-label">
                 {geoDetecting ? "Detecting…" : "Nearby"}
               </span>
             </button>
@@ -725,11 +726,15 @@ function HomeClient({
                     );
                     setStoryViewerOpen(true);
                   }}
-                  className="flex w-[4rem] shrink-0 flex-col items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  className="tm-story-item"
                   aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : `, ${group.length - seenCount} unviewed`}`}
                 >
-                  <div className="relative">
-                    <StoryRing total={group.length} seen={seenCount}>
+                  <div className="tm-story-item-frame">
+                    <StoryRing
+                      total={group.length}
+                      seen={seenCount}
+                      gradId={`tmStoryGrad-${first.id}`}
+                    >
                       {first.image_url && !brokenStoryImgs.has(first.id) ? (
                         <Image
                           src={getSafeImageUrl(first.image_url, "product")}
@@ -748,14 +753,12 @@ function HomeClient({
                       )}
                     </StoryRing>
                     {group.length > 1 ? (
-                      <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[0.6rem] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
+                      <span className="tm-story-count" aria-hidden>
                         {group.length}
                       </span>
                     ) : null}
                   </div>
-                  <span className="tm-story-ring-label w-full truncate text-center">
-                    {label}
-                  </span>
+                  <span className="tm-story-ring-label">{label}</span>
                 </button>
               );
             })
@@ -764,15 +767,15 @@ function HomeClient({
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="tm-story-slot-empty flex w-[4rem] shrink-0 flex-col items-center gap-0.5"
+                  className="tm-story-item tm-story-slot-empty"
                   aria-hidden={i > 0}
                 >
-                  <div className="flex h-[3.55rem] w-[3.55rem] items-center justify-center rounded-full border-2 border-dashed border-zinc-400 bg-zinc-100 dark:border-zinc-500 dark:bg-zinc-800/80">
+                  <div className="tm-story-ring tm-story-ring--empty">
                     {i === 0 ? (
-                      <span className="text-xl font-bold leading-none text-zinc-500 dark:text-zinc-400" aria-hidden>+</span>
+                      <span className="tm-story-empty-plus" aria-hidden>+</span>
                     ) : null}
                   </div>
-                  <span className="tm-story-ring-label w-full truncate text-center">
+                  <span className="tm-story-ring-label">
                     {i === 0 ? "Add story" : "\u00a0"}
                   </span>
                 </div>
