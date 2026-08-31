@@ -297,7 +297,7 @@ export default function HeroSlider({
               <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 lg:p-10">
                 {/* Badge */}
                 {slide.badge && (
-                  <span className="mb-2 inline-block rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-lg">
+                  <span className="tm-badge-pulse mb-2 inline-block rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-lg">
                     {slide.badge}
                   </span>
                 )}

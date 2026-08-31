@@ -72,6 +72,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-display: var(--font-display);
+  --font-shop: var(--font-shop);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -354,7 +355,8 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
 }
 
 /* Semantic badges — discount/danger + deal/amber live behind tokens so every
-   surface (product cards, deal cards, lists) shares one shade. */
+   surface (product cards, deal cards, lists) shares one shade. Soft blink keeps
+   % OFF / DEAL / Featured tags eye-catching without harsh on/off flashing. */
 .tm-badge-discount {
   display: inline-flex;
   align-items: center;
@@ -366,6 +368,9 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
   color: #fff;
   background: var(--tm-danger-soft);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  animation: tm-badge-blink 1.7s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity, filter;
 }
 .tm-badge-deal {
   display: inline-flex;
@@ -379,6 +384,16 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
   text-transform: uppercase;
   color: #fff;
   background: var(--tm-amber);
+  animation: tm-badge-blink 1.9s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity, filter;
+}
+
+/* Animation-only hook for one-off promo chips (hero slides, custom tags) */
+.tm-badge-pulse {
+  animation: tm-badge-blink 1.8s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity, filter;
 }
 
 /* Compact category tab — used by the deals day strip so the always-visible
@@ -503,6 +518,31 @@ h6 {
   overflow-wrap: break-word;
   word-break: break-word;
   hyphens: none;
+  font-family: var(--font-shop), var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  animation: tm-shop-name-glow 3.4s ease-in-out infinite;
+}
+
+/* Hero / dashboard shop titles — optical serif + soft teal breath */
+.tm-shop-title {
+  font-family: var(--font-shop), var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #134e4a;
+  animation: tm-shop-title-breathe 3.6s ease-in-out infinite;
+}
+html.dark .tm-shop-title {
+  color: #5eead4;
+}
+
+/* Compact inline shop name (deal cards, product rows) */
+.tm-shop-name-inline {
+  font-family: var(--font-shop), var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  animation: tm-shop-name-glow 3.4s ease-in-out infinite;
 }
 
 /* Ensure pre/code blocks are scrollable on mobile instead of overflowing. */
@@ -994,6 +1034,7 @@ html.dark .tm-promo-strip {
   border-radius: 999px;
   background: #ef4444;
   box-shadow: 0 0 0 1.5px color-mix(in srgb, #ef4444 25%, transparent);
+  animation: tm-live-blink 1.35s ease-in-out infinite;
 }
 .tm-live-shops-indicator-ping {
   position: absolute;
@@ -1874,6 +1915,9 @@ html.dark .tm-home-deal-media-fallback {
   color: var(--tm-text-strong);
   background: color-mix(in srgb, var(--tm-surface) 94%, transparent);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  animation: tm-badge-blink 1.85s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity, filter;
 }
 .tm-home-deal-badge-off {
   border-radius: var(--tm-radius-pill);
@@ -1885,6 +1929,9 @@ html.dark .tm-home-deal-media-fallback {
   background: color-mix(in srgb, var(--tm-text-strong) 82%, transparent);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  animation: tm-badge-blink 1.65s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity, filter;
 }
 
 .tm-home-deal-name {
@@ -2177,6 +2224,9 @@ html.dark .tm-sponsored-media-fallback {
   color: var(--tm-text-strong);
   background: color-mix(in srgb, var(--tm-surface) 94%, transparent);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  animation: tm-badge-blink 1.75s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform, opacity, filter;
 }
 
 .tm-sponsored-badge--hot {
@@ -3683,7 +3733,51 @@ html.dark .tm-product-add-text:hover {
 }
 
 .tm-live-dot {
-  animation: tm-live-pulse 1.8s ease-in-out infinite;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 999px;
+  animation: tm-live-blink 1.35s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.tm-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: inherit;
+  opacity: 0.45;
+  animation: tm-live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes tm-live-blink {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  45% {
+    transform: scale(0.72);
+    opacity: 0.28;
+  }
+  70% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@keyframes tm-live-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  75%,
+  100% {
+    transform: scale(2.35);
+    opacity: 0;
+  }
 }
 
 @keyframes tm-live-pulse {
@@ -3698,6 +3792,68 @@ html.dark .tm-product-add-text:hover {
   }
 }
 
+@keyframes tm-badge-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  40% {
+    opacity: 0.72;
+    transform: scale(0.96);
+    filter: brightness(1.08);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.07);
+    filter: brightness(1.18);
+  }
+}
+
+@keyframes tm-shop-title-breathe {
+  0%,
+  100% {
+    letter-spacing: -0.03em;
+    text-shadow: 0 0 0 transparent;
+    filter: brightness(1);
+    transform: translateY(0);
+  }
+  50% {
+    letter-spacing: -0.01em;
+    text-shadow: 0 0 18px color-mix(in srgb, var(--tm-sea) 55%, transparent);
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes tm-shop-name-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 transparent;
+    filter: brightness(1);
+  }
+  50% {
+    text-shadow: 0 0 14px color-mix(in srgb, var(--tm-sea) 42%, transparent);
+    filter: brightness(1.06);
+  }
+}
+
+/* Inline “live today” count on deals page */
+.tm-live-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.tm-live-count-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #ef4444 30%, transparent);
+  animation: tm-live-blink 1.35s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .trend-card,
   .shop-card,
@@ -3709,8 +3865,37 @@ html.dark .tm-product-add-text:hover {
     transform: none !important;
     animation: none !important;
   }
-  .tm-live-dot {
+  .tm-live-dot,
+  .tm-live-dot::after,
+  .tm-live-shops-indicator-dot,
+  .tm-live-shops-indicator-ping,
+  .tm-live-count-dot,
+  .tm-badge-discount,
+  .tm-badge-deal,
+  .tm-badge-pulse,
+  .tm-home-deal-badge-deal,
+  .tm-home-deal-badge-off,
+  .tm-sponsored-badge,
+  .tm-shop-title,
+  .tm-shop-name,
+  .tm-shop-name-inline,
+  .tm-product-offer-dot,
+  .tm-offer-ticker__dot,
+  .tm-offer-ticker {
     animation: none !important;
+  }
+  .tm-live-dot::after {
+    content: none;
+  }
+  .tm-shop-title {
+    color: #134e4a;
+    letter-spacing: -0.03em;
+    text-shadow: none;
+    filter: none;
+    transform: none;
+  }
+  html.dark .tm-shop-title {
+    color: #5eead4;
   }
 }
 
@@ -3790,6 +3975,7 @@ html.dark .shop-card:hover {
   font-weight: 600;
   line-height: 1;
   overflow: hidden;
+  animation: tm-offer-bar-glow 2.4s ease-in-out infinite;
 }
 html.dark .tm-offer-ticker {
   background: color-mix(in srgb, var(--tm-sea) 18%, #18181b);
@@ -3895,6 +4081,17 @@ html.dark .tm-offer-ticker--delivery {
   50% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+@keyframes tm-offer-bar-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  50% {
+    filter: brightness(1.08);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
   }
 }
 @keyframes tm-offer-fade {

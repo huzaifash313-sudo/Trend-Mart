@@ -664,9 +664,16 @@ function DealsInner() {
       </div>
 
       <p className="mb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
-        {loading
-          ? "Loading deals…"
-          : `${filtered.length} deal${filtered.length === 1 ? "" : "s"} ${resultHint}`}
+        {loading ? (
+          "Loading deals…"
+        ) : (
+          <span className="tm-live-count">
+            {(filter === "today" || resultHint.includes("live")) && (
+              <span className="tm-live-count-dot" aria-hidden="true" />
+            )}
+            {`${filtered.length} deal${filtered.length === 1 ? "" : "s"} ${resultHint}`}
+          </span>
+        )}
       </p>
 
       {error ? (

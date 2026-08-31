@@ -341,7 +341,7 @@ export default function DashboardOverviewPage() {
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
               Merchant dashboard
             </p>
-            <h1 className="tm-font-display truncate text-2xl font-black leading-tight tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl">
+            <h1 className="tm-shop-title truncate text-2xl leading-tight sm:text-3xl">
               {activeShop?.name ?? "Overview"}
             </h1>
           </div>
@@ -385,7 +385,9 @@ export default function DashboardOverviewPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <span
                   className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
-                    isShopPubliclyVisible(activeShop) ? "bg-emerald-500" : "bg-amber-500"
+                    isShopPubliclyVisible(activeShop)
+                      ? "tm-live-dot bg-emerald-500"
+                      : "bg-amber-500"
                   }`}
                   aria-hidden
                 />

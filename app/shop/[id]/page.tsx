@@ -937,7 +937,7 @@ function ShopDetailInner({ id }: { id: string }) {
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-base font-extrabold leading-tight tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-xl">
+                    <h2 className="tm-shop-title text-base leading-tight sm:text-xl">
                       {shop.name}
                     </h2>
                     <p className="mt-0.5 text-[0.65rem] font-medium leading-none text-teal-700 dark:text-teal-300">

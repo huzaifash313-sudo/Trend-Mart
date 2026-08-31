@@ -30,6 +30,15 @@ import { trackProductView } from "@/lib/behavior";
 // Re-exported so existing call sites (`/deals`) keep a stable import surface.
 export { dealToProduct };
 
+function dealCornerBadge(deal: ShopDeal): string {
+  const custom = (deal.badge_text || "").trim();
+  if (!custom) return "Deal";
+  // Keep custom promo labels (Sweet Deal, Weekend Special…). Numeric "% OFF"
+  // copy stays on the discount badge so we don't double-print percentages.
+  if (/\d+\s*%\s*off/i.test(custom)) return "Deal";
+  return custom;
+}
+
 // Lazy-load the heavy checkout form — it's only needed when a shopper actually
 // taps "Order", so it should never be in the deals-list bundle.
 const WhatsAppCheckoutModal = dynamic(
@@ -119,6 +128,7 @@ function DealCard({
   const product = useMemo(() => dealToProduct(deal), [deal]);
   const { hasDiscount, originalPrice, discountPercent } = getProductDiscount(product);
   const hasPrice = dealHasPrice(deal);
+  const cornerBadge = dealCornerBadge(deal);
 
   const tickerTags = useMemo(() => {
     const tags: string[] = [];
@@ -333,7 +343,8 @@ function DealCard({
                     {(deal.shop_name || "?").charAt(0).toUpperCase()}
                   </span>
                 )}
-                <span className="truncate">{deal.shop_name || "Store"}</span>
+                <span className="tm-shop-name-inline truncate">{deal.shop_name || "Store"}</span>
+                <span className="tm-live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
               </button>
               {tickerTags[0] ? (
                 <p className="tm-home-deal-meta truncate">{tickerTags[0]}</p>
@@ -435,7 +446,7 @@ function DealCard({
           )}
 
           <span className="tm-badge-deal absolute left-1.5 top-1.5 z-10">
-            Deal
+            {cornerBadge}
           </span>
 
           {hasDiscount && discountPercent > 0 ? (
@@ -500,9 +511,10 @@ function DealCard({
                 {(deal.shop_name || "?").charAt(0).toUpperCase()}
               </span>
             )}
-            <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
+            <span className="tm-shop-name-inline truncate text-[10px] leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
               {deal.shop_name || "Store"}
             </span>
+            <span className="tm-live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
           </button>
 
           <div className="tm-product-footer flex flex-col justify-end gap-0.5">
