@@ -317,6 +317,21 @@ const ProductCard = memo(function ProductCard({
 
         <OfferTickerMarquee tags={offerTags} />
 
+        {manage && kebabItems.length > 0 ? (
+          <div
+            className={`absolute right-1.5 z-30 ${
+              offerTags.length > 0 ? "bottom-[1.65rem]" : "bottom-1.5"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <KebabMenu
+              items={kebabItems}
+              variant="overlay"
+              ariaLabel={`Options for ${product.name}`}
+            />
+          </div>
+        ) : null}
+
         {!product.is_available ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-900/45">
             <span className="rounded bg-zinc-900/85 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -327,30 +342,17 @@ const ProductCard = memo(function ProductCard({
       </div>
 
       <div className="tm-product-body">
-        <div className="flex shrink-0 items-start gap-1">
-          <h3
-            className={`tm-product-title min-w-0 flex-1 ${
-              compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"
-            }`}
-            title={product.name}
-          >
-            {isPinned ? (
-              <PinSolidIcon className="mr-0.5 inline-block h-3 w-3 shrink-0 align-[-1px] text-amber-500" />
-            ) : null}
-            {product.name}
-          </h3>
-          {showShopMeta && product.shop_name ? (
-            <CompactRating
-              average={product.shop_avg_rating}
-              count={product.shop_review_count}
-              size="xs"
-              className="mt-0.5 shrink-0"
-            />
+        <h3
+          className={`tm-product-title ${
+            compact ? "text-[12px] sm:text-[13px]" : "text-[13px] sm:text-sm"
+          }`}
+          title={product.name}
+        >
+          {isPinned ? (
+            <PinSolidIcon className="mr-0.5 inline-block h-3 w-3 shrink-0 align-[-1px] text-amber-500" />
           ) : null}
-          {manage ? (
-            <KebabMenu items={kebabItems} variant="plain" ariaLabel={`Options for ${product.name}`} />
-          ) : null}
-        </div>
+          {product.name}
+        </h3>
 
         {showShopMeta && product.shop_name ? (
           <div className="tm-product-shop">
@@ -379,6 +381,12 @@ const ProductCard = memo(function ProductCard({
                 {product.shop_name}
               </span>
             </button>
+            <CompactRating
+              average={product.shop_avg_rating}
+              count={product.shop_review_count}
+              size="xs"
+              className="ml-auto shrink-0"
+            />
           </div>
         ) : !compact && product.description ? (
           <p className="tm-product-shop line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">

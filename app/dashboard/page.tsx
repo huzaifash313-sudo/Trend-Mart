@@ -341,7 +341,7 @@ export default function DashboardOverviewPage() {
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
               Merchant dashboard
             </p>
-            <h1 className="tm-font-display truncate text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
+            <h1 className="tm-font-display truncate text-2xl font-black leading-tight tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl">
               {activeShop?.name ?? "Overview"}
             </h1>
           </div>
