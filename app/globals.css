@@ -499,9 +499,7 @@ h6 {
   min-width: 0;
   width: 100%;
   line-height: 1.28;
-  /* Reserve exactly 2 lines (2 × 1.28em) so every card's title block is the
-     same height — short names no longer leave dead space above the CTA. */
-  min-height: 2.56em;
+  min-height: 0;
   overflow-wrap: break-word;
   word-break: break-word;
   hyphens: none;
@@ -3181,7 +3179,7 @@ html.dark .tm-product-placeholder {
   min-height: auto;
   min-height: min-content;
   padding: 0.3rem 0.38rem 0.32rem;
-  gap: 0.18rem;
+  gap: 0.1rem;
 }
 @media (min-width: 640px) {
   .tm-product-body {
@@ -3196,8 +3194,7 @@ html.dark .tm-product-placeholder {
   line-clamp: 2;
   overflow: hidden;
   flex-shrink: 0;
-  /* Reserve 2 lines so 1-line titles don't leave a ragged gap above the price. */
-  min-height: calc(1.22em * 2);
+  min-height: 0;
   font-weight: 600;
   line-height: 1.22;
   letter-spacing: -0.01em;

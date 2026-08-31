@@ -632,7 +632,7 @@ function DealsInner() {
         daysAhead={14}
       />
 
-      <div className="sticky top-[var(--tm-navbar-sticky-offset,4.35rem)] z-30 -mx-3 mb-3 border-b border-zinc-100/80 bg-white/95 px-3 py-2 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">
+      <div className="sticky top-[var(--tm-navbar-sticky-offset,4.35rem)] z-30 -mx-3 mb-2 border-b border-zinc-100/80 bg-white/95 px-3 py-1.5 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:mb-2 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-none">
             {FILTERS.map((opt) => (

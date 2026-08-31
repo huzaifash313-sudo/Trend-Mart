@@ -174,7 +174,7 @@ function ShopCard({
           <Link
             href={href}
             title={shop.name}
-            className="tm-shop-name line-clamp-2 min-w-0 flex-1 break-words text-[12.5px] font-semibold leading-snug tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[13.5px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
+            className="tm-shop-name line-clamp-2 min-w-0 flex-1 break-words text-[12.5px] font-bold leading-tight tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[13.5px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
           >
             {shop.name}
           </Link>
@@ -206,7 +206,7 @@ function ShopCard({
             e.stopPropagation();
             openShopReviews({ id: shop.id, name: shop.name });
           }}
-          className={`group/rating mt-0.5 flex min-w-0 w-full items-center rounded-md text-left transition-opacity ${
+          className={`group/rating mt-px flex min-w-0 w-full items-center rounded-md text-left transition-opacity ${
             hasRating ? "hover:opacity-80" : ""
           }`}
           title={

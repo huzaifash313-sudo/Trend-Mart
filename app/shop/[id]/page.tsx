@@ -931,22 +931,43 @@ function ShopDetailInner({ id }: { id: string }) {
               {theme.icon} {shop.category}
             </span>
           </ShopMediaHeader>
-          <div className="space-y-2 p-3 sm:p-4">
-            <div className="flex items-start gap-3">
+          <div className="space-y-1.5 p-3 sm:p-4">
+            <div className="flex items-start gap-2.5">
               <ShopLogoAvatar shopName={shop.name} logoUrl={shop.logo_url} size="md" />
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <h2 className="min-w-0 max-w-full truncate text-base font-bold text-zinc-900 dark:text-zinc-100 sm:text-xl">
-                    {shop.name}
-                  </h2>
-                  <span className={`max-w-full truncate rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold ${theme.badgeClass}`}>
-                    {shop.category}
-                  </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-base font-extrabold leading-tight tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-xl">
+                      {shop.name}
+                    </h2>
+                    <p className="mt-0.5 text-[0.65rem] font-medium leading-none text-teal-700 dark:text-teal-300">
+                      {shop.category}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => openShopReviews({ id: shop.id, name: shop.name })}
+                      className="mt-0.5 inline-flex items-center text-left transition-opacity hover:opacity-80"
+                      title="View all reviews or add yours"
+                      aria-label={`View reviews for ${shop.name}`}
+                    >
+                      <CompactRating
+                        average={shop.avg_rating}
+                        count={shop.review_count}
+                        size="sm"
+                      />
+                    </button>
+                    <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-tight text-zinc-500 dark:text-zinc-400">
+                      <PinIcon />
+                      <span className="truncate">
+                        {shop.address_display?.trim() || shop.location || "Location not set"}
+                      </span>
+                    </div>
+                  </div>
                   {isOwner ? (
                     <button
                       type="button"
                       onClick={() => setProfileEditorOpen(true)}
-                      className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
                     >
                       <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -955,25 +976,6 @@ function ShopDetailInner({ id }: { id: string }) {
                       Edit profile
                     </button>
                   ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => openShopReviews({ id: shop.id, name: shop.name })}
-                  className="mt-0.5 inline-flex items-center text-left transition-opacity hover:opacity-80"
-                  title="View all reviews or add yours"
-                  aria-label={`View reviews for ${shop.name}`}
-                >
-                  <CompactRating
-                    average={shop.avg_rating}
-                    count={shop.review_count}
-                    size="md"
-                  />
-                </button>
-                <div className="flex min-w-0 items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  <PinIcon />
-                  <span className="truncate">
-                    {shop.address_display?.trim() || shop.location || "Location not set"}
-                  </span>
                 </div>
               </div>
             </div>
@@ -989,7 +991,7 @@ function ShopDetailInner({ id }: { id: string }) {
                 !!(shop.business_hours?.trim() || operatingStatus?.trim());
               const isOpen = hours.state !== "closed";
               return (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-teal-100 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 px-3 py-2 dark:border-teal-900/40 dark:from-emerald-950/30 dark:to-teal-950/20">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-teal-100 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 px-3 py-1.5 dark:border-teal-900/40 dark:from-emerald-950/30 dark:to-teal-950/20">
                   <ClockIcon />
                   <div className="min-w-0 flex-1">
                     <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
@@ -1031,7 +1033,7 @@ function ShopDetailInner({ id }: { id: string }) {
             })()}
 
             {shop.store_bio?.trim() ? (
-              <div className="rounded-2xl border border-zinc-200/90 bg-gradient-to-br from-zinc-50 to-white px-3.5 py-3 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-950">
+              <div className="rounded-2xl border border-zinc-200/90 bg-gradient-to-br from-zinc-50 to-white px-3 py-2 dark:border-zinc-700 dark:from-zinc-900 dark:to-zinc-950">
                 <p className="text-[0.65rem] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                   About this store
                 </p>
@@ -1160,7 +1162,7 @@ function ShopDetailInner({ id }: { id: string }) {
                 className="flex min-w-0 items-center gap-2 text-left"
                 aria-expanded={couponsOpen}
               >
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Coupons</h2>
+                <h2 className="text-base font-extrabold text-zinc-900 dark:text-zinc-100">Coupons</h2>
                 <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                   {coupons.length}
                 </span>
@@ -1222,12 +1224,7 @@ function ShopDetailInner({ id }: { id: string }) {
         {isOwner ? (
           <section id="deals" aria-label="Manage your deals" className="space-y-2 scroll-mt-20">
             <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Your deals</h2>
-                <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                  Tap a deal&apos;s three dots to pin, edit or delete it. Pinned deals show first.
-                </p>
-              </div>
+              <h2 className="text-base font-extrabold text-zinc-900 dark:text-zinc-100">Your deals</h2>
             </div>
             {ownerDeals.length === 0 ? (
               <p className="text-xs text-zinc-400 dark:text-zinc-500">No deals yet.</p>
@@ -1261,11 +1258,6 @@ function ShopDetailInner({ id }: { id: string }) {
             />
           </section>
         ) : null}
-
-        {/* Category Description */}
-        <div className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">{theme.categoryDescription}</p>
-        </div>
 
         {/* ── Out-of-area soft notice (checkout still hard-blocks) ─────── */}
         {outsideCoverage && (

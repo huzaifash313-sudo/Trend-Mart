@@ -96,10 +96,13 @@ export default function DealDayDateFilter({
   return (
     <section
       aria-label="Filter deals by day or date"
-      className="mb-3 rounded-2xl border border-zinc-100 bg-zinc-50/60 p-2.5 dark:border-zinc-800/80 dark:bg-zinc-900/40"
+      className="mb-1.5 rounded-2xl border border-zinc-100 bg-zinc-50/60 p-2.5 dark:border-zinc-800/80 dark:bg-zinc-900/40"
     >
+      <h2 className="mb-2 text-sm font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
+        Search deal by date/day
+      </h2>
       {/* Weekday chips */}
-      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-2">
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1.5">
         {WEEKDAY_LABELS.map((label, weekday) => {
           const active = selectedWeekday === weekday && selectedDateKey != null;
           const nextKey = calendarKeys.find((k) => weekdayFromDateKey(k) === weekday);

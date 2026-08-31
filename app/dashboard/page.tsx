@@ -602,17 +602,17 @@ export default function DashboardOverviewPage() {
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Revenue</p>
                 </Link>
-                <div className="tm-panel p-3 text-center">
-                  <p className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                <div className="tm-panel p-4 text-center">
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
                     {analytics?.total_views ?? "—"}
                   </p>
-                  <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">Store views</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Store views</p>
                 </div>
-                <div className="tm-panel p-3 text-center">
-                  <p className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                <div className="tm-panel p-4 text-center">
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
                     {analytics?.total_product_clicks ?? "—"}
                   </p>
-                  <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">Product clicks</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Product clicks</p>
                 </div>
               </div>
             </section>

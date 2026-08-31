@@ -57,6 +57,72 @@ function LinkIcon() {
   );
 }
 
+async function renderTableQrPage(
+  doc: jsPDF,
+  table: DineInTable,
+  shop: Shop,
+  origin: string,
+  isFirstPage: boolean,
+) {
+  if (!isFirstPage) doc.addPage();
+  const url = `${origin}/t/${table.qr_token}`;
+  const qr = await QRCode.toDataURL(url, { width: 512, margin: 2 });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  const shopName = (shop.name ?? "TrendsMart").slice(0, 28);
+  const shopLocation = (shop.location ?? "").slice(0, 34);
+  const shopPhone = shop.whatsapp_number ?? "";
+
+  doc.setFillColor(6, 95, 70);
+  doc.rect(0, 0, pageW, 30, "F");
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(shopName, pageW / 2, 13, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  let hdrY = 20;
+  if (shopLocation) {
+    doc.text(shopLocation, pageW / 2, hdrY, { align: "center" });
+    hdrY += 4.5;
+  }
+  if (shopPhone) {
+    doc.text(shopPhone, pageW / 2, hdrY, { align: "center" });
+  }
+  doc.setTextColor(0);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text(table.name, pageW / 2, 42, { align: "center" });
+
+  const qrSize = Math.min(pageW - 26, pageH - 42 - 24 - 16);
+  const qrX = (pageW - qrSize) / 2;
+  doc.addImage(qr, "PNG", qrX, 48, qrSize, qrSize);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(90);
+  doc.text("Scan to view the menu & order from your table", pageW / 2, pageH - 12, { align: "center" });
+  doc.setFontSize(7);
+  doc.setTextColor(140);
+  doc.text("Powered by TrendsMart", pageW / 2, pageH - 7, { align: "center" });
+  doc.setTextColor(0);
+}
+
+async function buildTablesPdf(
+  targetTables: DineInTable[],
+  shop: Shop,
+  origin: string,
+): Promise<jsPDF | null> {
+  if (targetTables.length === 0) return null;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+  for (let i = 0; i < targetTables.length; i++) {
+    await renderTableQrPage(doc, targetTables[i], shop, origin, i === 0);
+  }
+  return doc;
+}
+
 export default function MerchantTablesPage() {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
@@ -64,10 +130,11 @@ export default function MerchantTablesPage() {
   const [shop, setShop] = useState<Shop | null>(null);
   const [tables, setTables] = useState<DineInTable[]>([]);
   const [name, setName] = useState("");
-  const [bulkCount, setBulkCount] = useState(5);
+  const [bulkCountInput, setBulkCountInput] = useState("5");
   const [adding, setAdding] = useState(false);
   const [qrDataUrls, setQrDataUrls] = useState<Record<string, string>>({});
-  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | "bulk" | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [todayStats, setTodayStats] = useState<{ orders: number; revenue: number } | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [billOrder, setBillOrder] = useState<Order | null>(null);
@@ -102,6 +169,32 @@ export default function MerchantTablesPage() {
         .slice(0, 20),
     [orders],
   );
+
+  const selectedTables = useMemo(
+    () => tables.filter((t) => selectedIds.has(t.id)),
+    [tables, selectedIds],
+  );
+
+  const allSelected = tables.length > 0 && selectedIds.size === tables.length;
+
+  function toggleSelect(tableId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tableId)) next.delete(tableId);
+      else next.add(tableId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(tables.map((t) => t.id)));
+  }
+
+  function parseBulkCount(): number {
+    const parsed = Number.parseInt(bulkCountInput.trim(), 10);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.min(50, Math.max(1, parsed));
+  }
 
   const load = useCallback(async () => {
     const result = await fetchTablesByShopId(shop?.id ?? "");
@@ -191,7 +284,7 @@ export default function MerchantTablesPage() {
 
   async function handleBulkAdd() {
     if (!shop) return;
-    const count = Math.min(50, Math.max(1, Math.round(bulkCount) || 1));
+    const count = parseBulkCount();
     const existingNames = new Set(tables.map((t) => t.name));
     const names: string[] = [];
     let i = 1;
@@ -240,63 +333,82 @@ export default function MerchantTablesPage() {
   }
 
   async function handleDownload(table: DineInTable) {
-    if (!origin) return;
+    if (!origin || !shop) return;
     setDownloading(table.id);
     try {
-      const url = `${origin}/t/${table.qr_token}`;
-      const qr = await QRCode.toDataURL(url, { width: 512, margin: 2 });
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-
-      const shopName = (shop?.name ?? "TrendsMart").slice(0, 28);
-      const shopLocation = (shop?.location ?? "").slice(0, 34);
-      const shopPhone = shop?.whatsapp_number ?? "";
-
-      // Header — shop name + address + phone (JazzCash-style card)
-      doc.setFillColor(6, 95, 70); // emerald-800
-      doc.rect(0, 0, pageW, 30, "F");
-      doc.setTextColor(255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(15);
-      doc.text(shopName, pageW / 2, 13, { align: "center" });
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      let hdrY = 20;
-      if (shopLocation) {
-        doc.text(shopLocation, pageW / 2, hdrY, { align: "center" });
-        hdrY += 4.5;
-      }
-      if (shopPhone) {
-        doc.text(shopPhone, pageW / 2, hdrY, { align: "center" });
-      }
-      doc.setTextColor(0);
-
-      // Big table name
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(20);
-      doc.text(table.name, pageW / 2, 42, { align: "center" });
-
-      // QR centered
-      const qrSize = Math.min(pageW - 26, pageH - 42 - 24 - 16);
-      const qrX = (pageW - qrSize) / 2;
-      doc.addImage(qr, "PNG", qrX, 48, qrSize, qrSize);
-
-      // Footer — instruction + brand
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(90);
-      doc.text("Scan to view the menu & order from your table", pageW / 2, pageH - 12, { align: "center" });
-      doc.setFontSize(7);
-      doc.setTextColor(140);
-      doc.text("Powered by TrendsMart", pageW / 2, pageH - 7, { align: "center" });
-      doc.setTextColor(0);
-
+      const doc = await buildTablesPdf([table], shop, origin);
+      if (!doc) return;
       doc.save(`${table.name.toLowerCase().replace(/\s+/g, "-")}-qr.pdf`);
     } catch {
       addToast("Could not generate the QR PDF.", "error");
     } finally {
       setDownloading(null);
+    }
+  }
+
+  async function handleDownloadMany(targetTables: DineInTable[], filename: string) {
+    if (!origin || !shop || targetTables.length === 0) return;
+    setDownloading("bulk");
+    try {
+      const doc = await buildTablesPdf(targetTables, shop, origin);
+      if (!doc) return;
+      doc.save(filename);
+      addToast(`${targetTables.length} table QR PDF${targetTables.length === 1 ? "" : "s"} downloaded.`, "success");
+    } catch {
+      addToast("Could not generate QR PDFs.", "error");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  async function handlePrintMany(targetTables: DineInTable[]) {
+    if (!origin || !shop || targetTables.length === 0) return;
+    setDownloading("bulk");
+    try {
+      const doc = await buildTablesPdf(targetTables, shop, origin);
+      if (!doc) return;
+      doc.autoPrint();
+      const blobUrl = doc.output("bloburl");
+      window.open(blobUrl, "_blank");
+      addToast(`Print dialog opened for ${targetTables.length} table${targetTables.length === 1 ? "" : "s"}.`, "success");
+    } catch {
+      addToast("Could not open print dialog.", "error");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  async function handleDeleteMany(targetTables: DineInTable[]) {
+    if (targetTables.length === 0) return;
+    const ok = await confirm({
+      title: targetTables.length === 1 ? "Delete table?" : `Delete ${targetTables.length} tables?`,
+      message:
+        targetTables.length === 1
+          ? `Delete "${targetTables[0].name}"? Its QR code will stop working.`
+          : `Delete ${targetTables.length} tables? Their QR codes will stop working.`,
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    const ids = new Set(targetTables.map((t) => t.id));
+    const failures: string[] = [];
+    for (const table of targetTables) {
+      const res = await deleteTable(table.id);
+      if (!res.success) failures.push(table.name);
+    }
+
+    setTables((prev) => prev.filter((t) => !ids.has(t.id)));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+
+    if (failures.length === 0) {
+      addToast(`${targetTables.length} table${targetTables.length === 1 ? "" : "s"} deleted.`, "success");
+    } else {
+      addToast(`Some tables could not be deleted: ${failures.join(", ")}`, "error");
     }
   }
 
@@ -422,12 +534,19 @@ export default function MerchantTablesPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
             <span className="text-xs text-zinc-500 dark:text-zinc-400">Quick setup:</span>
             <input
-              type="number"
-              min={1}
-              max={50}
-              value={bulkCount}
-              onChange={(e) => setBulkCount(Number(e.target.value))}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={bulkCountInput}
+              onChange={(e) => {
+                const next = e.target.value.replace(/\D/g, "");
+                setBulkCountInput(next);
+              }}
+              onBlur={() => {
+                if (!bulkCountInput.trim()) setBulkCountInput("1");
+              }}
               className="w-16 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-center text-sm text-zinc-900 outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              aria-label="Number of tables to add"
             />
             <button
               type="button"
@@ -450,13 +569,85 @@ export default function MerchantTablesPage() {
             </p>
           </div>
         ) : (
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-100 bg-white p-3 dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
+              <label className="mr-1 flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 accent-emerald-600"
+                />
+                Select all ({selectedIds.size}/{tables.length})
+              </label>
+              <button
+                type="button"
+                disabled={downloading === "bulk"}
+                onClick={() => void handleDownloadMany(tables, "all-tables-qr.pdf")}
+                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+              >
+                Download all PDFs
+              </button>
+              <button
+                type="button"
+                disabled={downloading === "bulk"}
+                onClick={() => void handlePrintMany(tables)}
+                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+              >
+                Print all
+              </button>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || downloading === "bulk"}
+                onClick={() => void handleDownloadMany(selectedTables, "selected-tables-qr.pdf")}
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                PDF selected
+              </button>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0 || downloading === "bulk"}
+                onClick={() => void handlePrintMany(selectedTables)}
+                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Print selected
+              </button>
+              <button
+                type="button"
+                disabled={selectedIds.size === 0}
+                onClick={() => void handleDeleteMany(selectedTables)}
+                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900/40 dark:hover:bg-red-950/30"
+              >
+                Delete selected
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteMany(tables)}
+                className="ml-auto rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 dark:border-red-900/40 dark:hover:bg-red-950/30"
+              >
+                Delete all
+              </button>
+            </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {tables.map((table) => (
               <div
                 key={table.id}
-                className="flex flex-col overflow-hidden rounded-2xl border border-zinc-100 bg-white dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]"
+                className={`flex flex-col overflow-hidden rounded-2xl border bg-white dark:bg-[color:var(--tm-surface)] ${
+                  selectedIds.has(table.id)
+                    ? "border-emerald-400 ring-1 ring-emerald-400/60 dark:border-emerald-600"
+                    : "border-zinc-100 dark:border-zinc-800"
+                }`}
               >
                 <div className="relative flex flex-col items-center justify-center bg-zinc-50 py-4 dark:bg-zinc-900">
+                  <label className="absolute left-2 top-2 flex cursor-pointer items-center rounded-md bg-white/90 p-0.5 shadow-sm dark:bg-zinc-900/90">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(table.id)}
+                      onChange={() => toggleSelect(table.id)}
+                      className="h-4 w-4 accent-emerald-600"
+                      aria-label={`Select ${table.name}`}
+                    />
+                  </label>
                   {qrDataUrls[table.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -477,14 +668,15 @@ export default function MerchantTablesPage() {
                   )}
                 </div>
                 <div className="flex flex-1 flex-col gap-2 p-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{table.name}</p>
-                    <label className="flex cursor-pointer items-center">
+                    <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                      <span>Active</span>
                       <input
                         type="checkbox"
                         checked={table.is_active}
                         onChange={() => void handleToggle(table)}
-                        className="h-4 w-4 accent-emerald-600"
+                        className="h-3.5 w-3.5 accent-emerald-600"
                         title="Pause/resume ordering from this table"
                       />
                     </label>
@@ -527,6 +719,7 @@ export default function MerchantTablesPage() {
               </div>
             ))}
           </div>
+          </>
         )}
 
         {/* Recent dine-in orders — print bills from here */}

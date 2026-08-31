@@ -339,6 +339,14 @@ const ProductCard = memo(function ProductCard({
             ) : null}
             {product.name}
           </h3>
+          {showShopMeta && product.shop_name ? (
+            <CompactRating
+              average={product.shop_avg_rating}
+              count={product.shop_review_count}
+              size="xs"
+              className="mt-0.5 shrink-0"
+            />
+          ) : null}
           {manage ? (
             <KebabMenu items={kebabItems} variant="plain" ariaLabel={`Options for ${product.name}`} />
           ) : null}
@@ -371,12 +379,6 @@ const ProductCard = memo(function ProductCard({
                 {product.shop_name}
               </span>
             </button>
-            <CompactRating
-              average={product.shop_avg_rating}
-              count={product.shop_review_count}
-              size="xs"
-              className="shrink-0"
-            />
           </div>
         ) : !compact && product.description ? (
           <p className="tm-product-shop line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
