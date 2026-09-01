@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, type FormEvent } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  type FormEvent,
+  type RefObject,
+  type MutableRefObject,
+} from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { signInSchema, signUpSchema, type SignInFormValues, type SignUpFormValues } from "@/lib/validations";
@@ -8,6 +15,8 @@ import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 import { useLocation } from "@/context/LocationContext";
 import { locationErrorMessage } from "@/services/geoRadiusService";
 import type { UserLocation } from "@/types";
+import TurnstileField, { type TurnstileFieldHandle } from "@/components/TurnstileField";
+import { isTurnstileUiEnabled } from "@/lib/turnstilePublic";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -16,14 +25,27 @@ import type { UserLocation } from "@/types";
 /** Sign-up submit values extended with the precise location captured in the form. */
 export interface SignUpSubmitValues extends SignUpFormValues {
   location?: UserLocation | null;
+  captchaToken?: string;
+}
+
+export interface SignInSubmitValues extends SignInFormValues {
+  captchaToken?: string;
 }
 
 export interface AuthFormProps {
   mode: "sign-in" | "sign-up";
-  onSubmit: (values: SignInFormValues | SignUpSubmitValues) => Promise<void>;
+  onSubmit: (values: SignInSubmitValues | SignUpSubmitValues) => Promise<void>;
   isLoading: boolean;
   serverError?: string | null;
+  /** Seconds remaining before the next password attempt is allowed. */
+  lockoutSeconds?: number;
+  /** When true, password sign-in is blocked — show reset CTA. */
+  forcePasswordReset?: boolean;
+  /** Optional external handle for post-OTP sign-in (fresh captcha token). */
+  turnstileRef?: RefObject<TurnstileFieldHandle | null>;
 }
+
+export type { TurnstileFieldHandle };
 
 interface FieldErrors {
   [field: string]: string;
@@ -70,7 +92,29 @@ function calculatePasswordStrength(password: string): StrengthResult {
 /*  Component                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export default function AuthForm({ mode, onSubmit, isLoading, serverError }: AuthFormProps) {
+export default function AuthForm({
+  mode,
+  onSubmit,
+  isLoading,
+  serverError,
+  lockoutSeconds = 0,
+  forcePasswordReset = false,
+  turnstileRef,
+}: AuthFormProps) {
+  const captchaEnabled = isTurnstileUiEnabled();
+  const internalCaptchaRef = useRef<TurnstileFieldHandle>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+
+  const setCaptchaRefs = useCallback(
+    (node: TurnstileFieldHandle | null) => {
+      internalCaptchaRef.current = node;
+      if (turnstileRef) {
+        (turnstileRef as MutableRefObject<TurnstileFieldHandle | null>).current = node;
+      }
+    },
+    [turnstileRef],
+  );
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -168,9 +212,15 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
     }
   }, [detectLocationDetailed]);
 
+  const isLockedOut = mode === "sign-in" && (lockoutSeconds > 0 || forcePasswordReset);
+
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+
+      if (mode === "sign-in" && (lockoutSeconds > 0 || forcePasswordReset)) {
+        return;
+      }
 
       setTouched({
         full_name: true,
@@ -188,9 +238,22 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         if (!agreedToTerms) return;
       }
 
+      let token = captchaToken;
+      if (captchaEnabled) {
+        token = internalCaptchaRef.current?.getToken() ?? captchaToken;
+        if (!token) {
+          token = (await internalCaptchaRef.current?.waitForToken(8_000)) ?? null;
+        }
+        if (!token) {
+          setCaptchaError("Please wait for the security check to finish.");
+          return;
+        }
+        setCaptchaError(null);
+      }
+
       const values =
         mode === "sign-in"
-          ? { email, password }
+          ? { email, password, captchaToken: token ?? undefined }
           : {
               full_name: fullName.trim(),
               phone,
@@ -199,9 +262,16 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
               confirmPassword,
               role,
               location: location ?? null,
+              captchaToken: token ?? undefined,
             };
 
-      await onSubmit(values);
+      try {
+        await onSubmit(values);
+      } finally {
+        // Tokens are single-use — refresh for the next attempt.
+        internalCaptchaRef.current?.reset();
+        setCaptchaToken(null);
+      }
     },
     [
       email,
@@ -215,6 +285,10 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
       validateAll,
       agreedToTerms,
       location,
+      lockoutSeconds,
+      forcePasswordReset,
+      captchaEnabled,
+      captchaToken,
     ],
   );
 
@@ -276,6 +350,40 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
           className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
         >
           {serverError}
+        </motion.div>
+      )}
+
+      {mode === "sign-in" && forcePasswordReset && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <p className="font-medium">Account temporarily locked</p>
+          <p className="mt-1 text-xs opacity-90">
+            Too many incorrect passwords. Reset via email to unlock — max 2 reset emails per half hour.
+          </p>
+          <Link
+            href={`/forgot-password?email=${encodeURIComponent(email.trim().toLowerCase())}&locked=1`}
+            className="mt-2 inline-block text-xs font-semibold underline underline-offset-2"
+          >
+            Go to forgot password →
+          </Link>
+        </motion.div>
+      )}
+
+      {mode === "sign-in" && !forcePasswordReset && lockoutSeconds > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-200"
+          role="status"
+          aria-live="polite"
+        >
+          Too many incorrect passwords. Try again in{" "}
+          <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+            {Math.floor(lockoutSeconds / 60)}:{String(lockoutSeconds % 60).padStart(2, "0")}
+          </span>
         </motion.div>
       )}
 
@@ -463,7 +571,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             value={email}
             onChange={(e) => handleChange("email", e.target.value)}
             className={`${inputClassName("email")} pl-10`}
-            disabled={isLoading}
+            disabled={isLoading || (mode === "sign-in" && forcePasswordReset)}
           />
           {touched["email"] && !getFieldError("email") && email && (
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
@@ -506,7 +614,7 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             value={password}
             onChange={(e) => handleChange("password", e.target.value)}
             className={`${inputClassName("password")} pl-10 pr-10`}
-            disabled={isLoading}
+            disabled={isLoading || isLockedOut}
           />
           <button
             type="button"
@@ -667,10 +775,26 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
         </motion.div>
       )}
 
+      {captchaEnabled && !forcePasswordReset && (
+        <div className="space-y-1">
+          <TurnstileField
+            ref={setCaptchaRefs}
+            onTokenChange={(token) => {
+              setCaptchaToken(token);
+              if (token) setCaptchaError(null);
+            }}
+            disabled={isLockedOut || isLoading}
+          />
+          {captchaError && (
+            <p className="text-xs text-red-500 dark:text-red-400">{captchaError}</p>
+          )}
+        </div>
+      )}
+
       <motion.button
         type="submit"
-        disabled={isLoading}
-        whileTap={isLoading ? undefined : { scale: 0.98 }}
+        disabled={isLoading || isLockedOut}
+        whileTap={isLoading || isLockedOut ? undefined : { scale: 0.98 }}
         className="tm-btn-primary relative w-full overflow-hidden rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed dark:focus:ring-offset-zinc-900"
       >
         {isLoading ? (
@@ -681,6 +805,10 @@ export default function AuthForm({ mode, onSubmit, isLoading, serverError }: Aut
             </svg>
             {mode === "sign-in" ? "Signing in..." : "Creating account..."}
           </span>
+        ) : forcePasswordReset && mode === "sign-in" ? (
+          "Reset password required"
+        ) : lockoutSeconds > 0 && mode === "sign-in" ? (
+          `Wait ${Math.floor(lockoutSeconds / 60)}:${String(lockoutSeconds % 60).padStart(2, "0")}`
         ) : mode === "sign-in" ? (
           "Sign In"
         ) : (

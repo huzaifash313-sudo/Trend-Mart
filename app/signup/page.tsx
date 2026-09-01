@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useCallback, Suspense } from "react";
+import { useState, useCallback, useRef, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import AuthForm, { type SignUpSubmitValues } from "@/components/AuthForm";
+import AuthForm, {
+  type SignUpSubmitValues,
+  type TurnstileFieldHandle,
+} from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
 import { signUpWithEmail, signInWithEmail, getCurrentUser, claimSignupRole, syncContactProfileFromMetadata } from "@/services/authService";
 import { recordLegalAcceptance } from "@/services/legalService";
 import { useToast } from "@/components/Toast";
-import type { SignInFormValues } from "@/lib/validations";
 import type { AuthRole } from "@/services/authService";
+import { isTurnstileUiEnabled } from "@/lib/turnstilePublic";
 
 /* -------------------------------------------------------------------------- */
 /*  Pre-computed particle configurations                                      */
@@ -110,6 +113,7 @@ function SignupPageInner() {
   // Held in memory only (never persisted) so we can sign the user in right after
   // the emailed 6-digit code is verified — verification itself creates no session.
   const [pendingPassword, setPendingPassword] = useState<string>("");
+  const turnstileRef = useRef<TurnstileFieldHandle | null>(null);
 
   const goAfterAuth = useCallback(
     (role: AuthRole | "admin") => {
@@ -130,8 +134,8 @@ function SignupPageInner() {
   );
 
   const handleSubmit = useCallback(
-    async (values: SignInFormValues | SignUpSubmitValues) => {
-      const signupValues = values as SignUpSubmitValues;
+    async (values: SignUpSubmitValues) => {
+      const signupValues = values;
       setIsLoading(true);
       setServerError(null);
 
@@ -143,6 +147,7 @@ function SignupPageInner() {
           fullName: signupValues.full_name,
           phone: signupValues.phone,
         },
+        signupValues.captchaToken,
       );
 
       if (result.success && !result.needsOtpVerification && result.role) {
@@ -187,7 +192,21 @@ function SignupPageInner() {
     // The code is verified and the account is now confirmed, but no session
     // exists yet — sign the user in with the password they just chose.
     if (email && password) {
-      const signIn = await signInWithEmail(email, password);
+      let captchaToken: string | undefined;
+      if (isTurnstileUiEnabled()) {
+        turnstileRef.current?.reset();
+        captchaToken =
+          (await turnstileRef.current?.waitForToken(12_000)) ?? undefined;
+        if (!captchaToken) {
+          addToast(
+            "Email verified — please sign in (security check timed out).",
+            "info",
+          );
+          window.location.href = "/login";
+          return;
+        }
+      }
+      const signIn = await signInWithEmail(email, password, captchaToken);
       if (signIn.success && signIn.user?.id) {
         recordLegalAcceptance(signIn.user.id, ["terms", "privacy"]);
         // Independent writes run in parallel — one round-trip instead of two.
@@ -343,6 +362,7 @@ function SignupPageInner() {
               onSubmit={handleSubmit}
               isLoading={isLoading}
               serverError={serverError}
+              turnstileRef={turnstileRef}
             />
 
             {/* Sign-in link */}

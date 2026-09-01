@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useCallback, Suspense } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
 import { signInWithEmail, getCurrentUser, detectUserRole, getDashboardPath } from "@/services/authService";
 import { useToast } from "@/components/Toast";
-import type { SignInFormValues, SignUpFormValues } from "@/lib/validations";
+import type { SignInSubmitValues } from "@/components/AuthForm";
+import type { SignUpFormValues } from "@/lib/validations";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants — pre-compute particle values                                   */
@@ -93,12 +94,42 @@ function GradientOrbs() {
 
 function LoginPageInner() {
   const { addToast } = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  const [forcePasswordReset, setForcePasswordReset] = useState(false);
+
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const id = window.setInterval(() => {
+      setLockoutSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [lockoutSeconds]);
+
+  const applyLockout = useCallback(
+    (email: string, lockout?: { retryAfterSec: number; forceReset: boolean } | null) => {
+      if (!lockout) return;
+      if (lockout.forceReset) {
+        setForcePasswordReset(true);
+        setLockoutSeconds(0);
+        addToast("Too many failed attempts — reset your password via email.", "error");
+        router.push(
+          `/forgot-password?email=${encodeURIComponent(email)}&locked=1`,
+        );
+        return;
+      }
+      if (lockout.retryAfterSec > 0) {
+        setLockoutSeconds(lockout.retryAfterSec);
+      }
+    },
+    [addToast, router],
+  );
 
   const finishLogin = useCallback(
     async (role?: "customer" | "merchant" | "admin", user?: Awaited<ReturnType<typeof getCurrentUser>>) => {
@@ -116,14 +147,21 @@ function LoginPageInner() {
   );
 
   const handleSubmit = useCallback(
-    async (values: SignInFormValues | SignUpFormValues) => {
+    async (values: SignInSubmitValues | SignUpFormValues) => {
+      if (lockoutSeconds > 0 || forcePasswordReset) return;
+
       setIsLoading(true);
       setServerError(null);
+      const email = values.email.trim().toLowerCase();
+      const captchaToken =
+        "captchaToken" in values ? values.captchaToken : undefined;
 
       try {
-        const result = await signInWithEmail(values.email, values.password);
+        const result = await signInWithEmail(email, values.password, captchaToken);
 
         if (result.success && result.role) {
+          setLockoutSeconds(0);
+          setForcePasswordReset(false);
           addToast("Welcome back!", "success");
           await finishLogin(result.role, result.user);
           return;
@@ -133,14 +171,17 @@ function LoginPageInner() {
           setServerError(null);
           addToast("Please verify your email to continue.", "info");
           // Prefer in-app OTP; also allow verify-notice with live session
-          setOtpEmail(values.email.trim().toLowerCase());
+          setOtpEmail(email);
           setShowOtpModal(true);
           return;
         }
 
         if (!result.success) {
-          setServerError(result.error ?? "Sign in failed. Please check your credentials.");
-          addToast(result.error ?? "Authentication failed.", "error");
+          applyLockout(email, result.lockout);
+          if (!result.lockout?.forceReset) {
+            setServerError(result.error ?? "Sign in failed. Please check your credentials.");
+            addToast(result.error ?? "Authentication failed.", "error");
+          }
         }
       } catch (err) {
         setServerError(err instanceof Error ? err.message : "An unexpected error occurred.");
@@ -149,7 +190,7 @@ function LoginPageInner() {
         setIsLoading(false);
       }
     },
-    [addToast, finishLogin],
+    [addToast, finishLogin, applyLockout, lockoutSeconds, forcePasswordReset],
   );
 
   const handleOtpVerified = useCallback(async () => {
@@ -282,6 +323,8 @@ function LoginPageInner() {
               onSubmit={handleSubmit}
               isLoading={isLoading}
               serverError={serverError}
+              lockoutSeconds={lockoutSeconds}
+              forcePasswordReset={forcePasswordReset}
             />
 
             {/* Sign-up link */}

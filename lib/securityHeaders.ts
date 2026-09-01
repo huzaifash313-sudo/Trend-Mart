@@ -55,10 +55,11 @@ export function buildStrictCspPolicy(nonce: string): string {
 
     // Connections: Supabase API + realtime websockets + OSM reverse geocode
     // + Cloudinary upload API (merchant image/story uploads run from the browser).
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com",
+    // + Cloudflare Turnstile siteverify / challenge assets.
+    "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com https://challenges.cloudflare.com",
 
-    // Frames: none (prevents clickjacking via iframes)
-    "frame-src 'none'",
+    // Frames: Turnstile challenge iframe only
+    "frame-src 'self' https://challenges.cloudflare.com",
 
     // Objects: none (prevents Flash/ActiveX injection)
     "object-src 'none'",

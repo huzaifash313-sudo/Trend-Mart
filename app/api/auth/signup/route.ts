@@ -13,6 +13,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findAuthUserByEmail, issueAndSendOtp } from "@/lib/authOtpServer";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { clientIpFromHeaders } from "@/lib/loginLockout";
 
 export const runtime = "nodejs";
 
@@ -24,6 +26,7 @@ interface SignupPayload {
   role?: string;
   fullName?: string;
   phone?: string;
+  captchaToken?: string;
 }
 
 function json(status: number, body: Record<string, unknown>) {
@@ -49,6 +52,14 @@ export async function POST(request: NextRequest) {
   const role = body.role === "merchant" ? "merchant" : "customer";
   const fullName = (body.fullName ?? "").trim().slice(0, 120);
   const phone = (body.phone ?? "").trim().slice(0, 30);
+
+  const captcha = await verifyTurnstileToken(
+    body.captchaToken,
+    clientIpFromHeaders(request.headers),
+  );
+  if (!captcha.ok) {
+    return json(403, { success: false, error: captcha.error ?? "Security check failed." });
+  }
 
   if (!EMAIL_PATTERN.test(email)) {
     return json(400, { success: false, error: "Please enter a valid email address." });

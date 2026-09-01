@@ -276,15 +276,15 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               isProd
-                ? "script-src 'self' 'unsafe-inline'"
-                : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+                ? "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com"
+                : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
               isProd
-                ? "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com"
-                : "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com",
-              "frame-src 'self'",
+                ? "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com https://challenges.cloudflare.com"
+                : "connect-src 'self' ws: wss: https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://nominatim.openstreetmap.org https://api.cloudinary.com https://res.cloudinary.com https://challenges.cloudflare.com",
+              "frame-src 'self' https://challenges.cloudflare.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

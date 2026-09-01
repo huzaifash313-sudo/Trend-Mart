@@ -1,8 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import type { AuthError, User } from "@supabase/supabase-js";
-import { getPublicAppUrl } from "@/lib/appUrl";
+import type { User } from "@supabase/supabase-js";
 import { clearQueryCache } from "@/lib/cacheBus";
 import { withTimeout } from "@/lib/withTimeout";
 
@@ -12,11 +11,19 @@ import { withTimeout } from "@/lib/withTimeout";
 
 export type AuthRole = "customer" | "merchant";
 
+export interface AuthLockoutInfo {
+  retryAfterSec: number;
+  lockedUntil: number | null;
+  failures: number;
+  forceReset: boolean;
+}
+
 export interface AuthResult {
   success: boolean;
   user?: User | null;
   error?: string;
   role?: AuthRole | "admin";
+  lockout?: AuthLockoutInfo;
 }
 
 export interface OtpVerificationResult {
@@ -41,63 +48,105 @@ const supabase = createClient();
 const SIGN_IN_TIMEOUT_MS = 20_000;
 
 /**
- * Sign in with email and password.
- * On success, queries the user's role and returns the appropriate redirect path.
- * Enforces email verification: returns an error if the user hasn't confirmed their email.
+ * Sign in with email and password via the server auth API (progressive lockout).
+ * On success, syncs the browser session and returns the role for redirect.
+ * Enforces email verification: returns needsVerification if unconfirmed.
  */
 export async function signInWithEmail(
   email: string,
   password: string,
+  captchaToken?: string,
 ): Promise<AuthResult & { needsVerification?: boolean }> {
   try {
-    const { data, error } = await withTimeout(
-      supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const res = await withTimeout(
+      fetch("/api/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+          captchaToken: captchaToken || undefined,
+        }),
       }),
       SIGN_IN_TIMEOUT_MS,
-      () => ({
-        data: { user: null, session: null },
-        error: new Error(
-          "Sign-in is taking too long. Check your internet connection and try again.",
-        ) as unknown as AuthError,
-      }),
+      () =>
+        ({
+          ok: false,
+          status: 408,
+          json: async () => ({
+            success: false,
+            error:
+              "Sign-in is taking too long. Check your internet connection and try again.",
+          }),
+        }) as unknown as Response,
     );
 
-    if (error) {
+    const jsonBody = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+      needsVerification?: boolean;
+      role?: AuthRole | "admin";
+      user?: User;
+      session?: {
+        access_token: string;
+        refresh_token: string;
+        expires_at?: number;
+      };
+      lockout?: AuthLockoutInfo;
+    };
+
+    if (!res.ok || !jsonBody.success) {
       return {
         success: false,
-        error: mapSupabaseError(error.message),
+        error: jsonBody.error ?? "Sign in failed. Please check your credentials.",
+        lockout: jsonBody.lockout,
+        needsVerification: jsonBody.needsVerification,
       };
     }
 
-    // Email not confirmed — keep the session so /auth/verify-notice can resend
-    // and check status. Middleware still blocks account/dashboard until verified.
-    if (data.user && !data.user.email_confirmed_at) {
+    // Sync browser client with tokens from the server (cookies alone can lag).
+    if (jsonBody.session?.access_token && jsonBody.session?.refresh_token) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: jsonBody.session.access_token,
+        refresh_token: jsonBody.session.refresh_token,
+      });
+      if (sessionError) {
+        return {
+          success: false,
+          error: mapSupabaseError(sessionError.message),
+        };
+      }
+    }
+
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
+    const user = currentUser ?? jsonBody.user ?? null;
+
+    if (jsonBody.needsVerification || (user && !user.email_confirmed_at)) {
       return {
         success: false,
-        user: data.user,
+        user,
         error: "Please verify your email before continuing. Check your inbox.",
         needsVerification: true,
       };
     }
 
-    const role = await detectUserRole(data.user);
+    const role = jsonBody.role ?? (await detectUserRole(user));
 
-    // Best-effort authoritative correction in the background — never blocks the
-    // sign-in. Covers rare cases where metadata is stale (an admin promoted via
-    // user_roles only, or a merchant whose metadata update was missed). The
-    // corrected role is cached and picked up by the landing page's own checks.
-    const signedInUser = data.user;
-    void resolveRoleFromDb(signedInUser).then((authoritative) => {
-      if (authoritative !== role) {
-        roleCache.set(signedInUser.id, { role: authoritative, at: Date.now() });
-      }
-    });
+    if (user) {
+      void resolveRoleFromDb(user).then((authoritative) => {
+        if (authoritative !== role) {
+          roleCache.set(user.id, { role: authoritative, at: Date.now() });
+        }
+      });
+    }
 
     return {
       success: true,
-      user: data.user,
+      user,
       role,
     };
   } catch (err) {
@@ -119,6 +168,7 @@ export async function signUpWithEmail(
   password: string,
   role: AuthRole = "customer",
   profile?: { fullName: string; phone: string },
+  captchaToken?: string,
 ): Promise<AuthResult & { needsOtpVerification: boolean }> {
   try {
     const signupRole: AuthRole = role === "merchant" ? "merchant" : "customer";
@@ -137,6 +187,7 @@ export async function signUpWithEmail(
         role: signupRole,
         fullName,
         phone,
+        captchaToken: captchaToken || undefined,
       }),
     });
 
@@ -314,19 +365,35 @@ export async function verifyOtp(
 }
 
 /**
- * Send a password-reset OTP / recovery email (Supabase recovery flow).
+ * Send a password-reset OTP / recovery email via the server (send caps + IP limit).
  * Configure the Recovery template in Supabase to use a 6-digit OTP for best UX.
  */
 export async function requestPasswordReset(
   email: string,
-): Promise<{ success: boolean; error?: string }> {
+  captchaToken?: string,
+): Promise<{ success: boolean; error?: string; retryAfterSec?: number }> {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo: `${getPublicAppUrl()}/auth/reset-password` },
-    );
-    if (error) {
-      return { success: false, error: mapSupabaseError(error.message) };
+    const res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        captchaToken: captchaToken || undefined,
+      }),
+    });
+
+    const jsonBody = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+      retryAfterSec?: number;
+    };
+
+    if (!res.ok || !jsonBody.success) {
+      return {
+        success: false,
+        error: jsonBody.error ?? "Could not send reset code.",
+        retryAfterSec: jsonBody.retryAfterSec,
+      };
     }
     return { success: true };
   } catch (err) {
@@ -354,6 +421,8 @@ export async function verifyRecoveryOtp(
     if (!data.session) {
       return { success: false, error: "Code accepted but session missing. Try again." };
     }
+    // Email ownership proven — drop progressive lockout / force-reset.
+    void fetch("/api/auth/clear-lockout", { method: "POST" }).catch(() => undefined);
     return { success: true };
   } catch (err) {
     return {
@@ -372,6 +441,8 @@ export async function updatePasswordAfterRecovery(
     if (error) {
       return { success: false, error: mapSupabaseError(error.message) };
     }
+    // Clear progressive lockout so the user can sign in with the new password.
+    void fetch("/api/auth/clear-lockout", { method: "POST" }).catch(() => undefined);
     return { success: true };
   } catch (err) {
     return {
