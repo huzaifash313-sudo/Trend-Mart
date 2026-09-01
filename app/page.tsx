@@ -1,10 +1,43 @@
+import type { Metadata } from "next";
 import type { ShopCategory, Shop, Story } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import HomeClient from "@/components/HomeClient";
 import { fetchHomeInitialData } from "@/lib/homeData";
+import { generateHomepageMetadata } from "@/lib/metadata";
 
 const EMPTY_SHOPS: Shop[] = [];
 const EMPTY_STORIES: Story[] = [];
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string; q?: string }>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const category = params.category?.trim();
+  const q = params.q?.trim();
+
+  if (!category && !q) {
+    return generateHomepageMetadata();
+  }
+
+  const base = generateHomepageMetadata();
+  const title = q
+    ? `Shops: "${q}"`
+    : category && SHOP_CATEGORIES.includes(category as ShopCategory)
+      ? `${category} shops near you`
+      : base.title;
+
+  return {
+    ...base,
+    title: title as string,
+    description: q
+      ? `Local shops matching "${q}" on TrendsMart — browse products, deals, and order via WhatsApp.`
+      : category
+        ? `Discover ${category.toLowerCase()} shops on TrendsMart. Order via WhatsApp from stores near you.`
+        : base.description,
+  };
+}
 
 /**
  * Homepage — server-rendered storefront.

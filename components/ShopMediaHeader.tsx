@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
+import { buildShopBannerAlt, buildShopLogoAlt } from "@/lib/seo/imageAlt";
 
 type Size = "card" | "hero";
 type LogoPlacement = "overlay" | "hidden";
@@ -11,6 +12,9 @@ export interface ShopMediaHeaderProps {
   shopName: string;
   bannerUrl?: string | null;
   logoUrl?: string | null;
+  /** City/area for SEO-rich image alt text */
+  location?: string | null;
+  category?: string | null;
   size?: Size;
   /** Cards default to "hidden" so the logo sits next to the shop name. */
   logoPlacement?: LogoPlacement;
@@ -28,6 +32,7 @@ export interface ShopMediaHeaderProps {
 export interface ShopLogoAvatarProps {
   shopName: string;
   logoUrl?: string | null;
+  location?: string | null;
   logoBroken?: boolean;
   onLogoError?: () => void;
   useNextImage?: boolean;
@@ -39,6 +44,7 @@ export interface ShopLogoAvatarProps {
 export function ShopLogoAvatar({
   shopName,
   logoUrl,
+  location,
   logoBroken = false,
   onLogoError,
   useNextImage = true,
@@ -48,6 +54,7 @@ export function ShopLogoAvatar({
   const logo = (logoUrl ?? "").trim();
   const showLogo = logo.length > 0 && !logoBroken;
   const initial = shopName.charAt(0).toUpperCase() || "S";
+  const logoAlt = buildShopLogoAlt(shopName, location);
   const box =
     size === "md"
       ? "h-10 w-10 text-sm sm:h-11 sm:w-11 sm:text-base"
@@ -63,7 +70,7 @@ export function ShopLogoAvatar({
         useNextImage ? (
           <Image
             src={getSafeImageUrl(logo, "shop")}
-            alt={`${shopName} logo`}
+            alt={logoAlt}
             fill
             className="object-cover"
             sizes={size === "md" ? "48px" : size === "xs" ? "24px" : "32px"}
@@ -73,7 +80,7 @@ export function ShopLogoAvatar({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={logo}
-            alt={`${shopName} logo`}
+            alt={logoAlt}
             className="h-full w-full object-cover"
             loading="lazy"
             onError={onLogoError}
@@ -95,6 +102,8 @@ export default function ShopMediaHeader({
   shopName,
   bannerUrl,
   logoUrl,
+  location,
+  category,
   size = "card",
   logoPlacement,
   onBannerError,
@@ -111,6 +120,8 @@ export default function ShopMediaHeader({
   const showBanner = banner.length > 0 && !bannerBroken;
   const showLogo = logo.length > 0 && !logoBroken;
   const initial = shopName.charAt(0).toUpperCase() || "S";
+  const bannerAlt = buildShopBannerAlt(shopName, location, category);
+  const logoAlt = buildShopLogoAlt(shopName, location);
 
   const isHero = size === "hero";
   const eager = isHero || priority;
@@ -139,7 +150,7 @@ export default function ShopMediaHeader({
           useNextImage ? (
             <Image
               src={getSafeImageUrl(banner, "shop")}
-              alt={`${shopName} banner`}
+              alt={bannerAlt}
               fill
               className="object-cover object-center"
               sizes={
@@ -154,7 +165,7 @@ export default function ShopMediaHeader({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={banner}
-              alt={`${shopName} banner`}
+              alt={bannerAlt}
               className="absolute inset-0 h-full w-full object-cover object-center"
               loading={eager ? "eager" : "lazy"}
               onError={onBannerError}
@@ -198,7 +209,7 @@ export default function ShopMediaHeader({
             useNextImage ? (
               <Image
                 src={getSafeImageUrl(logo, "shop")}
-                alt={`${shopName} logo`}
+                alt={logoAlt}
                 fill
                 className="object-cover"
                 sizes={isHero ? "72px" : "44px"}
@@ -208,7 +219,7 @@ export default function ShopMediaHeader({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logo}
-                alt={`${shopName} logo`}
+                alt={logoAlt}
                 className="h-full w-full object-cover"
                 loading="lazy"
                 onError={onLogoError}

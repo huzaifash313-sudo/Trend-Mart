@@ -137,6 +137,8 @@ function ShopCard({
           shopName={shop.name}
           bannerUrl={shop.banner_url}
           logoUrl={shop.logo_url}
+          location={shop.location}
+          category={shop.category}
           size="card"
           logoPlacement="overlay"
           bannerBroken={bannerBroken}

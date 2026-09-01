@@ -352,6 +352,46 @@ export async function fetchDealsByShopId(shopId: string): Promise<ServiceResult<
   }
 }
 
+/** Resolve a single active marketplace deal by id (for `/deals/[slug]` client UI). */
+export async function fetchDealById(
+  dealId: string,
+): Promise<ServiceResult<ShopDeal | null>> {
+  const supabase = createClient();
+  const trimmed = (dealId ?? "").trim();
+  if (!trimmed) return { success: true, data: null };
+
+  try {
+    const { data, error } = await selectWithFallback(
+      LIST_SELECT_ATTEMPTS,
+      {
+        get: () => cachedListSelect,
+        set: (s) => {
+          cachedListSelect = s;
+        },
+      },
+      async (select) => {
+        const res = await supabase
+          .from("shop_deals")
+          .select(select)
+          .eq("id", trimmed)
+          .eq("is_active", true)
+          .maybeSingle();
+        return { data: res.data, error: res.error };
+      },
+    );
+
+    if (error) throw error;
+    if (!data) return { success: true, data: null };
+    return {
+      success: true,
+      data: parseDeal(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    logError(err, { module: "dealService.fetchDealById", meta: { dealId: trimmed } });
+    return { success: false, error: toError(err) };
+  }
+}
+
 export async function fetchActiveDeals(limit = 100): Promise<ServiceResult<ShopDeal[]>> {
   const supabase = createClient();
   const cap = Math.min(Math.max(limit, 12), 160);

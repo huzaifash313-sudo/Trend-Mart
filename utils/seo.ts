@@ -559,8 +559,14 @@ interface StructuredProductParams {
   shopName: string;
   shopId: string;
   productId: string;
+  shortCode?: string;
   isAvailable: boolean;
   category?: string;
+  sku?: string;
+  brandName?: string;
+  url?: string;
+  ratingValue?: number;
+  reviewCount?: number;
 }
 
 export function buildProductJsonLd({
@@ -572,31 +578,123 @@ export function buildProductJsonLd({
   shopName,
   shopId,
   productId,
+  shortCode,
   isAvailable,
   category,
+  sku,
+  brandName,
+  url,
+  ratingValue,
+  reviewCount,
 }: StructuredProductParams): Record<string, unknown> {
-  return {
+  const productUrl = url || buildProductCanonicalUrl(shopId, productId);
+  const json: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
     name,
     description: description || `${name} — Available at ${shopName} on ${SITE_NAME}.`,
     image: imageUrl || OG_IMAGE_DEFAULT,
+    sku: sku || shortCode || productId,
     ...(category ? { category } : {}),
+    brand: {
+      "@type": "Brand",
+      name: brandName || shopName,
+    },
     offers: {
       "@type": "Offer",
       price,
       priceCurrency: currency,
+      itemCondition: "https://schema.org/NewCondition",
       availability: isAvailable
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
+      url: productUrl,
       seller: {
         "@type": "Organization",
         name: shopName,
         url: `${BASE_URL}/shop/${shopId}`,
       },
     },
-    url: buildProductCanonicalUrl(shopId, productId),
+    url: productUrl,
   };
+
+  if (
+    typeof ratingValue === "number" &&
+    ratingValue > 0 &&
+    typeof reviewCount === "number" &&
+    reviewCount >= 0
+  ) {
+    json.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: Math.min(5, Math.round(ratingValue * 10) / 10),
+      reviewCount,
+    };
+  }
+
+  return json;
+}
+
+interface StructuredDealParams {
+  name: string;
+  description?: string;
+  price?: number | null;
+  originalPrice?: number | null;
+  imageUrl?: string | null;
+  shopName: string;
+  shopId: string;
+  dealId: string;
+  url: string;
+  availability?: boolean;
+}
+
+/** JSON-LD for a shop deal (Product + discounted Offer). */
+export function buildDealJsonLd({
+  name,
+  description,
+  price,
+  originalPrice,
+  imageUrl,
+  shopName,
+  shopId,
+  dealId,
+  url,
+  availability = true,
+}: StructuredDealParams): Record<string, unknown> {
+  const hasPrice = typeof price === "number" && price > 0;
+  const json: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name,
+    description:
+      description || `${name} — limited-time deal at ${shopName} on ${SITE_NAME}.`,
+    image: imageUrl || OG_IMAGE_DEFAULT,
+    sku: dealId,
+    brand: {
+      "@type": "Brand",
+      name: shopName,
+    },
+    url,
+  };
+
+  if (hasPrice) {
+    json.offers = {
+      "@type": "Offer",
+      price,
+      priceCurrency: "PKR",
+      itemCondition: "https://schema.org/NewCondition",
+      availability: availability
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+      url,
+      seller: {
+        "@type": "Organization",
+        name: shopName,
+        url: `${BASE_URL}/shop/${shopId}`,
+      },
+    };
+  }
+
+  return json;
 }
 
 /**

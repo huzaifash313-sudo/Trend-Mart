@@ -9,6 +9,7 @@ import { getProductImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product, Shop } from "@/types";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
+import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import { hasPriceTiers, priceForQuantity, tierPreviewLabels } from "@/lib/priceTiers";
 import { useToast } from "@/components/Toast";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
@@ -97,6 +98,17 @@ export default function QuickViewModal({
   const images = useMemo(() => getProductImages(product), [product]);
   const safeIndex = images.length ? Math.min(activeIndex, images.length - 1) : 0;
   const currentUrl = images[safeIndex];
+  const productLocation =
+    ("shop_location" in product && product.shop_location?.trim()) || null;
+  const imageAltFor = useCallback(
+    (index: number) =>
+      buildProductImageAlt(product.name, {
+        location: productLocation,
+        index,
+        total: images.length,
+      }),
+    [product.name, productLocation, images.length],
+  );
   const hasVariants = Boolean(product.variants && product.variants.length > 0);
   const variantLabel = useMemo(
     () => selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · "),
@@ -266,7 +278,7 @@ export default function QuickViewModal({
               <Image
                 key={`${product.id}-${safeIndex}`}
                 src={getSafeImageUrl(currentUrl, "product")}
-                alt={`${product.name} photo ${safeIndex + 1}`}
+                alt={imageAltFor(safeIndex)}
                 fill
                 priority
                 className="object-contain transition-opacity duration-500 ease-out"
@@ -337,7 +349,7 @@ export default function QuickViewModal({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={getSafeImageUrl(url, "product")}
-                  alt=""
+                  alt={imageAltFor(i)}
                   loading={i < 4 ? "eager" : "lazy"}
                   className="h-full w-full object-contain bg-zinc-50 dark:bg-zinc-800"
                 />
@@ -532,7 +544,7 @@ export default function QuickViewModal({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={getSafeImageUrl(images[safeIndex]!, "product")}
-              alt={`${product.name} ${safeIndex + 1}`}
+              alt={imageAltFor(safeIndex)}
               className="max-h-[75vh] max-w-full object-contain transition-opacity duration-300"
             />
             {images.length > 1 && (
@@ -557,7 +569,7 @@ export default function QuickViewModal({
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={getSafeImageUrl(url, "product")} alt="" className="h-full w-full object-cover" />
+                <img src={getSafeImageUrl(url, "product")} alt={imageAltFor(i)} className="h-full w-full object-cover" />
               </button>
             ))}
           </div>

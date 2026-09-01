@@ -9,6 +9,7 @@ import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
+import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import { hasPriceTiers, tierPreviewLabels } from "@/lib/priceTiers";
 import CompactRating from "@/components/CompactRating";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
@@ -256,6 +257,9 @@ const ProductCard = memo(function ProductCard({
     () => buildProductOfferTags(product, offerContext),
     [product, offerContext],
   );
+  const imageAlt = buildProductImageAlt(product.name, {
+    location: product.shop_location,
+  });
 
   return (
     <article
@@ -282,7 +286,7 @@ const ProductCard = memo(function ProductCard({
         {product.image_url && !imgError ? (
           <Image
             src={getSafeImageUrl(product.image_url, "product")}
-            alt={product.name}
+            alt={imageAlt}
             fill
             className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"

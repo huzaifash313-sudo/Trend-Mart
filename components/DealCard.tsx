@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback, useEffect, memo, type MouseEvent } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import Link from "next/link";
 import {
   formatDealWhenTag,
   isDealOrderableToday,
@@ -11,6 +12,8 @@ import {
 import { getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
+import { getDealSeoPath } from "@/lib/seo/dealSlug";
+import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import { OfferTickerMarquee } from "@/components/ProductGrid";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { useCart } from "@/context/CartContext";
@@ -121,6 +124,10 @@ function DealCard({
     id: deal.shop_id,
     name: deal.shop_name || "Store",
     slug: deal.shop_slug,
+  });
+  const dealSeoHref = getDealSeoPath(deal.title, deal.id);
+  const dealImageAlt = buildProductImageAlt(deal.title, {
+    location: null,
   });
   const storeHref = href ?? `${shopHref}#deals`;
   const whenTag = formatDealWhenTag(deal);
@@ -292,7 +299,7 @@ function DealCard({
             {showPhoto && safeSrc ? (
               <Image
                 src={safeSrc}
-                alt={deal.title}
+                alt={dealImageAlt}
                 fill
                 className="object-contain transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                 sizes="(max-width: 640px) 52vw, (max-width: 1024px) 30vw, 20vw"
@@ -424,11 +431,14 @@ function DealCard({
         tabIndex={onOpen ? 0 : undefined}
         aria-label={onOpen ? `View ${deal.title}` : undefined}
       >
+        <Link href={dealSeoHref} className="sr-only">
+          View {deal.title} deal details
+        </Link>
         <div className="tm-product-media relative shrink-0 overflow-hidden">
           {showPhoto && safeSrc ? (
             <Image
               src={safeSrc}
-              alt={deal.title}
+              alt={dealImageAlt}
               fill
               className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
