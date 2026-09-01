@@ -9,7 +9,6 @@ import OtpVerificationModal from "@/components/OtpVerificationModal";
 import { signInWithEmail, getCurrentUser, detectUserRole, getDashboardPath } from "@/services/authService";
 import { useToast } from "@/components/Toast";
 import type { SignInSubmitValues } from "@/components/AuthForm";
-import type { SignUpFormValues } from "@/lib/validations";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants — pre-compute particle values                                   */
@@ -147,14 +146,13 @@ function LoginPageInner() {
   );
 
   const handleSubmit = useCallback(
-    async (values: SignInSubmitValues | SignUpFormValues) => {
+    async (values: SignInSubmitValues) => {
       if (lockoutSeconds > 0 || forcePasswordReset) return;
 
       setIsLoading(true);
       setServerError(null);
       const email = values.email.trim().toLowerCase();
-      const captchaToken =
-        "captchaToken" in values ? values.captchaToken : undefined;
+      const captchaToken = values.captchaToken;
 
       try {
         const result = await signInWithEmail(email, values.password, captchaToken);

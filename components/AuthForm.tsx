@@ -32,9 +32,7 @@ export interface SignInSubmitValues extends SignInFormValues {
   captchaToken?: string;
 }
 
-export interface AuthFormProps {
-  mode: "sign-in" | "sign-up";
-  onSubmit: (values: SignInSubmitValues | SignUpSubmitValues) => Promise<void>;
+export interface AuthFormBaseProps {
   isLoading: boolean;
   serverError?: string | null;
   /** Seconds remaining before the next password attempt is allowed. */
@@ -44,6 +42,16 @@ export interface AuthFormProps {
   /** Optional external handle for post-OTP sign-in (fresh captcha token). */
   turnstileRef?: RefObject<TurnstileFieldHandle | null>;
 }
+
+export type AuthFormProps =
+  | (AuthFormBaseProps & {
+      mode: "sign-in";
+      onSubmit: (values: SignInSubmitValues) => Promise<void>;
+    })
+  | (AuthFormBaseProps & {
+      mode: "sign-up";
+      onSubmit: (values: SignUpSubmitValues) => Promise<void>;
+    });
 
 export type { TurnstileFieldHandle };
 
@@ -251,22 +259,25 @@ export default function AuthForm({
         setCaptchaError(null);
       }
 
-      const values =
-        mode === "sign-in"
-          ? { email, password, captchaToken: token ?? undefined }
-          : {
-              full_name: fullName.trim(),
-              phone,
-              email,
-              password,
-              confirmPassword,
-              role,
-              location: location ?? null,
-              captchaToken: token ?? undefined,
-            };
-
       try {
-        await onSubmit(values);
+        if (mode === "sign-in") {
+          await (onSubmit as (values: SignInSubmitValues) => Promise<void>)({
+            email,
+            password,
+            captchaToken: token ?? undefined,
+          });
+        } else {
+          await (onSubmit as (values: SignUpSubmitValues) => Promise<void>)({
+            full_name: fullName.trim(),
+            phone,
+            email,
+            password,
+            confirmPassword,
+            role,
+            location: location ?? null,
+            captchaToken: token ?? undefined,
+          });
+        }
       } finally {
         // Tokens are single-use — refresh for the next attempt.
         internalCaptchaRef.current?.reset();
