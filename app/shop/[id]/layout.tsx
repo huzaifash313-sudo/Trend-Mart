@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { generateShopMetadata, absoluteUrl } from "@/lib/metadata";
+import { generateShopMetadata, absoluteUrl, SITE_NAME } from "@/lib/metadata";
 import { getShopPath } from "@/lib/shopSlug";
 
 type Props = { params: Promise<{ id: string }> };
@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!shop) {
     return {
       title: "Shop",
-      description: "Browse this local store on TrendsMart.",
+      description: `Browse this local store on ${SITE_NAME}.`,
     };
   }
   return generateShopMetadata({

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { getPublicAppUrl } from "@/lib/appUrl";
+import { getShopPath } from "@/lib/shopSlug";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  TrendsMart — Dynamic Sitemap Generator (Enhanced SEO)                       */
@@ -30,16 +31,18 @@ function createSupabase() {
   );
 }
 
-async function getLiveShopIds(): Promise<string[]> {
+async function getLiveShops(): Promise<
+  { id: string; name: string; slug: string | null }[]
+> {
   try {
     const supabase = createSupabase();
     const { data } = await supabase
       .from("shops")
-      .select("id")
+      .select("id, name, slug")
       .eq("is_live", true)
       .order("created_at", { ascending: false })
       .limit(5000);
-    return data?.map((s: { id: string }) => s.id) ?? [];
+    return (data as { id: string; name: string; slug: string | null }[]) ?? [];
   } catch {
     return [];
   }
@@ -145,14 +148,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   // Fetch all data in parallel for performance
-  const [shopIds, categories, products, storyShopIds] = await Promise.all([
-    getLiveShopIds(),
+  const [shops, categories, products, storyShopIds] = await Promise.all([
+    getLiveShops(),
     getActiveCategories(),
     getProductSlugs(),
     getActiveStoryShopIds(),
   ]);
 
   const storyShopSet = new Set(storyShopIds);
+  const shopIds = shops.map((s) => s.id);
   const maxCategoryCount = Math.max(
     ...categories.map((c) => c.count),
     1,
@@ -210,10 +214,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.3,
     },
     {
-      url: `${BASE_URL}/wishlist`,
+      url: `${BASE_URL}/legal/refund-policy`,
       lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.4,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${BASE_URL}/legal/merchant-guidelines`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
     },
   ];
 
@@ -226,11 +236,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // ── Shop Storefront Routes ──────────────────────────────────────────────
-  const shopRoutes: MetadataRoute.Sitemap = shopIds.map((id, index) => ({
-    url: `${BASE_URL}/shop/${id}`,
+  const shopRoutes: MetadataRoute.Sitemap = shops.map((shop, index) => ({
+    url: `${BASE_URL}${getShopPath(shop)}`,
     lastModified: now,
     changeFrequency: "daily" as const,
-    priority: getShopPriority(index, totalShops, storyShopSet.has(id)),
+    priority: getShopPriority(index, totalShops, storyShopSet.has(shop.id)),
   }));
 
   // ── Product Deep-Link Routes ────────────────────────────────────────────

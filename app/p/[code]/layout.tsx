@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { absoluteUrl } from "@/lib/metadata";
+import { absoluteUrl, SITE_NAME } from "@/lib/metadata";
 
 type Props = { params: Promise<{ code: string }> };
-
-const SITE_NAME = "TrendsMart";
 
 interface ProductMetaRow {
   id: string;
@@ -77,7 +75,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!product?.name) {
     return {
       title: "Product",
-      description: "Browse this product on TrendsMart.",
+      description: `Browse this product on ${SITE_NAME}.`,
       robots: { index: false, follow: false },
     };
   }
@@ -85,7 +83,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = product.name;
   const desc =
     product.description?.trim() ||
-    `${product.name} — available at ${shopName}${shopLocation ? ` in ${shopLocation}` : ""}. Order via WhatsApp on TrendsMart.`;
+    `${product.name} — available at ${shopName}${shopLocation ? ` in ${shopLocation}` : ""}. Order via WhatsApp on ${SITE_NAME}.`;
   const image = productImageUrl(product);
   const url = absoluteUrl(
     `/p/${product.short_code?.trim() || product.id}`,

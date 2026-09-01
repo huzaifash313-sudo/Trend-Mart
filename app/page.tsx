@@ -2,6 +2,9 @@ import type { ShopCategory, Shop, Story } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import HomeClient from "@/components/HomeClient";
 import { fetchHomeInitialData } from "@/lib/homeData";
+import { generateHomepageMetadata } from "@/lib/metadata";
+
+export const metadata = generateHomepageMetadata();
 
 const EMPTY_SHOPS: Shop[] = [];
 const EMPTY_STORIES: Story[] = [];

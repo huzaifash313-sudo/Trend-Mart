@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
+import { generateLegalMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy — TrendsMart",
-  description: "How TrendsMart collects, uses, and protects your personal data.",
-  robots: { index: true, follow: true },
-};
+export const metadata: Metadata = generateLegalMetadata(
+  "Privacy Policy",
+  "How Trends Mart collects, uses, and protects your personal data on trendsmart.pk.",
+  "/legal/privacy",
+);
 
 export default function PrivacyPage() {
   return (

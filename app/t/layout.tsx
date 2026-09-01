@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { generateNoIndexMetadata } from "@/lib/metadata";
 
-/** QR dine-in routes are standalone — no global navbar, footer, or bottom nav. */
+export const metadata: Metadata = {
+  ...generateNoIndexMetadata("Dine-In Menu", "QR dine-in menu on Trends Mart."),
+  robots: { index: false, follow: false, noarchive: true },
+};
+
 export default function DineInLayout({ children }: { children: ReactNode }) {
   return <div className="tm-dine-in-shell">{children}</div>;
 }
