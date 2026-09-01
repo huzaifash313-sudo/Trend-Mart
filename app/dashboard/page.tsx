@@ -744,17 +744,18 @@ export default function DashboardOverviewPage() {
                 Everything else
               </h2>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-                {quickActions.map((action) => (
+                {quickActions.map((action, index) => (
                   <Link
                     key={action.id}
                     href={action.href ?? "#"}
-                    className="tm-panel flex items-center gap-3 px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    style={{ "--card-i": index } as CSSProperties}
+                    className="tm-dash-quick-card group tm-panel flex items-center gap-3 px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
                   >
-                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${action.tone}`}>
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base transition-transform group-hover:scale-105 ${action.tone}`}>
                       {action.icon}
                     </span>
                     <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                      <span className="tm-dash-card-label flex items-center gap-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
                         {action.label}
                         {action.badge ? (
                           <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[0.6rem] font-bold leading-none text-white">
@@ -762,7 +763,7 @@ export default function DashboardOverviewPage() {
                           </span>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 block truncate text-[0.7rem] text-zinc-500 dark:text-zinc-400">
+                      <span className="tm-dash-card-desc mt-0.5 block truncate text-[0.7rem] text-zinc-500 dark:text-zinc-400">
                         {action.description}
                       </span>
                     </span>

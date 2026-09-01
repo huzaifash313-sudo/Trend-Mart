@@ -17,6 +17,7 @@ export interface TrackedOrder {
   shopWhatsapp?: string | null;
   customerName: string;
   customerPhone: string;
+  customerUserId?: string | null;
   items: Array<{
     name: string;
     price: number;
@@ -31,6 +32,8 @@ export interface TrackedOrder {
   trackingNumber?: string | null;
   createdAt: string;
   updatedAt?: string;
+  whatsappSentAt?: string | null;
+  whatsappMessage?: string | null;
 }
 
 export interface StatusTimelineEntry {
@@ -176,6 +179,7 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
         : (row.shop_whatsapp as string) ?? (row.whatsapp_number as string)) ?? null,
     customerName: (row.customer_name as string) ?? "",
     customerPhone: (row.customer_phone as string) ?? "",
+    customerUserId: (row.customer_user_id as string | null | undefined) ?? null,
     items,
     totalAmount: Number(row.total_amount) || 0,
     status,
@@ -188,6 +192,12 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
     trackingNumber: (row.tracking_number as string) ?? null,
     createdAt,
     updatedAt,
+    whatsappSentAt:
+      typeof row.whatsapp_sent_at === "string" ? row.whatsapp_sent_at : null,
+    whatsappMessage:
+      typeof row.whatsapp_message === "string" && row.whatsapp_message.trim()
+        ? row.whatsapp_message.trim()
+        : null,
   };
 }
 
@@ -208,6 +218,8 @@ interface TrackedOrderRow {
   tracking_number?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  whatsapp_sent_at?: string | null;
+  whatsapp_message?: string | null;
   [key: string]: unknown;
 }
 

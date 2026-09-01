@@ -260,6 +260,34 @@ export function subscribeToInquiries(
   return () => unsubscribe(channelKey);
 }
 
+/** Customer portal — live updates when the merchant replies. */
+export function subscribeToMyInquiries(
+  userId: string,
+  onUpdate: RealtimeCallback<InquiryPayload>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = uniqueKey(`my-inquiries-${userId}`);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "customer_inquiries",
+        filter: `customer_user_id=eq.${userId}`,
+      },
+      (payload) => {
+        onUpdate(payload as RealtimePostgresChangesPayload<InquiryPayload>);
+      },
+    )
+    .subscribe();
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
 /**
  * Subscribe to order status updates for a logged-in customer.
  */

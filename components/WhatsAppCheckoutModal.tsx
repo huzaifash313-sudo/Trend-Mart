@@ -25,7 +25,8 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createOrder } from "@/services/orderService";
+import { createOrder, updateOrderWhatsApp } from "@/services/orderService";
+import { logLead } from "@/services/leadsService";
 import { validateCoupon, fetchCouponsByShopId } from "@/services/couponService";
 import { saveOrderRecord } from "@/services/orderHistoryService";
 import type { OrderItem as OrderItemType, PriceTier, Shop, VariantGroup } from "@/types";
@@ -1132,7 +1133,15 @@ export default function WhatsAppCheckoutModal({
       const ref = orderResult.data.id;
       setOrderRef(ref);
 
-      // Save to local history (items array so the orders page can render it)
+      logLead({
+        shopId: shop.id,
+        customerName: shipping.customerName.trim(),
+        customerPhone: shipping.customerPhone,
+        serviceContext: `Order ${ref.slice(0, 8)} — Rs ${grandTotal}`,
+        source: "whatsapp",
+      });
+
+      // Save to local history
       saveOrderRecord({
         shopId: shop.id,
         shopName: shop.name,
@@ -1170,6 +1179,9 @@ export default function WhatsAppCheckoutModal({
       const whatsappUrl = `https://wa.me/${merchantPhone}?text=${encodeURIComponent(whatsappText)}`;
       setPendingWhatsAppUrl(whatsappUrl);
 
+      // Store the exact message server-side so "Send again" from My Orders works.
+      void updateOrderWhatsApp(ref, { message: whatsappText }).catch(() => undefined);
+
       // WhatsApp-first: order placed → open the merchant chat immediately, then
       // close with a single confirmation toast. If the popup is blocked, fall
       // back to the success screen so the shopper can still open it with one tap.
@@ -1184,6 +1196,9 @@ export default function WhatsAppCheckoutModal({
       addToast("Order placed — WhatsApp chat opened.", "success");
 
       if (opened) {
+        void updateOrderWhatsApp(ref, { message: whatsappText, sent: true }).catch(
+          () => undefined,
+        );
         onOrderPlaced();
       } else {
         setStep("success");
@@ -1234,11 +1249,18 @@ export default function WhatsAppCheckoutModal({
   }, [onOrderPlaced]);
 
   const openWhatsAppAndFinish = useCallback(() => {
-    if (pendingWhatsAppUrl) {
+    if (pendingWhatsAppUrl && orderRef) {
       window.open(pendingWhatsAppUrl, "_blank", "noopener,noreferrer");
+      const message = decodeURIComponent(
+        pendingWhatsAppUrl.split("text=")[1] ?? "",
+      );
+      void updateOrderWhatsApp(orderRef, {
+        ...(message ? { message } : {}),
+        sent: true,
+      }).catch(() => undefined);
     }
     finishOrder();
-  }, [pendingWhatsAppUrl, finishOrder]);
+  }, [pendingWhatsAppUrl, orderRef, finishOrder]);
 
   // ── Render (portal to body so transform/overflow ancestors can't clip) ──
 
@@ -2029,10 +2051,10 @@ export default function WhatsAppCheckoutModal({
             </div>
             <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Order Placed Successfully!</h4>
               <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                Your order is saved. The shop only sees it when you tap Open WhatsApp and send the message.
+                Your order is saved in TrendsMart. Tap Open WhatsApp and send the message so the shop can confirm.
               </p>
               <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
-                Tracking stays on Pending until the shop updates it in their dashboard.
+                Changed your mind? Cancel anytime from My Orders while it is still Pending.
               </p>
             {orderRef && (
               <p className="mt-3 inline-block rounded-full bg-zinc-100 px-3 py-1 text-xs font-mono text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">

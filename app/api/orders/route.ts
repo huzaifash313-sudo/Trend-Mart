@@ -1071,6 +1071,8 @@ export async function POST(request: Request) {
     delivery_fee: deliveryFee,
     discount_amount: discount,
     coupon_code: appliedCoupon ?? undefined,
+    whatsapp_sent_at: null,
+    whatsapp_message: null,
     created_at: String((inserted as Record<string, unknown>).created_at ?? new Date().toISOString()),
     updated_at: (inserted as Record<string, unknown>).updated_at as string | undefined,
   };
@@ -1080,17 +1082,18 @@ export async function POST(request: Request) {
   const amountLabel = `Rs. ${Math.round(total).toLocaleString()}`;
   const shopName = (shopRow.name ?? "your shop").trim() || "your shop";
   void (async () => {
+    const waHint = " WhatsApp not sent yet — verify with customer before preparing.";
     if (shopRow.owner_id) {
       await sendPushToUser(shopRow.owner_id, {
         title: "New TrendsMart order",
-        body: `${customerName} placed an order — ${amountLabel} at ${shopName}.`,
+        body: `${customerName} placed an order — ${amountLabel} at ${shopName}.${waHint}`,
         url: "/dashboard/orders",
         tag: `order-${order.id}`,
       });
     }
     await sendPushToUser(user.id, {
-      title: "Order placed on TrendsMart",
-      body: `Your order at ${shopName} was received (${amountLabel}).`,
+      title: "Order saved on TrendsMart",
+      body: `Send it on WhatsApp so ${shopName} can confirm (${amountLabel}). You can cancel from My Orders if you changed your mind.`,
       url: `/orders/tracking?orderId=${encodeURIComponent(order.id)}`,
       tag: `order-${order.id}-customer`,
     });

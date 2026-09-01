@@ -639,6 +639,10 @@ export interface Order {
   discount_amount?: number | null;
   /** Coupon code used, when any. */
   coupon_code?: string | null;
+  /** When the customer confirmed the WhatsApp hand-off (null = not sent yet). */
+  whatsapp_sent_at?: string | null;
+  /** Stored checkout WhatsApp text for "Send again" (includes Maps pin). */
+  whatsapp_message?: string | null;
 }
 
 // ─── Merchant Analytics Summary (dashboard cards) ───────────────────────────
@@ -741,7 +745,6 @@ export function isServiceCategory(category?: string): boolean {
 /** Food categories that should get the QR table dining feature. */
 export const DINE_IN_CATEGORIES: ReadonlySet<string> = new Set([
   "Fast Food & Restaurants",
-  "Bakery & Sweets",
 ]);
 
 /** Check if a shop category is eligible for QR table ordering. */

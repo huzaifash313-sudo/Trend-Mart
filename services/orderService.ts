@@ -111,6 +111,14 @@ function parseOrder(row: Record<string, unknown>): Order {
       typeof row.coupon_code === "string" && row.coupon_code.trim()
         ? row.coupon_code.trim()
         : undefined,
+    customer_user_id:
+      typeof row.customer_user_id === "string" ? row.customer_user_id : null,
+    whatsapp_sent_at:
+      typeof row.whatsapp_sent_at === "string" ? row.whatsapp_sent_at : null,
+    whatsapp_message:
+      typeof row.whatsapp_message === "string" && row.whatsapp_message.trim()
+        ? row.whatsapp_message.trim()
+        : null,
   };
 }
 
@@ -1274,4 +1282,65 @@ export async function bulkUpdateVariantStock(
   }
 
   return { success: true, data: { updated, failed } };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Customer order lifecycle (WhatsApp hand-off + cancel)                      */
+/* -------------------------------------------------------------------------- */
+
+/** Persist the WhatsApp payload and optionally mark it as sent. */
+export async function updateOrderWhatsApp(
+  orderId: string,
+  opts: { message?: string; sent?: boolean },
+): Promise<ServiceResult<{ whatsappSentAt: string | null; whatsappMessage: string | null }>> {
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/whatsapp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(opts.message !== undefined ? { message: opts.message } : {}),
+        ...(opts.sent ? { sent: true } : {}),
+      }),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      whatsappSentAt?: string | null;
+      whatsappMessage?: string | null;
+    };
+    if (!res.ok || !json.success) {
+      return { success: false, error: json.error ?? "Could not update WhatsApp status." };
+    }
+    return {
+      success: true,
+      data: {
+        whatsappSentAt: json.whatsappSentAt ?? null,
+        whatsappMessage: json.whatsappMessage ?? null,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: toError(err) };
+  }
+}
+
+/** Customer cancels a Pending order before the shop starts processing. */
+export async function cancelOrderAsCustomer(
+  orderId: string,
+): Promise<ServiceResult<{ id: string; status: string }>> {
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/cancel`, {
+      method: "POST",
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      order?: { id: string; status: string };
+    };
+    if (!res.ok || !json.success || !json.order) {
+      return { success: false, error: json.error ?? "Could not cancel the order." };
+    }
+    return { success: true, data: json.order };
+  } catch (err) {
+    return { success: false, error: toError(err) };
+  }
 }

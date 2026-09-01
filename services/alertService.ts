@@ -102,7 +102,7 @@ export async function fetchAlertCounts(
           .from("customer_inquiries")
           .select("id", { count: "exact", head: true })
           .eq("shop_id", shopId)
-          .or("is_read.eq.false,is_urgent.eq.true"),
+          .eq("is_read", false),
       ]);
 
     if (lowStockResult.error) throw lowStockResult.error;

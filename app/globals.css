@@ -4358,6 +4358,75 @@ html.dark .tm-product-add-text:hover {
   }
 }
 
+/* Merchant dashboard quick-action cards */
+@keyframes tm-dash-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tm-dash-desc-shimmer {
+  0%,
+  100% {
+    color: #71717a;
+  }
+  45% {
+    color: color-mix(in srgb, var(--tm-sea) 72%, #71717a);
+  }
+  55% {
+    color: color-mix(in srgb, var(--tm-sea) 88%, #ffffff);
+  }
+}
+
+@keyframes tm-dash-desc-shimmer-dark {
+  0%,
+  100% {
+    color: #a1a1aa;
+  }
+  45% {
+    color: color-mix(in srgb, var(--tm-sea) 65%, #a1a1aa);
+  }
+  55% {
+    color: #e4e4e7;
+  }
+}
+
+.tm-dash-quick-card {
+  animation: tm-dash-card-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--card-i, 0) * 48ms);
+}
+
+.tm-dash-card-label {
+  transition: letter-spacing 0.25s ease, color 0.25s ease;
+}
+
+.tm-dash-quick-card:hover .tm-dash-card-label {
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--tm-sea) 55%, #27272a);
+}
+
+html.dark .tm-dash-quick-card:hover .tm-dash-card-label {
+  color: color-mix(in srgb, var(--tm-sea) 40%, #fafafa);
+}
+
+.tm-dash-card-desc {
+  transition: transform 0.25s ease;
+}
+
+.tm-dash-quick-card:hover .tm-dash-card-desc {
+  animation: tm-dash-desc-shimmer 1.4s ease-in-out;
+  transform: translateX(3px);
+}
+
+html.dark .tm-dash-quick-card:hover .tm-dash-card-desc {
+  animation-name: tm-dash-desc-shimmer-dark;
+}
+
 /* Inline “live today” count on deals page */
 .tm-live-count {
   display: inline-flex;
@@ -4399,6 +4468,8 @@ html.dark .tm-product-add-text:hover {
   .tm-shop-title-merchant-letter,
   .tm-shop-name,
   .tm-shop-name-inline,
+  .tm-dash-quick-card,
+  .tm-dash-card-desc,
   .tm-product-offer-dot,
   .tm-offer-ticker__dot,
   .tm-offer-ticker {

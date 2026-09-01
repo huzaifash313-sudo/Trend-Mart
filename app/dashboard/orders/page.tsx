@@ -16,6 +16,7 @@ import CustomSelect from "@/components/CustomSelect";
 import OrderBillModal from "@/components/OrderBillModal";
 import type { Order, OrderStatus, Shop } from "@/types";
 import { toPkWhatsAppDigits } from "@/lib/phoneFormat";
+import { buildCustomerVerifyWhatsAppUrl, isAwaitingWhatsApp } from "@/lib/orderWhatsApp";
 
 type StatusFilter = "all" | OrderStatus;
 
@@ -94,7 +95,12 @@ export default function MerchantOrdersPage() {
             } catch {
               /* optional sound */
             }
-            addToast("New order received", "success");
+            addToast(
+              row.whatsapp_sent_at
+                ? "New order received"
+                : "New order — WhatsApp not sent yet (verify with customer)",
+              row.whatsapp_sent_at ? "success" : "info",
+            );
           },
           (payload) => {
             const row = payload.new as Order | undefined;
@@ -157,17 +163,41 @@ export default function MerchantOrdersPage() {
     [addToast],
   );
 
-  const openWhatsApp = (order: Order) => {
-    const digits = toPkWhatsAppDigits(order.customer_phone ?? "");
-    if (!digits) {
+  const openCustomerWhatsApp = (order: Order) => {
+    const awaiting = isAwaitingWhatsApp(order);
+    const url = awaiting
+      ? buildCustomerVerifyWhatsAppUrl(
+          order.customer_phone ?? "",
+          order.id,
+          order.customer_name,
+        )
+      : (() => {
+          const digits = toPkWhatsAppDigits(order.customer_phone ?? "");
+          if (!digits) return null;
+          const msg = encodeURIComponent(
+            `Salam ${order.customer_name || ""}! Your TrendsMart order (${order.id.slice(0, 8)}) is ${order.status}.`,
+          );
+          return `https://wa.me/${digits}?text=${msg}`;
+        })();
+    if (!url) {
       addToast("No valid customer phone on this order.", "error");
       return;
     }
-    const msg = encodeURIComponent(
-      `Salam ${order.customer_name || ""}! Your TrendsMart order (${order.id.slice(0, 8)}) is ${order.status}.`,
-    );
-    window.open(`https://wa.me/${digits}?text=${msg}`, "_blank", "noopener,noreferrer");
+    window.open(url, "_blank", "noopener,noreferrer");
   };
+
+  const quickCancelOrder = useCallback(
+    async (order: Order) => {
+      const result = await transitionOrderStatus(order.id, "Cancelled");
+      if (result.success) {
+        setOrders((prev) => prev.map((o) => (o.id === order.id ? result.data : o)));
+        addToast("Order cancelled.", "success");
+      } else {
+        addToast(result.error ?? "Could not cancel.", "error");
+      }
+    },
+    [addToast],
+  );
 
   if (loading) {
     return (
@@ -267,11 +297,21 @@ export default function MerchantOrdersPage() {
                       <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-bold ${statusTone(order.status)}`}>
                         {getStatusLabel(order.status)}
                       </span>
+                      {isAwaitingWhatsApp(order) && (
+                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[0.65rem] font-bold text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                          ⚠️ WhatsApp not sent
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       {formatMoney(order.total_amount)} · {new Date(order.created_at).toLocaleString()}
                       {order.customer_phone ? ` · ${order.customer_phone}` : ""}
                     </p>
+                    {isAwaitingWhatsApp(order) && (
+                      <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">
+                        Customer has not sent the WhatsApp message yet — verify before preparing.
+                      </p>
+                    )}
                     {order.notes ? (
                       <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
                         Note: {order.notes}
@@ -302,11 +342,22 @@ export default function MerchantOrdersPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => openWhatsApp(order)}
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                      onClick={() => openCustomerWhatsApp(order)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                      title={isAwaitingWhatsApp(order) ? "Verify order with customer on WhatsApp" : "Message customer on WhatsApp"}
                     >
-                      WhatsApp
+                      <span aria-hidden="true">💬</span>
+                      {isAwaitingWhatsApp(order) ? "Verify on WhatsApp" : "WhatsApp"}
                     </button>
+                    {isAwaitingWhatsApp(order) && order.status === "Pending" && (
+                      <button
+                        type="button"
+                        onClick={() => void quickCancelOrder(order)}
+                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        Cancel
+                      </button>
+                    )}
                     <CustomSelect
                       value={order.status}
                       onChange={(val) => handleUpdateStatus(order.id, val as OrderStatus)}

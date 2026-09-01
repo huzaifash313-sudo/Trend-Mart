@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import CustomerOrderActions from "@/components/CustomerOrderActions";
+import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderItem } from "@/types";
 import { fetchOrdersByPhone } from "@/services/orderService";
 import { fetchShops } from "@/services/shopService";
@@ -90,7 +92,17 @@ function StatusBadge({ status }: { status: string }) {
 /*  OrderCard                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function OrderCard({ order, shopMap }: { order: Order; shopMap: Map<string, Shop> }) {
+function OrderCard({
+  order,
+  shopMap,
+  userId,
+  onOrderPatch,
+}: {
+  order: Order;
+  shopMap: Map<string, Shop>;
+  userId?: string | null;
+  onOrderPatch?: (orderId: string, patch: Partial<Order>) => void;
+}) {
   const shop = shopMap.get(order.shop_id);
   const items: OrderItem[] = order.items_json ?? [];
 
@@ -140,20 +152,34 @@ function OrderCard({ order, shopMap }: { order: Order; shopMap: Map<string, Shop
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/50">
-        <div>
+      <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/50">
+        <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
             Total: Rs. {order.total_amount.toLocaleString()}
           </p>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/orders/tracking?orderId=${encodeURIComponent(order.id)}`}
+              className="text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              Track →
+            </Link>
+            {shop && (
+              <Link
+                href={`/shop/${shop.id}`}
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+              >
+                View Shop ↗
+              </Link>
+            )}
+          </div>
         </div>
-        {shop && (
-          <Link
-            href={`/shop/${shop.id}`}
-            className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
-          >
-            View Shop ↗
-          </Link>
-        )}
+        <CustomerOrderActions
+          order={order}
+          shopWhatsapp={shop?.whatsapp_number}
+          userId={userId}
+          onUpdated={(patch) => onOrderPatch?.(order.id, patch)}
+        />
       </div>
     </div>
   );
@@ -211,6 +237,14 @@ function OrdersInner() {
   const [dbOrders, setDbOrders] = useState<Order[]>([]);
   const [shops, setShops] = useState<Map<string, Shop>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
+    });
+  }, []);
 
   // Load shops for shop name display.
   // Public-only: the tracking page is customer-facing and only needs shop
@@ -255,6 +289,12 @@ function OrdersInner() {
       setSearching(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleOrderPatch = useCallback((orderId: string, patch: Partial<Order>) => {
+    setDbOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, ...patch } : o)),
+    );
   }, []);
 
   const localOrders = getLocalOrders();
@@ -369,7 +409,13 @@ function OrdersInner() {
                 Orders ({dbOrders.length})
               </h3>
               {dbOrders.map((order) => (
-                <OrderCard key={order.id} order={order} shopMap={shops} />
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  shopMap={shops}
+                  userId={userId}
+                  onOrderPatch={handleOrderPatch}
+                />
               ))}
             </div>
           )}

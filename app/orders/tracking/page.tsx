@@ -25,6 +25,9 @@ import { subscribeToOrderUpdates } from "@/services/notificationService";
 import { formatRupees } from "@/lib/formatters";
 import { formatDate, formatRelativeTime } from "@/lib/formatters";
 import { toWhatsAppDigits } from "@/lib/sanitization";
+import CustomerOrderActions from "@/components/CustomerOrderActions";
+import { createClient } from "@/lib/supabase/client";
+import type { Order } from "@/types";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -321,10 +324,14 @@ function OrderCard({
   order,
   highlighted,
   justUpdated,
+  userId,
+  onOrderPatch,
 }: {
   order: TrackedOrder;
   highlighted?: boolean;
   justUpdated?: boolean;
+  userId?: string | null;
+  onOrderPatch?: (orderId: string, patch: Partial<Order>) => void;
 }) {
   const whatsappNumber = toWhatsAppDigits(order.shopWhatsapp ?? "");
   const whatsappUrl = whatsappNumber
@@ -474,7 +481,21 @@ function OrderCard({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
+      <div className="space-y-3 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
+        <CustomerOrderActions
+          order={{
+            id: order.id,
+            status: order.status,
+            customer_user_id: order.customerUserId,
+            whatsapp_sent_at: order.whatsappSentAt,
+            whatsapp_message: order.whatsappMessage,
+          }}
+          shopWhatsapp={order.shopWhatsapp}
+          userId={userId}
+          compact
+          onUpdated={(patch) => onOrderPatch?.(order.id, patch)}
+        />
+        <div className="flex gap-2">
         {whatsappUrl ? (
           <a
             href={whatsappUrl}
@@ -502,6 +523,7 @@ function OrderCard({
         >
           Copy Ref
         </button>
+        </div>
       </div>
     </div>
   );
@@ -539,6 +561,33 @@ function OrderTrackingInner() {
   // Live realtime status: order IDs that just received a status update
   const [liveUpdatedIds, setLiveUpdatedIds] = useState<Set<string>>(new Set());
   const [liveConnected, setLiveConnected] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
+    });
+  }, []);
+
+  const handleOrderPatch = useCallback((orderId: string, patch: Partial<Order>) => {
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId
+          ? {
+              ...o,
+              ...(patch.status ? { status: patch.status } : {}),
+              ...(patch.whatsapp_sent_at !== undefined
+                ? { whatsappSentAt: patch.whatsapp_sent_at }
+                : {}),
+              ...(patch.whatsapp_message !== undefined
+                ? { whatsappMessage: patch.whatsapp_message }
+                : {}),
+            }
+          : o,
+      ),
+    );
+  }, []);
 
   // ── Realtime Subscriptions: keep displayed orders live-updated ─────────
   useEffect(() => {
@@ -907,6 +956,8 @@ function OrderTrackingInner() {
                     order={order}
                     highlighted={order.id === highlightedOrderId}
                     justUpdated={liveUpdatedIds.has(order.id)}
+                    userId={userId}
+                    onOrderPatch={handleOrderPatch}
                   />
                 ))}
               </div>

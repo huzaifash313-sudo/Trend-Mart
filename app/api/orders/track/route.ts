@@ -35,6 +35,8 @@ interface TrackedOrderRow {
   tracking_number?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  whatsapp_sent_at?: string | null;
+  whatsapp_message?: string | null;
 }
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
