@@ -25,6 +25,7 @@ import CustomSelect from "@/components/CustomSelect";
 import {
   cloneVariantGroups,
   getVariantTemplates,
+  mergeVariantGroups,
   sanitizeVariantGroups,
   type VariantTemplatePack,
 } from "@/lib/variantTemplates";
@@ -176,7 +177,7 @@ export default function BulkProductCreator({
       setRows((prev) => {
         const next = prev.map((r) => ({
           ...r,
-          variants: cloneVariantGroups(pack.groups),
+          variants: mergeVariantGroups(r.variants, pack.groups),
         }));
         setExpandedVariants((exp) => {
           const opened = { ...exp };

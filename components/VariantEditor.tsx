@@ -16,9 +16,11 @@ import { effectiveOptionPrice } from "@/lib/variantPricing";
 import {
   EXTRA_GROUP_PRESETS,
   categoryUsuallyHasVariants,
-  cloneVariantGroups,
+  createGroupFromPreset,
+  getComboTemplates,
   getOptionPoolForGroup,
-  getVariantTemplates,
+  getQuickGroupNamesForCategory,
+  mergeVariantGroups,
   type VariantTemplatePack,
 } from "@/lib/variantTemplates";
 
@@ -73,18 +75,42 @@ export default function VariantEditor({
   const [customOption, setCustomOption] = useState<Record<number, string>>({});
   const [showPrices, setShowPrices] = useState(false);
   const [showMoreGroups, setShowMoreGroups] = useState(false);
+  const [showCombos, setShowCombos] = useState(false);
 
-  const templates = useMemo(
-    () => getVariantTemplates(shopCategory),
+  const quickGroupNames = useMemo(
+    () => getQuickGroupNamesForCategory(shopCategory),
+    [shopCategory],
+  );
+  const comboTemplates = useMemo(
+    () => getComboTemplates(shopCategory),
     [shopCategory],
   );
 
   const usuallyNeeds = categoryUsuallyHasVariants(shopCategory);
   const hasVariants = variants.length > 0;
 
+  function hasGroupName(name: string) {
+    return variants.some((g) => optionKey(g.name) === optionKey(name));
+  }
+
   function applyPack(pack: VariantTemplatePack) {
-    onChange(cloneVariantGroups(pack.groups));
+    onChange(mergeVariantGroups(variants, pack.groups));
     setShowMoreGroups(false);
+  }
+
+  function toggleQuickGroup(name: string) {
+    if (hasGroupName(name)) {
+      onChange(variants.filter((g) => optionKey(g.name) !== optionKey(name)));
+      return;
+    }
+    const group = createGroupFromPreset(name);
+    if (!group) return;
+    onChange([...variants, group]);
+    setShowMoreGroups(false);
+  }
+
+  function packFullyApplied(pack: VariantTemplatePack) {
+    return pack.groups.every((g) => hasGroupName(g.name));
   }
 
   function addGroup(name: string) {
@@ -177,6 +203,30 @@ export default function VariantEditor({
     );
   }
 
+  function selectAllInGroup(groupIdx: number) {
+    const group = variants[groupIdx];
+    if (!group) return;
+    const pool = getOptionPoolForGroup(group.name);
+    const custom = group.options.filter(
+      (o) =>
+        o.label.trim() &&
+        !pool.some((p) => optionKey(p) === optionKey(o.label)),
+    );
+    const merged = [
+      ...pool.map((label) => ({ label, is_available: true })),
+      ...custom,
+    ];
+    onChange(
+      variants.map((g, i) => (i === groupIdx ? { ...g, options: merged } : g)),
+    );
+  }
+
+  function clearAllInGroup(groupIdx: number) {
+    onChange(
+      variants.map((g, i) => (i === groupIdx ? { ...g, options: [] } : g)),
+    );
+  }
+
   const comboCount = useMemo(() => {
     if (variants.length === 0) return 0;
     return variants.reduce((acc, g) => {
@@ -224,42 +274,84 @@ export default function VariantEditor({
         ) : null}
       </div>
 
-      {/* ── Empty: one-tap category packs ─────────────────────────────── */}
-      {!hasVariants ? (
-        <div className="space-y-2.5">
+      {/* ── Quick groups: tap one or many ───────────────────────────────── */}
+      {quickGroupNames.length > 0 ? (
+        <div className="mb-2.5 space-y-1.5">
           <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-            {usuallyNeeds
-              ? "Ek tap se options lagao — baad mein chips se hata / add kar sakte ho."
-              : "Zyada tar items bina options ke chalenge. Zarurat ho to neeche se choose karo."}
+            Tap karo — jitne groups chaho, utne lagao. Dobara tap = hata do.
           </p>
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {templates.map((pack) => (
-              <button
-                key={pack.id}
-                type="button"
-                onClick={() => applyPack(pack)}
-                className="rounded-xl border border-teal-200 bg-white px-3 py-2.5 text-left transition hover:border-teal-400 hover:bg-teal-50/80 dark:border-teal-900/50 dark:bg-zinc-900 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
-              >
-                <span className="block text-xs font-bold text-teal-800 dark:text-teal-300">
-                  {pack.label}
-                </span>
-                <span className="mt-0.5 block text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {pack.hint}
-                </span>
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-1.5">
+            {quickGroupNames.map((name) => {
+              const on = hasGroupName(name);
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => toggleQuickGroup(name)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                    on
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "border border-teal-200 bg-white text-teal-800 hover:border-teal-400 hover:bg-teal-50 dark:border-teal-800 dark:bg-zinc-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                  }`}
+                >
+                  {on ? "✓ " : "+ "}
+                  {name}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        </div>
+      ) : null}
+
+      {comboTemplates.length > 0 ? (
+        <div className="mb-2.5">
+          <button
+            type="button"
+            onClick={() => setShowCombos((v) => !v)}
+            className="text-[11px] font-semibold text-teal-700 hover:underline dark:text-teal-400"
+          >
+            {showCombos ? "▾ Tez combos chhupao" : "▸ Tez combos (2 groups ek saath)"}
+          </button>
+          {showCombos ? (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {comboTemplates.map((pack) => {
+                const done = packFullyApplied(pack);
+                return (
+                  <button
+                    key={pack.id}
+                    type="button"
+                    onClick={() => applyPack(pack)}
+                    disabled={done}
+                    title={pack.hint}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                      done
+                        ? "cursor-default border-emerald-300 bg-emerald-50 text-emerald-700 opacity-80 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                        : "border-teal-200 bg-white text-teal-700 hover:border-teal-400 hover:bg-teal-50 dark:border-teal-800 dark:bg-zinc-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                    }`}
+                  >
+                    {done ? "✓ " : "+ "}
+                    {pack.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!hasVariants ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setShowMoreGroups((v) => !v)}
               className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
             >
-              {showMoreGroups ? "Hide extras" : "+ Other group"}
+              {showMoreGroups ? "Hide" : "+ Custom group"}
             </button>
-            <span className="text-[11px] text-zinc-400">
-              Ya skip — simple product, no options
-            </span>
+            {!usuallyNeeds ? (
+              <span className="text-[11px] text-zinc-400">Skip = simple product</span>
+            ) : null}
           </div>
           {showMoreGroups ? (
             <ExtraGroupBar
@@ -272,25 +364,13 @@ export default function VariantEditor({
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Swap pack without clearing manually */}
-          <div className="flex flex-wrap gap-1.5">
-            {templates.map((pack) => (
-              <button
-                key={pack.id}
-                type="button"
-                onClick={() => applyPack(pack)}
-                className="rounded-full border border-teal-200 bg-white px-2.5 py-1 text-[11px] font-medium text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:bg-zinc-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
-                title={pack.hint}
-              >
-                Use {pack.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setShowMoreGroups((v) => !v)}
               className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
             >
-              + Group
+              {showMoreGroups ? "Hide" : "+ Custom group"}
             </button>
           </div>
 
@@ -327,8 +407,22 @@ export default function VariantEditor({
                     aria-label="Group name"
                   />
                   <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => selectAllInGroup(groupIdx)}
+                      className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    >
+                      Sab ✓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => clearAllInGroup(groupIdx)}
+                      className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                    >
+                      Clear
+                    </button>
                     <span className="text-[10px] font-medium text-zinc-400">
-                      {group.options.filter((o) => o.label.trim()).length} selected
+                      {group.options.filter((o) => o.label.trim()).length} on
                     </span>
                     <button
                       type="button"
@@ -341,9 +435,6 @@ export default function VariantEditor({
                   </div>
                 </div>
 
-                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-                  Tap to include / remove
-                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {pool.map((label) => {
                     const on = selectedKeys.has(optionKey(label));

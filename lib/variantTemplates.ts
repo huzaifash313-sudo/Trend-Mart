@@ -28,6 +28,66 @@ export function cloneVariantGroups(groups: VariantGroup[]): VariantGroup[] {
   return JSON.parse(JSON.stringify(groups)) as VariantGroup[];
 }
 
+function groupNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/**
+ * Add groups from `incoming` without replacing existing ones (matched by name).
+ * Lets merchants stack Portion + Spice + Add-ons instead of picking one pack.
+ */
+export function mergeVariantGroups(
+  existing: VariantGroup[],
+  incoming: VariantGroup[],
+): VariantGroup[] {
+  const result = cloneVariantGroups(existing);
+  const seen = new Set(result.map((g) => groupNameKey(g.name)));
+
+  for (const group of incoming) {
+    const name = group.name.trim();
+    const key = groupNameKey(name);
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    result.push(cloneVariantGroups([group])[0]!);
+  }
+
+  return result;
+}
+
+/** Build a ready-to-edit group from a preset label (Size, Portion, …). */
+export function createGroupFromPreset(name: string): VariantGroup | null {
+  const clean = name.trim();
+  if (!clean) return null;
+  const pool = getOptionPoolForGroup(clean);
+  return {
+    name: clean,
+    options: pool.length
+      ? pool.map((label) => ({ label, is_available: true }))
+      : [],
+  };
+}
+
+/** Unique single-group names suggested for this shop category. */
+export function getQuickGroupNamesForCategory(category?: string | null): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const pack of getVariantTemplates(category)) {
+    for (const group of pack.groups) {
+      const clean = group.name.trim();
+      const key = groupNameKey(clean);
+      if (!clean || seen.has(key)) continue;
+      seen.add(key);
+      names.push(clean);
+    }
+  }
+  return names;
+}
+
+/** Multi-group shortcuts (Portion + Spice, Size + Color, …). */
+export function getComboTemplates(category?: string | null): VariantTemplatePack[] {
+  return getVariantTemplates(category).filter((pack) => pack.groups.length > 1);
+}
+
 /** Common option pools — used for quick-add chips inside the editor. */
 export const OPTION_POOLS: Record<string, string[]> = {
   /* Fashion / general apparel */
