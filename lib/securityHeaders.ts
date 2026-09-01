@@ -129,7 +129,7 @@ export function getBaseSecurityHeaders(): Record<string, string> {
     "X-Permitted-Cross-Domain-Policies": "none",
     "X-Download-Options": "noopen",
     "X-DNS-Prefetch-Control": "on",
-    "Cross-Origin-Resource-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "cross-origin",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Embedder-Policy": "unsafe-none",
   };

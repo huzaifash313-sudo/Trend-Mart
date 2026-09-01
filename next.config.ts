@@ -69,6 +69,11 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
+    NEXT_PUBLIC_TURNSTILE_ENFORCED:
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY &&
+      process.env.TURNSTILE_SECRET_KEY
+        ? "true"
+        : "false",
   },
 
   // ── Allowed Dev Origins (network access via LAN IP) ─────────────────────────
@@ -268,7 +273,7 @@ const nextConfig: NextConfig = {
           },
           { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "X-DNS-Prefetch-Control", value: "on" },
-          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "Cross-Origin-Embedder-Policy", value: "unsafe-none" },
           // Content Security Policy (CSP)
@@ -277,9 +282,9 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               isProd
-                ? "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com"
-                : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
-              "style-src 'self' 'unsafe-inline'",
+                ? "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://*.cloudflare.com"
+                : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.cloudflare.com",
+              "style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
               isProd

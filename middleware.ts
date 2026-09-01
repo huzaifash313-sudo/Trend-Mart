@@ -593,7 +593,9 @@ function applySecurityHeaders(response: NextResponse): void {
   headers.set("X-XSS-Protection", "1; mode=block");
   headers.set("X-Permitted-Cross-Domain-Policies", "none");
   headers.set("X-Download-Options", "noopen");
-  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+  // Allow third-party widgets (Turnstile iframe/script) — `same-origin` blocked
+  // challenges.cloudflare.com with ERR_BLOCKED_BY_RESPONSE.NotSameOrigin.
+  headers.set("Cross-Origin-Resource-Policy", "cross-origin");
 
   const isProd = process.env.NODE_ENV === "production";
   const cspDirectives = [
@@ -602,9 +604,9 @@ function applySecurityHeaders(response: NextResponse): void {
     // in app/layout.tsx. 'unsafe-eval' only in development — React/Next DevTools
     // need eval for callstacks; production CSP stays without it.
     isProd
-      ? "script-src 'self' 'unsafe-inline' https://*.supabase.co https://challenges.cloudflare.com"
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://challenges.cloudflare.com",
-    "style-src 'self' 'unsafe-inline'",
+      ? "script-src 'self' 'unsafe-inline' https://*.supabase.co https://challenges.cloudflare.com https://*.cloudflare.com"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://challenges.cloudflare.com https://*.cloudflare.com",
+    "style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
     "img-src 'self' data: https: blob:",
     // Always allow Supabase HTTPS + Realtime WebSockets (prod was missing wss://)
     // + Cloudinary upload API (merchant image/story uploads run from the browser).

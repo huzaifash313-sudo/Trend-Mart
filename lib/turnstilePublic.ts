@@ -7,6 +7,13 @@ export function getTurnstileSiteKey(): string | null {
   return key && key.length > 0 ? key : null;
 }
 
+/**
+ * True when the login UI should show / wait for Turnstile.
+ * Mirrors server `isTurnstileEnforced()` via build-time flag when both keys exist.
+ */
 export function isTurnstileUiEnabled(): boolean {
+  if (process.env.NEXT_PUBLIC_TURNSTILE_ENFORCED === "true") {
+    return true;
+  }
   return Boolean(getTurnstileSiteKey());
 }

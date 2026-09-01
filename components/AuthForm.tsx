@@ -113,6 +113,7 @@ export default function AuthForm({
   const internalCaptchaRef = useRef<TurnstileFieldHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [captchaLoadFailed, setCaptchaLoadFailed] = useState(false);
 
   const setCaptchaRefs = useCallback(
     (node: TurnstileFieldHandle | null) => {
@@ -246,8 +247,14 @@ export default function AuthForm({
         if (!agreedToTerms) return;
       }
 
-      let token = captchaToken;
+      let token: string | null = captchaToken;
       if (captchaEnabled) {
+        if (captchaLoadFailed || internalCaptchaRef.current?.isLoadFailed()) {
+          setCaptchaError(
+            "Security check blocked. Fix the issue below, then retry.",
+          );
+          return;
+        }
         token = internalCaptchaRef.current?.getToken() ?? captchaToken;
         if (!token) {
           token = (await internalCaptchaRef.current?.waitForToken(8_000)) ?? null;
@@ -300,6 +307,7 @@ export default function AuthForm({
       forcePasswordReset,
       captchaEnabled,
       captchaToken,
+      captchaLoadFailed,
     ],
   );
 
@@ -792,8 +800,12 @@ export default function AuthForm({
             ref={setCaptchaRefs}
             onTokenChange={(token) => {
               setCaptchaToken(token);
-              if (token) setCaptchaError(null);
+              if (token) {
+                setCaptchaError(null);
+                setCaptchaLoadFailed(false);
+              }
             }}
+            onLoadFailed={() => setCaptchaLoadFailed(true)}
             disabled={isLockedOut || isLoading}
           />
           {captchaError && (
