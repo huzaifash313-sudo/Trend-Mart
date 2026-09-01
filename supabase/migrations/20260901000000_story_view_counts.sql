@@ -76,15 +76,22 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  INSERT INTO public.story_views (story_id, viewer_key)
-  VALUES (p_story_id, v_key)
-  ON CONFLICT (story_id, viewer_key) DO NOTHING;
+  WITH ins AS (
+    INSERT INTO public.story_views (story_id, viewer_key)
+    VALUES (p_story_id, v_key)
+    ON CONFLICT (story_id, viewer_key) DO NOTHING
+    RETURNING story_id
+  ),
+  bumped AS (
+    UPDATE public.stories s
+    SET view_count = s.view_count + 1
+    WHERE s.id = p_story_id
+      AND EXISTS (SELECT 1 FROM ins)
+    RETURNING s.view_count
+  )
+  SELECT b.view_count INTO v_count FROM bumped b;
 
-  IF FOUND THEN
-    UPDATE public.stories
-    SET view_count = view_count + 1
-    WHERE id = p_story_id
-    RETURNING view_count INTO v_count;
+  IF v_count IS NOT NULL THEN
     RETURN v_count;
   END IF;
 

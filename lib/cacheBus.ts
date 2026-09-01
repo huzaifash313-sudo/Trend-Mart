@@ -10,6 +10,8 @@
 /* -------------------------------------------------------------------------- */
 
 import type { QueryClient } from "@tanstack/react-query";
+import type { Story } from "@/types";
+import { queryKeys } from "@/lib/queries";
 
 let queryClient: QueryClient | null = null;
 
@@ -42,6 +44,26 @@ export function invalidateStorefrontData(): void {
 export function invalidateQuery(queryKey: readonly unknown[]): void {
   if (!queryClient) return;
   queryClient.invalidateQueries({ queryKey });
+}
+
+/**
+ * Patch a single story's view_count in the React Query cache so the tray badge
+ * updates immediately after a view is recorded (no full refetch wait).
+ */
+export function patchStoryViewCount(storyId: string, viewCount: number): void {
+  if (!queryClient || !storyId) return;
+  const safe = Math.max(0, Math.floor(Number(viewCount) || 0));
+  queryClient.setQueryData<Story[]>(queryKeys.stories, (old) => {
+    if (!old?.length) return old;
+    let changed = false;
+    const next = old.map((s) => {
+      if (s.id !== storyId) return s;
+      if ((s.view_count ?? 0) === safe) return s;
+      changed = true;
+      return { ...s, view_count: safe };
+    });
+    return changed ? next : old;
+  });
 }
 
 /**

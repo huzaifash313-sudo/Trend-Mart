@@ -88,6 +88,12 @@ export const RATE_LIMITS = {
     windowMs: 60_000, // 10 cart generations per minute
   } as const,
 
+  /** Story view pings — allow browsing many stories but block abuse. */
+  STORY_VIEW: {
+    maxRequests: 120,
+    windowMs: 60_000,
+  } as const,
+
   /** Shop/product creation (mutations) — very strict to prevent mass-creation. */
   MUTATIONS: {
     maxRequests: 15,

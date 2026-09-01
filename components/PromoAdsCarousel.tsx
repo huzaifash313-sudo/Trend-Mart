@@ -56,17 +56,6 @@ const PLACEMENT_SHELF: Record<
   store_top: { label: "Featured", viewAllHref: "/products" },
 };
 
-function badgeVariantClass(label?: string | null): string {
-  const l = (label ?? "Sponsored").toLowerCase();
-  if (l.includes("hot") || l.includes("combo")) return "tm-sponsored-badge--hot";
-  if (l.includes("limited") || l.includes("flash")) return "tm-sponsored-badge--flash";
-  if (l.includes("featured") || l.includes("pick")) return "tm-sponsored-badge--featured";
-  if (l.includes("new")) return "tm-sponsored-badge--new";
-  if (l.includes("sweet") || l.includes("deal")) return "tm-sponsored-badge--deal";
-  if (l.includes("trusted")) return "tm-sponsored-badge--trusted";
-  return "";
-}
-
 const DEMO_AD_ID_PREFIX = "f0000001-";
 
 function isDemoAdId(id: string): boolean {
@@ -159,7 +148,7 @@ function SponsoredCard({
             </span>
           </div>
         ) : null}
-        <span className={`tm-sponsored-badge absolute left-2.5 top-2.5 ${badgeVariantClass(ad.badge_label)}`}>
+        <span className="tm-sponsored-badge absolute left-2.5 top-2.5">
           {ad.badge_label?.trim() || "Sponsored"}
         </span>
       </div>

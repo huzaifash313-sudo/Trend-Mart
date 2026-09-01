@@ -103,7 +103,10 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
       .limit(150);
 
     if (error) throw error;
-    return { success: true, data: (data as Story[]) ?? [] };
+    return {
+      success: true,
+      data: (data as Record<string, unknown>[]).map(mapStoryRow),
+    };
   } catch (err) {
     logError(err, { module: "storyService.fetchActiveStories" });
     return { success: false, error: toError(err) };
@@ -259,13 +262,29 @@ export async function recordStoryView(
     }
     if (key.length < 8) return null;
 
+    try {
+      const res = await fetch("/api/stories/view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storyId, viewerKey: key }),
+        credentials: "same-origin",
+      });
+      if (res.ok) {
+        const payload = (await res.json()) as { viewCount?: unknown };
+        const n = Number(payload.viewCount);
+        if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+      }
+    } catch {
+      /* fall through to direct RPC */
+    }
+
     const { data, error } = await supabase.rpc("record_story_view", {
       p_story_id: storyId,
       p_viewer_key: key,
     });
     if (error) throw error;
     const n = typeof data === "number" ? data : Number(data);
-    return Number.isFinite(n) ? n : null;
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
   } catch (err) {
     logError(err, { module: "storyService.recordStoryView", meta: { storyId } });
     return null;

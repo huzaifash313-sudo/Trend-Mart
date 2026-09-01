@@ -10,7 +10,7 @@
 /*  settings, finances, ads…) is one tap away.                                 */
 /* -------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -68,6 +68,24 @@ function compactCount(n: number): string {
   }
   const v = n / 1_000_000;
   return `${v.toFixed(1).replace(/\.0$/, "")}M`;
+}
+
+/** Merchant dashboard shop name — silver letter chase (matches navbar style). */
+function MerchantShopTitle({ name }: { name: string }) {
+  if (!name || name === "Overview") return <>{name}</>;
+  return (
+    <>
+      {name.split("").map((ch, i) => (
+        <span
+          key={`${i}-${ch}`}
+          className="tm-shop-title-merchant-letter"
+          style={{ "--letter-i": i } as CSSProperties}
+        >
+          {ch === " " ? "\u00a0" : ch}
+        </span>
+      ))}
+    </>
+  );
 }
 
 /** Skeleton shown while auth + shop list resolve — avoids flashing the empty-store CTA. */
@@ -409,8 +427,8 @@ export default function DashboardOverviewPage() {
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
               Merchant dashboard
             </p>
-            <h1 className="tm-shop-title truncate text-2xl leading-tight sm:text-3xl">
-              {activeShop?.name ?? "Overview"}
+            <h1 className="tm-shop-title tm-shop-title-merchant truncate text-2xl leading-tight sm:text-3xl">
+              <MerchantShopTitle name={activeShop?.name ?? "Overview"} />
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">

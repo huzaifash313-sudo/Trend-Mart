@@ -11,6 +11,7 @@ import type { Story } from "@/types";
 import { fetchActiveStories, deleteStory, recordStoryView } from "@/services/storyService";
 import { getSafeImageUrl } from "@/services/storageService";
 import { markStoryViewed, sortStoriesUnseenFirst, formatStoryViewCount } from "@/lib/storyViewed";
+import { patchStoryViewCount } from "@/lib/cacheBus";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/Toast";
 
@@ -248,6 +249,8 @@ export default function StoriesViewer({
     void recordStoryView(story.id).then((count) => {
       if (typeof count !== "number") return;
       setViewCounts((prev) => ({ ...prev, [story.id]: count }));
+      patchStoryViewCount(story.id, count);
+      window.dispatchEvent(new Event("trendsmart:stories-updated"));
     });
   }, [stories, currentIndex, myShopId]);
 
@@ -472,25 +475,7 @@ export default function StoriesViewer({
             ))}
           </div>
 
-          {/* Story counter + view count */}
-          <div className="absolute bottom-20 left-4 z-20 flex items-center gap-2">
-            <div className="rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/85 backdrop-blur-sm">
-              {currentIndex + 1} / {stories.length}
-            </div>
-            <div
-              className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur-sm"
-              title={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
-              aria-label={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
-            >
-              <EyeIcon />
-              <span>
-                {formatStoryViewCount(viewCount)}
-                {isOwnStory ? (viewCount === 1 ? " view" : " views") : ""}
-              </span>
-            </div>
-          </div>
-
-          {/* Header — shop name */}
+          {/* Header — shop name + time (caption lives in footer, WhatsApp-style) */}
           <div className="absolute left-3 right-3 top-6 z-20 flex items-center gap-2.5 pt-1">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-emerald-600 text-sm font-bold text-white">
               {current.shop_logo_url ? (
@@ -515,11 +500,6 @@ export default function StoriesViewer({
                   </span>
                 ) : null}
               </div>
-              {current.caption ? (
-                <p className="truncate text-[11px] text-white/75 drop-shadow">
-                  {current.caption}
-                </p>
-              ) : null}
             </div>
             {myShopId && current.shop_id === myShopId ? (
               <button
@@ -554,26 +534,55 @@ export default function StoriesViewer({
           </div>
 
           {/* Media */}
-          <div className="flex flex-1 items-center justify-center px-2 pb-24 pt-20">
+          <div className="flex flex-1 items-center justify-center px-2 pb-36 pt-20">
             <div className="flex h-full max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40">
               <StoryImage story={current} />
             </div>
           </div>
 
-          {/* Footer CTA */}
-          <div className="absolute bottom-8 left-4 right-4 z-20 flex justify-center">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-                router.push(`/shop/${current.shop_id}`);
-              }}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/40 transition hover:bg-emerald-700 active:scale-95"
-            >
-              <ShoppingBagIcon />
-              Visit {shopLabel.length > 18 ? "Store" : shopLabel}
-            </button>
+          {/* Footer — WhatsApp-style: Visit Store above, caption at bottom */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 pb-5 pt-24">
+            <div className="pointer-events-auto flex flex-col gap-2.5">
+              <div className="flex items-center gap-2">
+                <div className="rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/85 backdrop-blur-sm">
+                  {currentIndex + 1} / {stories.length}
+                </div>
+                {isOwnStory ? (
+                  <div
+                    className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur-sm"
+                    title={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
+                    aria-label={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
+                  >
+                    <EyeIcon />
+                    <span>
+                      {formatStoryViewCount(viewCount)}
+                      {viewCount === 1 ? " view" : " views"}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {!isOwnStory ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                    router.push(`/shop/${current.shop_id}`);
+                  }}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/40 transition hover:bg-emerald-700 active:scale-95"
+                >
+                  <ShoppingBagIcon />
+                  Visit {shopLabel.length > 18 ? "Store" : shopLabel}
+                </button>
+              ) : null}
+
+              {current.caption?.trim() ? (
+                <p className="text-sm leading-snug text-white drop-shadow-md line-clamp-4">
+                  {current.caption.trim()}
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
