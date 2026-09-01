@@ -26,7 +26,7 @@ import ReviewReminderPopup from "@/components/ReviewReminderPopup";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import PolicyNotice from "@/components/PolicyNotice";
-import ScrollToTop from "@/components/ScrollToTop";
+import TurnstileScript from "@/components/TurnstileScript";
 import { ScrollToTopSuspense } from "@/components/PageLoadingShell";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
 import type { ReactNode } from "react";
@@ -159,6 +159,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <OnboardingWizard />
               <PolicyNotice />
               <PwaRegister />
+              <TurnstileScript />
               <ReviewReminderPopup />
               </AppNotifications>
               </ShopReviewsProvider>

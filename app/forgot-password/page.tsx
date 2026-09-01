@@ -21,6 +21,7 @@ function ForgotPasswordInner() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [cooldownSec, setCooldownSec] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (prefill) setEmail(prefill);
@@ -38,22 +39,23 @@ function ForgotPasswordInner() {
     e.preventDefault();
     if (cooldownSec > 0) return;
 
-    let captchaToken: string | undefined;
+    let token = captchaToken;
     if (captchaEnabled) {
-      captchaToken =
+      token =
         captchaRef.current?.getToken() ??
         (await captchaRef.current?.waitForToken(8_000)) ??
-        undefined;
-      if (!captchaToken) {
-        addToast("Please wait for the security check to finish.", "error");
+        null;
+      if (!token) {
+        addToast("Tick the Cloudflare box above, then try again.", "error");
         return;
       }
     }
 
     setLoading(true);
-    const result = await requestPasswordReset(email, captchaToken);
+    const result = await requestPasswordReset(email, token ?? undefined);
     setLoading(false);
     captchaRef.current?.reset();
+    setCaptchaToken(null);
 
     if (!result.success) {
       if (result.retryAfterSec && result.retryAfterSec > 0) {
@@ -100,13 +102,17 @@ function ForgotPasswordInner() {
         {captchaEnabled && (
           <TurnstileField
             ref={captchaRef}
+            action="forgot-password"
+            onTokenChange={setCaptchaToken}
             disabled={loading || sent || cooldownSec > 0}
           />
         )}
 
         <button
           type="submit"
-          disabled={loading || sent || cooldownSec > 0}
+          disabled={
+            loading || sent || cooldownSec > 0 || (captchaEnabled && !captchaToken)
+          }
           className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
         >
           {loading

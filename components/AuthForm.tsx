@@ -260,7 +260,7 @@ export default function AuthForm({
           token = (await internalCaptchaRef.current?.waitForToken(8_000)) ?? null;
         }
         if (!token) {
-          setCaptchaError("Please wait for the security check to finish.");
+          setCaptchaError("Tick the Cloudflare box above, then try again.");
           return;
         }
         setCaptchaError(null);
@@ -798,6 +798,7 @@ export default function AuthForm({
         <div className="space-y-1">
           <TurnstileField
             ref={setCaptchaRefs}
+            action={mode === "sign-in" ? "sign-in" : "sign-up"}
             onTokenChange={(token) => {
               setCaptchaToken(token);
               if (token) {
@@ -816,8 +817,18 @@ export default function AuthForm({
 
       <motion.button
         type="submit"
-        disabled={isLoading || isLockedOut}
-        whileTap={isLoading || isLockedOut ? undefined : { scale: 0.98 }}
+        disabled={
+          isLoading ||
+          isLockedOut ||
+          (captchaEnabled && !forcePasswordReset && !captchaToken && !captchaLoadFailed)
+        }
+        whileTap={
+          isLoading ||
+          isLockedOut ||
+          (captchaEnabled && !forcePasswordReset && !captchaToken)
+            ? undefined
+            : { scale: 0.98 }
+        }
         className="tm-btn-primary relative w-full overflow-hidden rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed dark:focus:ring-offset-zinc-900"
       >
         {isLoading ? (
@@ -832,6 +843,8 @@ export default function AuthForm({
           "Reset password required"
         ) : lockoutSeconds > 0 && mode === "sign-in" ? (
           `Wait ${Math.floor(lockoutSeconds / 60)}:${String(lockoutSeconds % 60).padStart(2, "0")}`
+        ) : captchaEnabled && !forcePasswordReset && !captchaToken ? (
+          "Complete security check"
         ) : mode === "sign-in" ? (
           "Sign In"
         ) : (

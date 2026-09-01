@@ -1,6 +1,5 @@
 "use client";
 
-import Script from "next/script";
 import {
   forwardRef,
   useCallback,
@@ -10,26 +9,16 @@ import {
   useState,
 } from "react";
 import { getTurnstileSiteKey } from "@/lib/turnstilePublic";
+import { isTurnstileScriptReady, loadTurnstileScript, onTurnstileScriptReady } from "@/lib/turnstileLoader";
 
 /* -------------------------------------------------------------------------- */
-/*  Cloudflare Turnstile — interaction-only (usually invisible to real users)  */
+/*  Cloudflare Turnstile — visible Managed widget (checkbox / tick)             */
 /* -------------------------------------------------------------------------- */
-
-const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
 type TurnstileApi = {
   render: (
     el: HTMLElement,
-    options: {
-      sitekey: string;
-      theme?: "light" | "dark" | "auto";
-      appearance?: "always" | "execute" | "interaction-only";
-      size?: "normal" | "compact" | "flexible";
-      callback?: (token: string) => void;
-      "error-callback"?: () => void;
-      "expired-callback"?: () => void;
-      "timeout-callback"?: () => void;
-    },
+    options: Record<string, unknown>,
   ) => string;
   reset: (widgetId?: string) => void;
   remove: (widgetId?: string) => void;
@@ -38,7 +27,6 @@ type TurnstileApi = {
 declare global {
   interface Window {
     turnstile?: TurnstileApi;
-    onTurnstileLoad?: () => void;
   }
 }
 
@@ -46,11 +34,13 @@ export interface TurnstileFieldHandle {
   reset: () => void;
   getToken: () => string | null;
   waitForToken: (timeoutMs?: number) => Promise<string | null>;
-  /** True when the Cloudflare script failed to load (ad-blocker, CORP, wrong domain). */
   isLoadFailed: () => boolean;
+  isVerified: () => boolean;
 }
 
 interface TurnstileFieldProps {
+  /** Passed to Turnstile for analytics (e.g. sign-in, sign-up). */
+  action?: string;
   onTokenChange?: (token: string | null) => void;
   onLoadFailed?: () => void;
   className?: string;
@@ -58,7 +48,10 @@ interface TurnstileFieldProps {
 }
 
 const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
-  function TurnstileField({ onTokenChange, onLoadFailed, className, disabled = false }, ref) {
+  function TurnstileField(
+    { action = "auth", onTokenChange, onLoadFailed, className, disabled = false },
+    ref,
+  ) {
     const siteKey = getTurnstileSiteKey();
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
@@ -66,7 +59,7 @@ const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
     const onTokenChangeRef = useRef(onTokenChange);
     const onLoadFailedRef = useRef(onLoadFailed);
     const [scriptReady, setScriptReady] = useState(false);
-    const [widgetReady, setWidgetReady] = useState(false);
+    const [verified, setVerified] = useState(false);
     const [failed, setFailed] = useState(false);
     const [renderKey, setRenderKey] = useState(0);
 
@@ -80,18 +73,21 @@ const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
 
     const setToken = useCallback((token: string | null) => {
       tokenRef.current = token;
+      setVerified(Boolean(token));
       onTokenChangeRef.current?.(token);
     }, []);
 
     const markFailed = useCallback(() => {
       setFailed(true);
+      setVerified(false);
       setToken(null);
       onLoadFailedRef.current?.();
     }, [setToken]);
 
     const reset = useCallback(() => {
-      setToken(null);
       setFailed(false);
+      setVerified(false);
+      setToken(null);
       if (widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.reset(widgetIdRef.current);
@@ -109,7 +105,8 @@ const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
         reset,
         getToken: () => tokenRef.current,
         isLoadFailed: () => failed,
-        waitForToken: (timeoutMs = 12_000) =>
+        isVerified: () => verified,
+        waitForToken: (timeoutMs = 20_000) =>
           new Promise((resolve) => {
             if (tokenRef.current) {
               resolve(tokenRef.current);
@@ -133,11 +130,39 @@ const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
             }, 150);
           }),
       }),
-      [reset, failed],
+      [reset, failed, verified],
     );
 
-    const renderWidget = useCallback(() => {
-      if (!siteKey || disabled || !containerRef.current || !window.turnstile) return;
+    useEffect(() => {
+      if (!siteKey) return;
+      let cancelled = false;
+
+      if (isTurnstileScriptReady()) {
+        setScriptReady(true);
+      } else {
+        void loadTurnstileScript()
+          .then(() => {
+            if (!cancelled) setScriptReady(true);
+          })
+          .catch(() => {
+            if (!cancelled) markFailed();
+          });
+      }
+
+      const off = onTurnstileScriptReady(() => {
+        if (!cancelled) setScriptReady(true);
+      });
+
+      return () => {
+        cancelled = true;
+        off();
+      };
+    }, [siteKey, markFailed]);
+
+    useEffect(() => {
+      if (!scriptReady || !siteKey || disabled || !containerRef.current || !window.turnstile) {
+        return;
+      }
 
       if (widgetIdRef.current) {
         try {
@@ -155,33 +180,32 @@ const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
       try {
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
+          action,
           theme: prefersDark ? "dark" : "auto",
-          appearance: "interaction-only",
-          size: "flexible",
-          callback: (token) => {
+          // Always show Cloudflare's checkbox / tick — most reliable on mobile.
+          appearance: "always",
+          size: "normal",
+          retry: "auto",
+          "refresh-expired": "auto",
+          callback: (token: string) => {
             setFailed(false);
             setToken(token);
-            setWidgetReady(true);
           },
           "error-callback": () => {
             markFailed();
           },
           "expired-callback": () => {
+            setVerified(false);
             setToken(null);
           },
           "timeout-callback": () => {
             markFailed();
           },
         });
-        setWidgetReady(true);
       } catch {
         markFailed();
       }
-    }, [siteKey, disabled, setToken, markFailed]);
 
-    useEffect(() => {
-      if (!scriptReady || !siteKey || disabled) return;
-      renderWidget();
       return () => {
         if (widgetIdRef.current && window.turnstile) {
           try {
@@ -192,38 +216,30 @@ const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
           widgetIdRef.current = null;
         }
       };
-    }, [scriptReady, siteKey, disabled, renderKey, renderWidget]);
+    }, [scriptReady, siteKey, disabled, renderKey, action, setToken, markFailed]);
 
     if (!siteKey || disabled) return null;
 
     return (
       <div className={className}>
-        <Script
-          id="cf-turnstile-script"
-          src={SCRIPT_SRC}
-          strategy="afterInteractive"
-          onLoad={() => {
-            setScriptReady(true);
-            setFailed(false);
-          }}
-          onError={() => {
-            markFailed();
-          }}
+        <p className="mb-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+          {verified
+            ? "✓ Security verified — you can continue"
+            : "Complete the Cloudflare check below"}
+        </p>
+        <div
+          ref={containerRef}
+          className="flex min-h-[65px] w-full items-center justify-center overflow-visible rounded-xl border border-zinc-200/80 bg-zinc-50/80 p-2 dark:border-zinc-700/60 dark:bg-zinc-900/40"
         />
-        <div ref={containerRef} className="min-h-[1px] overflow-hidden" />
         {failed && (
-          <p className="mt-1.5 text-xs text-amber-800 dark:text-amber-200">
-            Security check blocked. Disable ad-blocker, open{" "}
-            <strong>trendsmart.pk</strong> (not preview URL), add{" "}
-            <strong>www.trendsmart.pk</strong> in Cloudflare Turnstile hostnames, then{" "}
+          <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
+            Security check failed. Turn off ad-blocker, use{" "}
+            <strong>trendsmart.pk</strong>, then{" "}
             <button
               type="button"
               onClick={() => {
                 setFailed(false);
-                setScriptReady(false);
-                setWidgetReady(false);
                 setRenderKey((k) => k + 1);
-                reset();
               }}
               className="font-semibold underline underline-offset-2"
             >
@@ -232,11 +248,8 @@ const TurnstileField = forwardRef<TurnstileFieldHandle, TurnstileFieldProps>(
             .
           </p>
         )}
-        {!failed && !widgetReady && scriptReady && (
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Checking security…</p>
-        )}
-        {!failed && !scriptReady && (
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Loading security…</p>
+        {!failed && !verified && !scriptReady && (
+          <p className="mt-1 text-[11px] text-zinc-400">Loading security check…</p>
         )}
       </div>
     );
