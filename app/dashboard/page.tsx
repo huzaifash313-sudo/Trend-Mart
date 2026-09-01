@@ -70,6 +70,65 @@ function compactCount(n: number): string {
   return `${v.toFixed(1).replace(/\.0$/, "")}M`;
 }
 
+/** Skeleton shown while auth + shop list resolve — avoids flashing the empty-store CTA. */
+function DashboardOverviewSkeleton() {
+  return (
+    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+          <div className="space-y-2">
+            <div className="h-3 w-28 animate-pulse rounded bg-emerald-200/70 dark:bg-emerald-900/40" />
+            <div className="h-8 w-48 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+          </div>
+          <div className="h-8 w-24 animate-pulse rounded-full bg-emerald-200/80 dark:bg-emerald-900/40" />
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
+        <div className="h-16 animate-pulse rounded-2xl bg-emerald-100/80 dark:bg-emerald-950/30" />
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <div className="h-9 w-9 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-10 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="flex gap-1.5">
+                {Array.from({ length: 4 }).map((__, j) => (
+                  <div
+                    key={j}
+                    className="h-12 w-12 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-20 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-800"
+            />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-16 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-800"
+            />
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 /* ─── Component ────────────────────────────────────────────────────────────── */
 
 export default function DashboardOverviewPage() {
@@ -86,7 +145,8 @@ export default function DashboardOverviewPage() {
   const [deals, setDeals] = useState<ShopDeal[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
-  const [dataLoading, setDataLoading] = useState(false);
+  const [shopsLoaded, setShopsLoaded] = useState(false);
+  const [shopDataReady, setShopDataReady] = useState(false);
 
   const activeShop = shops.find((s) => s.id === activeShopId) ?? null;
 
@@ -112,6 +172,7 @@ export default function DashboardOverviewPage() {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
+    setShopsLoaded(false);
     (async () => {
       const result = await fetchMyShops();
       if (cancelled) return;
@@ -128,6 +189,7 @@ export default function DashboardOverviewPage() {
       } else {
         addToast(result.error ?? "Could not load your shops.", "error");
       }
+      setShopsLoaded(true);
     })();
     return () => {
       cancelled = true;
@@ -139,7 +201,11 @@ export default function DashboardOverviewPage() {
   useEffect(() => {
     if (!activeShopId) return;
     let cancelled = false;
-    setDataLoading(true);
+    setShopDataReady(false);
+    setProducts([]);
+    setDeals([]);
+    setOrders([]);
+    setAnalytics(null);
     (async () => {
       const [productResult, dealResult, orderResult, analyticsResult] =
         await Promise.all([
@@ -153,7 +219,7 @@ export default function DashboardOverviewPage() {
       if (dealResult.success) setDeals(dealResult.data);
       if (orderResult.success) setOrders(orderResult.data);
       if (analyticsResult.success) setAnalytics(analyticsResult.data);
-      setDataLoading(false);
+      setShopDataReady(true);
     })();
     return () => {
       cancelled = true;
@@ -300,16 +366,18 @@ export default function DashboardOverviewPage() {
     return base;
   }, [activeShop, pendingOrders.length]);
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
-      </div>
-    );
+  const isBootstrapping =
+    authLoading ||
+    (Boolean(userId) && !shopsLoaded) ||
+    (shopsLoaded && shops.length > 0 && !activeShop);
+  const isShopDataPending = Boolean(activeShopId) && !shopDataReady;
+
+  if (isBootstrapping) {
+    return <DashboardOverviewSkeleton />;
   }
 
   /* No shop yet — guide the merchant to create one. */
-  if (!authLoading && shops.length === 0) {
+  if (shopsLoaded && shops.length === 0) {
     return (
       <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-4 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-100 text-3xl dark:bg-emerald-900/40">
@@ -425,6 +493,27 @@ export default function DashboardOverviewPage() {
                 </span>
               </div>
 
+              {isShopDataPending ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                      <div className="h-9 w-9 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+                      <div className="h-10 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                      <div className="flex gap-1.5">
+                        {Array.from({ length: 4 }).map((__, j) => (
+                          <div
+                            key={j}
+                            className="h-12 w-12 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {/* Products card → inventory manager */}
                 <Link
@@ -582,10 +671,21 @@ export default function DashboardOverviewPage() {
                   </div>
                 </a>
               </div>
+              )}
             </section>
 
             {/* ── KPI cards ────────────────────────────────────────────── */}
             <section aria-label="Store overview">
+              {isShopDataPending ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-20 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-800"
+                    />
+                  ))}
+                </div>
+              ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Link
                   href="/dashboard/orders"
@@ -617,6 +717,7 @@ export default function DashboardOverviewPage() {
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Product clicks</p>
                 </div>
               </div>
+              )}
             </section>
 
             {/* ── Quick actions ─────────────────────────────────────────── */}
@@ -666,7 +767,7 @@ export default function DashboardOverviewPage() {
                 </Link>
               </div>
 
-              {dataLoading ? (
+              {isShopDataPending ? (
                 <div className="space-y-2">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="tm-panel animate-pulse px-4 py-3">
