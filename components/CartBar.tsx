@@ -186,17 +186,13 @@ export default function CartBar() {
     };
   }, [checkoutShop]);
 
-  if (
+  const suppressCartBar =
     pathname === "/offline" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/t/") ||
     pathname === "/login" ||
     pathname === "/signup" ||
-    totalItems === 0 ||
-    keyboardOpen
-  ) {
-    return null;
-  }
+    totalItems === 0;
 
   const checkoutItems: WhatsAppCartItem[] = (checkoutShop?.items ?? []).map((i) => ({
     id: i.id,
@@ -219,8 +215,15 @@ export default function CartBar() {
     clearCart();
   };
 
+  // Keep checkout mounted while the on-screen keyboard is open — hiding the
+  // whole CartBar used to unmount WhatsAppCheckoutModal and reset step → review.
+  if (suppressCartBar && !checkoutShop) {
+    return null;
+  }
+
   return (
     <>
+      {!suppressCartBar && !keyboardOpen && (
       <div className="tm-cartbar-root fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 md:bottom-0 md:z-50">
         <div className="mx-auto max-w-lg px-3">
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg transition-all dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]">
@@ -385,6 +388,7 @@ export default function CartBar() {
           </div>
         </div>
       </div>
+      )}
 
       {checkoutShop && resolvedShop && (
         <WhatsAppCheckoutModal

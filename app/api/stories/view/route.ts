@@ -15,6 +15,12 @@ import {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+interface StoryRow {
+  id: string;
+  view_count: number | null;
+  expires_at: string | null;
+}
+
 function normalizeViewerKey(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const key = raw.trim();
@@ -29,11 +35,12 @@ async function recordViaAdmin(
   const admin = getSupabaseAdminClient();
   if (!admin) return null;
 
-  const { data: story, error: storyErr } = await admin
+  const { data: storyRaw, error: storyErr } = await admin
     .from("stories")
     .select("id, view_count, expires_at")
     .eq("id", storyId)
     .maybeSingle();
+  const story = storyRaw as unknown as StoryRow | null;
   if (storyErr || !story) return null;
   if (story.expires_at && new Date(story.expires_at).getTime() <= Date.now()) {
     return null;
@@ -42,7 +49,7 @@ async function recordViaAdmin(
   const { error: insertErr } = await admin.from("story_views").insert({
     story_id: storyId,
     viewer_key: viewerKey,
-  });
+  } as never);
   if (insertErr) {
     const code = (insertErr as { code?: string }).code;
     if (code === "23505") {
@@ -52,12 +59,13 @@ async function recordViaAdmin(
   }
 
   const next = Math.max(0, Number(story.view_count) || 0) + 1;
-  const { data: updated, error: updateErr } = await admin
+  const { data: updatedRaw, error: updateErr } = await admin
     .from("stories")
-    .update({ view_count: next })
+    .update({ view_count: next } as never)
     .eq("id", storyId)
     .select("view_count")
     .maybeSingle();
+  const updated = updatedRaw as unknown as { view_count: number | null } | null;
   if (updateErr) return next;
   return Math.max(0, Number(updated?.view_count) || next);
 }
@@ -68,7 +76,8 @@ export async function POST(request: NextRequest) {
     name: "story-view",
   });
   if (!limited.allowed) {
-    return buildRateLimitResponse(limited);
+    const res = buildRateLimitResponse(limited);
+    return NextResponse.json(res.body, { status: res.status, headers: res.headers });
   }
 
   let body: unknown;

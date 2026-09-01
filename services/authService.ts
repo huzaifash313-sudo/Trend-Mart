@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import type { AuthError, User } from "@supabase/supabase-js";
 import { clearQueryCache } from "@/lib/cacheBus";
 import { withTimeout } from "@/lib/withTimeout";
 
@@ -117,7 +117,12 @@ export async function signInWithEmail(
           refresh_token: jsonBody.session.refresh_token,
         }),
         SESSION_SYNC_TIMEOUT_MS,
-        () => ({ error: { message: "Session sync timed out. Please try again." } }),
+        () => ({
+          data: { user: null, session: null },
+          error: {
+            message: "Session sync timed out. Please try again.",
+          } as AuthError,
+        }),
       );
       if (sessionError) {
         return {
