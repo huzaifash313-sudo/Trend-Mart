@@ -2755,21 +2755,23 @@ html.dark .tm-story-skel-label {
 
 @media (min-width: 641px) {
   .tm-home-hero-compact .tm-brand-video {
-    --tm-brand-video-h: min(35.2dvh, 372px);
-    width: min(100%, calc(var(--tm-brand-video-h) * 16 / 9));
-    height: var(--tm-brand-video-h);
-    max-height: var(--tm-brand-video-h);
-    margin-inline: auto;
+    width: 100%;
+    aspect-ratio: unset;
+    height: clamp(200px, 26dvh, 280px);
+    max-height: clamp(200px, 26dvh, 280px);
+    margin-inline: 0;
   }
 }
 @media (min-width: 1024px) {
   .tm-home-hero-compact .tm-brand-video {
-    --tm-brand-video-h: min(40.8dvh, 428px);
+    height: clamp(220px, 28dvh, 320px);
+    max-height: clamp(220px, 28dvh, 320px);
   }
 }
 @media (min-width: 1280px) {
   .tm-home-hero-compact .tm-brand-video {
-    --tm-brand-video-h: min(44.5dvh, 465px);
+    height: clamp(240px, 30dvh, 360px);
+    max-height: clamp(240px, 30dvh, 360px);
   }
 }
 
@@ -2788,28 +2790,30 @@ html.dark .tm-story-skel-label {
     linear-gradient(to top, rgba(5, 10, 20, 0.35) 0%, transparent 40%);
 }
 
-/* Tablet / laptop: cap height so the reel fits one screen with breathing room.
+/* Tablet / laptop: full-width banner with a comfortable fixed height.
    Mobile keeps full-width 16:9 — unchanged below 641px. */
 @media (min-width: 641px) {
   .tm-brand-showcase {
-    align-items: center;
+    align-items: stretch;
   }
   .tm-brand-video {
-    --tm-brand-video-h: min(38dvh, 400px);
-    width: min(100%, calc(var(--tm-brand-video-h) * 16 / 9));
-    height: var(--tm-brand-video-h);
-    max-height: var(--tm-brand-video-h);
-    margin-inline: auto;
+    width: 100%;
+    aspect-ratio: unset;
+    height: clamp(200px, 26dvh, 280px);
+    max-height: clamp(200px, 26dvh, 280px);
+    margin-inline: 0;
   }
 }
 @media (min-width: 1024px) {
   .tm-brand-video {
-    --tm-brand-video-h: min(44dvh, 460px);
+    height: clamp(220px, 28dvh, 320px);
+    max-height: clamp(220px, 28dvh, 320px);
   }
 }
 @media (min-width: 1280px) {
   .tm-brand-video {
-    --tm-brand-video-h: min(48dvh, 500px);
+    height: clamp(240px, 30dvh, 360px);
+    max-height: clamp(240px, 30dvh, 360px);
   }
 }
 
