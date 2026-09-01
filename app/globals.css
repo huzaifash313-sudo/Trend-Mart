@@ -2757,21 +2757,21 @@ html.dark .tm-story-skel-label {
   .tm-home-hero-compact .tm-brand-video {
     width: 100%;
     aspect-ratio: unset;
-    height: clamp(200px, 26dvh, 280px);
-    max-height: clamp(200px, 26dvh, 280px);
+    height: clamp(280px, 38dvh, 400px);
+    max-height: clamp(280px, 38dvh, 400px);
     margin-inline: 0;
   }
 }
 @media (min-width: 1024px) {
   .tm-home-hero-compact .tm-brand-video {
-    height: clamp(220px, 28dvh, 320px);
-    max-height: clamp(220px, 28dvh, 320px);
+    height: clamp(320px, 42dvh, 460px);
+    max-height: clamp(320px, 42dvh, 460px);
   }
 }
 @media (min-width: 1280px) {
   .tm-home-hero-compact .tm-brand-video {
-    height: clamp(240px, 30dvh, 360px);
-    max-height: clamp(240px, 30dvh, 360px);
+    height: clamp(340px, 44dvh, 500px);
+    max-height: clamp(340px, 44dvh, 500px);
   }
 }
 
@@ -2799,21 +2799,21 @@ html.dark .tm-story-skel-label {
   .tm-brand-video {
     width: 100%;
     aspect-ratio: unset;
-    height: clamp(200px, 26dvh, 280px);
-    max-height: clamp(200px, 26dvh, 280px);
+    height: clamp(280px, 38dvh, 400px);
+    max-height: clamp(280px, 38dvh, 400px);
     margin-inline: 0;
   }
 }
 @media (min-width: 1024px) {
   .tm-brand-video {
-    height: clamp(220px, 28dvh, 320px);
-    max-height: clamp(220px, 28dvh, 320px);
+    height: clamp(320px, 42dvh, 460px);
+    max-height: clamp(320px, 42dvh, 460px);
   }
 }
 @media (min-width: 1280px) {
   .tm-brand-video {
-    height: clamp(240px, 30dvh, 360px);
-    max-height: clamp(240px, 30dvh, 360px);
+    height: clamp(340px, 44dvh, 500px);
+    max-height: clamp(340px, 44dvh, 500px);
   }
 }
 
