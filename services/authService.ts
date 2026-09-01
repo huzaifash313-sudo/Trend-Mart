@@ -609,16 +609,33 @@ export async function verifyPassword(
  * preferences (theme, font scale) and the one-time onboarding "seen" flags,
  * making the welcome flow and dark mode reset after every sign-out.
  */
-export async function signOut(): Promise<{ success: boolean; error?: string }> {
+export async function signOut(options?: {
+  /** Full page redirect after logout (avoids soft-nav auth glitches). */
+  redirectTo?: string;
+}): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) {
+      // Still wipe local caches / redirect so the UI never stays half-logged-in.
+      clearRoleCache();
+      clearQueryCache();
+      if (typeof window !== "undefined" && options?.redirectTo) {
+        window.location.assign(options.redirectTo);
+      }
       return { success: false, error: error.message };
     }
     clearRoleCache();
     clearQueryCache();
+    if (typeof window !== "undefined" && options?.redirectTo) {
+      window.location.assign(options.redirectTo);
+    }
     return { success: true };
   } catch (err) {
+    clearRoleCache();
+    clearQueryCache();
+    if (typeof window !== "undefined" && options?.redirectTo) {
+      window.location.assign(options.redirectTo);
+    }
     return {
       success: false,
       error:

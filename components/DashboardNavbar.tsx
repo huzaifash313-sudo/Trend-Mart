@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/services/authService";
 import type { AlertCounts } from "@/services/alertService";
@@ -94,7 +93,6 @@ function AlertPopover({ counts, onClose }: { counts: AlertCounts; onClose: () =>
 
 export default function DashboardNavbar() {
   const supabase = createClient();
-  const router = useRouter();
 
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopCategory, setShopCategory] = useState<string | null>(null);
@@ -130,9 +128,8 @@ export default function DashboardNavbar() {
   }, [shopId]);
 
   const handleSignOut = useCallback(async () => {
-    await signOut();
-    router.push("/");
-  }, [router]);
+    await signOut({ redirectTo: "/" });
+  }, []);
 
   const togglePopover = useCallback(() => setPopoverOpen((prev) => !prev), []);
   const closePopover = useCallback(() => setPopoverOpen(false), []);

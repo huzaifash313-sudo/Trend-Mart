@@ -2,7 +2,6 @@
 
 import { useEffect, useCallback, useState, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/services/authService";
 import { SHOP_CATEGORIES, CATEGORY_ICONS, isDineInCategory } from "@/types";
@@ -172,7 +171,6 @@ interface SidebarDrawerProps {
  *   - `transform: translateZ(0)` to force GPU compositing on mobile
  */
 export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
-  const router = useRouter();
   const [session, setSession] = useState(false);
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
@@ -362,12 +360,11 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
     return () => document.removeEventListener("keydown", handleKey, { capture: true });
   }, [isOpen, onClose]);
 
-  /* ── Sign Out handler (clear cache + close drawer then redirect) ────────── */
+  /* ── Sign Out handler (clear cache + hard redirect — no soft-nav glitch) ── */
   const handleSignOut = useCallback(async () => {
-    await signOut();
     onClose();
-    router.push("/");
-  }, [onClose, router]);
+    await signOut({ redirectTo: "/" });
+  }, [onClose]);
 
   /* ── Safe backdrop click — stopPropagation on drawer prevents double fire ── */
   const handleBackdropClick = useCallback(
@@ -733,13 +730,17 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                   </button>
                 </>
               ) : (
-                <Link
+                <a
                   href="/login"
-                  onClick={onClose}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onClose();
+                    window.location.assign("/login");
+                  }}
                   className="flex items-center gap-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/40"
                 >
                   <UserIcon /> Sign In / Register
-                </Link>
+                </a>
               )}
             </li>
 

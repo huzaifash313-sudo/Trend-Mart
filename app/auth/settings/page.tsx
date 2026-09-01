@@ -255,8 +255,7 @@ export default function AccountSettingsPage() {
   );
 
   const handleSignOut = useCallback(async () => {
-    await signOut();
-    window.location.href = "/";
+    await signOut({ redirectTo: "/" });
   }, []);
 
   if (loading) {

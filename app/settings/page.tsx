@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { detectUserRole, signOut } from "@/services/authService";
 
@@ -96,7 +95,6 @@ function PinIcon() {
 /* -------------------------------------------------------------------------- */
 
 export default function SettingsPage() {
-  const router = useRouter();
   const [session, setSession] = useState(false);
   const [isMerchant, setIsMerchant] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -132,12 +130,11 @@ export default function SettingsPage() {
 
   const handleSignOut = useCallback(async () => {
     try {
-      await signOut();
-      router.push("/");
+      await signOut({ redirectTo: "/" });
     } catch {
-      // Silently fail
+      window.location.assign("/");
     }
-  }, [router]);
+  }, []);
 
   if (loading) {
     return (

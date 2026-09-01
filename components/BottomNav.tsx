@@ -302,20 +302,30 @@ export default function BottomNav() {
   ) {
     return null;
   }
-  const accountHref = session === false
+
+  // While auth is still resolving (`session === null`), NEVER point at /account
+  // or /dashboard — those routes trip middleware → /login redirect loops and a
+  // spinner "glitch". Guests go straight to /login with a full page load.
+  const authPending = session === null;
+  const isGuest = session === false;
+  const accountHref = isGuest
     ? "/login"
-    : role === "admin"
-      ? "/admin/dashboard"
-      : isMerchant
-        ? "/dashboard"
-        : "/account";
-  const accountLabel = session === false
+    : authPending
+      ? "/"
+      : role === "admin"
+        ? "/admin/dashboard"
+        : isMerchant
+          ? "/dashboard"
+          : "/account";
+  const accountLabel = isGuest
     ? "Sign In"
-    : role === "admin"
-      ? "Admin"
-      : isMerchant
-        ? "Dashboard"
-        : "Account";
+    : authPending
+      ? "…"
+      : role === "admin"
+        ? "Admin"
+        : isMerchant
+          ? "Dashboard"
+          : "Account";
 
   const isHomeActive = pathname === "/";
   const isDealsActive = pathname === "/deals" || pathname.startsWith("/deals/");
@@ -359,7 +369,7 @@ export default function BottomNav() {
       router.push("/account/become-merchant");
       return;
     }
-    router.push("/login?redirect=/account/become-merchant");
+    window.location.assign("/login?redirect=/account/become-merchant");
   };
 
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
@@ -438,15 +448,39 @@ export default function BottomNav() {
           <span>Products</span>
         </Link>
 
-        <Link
-          href={accountHref}
-          className={sideTabClass(isAccountActive)}
-          aria-label={accountLabel}
-          aria-current={isAccountActive ? "page" : undefined}
-        >
-          <UserIcon active={isAccountActive} />
-          <span>{accountLabel}</span>
-        </Link>
+        {isGuest ? (
+          <a
+            href="/login"
+            className={sideTabClass(isAccountActive)}
+            aria-label="Sign In"
+            onClick={(e) => {
+              // Full navigation — soft client routing to /login after logout
+              // often flashes the global loading spinner / redirect bounce.
+              e.preventDefault();
+              window.location.assign("/login");
+            }}
+          >
+            <UserIcon active={isAccountActive} />
+            <span>{accountLabel}</span>
+          </a>
+        ) : (
+          <Link
+            href={accountHref}
+            className={sideTabClass(isAccountActive)}
+            aria-label={accountLabel}
+            aria-current={isAccountActive ? "page" : undefined}
+            onClick={
+              authPending
+                ? (e) => {
+                    e.preventDefault();
+                  }
+                : undefined
+            }
+          >
+            <UserIcon active={isAccountActive} />
+            <span>{accountLabel}</span>
+          </Link>
+        )}
       </div>
 
       {/* ── WhatsApp-style quick-action sheet (merchant + button) ──────── */}

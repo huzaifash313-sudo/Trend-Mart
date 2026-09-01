@@ -72,6 +72,8 @@ const KNOWN_SAFE_PUBLIC_VARS = [
   "NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
   "NEXT_PUBLIC_FACEBOOK_APP_ID",
+  // Cloudflare Turnstile site key is designed for browser embedding (secret stays server-only).
+  "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
 ] as const;
 
 /**
@@ -134,6 +136,7 @@ const FORBIDDEN_PUBLIC_PREFIXES = [
   "RESEND_API_KEY",
   "SMTP_PASSWORD",
   "AWS_SECRET_ACCESS_KEY",
+  "TURNSTILE_SECRET_KEY",
 ] as const;
 
 // ─── Audit Implementation ────────────────────────────────────────────────────

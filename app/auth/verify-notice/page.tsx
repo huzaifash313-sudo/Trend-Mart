@@ -128,9 +128,8 @@ function VerifyNoticeInner() {
   }, [redirectParam, router, addToast]);
 
   const handleSignOut = useCallback(async () => {
-    await signOut();
-    router.replace("/login");
-  }, [router]);
+    await signOut({ redirectTo: "/login" });
+  }, []);
 
   if (loading) {
     return (
