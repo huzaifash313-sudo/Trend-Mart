@@ -3,6 +3,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { getTurnstileSiteKey } from "@/lib/turnstilePublic";
+import { withTimeout } from "@/lib/withTimeout";
 
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
@@ -50,11 +51,22 @@ export async function verifyTurnstileToken(
   }
 
   try {
-    const res = await fetch(SITEVERIFY_URL, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body,
-    });
+    const res = await withTimeout(
+      fetch(SITEVERIFY_URL, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body,
+      }),
+      8_000,
+      () => null,
+    );
+
+    if (!res) {
+      return {
+        ok: false,
+        error: "Security check timed out. Please try again.",
+      };
+    }
 
     if (!res.ok) {
       return {

@@ -46,6 +46,9 @@ const supabase = createClient();
  * spinner.
  */
 const SIGN_IN_TIMEOUT_MS = 20_000;
+/** Cap session sync / role lookup so mobile browsers never hang on login. */
+const SESSION_SYNC_TIMEOUT_MS = 8_000;
+const ROLE_LOOKUP_TIMEOUT_MS = 5_000;
 
 /**
  * Sign in with email and password via the server auth API (progressive lockout).
@@ -108,10 +111,14 @@ export async function signInWithEmail(
 
     // Sync browser client with tokens from the server (cookies alone can lag).
     if (jsonBody.session?.access_token && jsonBody.session?.refresh_token) {
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: jsonBody.session.access_token,
-        refresh_token: jsonBody.session.refresh_token,
-      });
+      const { error: sessionError } = await withTimeout(
+        supabase.auth.setSession({
+          access_token: jsonBody.session.access_token,
+          refresh_token: jsonBody.session.refresh_token,
+        }),
+        SESSION_SYNC_TIMEOUT_MS,
+        () => ({ error: { message: "Session sync timed out. Please try again." } }),
+      );
       if (sessionError) {
         return {
           success: false,
@@ -120,21 +127,28 @@ export async function signInWithEmail(
       }
     }
 
-    const {
-      data: { user: currentUser },
-    } = await supabase.auth.getUser();
-    const user = currentUser ?? jsonBody.user ?? null;
-
-    if (jsonBody.needsVerification || (user && !user.email_confirmed_at)) {
+    // Server is authoritative for verification — don't block a verified sign-in
+    // because the local JWT still shows email_confirmed_at as null.
+    if (jsonBody.needsVerification) {
       return {
         success: false,
-        user,
+        user: jsonBody.user ?? null,
         error: "Please verify your email before continuing. Check your inbox.",
         needsVerification: true,
       };
     }
 
-    const role = jsonBody.role ?? (await detectUserRole(user));
+    const user =
+      jsonBody.user ??
+      (await withTimeout(getCurrentUser(), SESSION_SYNC_TIMEOUT_MS, () => null));
+
+    const role =
+      jsonBody.role ??
+      (await withTimeout(
+        detectUserRole(user),
+        ROLE_LOOKUP_TIMEOUT_MS,
+        () => "customer" as const,
+      ));
 
     if (user) {
       void resolveRoleFromDb(user).then((authoritative) => {

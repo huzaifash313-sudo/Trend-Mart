@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from "react";
 import Link from "next/link";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/services/authService";
 import { SHOP_CATEGORIES, CATEGORY_ICONS, isDineInCategory } from "@/types";
@@ -171,7 +172,7 @@ interface SidebarDrawerProps {
  *   - `transform: translateZ(0)` to force GPU compositing on mobile
  */
 export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
-  const [session, setSession] = useState(false);
+  const [session, setSession] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
   const [merchantShopCategory, setMerchantShopCategory] = useState<string | null>(null);
@@ -183,86 +184,93 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  /* ── Auth session check ───────────────────────────────────────────────── */
+  /* ── Auth session — always mounted so sidebar never shows stale guest UI ─ */
   useEffect(() => {
-    if (!isOpen) return;
-
     let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    function roleHint(user: User | null | undefined): "customer" | "merchant" | "admin" | null {
+      const appMeta = user?.app_metadata?.role as string | undefined;
+      if (appMeta === "admin" || appMeta === "merchant" || appMeta === "customer") {
+        return appMeta;
+      }
+      const userMeta = user?.user_metadata?.role as string | undefined;
+      if (userMeta === "merchant" || userMeta === "customer") return userMeta;
+      return null;
+    }
+
+    async function syncMerchantShop(userId: string) {
+      const supabase = createClient();
+      const { data: shop } = await supabase
+        .from("shops")
+        .select("id, category")
+        .eq("owner_id", userId)
+        .maybeSingle();
+      if (cancelled) return;
+      setMerchantShopId(shop?.id ?? null);
+      setMerchantShopCategory(typeof shop?.category === "string" ? shop.category : null);
+    }
+
+    async function syncAuth(signedIn: boolean, user?: User | null) {
+      if (!signedIn || !user?.id) {
+        if (!cancelled) {
+          setSession(false);
+          setUserRole(null);
+          setMerchantShopId(null);
+          setMerchantShopCategory(null);
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setSession(true);
+        const hint = roleHint(user);
+        if (hint) setUserRole(hint);
+      }
+
+      const { detectUserRole } = await import("@/services/authService");
+      const role = await detectUserRole(user);
+      if (cancelled) return;
+
+      setUserRole(role);
+      if (role === "merchant" || role === "admin") {
+        await syncMerchantShop(user.id);
+      } else if (!cancelled) {
+        setMerchantShopId(null);
+        setMerchantShopCategory(null);
+      }
+    }
 
     async function init() {
       try {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
-        if (!cancelled) setSession(!!data.session);
-        if (data.session?.user && !cancelled) {
-          const { detectUserRole } = await import("@/services/authService");
-          const role = await detectUserRole(data.session.user);
-          setUserRole(role);
-          if (role === "merchant" || role === "admin") {
-            const { data: auth } = await supabase.auth.getUser();
-            if (auth.user && !cancelled) {
-              const { data: shop } = await supabase
-                .from("shops")
-                .select("id, category")
-                .eq("owner_id", auth.user.id)
-                .maybeSingle();
-              if (!cancelled) {
-                setMerchantShopId(shop?.id ?? null);
-                setMerchantShopCategory(typeof shop?.category === "string" ? shop.category : null);
-              }
-            }
-          } else if (!cancelled) {
-            setMerchantShopId(null);
-          }
-        }
+        await syncAuth(!!data.session, data.session?.user ?? null);
 
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
           if (cancelled) return;
-          setSession(!!currentSession);
-          if (currentSession?.user) {
-            const { detectUserRole } = await import("@/services/authService");
-            const role = await detectUserRole(currentSession.user);
-            setUserRole(role);
-            if (role === "merchant" || role === "admin") {
-              const { data: auth } = await supabase.auth.getUser();
-              if (auth.user && !cancelled) {
-                const { data: shop } = await supabase
-                  .from("shops")
-                  .select("id, category")
-                  .eq("owner_id", auth.user.id)
-                  .maybeSingle();
-                if (!cancelled) {
-                  setMerchantShopId(shop?.id ?? null);
-                  setMerchantShopCategory(typeof shop?.category === "string" ? shop.category : null);
-                }
-              }
-            } else {
-              setMerchantShopId(null);
-              setMerchantShopCategory(null);
-            }
-          } else {
-            setUserRole(null);
-            setMerchantShopId(null);
-            setMerchantShopCategory(null);
-          }
+          await syncAuth(!!currentSession, currentSession?.user ?? null);
         });
-
-        if (cancelled) {
-          subscription.unsubscribe();
-        }
+        unsubscribe = () => subscription.unsubscribe();
       } catch {
-        if (!cancelled) setSession(false);
+        if (!cancelled) {
+          setSession(false);
+          setUserRole(null);
+          setMerchantShopId(null);
+          setMerchantShopCategory(null);
+        }
       }
     }
 
-    init();
+    void init();
 
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
-  }, [isOpen]);
+  }, []);
 
   /* ── Body Scroll Lock with iOS Safe Handling ─────────────────────────── */
   useEffect(() => {
@@ -572,7 +580,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
 
             {/* Dashboard / Sign In */}
             <li>
-            {session ? (
+            {session === true ? (
                 <>
                   {userRole === "merchant" || userRole === "admin" ? (
                     <>
@@ -729,7 +737,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                     <SignOutIcon /> Sign Out
                   </button>
                 </>
-              ) : (
+              ) : session === false ? (
                 <a
                   href="/login"
                   onClick={(e) => {
@@ -741,6 +749,10 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                 >
                   <UserIcon /> Sign In / Register
                 </a>
+              ) : (
+                <div className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 dark:text-zinc-500">
+                  <UserIcon /> Loading…
+                </div>
               )}
             </li>
 

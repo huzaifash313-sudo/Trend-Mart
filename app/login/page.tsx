@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AuthForm from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
 import { signInWithEmail, getCurrentUser, detectUserRole, getDashboardPath } from "@/services/authService";
+import { withTimeout } from "@/lib/withTimeout";
 import { useToast } from "@/components/Toast";
 import type { SignInSubmitValues } from "@/components/AuthForm";
 
@@ -100,6 +101,7 @@ function LoginPageInner() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [otpEmail, setOtpEmail] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [pendingPassword, setPendingPassword] = useState<string>("");
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const [forcePasswordReset, setForcePasswordReset] = useState(false);
 
@@ -132,15 +134,18 @@ function LoginPageInner() {
 
   const finishLogin = useCallback(
     async (role?: "customer" | "merchant" | "admin", user?: Awaited<ReturnType<typeof getCurrentUser>>) => {
-      // Use the user already returned by sign-in — no extra round-trip.
-      const currentUser = user ?? (await getCurrentUser());
-      const resolved = role ?? (await detectUserRole(currentUser));
+      // Server usually returns role on sign-in — redirect immediately (no extra RPC).
+      let resolved = role;
+      if (!resolved) {
+        const currentUser = user ?? (await withTimeout(getCurrentUser(), 4_000, () => null));
+        resolved = await withTimeout(detectUserRole(currentUser), 4_000, () => "customer" as const);
+      }
       const fallback = getDashboardPath(resolved);
       const target =
         redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
           ? redirectTo
           : fallback;
-      window.location.href = target;
+      window.location.assign(target);
     },
     [redirectTo],
   );
@@ -157,7 +162,7 @@ function LoginPageInner() {
       try {
         const result = await signInWithEmail(email, values.password, captchaToken);
 
-        if (result.success && result.role) {
+        if (result.success) {
           setLockoutSeconds(0);
           setForcePasswordReset(false);
           addToast("Welcome back!", "success");
@@ -168,7 +173,7 @@ function LoginPageInner() {
         if (!result.success && result.needsVerification) {
           setServerError(null);
           addToast("Please verify your email to continue.", "info");
-          // Prefer in-app OTP; also allow verify-notice with live session
+          setPendingPassword(values.password);
           setOtpEmail(email);
           setShowOtpModal(true);
           return;
@@ -192,11 +197,26 @@ function LoginPageInner() {
   );
 
   const handleOtpVerified = useCallback(async () => {
+    const email = otpEmail;
+    const password = pendingPassword;
     setShowOtpModal(false);
     setOtpEmail(null);
+    setPendingPassword("");
+
     addToast("Verification successful! Signing you in...", "success");
+
+    // OTP verification does not create a session — sign in with the password
+    // the user just entered so cookies + JWT are fresh and confirmed.
+    if (email && password) {
+      const signIn = await signInWithEmail(email, password);
+      if (signIn.success) {
+        await finishLogin(signIn.role, signIn.user);
+        return;
+      }
+    }
+
     await finishLogin();
-  }, [addToast, finishLogin]);
+  }, [addToast, finishLogin, otpEmail, pendingPassword]);
 
   return (
     <div className="relative flex min-h-screen overflow-y-auto">
@@ -381,6 +401,7 @@ function LoginPageInner() {
         onClose={() => {
           setShowOtpModal(false);
           setOtpEmail(null);
+          setPendingPassword("");
         }}
         onVerified={handleOtpVerified}
       />

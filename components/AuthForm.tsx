@@ -249,21 +249,25 @@ export default function AuthForm({
 
       let token: string | null = captchaToken;
       if (captchaEnabled) {
-        if (captchaLoadFailed || internalCaptchaRef.current?.isLoadFailed()) {
-          setCaptchaError(
-            "Security check blocked. Fix the issue below, then retry.",
-          );
-          return;
+        const loadFailed =
+          captchaLoadFailed || internalCaptchaRef.current?.isLoadFailed();
+        if (!loadFailed) {
+          token = internalCaptchaRef.current?.getToken() ?? captchaToken;
+          if (!token) {
+            token = (await internalCaptchaRef.current?.waitForToken(8_000)) ?? null;
+          }
         }
-        token = internalCaptchaRef.current?.getToken() ?? captchaToken;
-        if (!token) {
-          token = (await internalCaptchaRef.current?.waitForToken(8_000)) ?? null;
-        }
-        if (!token) {
+        if (!token && !loadFailed) {
           setCaptchaError("Tick the Cloudflare box above, then try again.");
           return;
         }
-        setCaptchaError(null);
+        if (!token && loadFailed) {
+          // Script blocked (ad-blocker / slow mobile) — still try; server
+          // enforces only when TURNSTILE_SECRET_KEY is configured.
+          setCaptchaError(null);
+        } else {
+          setCaptchaError(null);
+        }
       }
 
       try {
@@ -843,7 +847,7 @@ export default function AuthForm({
           "Reset password required"
         ) : lockoutSeconds > 0 && mode === "sign-in" ? (
           `Wait ${Math.floor(lockoutSeconds / 60)}:${String(lockoutSeconds % 60).padStart(2, "0")}`
-        ) : captchaEnabled && !forcePasswordReset && !captchaToken ? (
+        ) : captchaEnabled && !forcePasswordReset && !captchaToken && !captchaLoadFailed ? (
           "Complete security check"
         ) : mode === "sign-in" ? (
           "Sign In"

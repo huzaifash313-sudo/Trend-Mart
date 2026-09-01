@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import type { Session, User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
@@ -15,6 +16,8 @@ import {
   clientIpFromHeaders,
 } from "@/lib/loginLockout";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { findAuthUserByEmail } from "@/lib/authOtpServer";
 
 export const runtime = "nodejs";
 
@@ -47,6 +50,11 @@ function resolveRole(user: {
   return "customer";
 }
 
+function isEmailNotConfirmedError(message: string | undefined): boolean {
+  const lowered = (message ?? "").toLowerCase();
+  return lowered.includes("email not confirmed") || lowered.includes("email not verified");
+}
+
 function mapAuthError(message: string): string {
   const lowered = message.toLowerCase();
   if (
@@ -55,13 +63,49 @@ function mapAuthError(message: string): string {
   ) {
     return "Invalid email or password. Please try again.";
   }
-  if (lowered.includes("email not confirmed")) {
+  if (isEmailNotConfirmedError(message)) {
     return "Please verify your email before signing in. Check your inbox.";
   }
   if (lowered.includes("rate limit") || lowered.includes("too many requests")) {
     return "Too many attempts. Please wait a moment and try again.";
   }
   return "Sign in failed. Please try again.";
+}
+
+function buildSignInSuccessResponse(
+  data: { user: User; session: Session },
+  pendingCookies: {
+    name: string;
+    value: string;
+    options?: Parameters<Awaited<ReturnType<typeof cookies>>["set"]>[2];
+  }[],
+) {
+  const role = resolveRole(data.user);
+  const needsVerification = !data.user.email_confirmed_at;
+
+  const response = NextResponse.json({
+    success: true,
+    needsVerification,
+    role: needsVerification ? undefined : role,
+    user: {
+      id: data.user.id,
+      email: data.user.email,
+      email_confirmed_at: data.user.email_confirmed_at,
+      app_metadata: data.user.app_metadata,
+      user_metadata: data.user.user_metadata,
+    },
+    session: {
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_at: data.session.expires_at,
+    },
+  });
+
+  for (const { name, value, options } of pendingCookies) {
+    response.cookies.set(name, value, options);
+  }
+
+  return response;
 }
 
 export async function POST(request: NextRequest) {
@@ -155,6 +199,38 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.user || !data.session) {
+    // Unverified accounts: route to the in-app OTP flow instead of a dead-end error.
+    if (isEmailNotConfirmedError(error?.message)) {
+      const admin = getSupabaseAdminClient();
+      if (admin) {
+        const existing = await Promise.race([
+          findAuthUserByEmail(admin, email),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2_500)),
+        ]);
+        if (existing?.email_confirmed_at) {
+          // OTP already confirmed the email — re-assert and retry once (handles stale auth state).
+          await admin.auth.admin.updateUserById(existing.id, { email_confirm: true });
+          const retry = await supabase.auth.signInWithPassword({ email, password });
+          if (!retry.error && retry.data.user && retry.data.session) {
+            clearLoginLockout(email);
+            return buildSignInSuccessResponse(
+              { user: retry.data.user, session: retry.data.session },
+              pendingCookies,
+            );
+          }
+        }
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          needsVerification: true,
+          error: "Please verify your email before signing in. Check your inbox.",
+        },
+        { status: 403 },
+      );
+    }
+
     const nextLock = recordLoginFailure(email, ip);
     return NextResponse.json(
       {
@@ -175,30 +251,8 @@ export async function POST(request: NextRequest) {
 
   clearLoginLockout(email);
 
-  const role = resolveRole(data.user);
-  const needsVerification = !data.user.email_confirmed_at;
-
-  const response = NextResponse.json({
-    success: true,
-    needsVerification,
-    role: needsVerification ? undefined : role,
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-      email_confirmed_at: data.user.email_confirmed_at,
-      app_metadata: data.user.app_metadata,
-      user_metadata: data.user.user_metadata,
-    },
-    session: {
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_at: data.session.expires_at,
-    },
-  });
-
-  for (const { name, value, options } of pendingCookies) {
-    response.cookies.set(name, value, options);
-  }
-
-  return response;
+  return buildSignInSuccessResponse(
+    { user: data.user, session: data.session },
+    pendingCookies,
+  );
 }

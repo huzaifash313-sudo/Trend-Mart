@@ -105,11 +105,15 @@ function VerifyNoticeInner() {
     setChecking(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email_confirmed_at) {
+      const { data: refreshData } = await supabase.auth.refreshSession();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const confirmedUser = user ?? refreshData.session?.user ?? null;
+      if (confirmedUser?.email_confirmed_at) {
         setVerified(true);
         addToast("Email verified! Redirecting...", "success");
-        const role = await detectUserRole(session.user);
+        const role = await detectUserRole(confirmedUser);
         const fallback = getDashboardPath(role);
         const target =
           redirectParam && redirectParam !== "/"
