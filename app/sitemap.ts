@@ -9,6 +9,7 @@ import {
   fetchSitemapProducts,
   fetchSitemapShops,
 } from "@/lib/seo/sitemapData";
+
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  TrendsMart — Dynamic Sitemap (live Supabase data, ISR hourly)             */
 /* ────────────────────────────────────────────────────────────────────────── */

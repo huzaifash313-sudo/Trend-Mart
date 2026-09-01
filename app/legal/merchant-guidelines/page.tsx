@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
+import { generateLegalMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Merchant Security Guidelines — TrendsMart",
-  description: "Security and conduct guidelines every TrendsMart merchant must follow.",
-  robots: { index: true, follow: true },
-};
+export const metadata: Metadata = generateLegalMetadata(
+  "Merchant Security Guidelines",
+  "Security and conduct guidelines every Trends Mart merchant must follow on trendsmart.pk.",
+  "/legal/merchant-guidelines",
+);
 
 export default function MerchantGuidelinesPage() {
   return (

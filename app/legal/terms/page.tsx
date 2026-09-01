@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
+import { generateLegalMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Terms & Conditions — TrendsMart",
-  description: "The terms and conditions governing use of the TrendsMart marketplace.",
-  robots: { index: true, follow: true },
-};
+export const metadata: Metadata = generateLegalMetadata(
+  "Terms & Conditions",
+  "The terms and conditions governing use of the Trends Mart marketplace on trendsmart.pk.",
+  "/legal/terms",
+);
 
 export default function TermsPage() {
   return (

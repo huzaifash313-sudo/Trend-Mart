@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import LegalPageLayout, { LegalSection, LegalList } from "@/components/LegalPageLayout";
+import { generateLegalMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Refund & Order Policy — TrendsMart",
-  description: "TrendsMart's refund, cancellation, and order dispute policy.",
-  robots: { index: true, follow: true },
-};
+export const metadata: Metadata = generateLegalMetadata(
+  "Refund & Order Policy",
+  "Trends Mart refund, cancellation, and order dispute policy for customers and merchants.",
+  "/legal/refund-policy",
+);
 
 export default function RefundPolicyPage() {
   return (

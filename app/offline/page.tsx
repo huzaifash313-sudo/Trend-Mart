@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { generateNoIndexMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = {
-  title: "You're Offline — TrendsMart",
+  ...generateNoIndexMetadata("You're Offline", "Trends Mart offline page."),
   robots: { index: false, follow: false },
 };
 
