@@ -8,6 +8,19 @@ import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLi
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+type ConvRow = {
+  id: string;
+  shop_id: string;
+  customer_user_id: string | null;
+  customer_name: string | null;
+};
+
+type ShopRow = {
+  id: string;
+  owner_id: string | null;
+  name: string | null;
+};
+
 /**
  * POST /api/push/notify-chat
  * Sender notifies the other party of a new chat message (background OS push).
@@ -51,22 +64,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, sent: 0 });
     }
 
-    const { data: conv } = await admin
+    const { data: convRaw } = await admin
       .from("conversations")
       .select("id, shop_id, customer_user_id, customer_name")
       .eq("id", conversationId)
       .maybeSingle();
 
+    const conv = convRaw as ConvRow | null;
     if (!conv) {
       return NextResponse.json(buildSafeErrorResponse(404, "Chat not found."), { status: 404 });
     }
 
-    const { data: shop } = await admin
+    const { data: shopRaw } = await admin
       .from("shops")
       .select("id, owner_id, name")
       .eq("id", conv.shop_id)
       .maybeSingle();
 
+    const shop = shopRaw as ShopRow | null;
     if (!shop?.owner_id) {
       return NextResponse.json({ success: true, sent: 0 });
     }

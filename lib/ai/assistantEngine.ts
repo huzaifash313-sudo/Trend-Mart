@@ -1687,10 +1687,7 @@ async function runAssistantCore(
         {
           intent: "delivery_help",
           confidence: 0.92,
-          suggestions:
-            role === "merchant"
-              ? ["Meri shop ki live summary", "Growth tips"]
-              : ["Order kaise karun?", "Best deals?", "Support"],
+          suggestions: ["Order kaise karun?", "Best deals?", "Support"],
           reply:
             `🚚 *Delivery (confirmed TrendsMart rules)*\n\n` +
             `1️⃣ *Pickup* → fee Rs 0\n` +

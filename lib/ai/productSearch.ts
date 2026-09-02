@@ -127,7 +127,7 @@ export async function searchProductsForAssistant(
     }
     legacy = legacy.or(buildSupabaseOrFilter(expandedTerms));
     const fallback = await legacy.limit(150);
-    data = fallback.data;
+    data = fallback.data as unknown as typeof data;
     error = fallback.error;
   }
 

@@ -166,9 +166,9 @@ async function queryProductByReference(
     /avg_rating|review_count|column .* does not exist/i.test(primary.error.message || "")
   ) {
     const legacy = await run(PRODUCT_SEO_SELECT_LEGACY);
-    return legacy.data ? mapProductSeoRow(legacy.data as RawProductSeoRow) : null;
+    return legacy.data ? mapProductSeoRow(legacy.data as unknown as RawProductSeoRow) : null;
   }
-  return primary.data ? mapProductSeoRow(primary.data as RawProductSeoRow) : null;
+  return primary.data ? mapProductSeoRow(primary.data as unknown as RawProductSeoRow) : null;
 }
 
 /** Primary image URL for OG / JSON-LD. */
