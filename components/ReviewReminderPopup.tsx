@@ -63,11 +63,13 @@ function Stars({
 /* -------------------------------------------------------------------------- */
 
 interface ReviewTarget {
+  /** Shop id (legacy) or product shop id */
   id: string;
   name: string;
-  /** Delivered order that triggered this prompt — dismissal is per order, so a
-   *  new order from the same shop later will show the popup again. */
   orderId?: string;
+  productId?: string;
+  shopName?: string;
+  imageUrl?: string | null;
 }
 
 /** Dismissed orders (per ORDER, per ACCOUNT — never per device). Cross kiya →
@@ -159,6 +161,20 @@ export default function ReviewReminderPopup() {
     try {
       const result = await fetchMyReviews();
       if (result.success) {
+        const product = (result.data.reviewableProducts ?? []).find(
+          (p) => !p.orderId || !isOrderDismissed(session.user.id, p.orderId),
+        );
+        if (product) {
+          openFor({
+            id: product.shopId,
+            name: product.name,
+            shopName: product.shopName,
+            productId: product.productId,
+            imageUrl: product.imageUrl,
+            orderId: product.orderId,
+          });
+          return;
+        }
         const shop = result.data.reviewableShops.find(
           (s) => !s.orderId || !isOrderDismissed(session.user.id, s.orderId),
         );
@@ -200,11 +216,10 @@ export default function ReviewReminderPopup() {
         customerUserId?: string | null;
       }>).detail;
       if (!detail || detail.newStatus !== "Delivered" || !detail.shopId) return;
-      // Guest orders (no linked account) are not reviewable by anyone — and an
-      // event without a matching account id must never prompt this device.
       if (!detail.customerUserId || detail.customerUserId !== currentUserIdRef.current) return;
       if (detail.orderId && isOrderDismissed(currentUserIdRef.current, detail.orderId)) return;
-      openFor({ id: detail.shopId, name: detail.shopName || "the shop", orderId: detail.orderId });
+      // Prefer product rating targets from API (not shop-only shortcut).
+      void checkForReviewable();
     };
     window.addEventListener("trendsmart:order-update", onOrderUpdate);
 
@@ -212,7 +227,7 @@ export default function ReviewReminderPopup() {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("trendsmart:order-update", onOrderUpdate);
     };
-  }, [maybeAutoOpen, openFor]);
+  }, [maybeAutoOpen, openFor, checkForReviewable]);
 
   // Realtime (app open on ANY page): a merchant marks one of the customer's
   // orders Delivered → re-check reviewable shops and surface the popup right
@@ -269,13 +284,24 @@ export default function ReviewReminderPopup() {
       return;
     }
     setSubmitting(true);
-    const result = await submitReview(target.id, "", rating, comment);
+    const result = await submitReview(
+      target.id,
+      "",
+      rating,
+      comment,
+      target.productId ?? null,
+    );
     setSubmitting(false);
     if (!result.success) {
       addToast(result.error, "error");
       return;
     }
-    addToast(`Review submitted for ${target.name}.`, "success");
+    addToast(
+      target.productId
+        ? `Thanks! ${target.name} rated — shop rating also updated.`
+        : `Review submitted for ${target.name}.`,
+      "success",
+    );
     setTarget(null);
   };
 
@@ -303,10 +329,12 @@ export default function ReviewReminderPopup() {
         <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
           <div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              How do you rate the shop?
+              {target.productId ? "Rate this product" : "How do you rate the shop?"}
             </h3>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Your order from {target.name} was delivered.
+              {target.productId
+                ? `${target.name}${target.shopName ? ` · ${target.shopName}` : ""} — your stars also update the shop.`
+                : `Your order from ${target.name} was delivered.`}
             </p>
           </div>
           <button
@@ -324,6 +352,16 @@ export default function ReviewReminderPopup() {
 
         {/* Body */}
         <div className="space-y-4 px-6 py-5">
+          {target.imageUrl ? (
+            <div className="mx-auto h-20 w-20 overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={target.imageUrl}
+                alt=""
+                className="h-full w-full object-contain"
+              />
+            </div>
+          ) : null}
           <div className="flex flex-col items-center gap-1.5">
             <Stars rating={rating} onChange={setRating} />
             {rating > 0 ? (

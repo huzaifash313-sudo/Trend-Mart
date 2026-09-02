@@ -15,7 +15,7 @@ declare global {
 
 /**
  * Install prompt capture + safe SW update.
- * Replaces any old fetch-intercepting worker with a no-intercept SW.
+ * Keeps current image/shell caches; only deletes obsolete Cache Storage keys.
  */
 export default function PwaRegister() {
   useEffect(() => {
@@ -27,8 +27,6 @@ export default function PwaRegister() {
 
     const onBeforeInstall = (event: Event) => {
       // Do not preventDefault — Chrome's native install banner is the prompt.
-      // Intercepting without calling .prompt() logs:
-      // "Banner not shown: beforeinstallpromptevent.preventDefault() called"
       window.__tmDeferredInstall = event as BeforeInstallPromptEvent;
       window.dispatchEvent(new Event("tm-pwa-install-available"));
     };
@@ -40,12 +38,17 @@ export default function PwaRegister() {
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
 
+    const KEEP_PREFIXES = ["tm-images-", "tm-shell-"];
+
     const setup = async () => {
       try {
-        // Clear stale Cache Storage from older SW versions
         if ("caches" in window) {
           const keys = await caches.keys();
-          await Promise.all(keys.map((k) => caches.delete(k)));
+          await Promise.all(
+            keys
+              .filter((k) => !KEEP_PREFIXES.some((p) => k.startsWith(p)))
+              .map((k) => caches.delete(k)),
+          );
         }
         await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
         const reg = await navigator.serviceWorker.getRegistration();

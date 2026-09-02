@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState, useCallback, useMemo, memo, type ReactNode } from "react";
+import { useState, useCallback, useMemo, memo, useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
@@ -14,6 +14,8 @@ import { hasPriceTiers, tierPreviewLabels } from "@/lib/priceTiers";
 import CompactRating from "@/components/CompactRating";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import KebabMenu, { type KebabMenuItem } from "@/components/KebabMenu";
+import VirtualizedGrid from "@/components/VirtualizedGrid";
+import { VIRTUALIZE_AFTER } from "@/lib/mobilePerf";
 
 export { buildDeliveryTickerLabel } from "@/lib/shopOfferLabels";
 
@@ -92,8 +94,22 @@ function buildProductOfferTags(
   });
 }
 
-/** Dark continuous ticker over product / deal image. */
+/** Dark continuous ticker over product / deal image. Pauses when off-screen. */
 export function OfferTickerMarquee({ tags }: { tags: string[] }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [active, setActive] = useState(true);
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([entry]) => setActive(Boolean(entry?.isIntersecting)),
+      { rootMargin: "40px", threshold: 0.01 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   if (tags.length === 0) return null;
 
   const unique = tags.filter((t, i) => tags.indexOf(t) === i);
@@ -103,13 +119,17 @@ export function OfferTickerMarquee({ tags }: { tags: string[] }) {
 
   return (
     <div
+      ref={rootRef}
       className="tm-product-offer-strip"
       aria-label={unique.join(", ")}
       onClick={(e) => e.stopPropagation()}
     >
       <div
         className="tm-product-offer-track"
-        style={{ animationDuration: `${durationSec}s` }}
+        style={{
+          animationDuration: `${durationSec}s`,
+          animationPlayState: active ? "running" : "paused",
+        }}
       >
         {track.map((tag, i) => (
           <span key={`${tag}-${i}`} className="tm-product-offer-chip">
@@ -285,14 +305,14 @@ const ProductCard = memo(function ProductCard({
       <div className="tm-product-media relative shrink-0 overflow-hidden">
         {product.image_url && !imgError ? (
           <Image
-            src={getSafeImageUrl(product.image_url, "product")}
+            src={getSafeImageUrl(product.image_url, "product", "card")}
             alt={imageAlt}
             fill
             className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             priority={priority}
             loading={priority ? "eager" : "lazy"}
-            quality={75}
+            quality={60}
             onError={() => setImgError(true)}
           />
         ) : (
@@ -386,8 +406,16 @@ const ProductCard = memo(function ProductCard({
               </span>
             </button>
             <CompactRating
-              average={product.shop_avg_rating}
-              count={product.shop_review_count}
+              average={
+                Number(product.avg_rating) > 0
+                  ? product.avg_rating
+                  : product.shop_avg_rating
+              }
+              count={
+                Number(product.review_count) > 0
+                  ? product.review_count
+                  : product.shop_review_count
+              }
               size="xs"
               className="ml-auto shrink-0"
             />
@@ -561,10 +589,23 @@ export default function ProductGrid({
   }
 
   return (
-    <div className={`grid ${gridCols} ${gap} items-stretch`}>
-      {products.map((product, index) => (
+    <VirtualizedGrid
+      items={products}
+      getKey={(p) => p.id}
+      force={products.length > VIRTUALIZE_AFTER}
+      estimateRowHeight={compact ? 260 : 320}
+      gapClassName={gap}
+      columnBreakpoints={
+        columns === "2"
+          ? { base: 2 }
+          : columns === "3"
+            ? { base: 2, md: 3 }
+            : columns === "4"
+              ? { base: 2, md: 3, lg: 4 }
+              : { base: 2, md: 3, lg: 4, xl: 5 }
+      }
+      renderItem={(product, index) => (
         <ProductCard
-          key={product.id}
           product={product}
           compact={compact}
           isFavorite={favorites.has(product.id)}
@@ -582,7 +623,7 @@ export default function ProductGrid({
           onDelete={onDelete}
           onShopClick={onShopClick}
         />
-      ))}
-    </div>
+      )}
+    />
   );
 }

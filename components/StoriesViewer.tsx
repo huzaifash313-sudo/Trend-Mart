@@ -116,6 +116,35 @@ const STORY_DURATION_MS = 5500;
 const TAP_MAX_MS = 300;
 const SWIPE_THRESHOLD = 50;
 
+/**
+ * WhatsApp/Instagram: progress + counter are per shop ring, not the whole tray.
+ * Flat list stays ordered by tray groups (contiguous same shop_id).
+ */
+function getShopSegment(stories: Story[], index: number) {
+  const current = stories[index];
+  if (!current?.shop_id) {
+    return {
+      groupStart: index,
+      localIndex: 0,
+      groupLength: 1,
+      groupStories: current ? [current] : [],
+    };
+  }
+  let start = index;
+  while (start > 0 && stories[start - 1]?.shop_id === current.shop_id) start -= 1;
+  let end = index;
+  while (end < stories.length - 1 && stories[end + 1]?.shop_id === current.shop_id) {
+    end += 1;
+  }
+  const groupStories = stories.slice(start, end + 1);
+  return {
+    groupStart: start,
+    localIndex: index - start,
+    groupLength: groupStories.length,
+    groupStories,
+  };
+}
+
 export default function StoriesViewer({
   initialIndex = 0,
   stories: storiesProp,
@@ -430,6 +459,7 @@ export default function StoriesViewer({
     ? viewCounts[current.id] ?? Math.max(0, Number(current.view_count) || 0)
     : 0;
   const initial = shopLabel.charAt(0).toUpperCase();
+  const segment = getShopSegment(stories, currentIndex);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black">
@@ -460,96 +490,121 @@ export default function StoriesViewer({
             </div>
           )}
 
-          {/* Progress segments — viewed filled, current animating, rest empty */}
+          {/* Progress segments — per shop only (WhatsApp-style), not whole tray */}
           <div className="absolute left-3 right-3 top-3 z-20 flex gap-1">
-            {stories.map((s, i) => (
+            {segment.groupStories.map((s, i) => (
               <div key={s.id} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/25">
                 <div
                   className="h-full rounded-full bg-white transition-[width] duration-75 ease-linear"
                   style={{
                     width:
-                      i < currentIndex ? "100%" : i === currentIndex ? `${progress * 100}%` : "0%",
+                      i < segment.localIndex
+                        ? "100%"
+                        : i === segment.localIndex
+                          ? `${progress * 100}%`
+                          : "0%",
                   }}
                 />
               </div>
             ))}
           </div>
 
-          {/* Header — shop name + time (caption lives in footer, WhatsApp-style) */}
-          <div className="absolute left-3 right-3 top-6 z-20 flex items-center gap-2.5 pt-1">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-emerald-600 text-sm font-bold text-white">
-              {current.shop_logo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={getSafeImageUrl(current.shop_logo_url, "shop")}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initial
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <p className="truncate text-sm font-semibold text-white drop-shadow">
-                  {shopLabel}
-                </p>
-                {current.created_at ? (
-                  <span className="shrink-0 rounded-full bg-black/30 px-1.5 py-0.5 text-[9px] font-semibold text-white/80 backdrop-blur-sm">
-                    {timeAgo(current.created_at)}
-                  </span>
+          {/* Header — shop + View shop directly under (WhatsApp-adjacent) */}
+          <div className="absolute left-3 right-3 top-6 z-20 flex flex-col gap-2 pt-1">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-emerald-600 text-sm font-bold text-white">
+                {current.shop_logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={getSafeImageUrl(current.shop_logo_url, "shop")}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initial
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-sm font-semibold text-white drop-shadow">
+                    {shopLabel}
+                  </p>
+                  {current.created_at ? (
+                    <span className="shrink-0 rounded-full bg-black/30 px-1.5 py-0.5 text-[9px] font-semibold text-white/80 backdrop-blur-sm">
+                      {timeAgo(current.created_at)}
+                    </span>
+                  ) : null}
+                </div>
+                {!isOwnStory ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose();
+                      router.push(`/shop/${current.shop_id}`);
+                    }}
+                    className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/25"
+                  >
+                    <ShoppingBagIcon />
+                    View shop
+                  </button>
                 ) : null}
               </div>
-            </div>
-            {myShopId && current.shop_id === myShopId ? (
+              {myShopId && current.shop_id === myShopId ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleDeleteOwnStory();
+                  }}
+                  disabled={deletingStoryId === current.id}
+                  className="rounded-full bg-black/35 p-2 text-white backdrop-blur-sm transition hover:bg-rose-600/80 disabled:opacity-50"
+                  aria-label="Delete my story"
+                  title="Delete story"
+                >
+                  {deletingStoryId === current.id ? (
+                    <span className="block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <TrashIcon />
+                  )}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  void handleDeleteOwnStory();
+                  onClose();
                 }}
-                disabled={deletingStoryId === current.id}
-                className="rounded-full bg-black/35 p-2 text-white backdrop-blur-sm transition hover:bg-rose-600/80 disabled:opacity-50"
-                aria-label="Delete my story"
-                title="Delete story"
+                className="rounded-full bg-black/35 p-2 text-white backdrop-blur-sm hover:bg-black/50"
+                aria-label="Close stories"
               >
-                {deletingStoryId === current.id ? (
-                  <span className="block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <TrashIcon />
-                )}
+                <CloseIcon />
               </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="rounded-full bg-black/35 p-2 text-white backdrop-blur-sm hover:bg-black/50"
-              aria-label="Close stories"
-            >
-              <CloseIcon />
-            </button>
+            </div>
           </div>
 
           {/* Media */}
-          <div className="flex flex-1 items-center justify-center px-2 pb-36 pt-20">
+          <div className="flex flex-1 items-center justify-center px-2 pb-28 pt-24">
             <div className="flex h-full max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40">
               <StoryImage story={current} />
             </div>
           </div>
 
-          {/* Footer — WhatsApp-style: Visit Store above, caption at bottom */}
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 pb-5 pt-24">
-            <div className="pointer-events-auto flex flex-col gap-2.5">
+          {/* Bottom — WhatsApp-style centered caption + counter */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-5 pb-6 pt-20">
+            <div className="flex flex-col items-center gap-3">
+              {current.caption?.trim() ? (
+                <p className="max-w-[92%] text-center text-[15px] font-medium leading-snug text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)] line-clamp-4">
+                  {current.caption.trim()}
+                </p>
+              ) : null}
               <div className="flex items-center gap-2">
-                <div className="rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/85 backdrop-blur-sm">
-                  {currentIndex + 1} / {stories.length}
+                <div className="rounded-full bg-black/40 px-2.5 py-0.5 text-[10px] font-semibold text-white/85 backdrop-blur-sm">
+                  {segment.localIndex + 1} / {segment.groupLength}
                 </div>
                 {isOwnStory ? (
                   <div
-                    className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur-sm"
+                    className="inline-flex items-center gap-1 rounded-full bg-black/40 px-2.5 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur-sm"
                     title={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
                     aria-label={`${viewCount} ${viewCount === 1 ? "view" : "views"}`}
                   >
@@ -561,27 +616,6 @@ export default function StoriesViewer({
                   </div>
                 ) : null}
               </div>
-
-              {!isOwnStory ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                    router.push(`/shop/${current.shop_id}`);
-                  }}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/40 transition hover:bg-emerald-700 active:scale-95"
-                >
-                  <ShoppingBagIcon />
-                  Visit {shopLabel.length > 18 ? "Store" : shopLabel}
-                </button>
-              ) : null}
-
-              {current.caption?.trim() ? (
-                <p className="text-sm leading-snug text-white drop-shadow-md line-clamp-4">
-                  {current.caption.trim()}
-                </p>
-              ) : null}
             </div>
           </div>
         </div>

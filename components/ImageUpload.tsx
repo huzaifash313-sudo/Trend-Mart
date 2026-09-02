@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   uploadImage,
   validateImage,
@@ -9,10 +9,7 @@ import {
 } from "@/services/storageService";
 
 /* -------------------------------------------------------------------------- */
-/*  ImageUpload — minimal single-image picker (logo, banner, story).          */
-/*                                                                             */
-/*  One clean clickable box: tap to pick (or re-pick) a photo, tap the small   */
-/*  ✕ to remove. No verbose helper text, no "Change"/"Remove" buttons.        */
+/*  ImageUpload — single-image picker with full (uncropped) preview.          */
 /* -------------------------------------------------------------------------- */
 
 export interface ImageUploadProps {
@@ -25,7 +22,7 @@ export interface ImageUploadProps {
   showPreview?: boolean;
   fallbackType?: "shop" | "product" | "generic";
   variant?: "default" | "compact";
-  /** "video" renders the preview box in a wide 16:9 banner shape (ads). */
+  /** "video" = wide 16:9 frame (ads/banners). Image still fits fully inside. */
   aspect?: "square" | "video";
 }
 
@@ -47,12 +44,73 @@ function XIcon() {
   );
 }
 
+function ExpandIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
 function Spinner() {
   return (
     <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
       <path d="M4 12a8 8 0 0 1 8-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
+  );
+}
+
+/** Full-bleed lightbox — entire image visible (object-contain). */
+function PreviewLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+        aria-label="Close preview"
+      >
+        <XIcon />
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-[90vh] max-w-[min(96vw,56rem)] object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
   );
 }
 
@@ -74,10 +132,18 @@ export default function ImageUpload({
   const [validationError, setValidationError] =
     useState<ImageValidationResult | null>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState(false);
 
   const hasImage = !!(currentUrl && currentUrl.trim());
   const showImage = !!(localPreview || hasImage);
   const previewUrl = localPreview ?? (hasImage ? currentUrl : FALLBACK_URLS[fallbackType]);
+
+  // Revoke object URLs on unmount / replace
+  useEffect(() => {
+    return () => {
+      if (localPreview?.startsWith("blob:")) URL.revokeObjectURL(localPreview);
+    };
+  }, [localPreview]);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,17 +160,24 @@ export default function ImageUpload({
         return;
       }
 
-      // Show the selected file immediately — upload + WebP compression can
-      // take a moment, so a local object-URL preview keeps the UI honest.
       const objectUrl = URL.createObjectURL(file);
-      setLocalPreview(objectUrl);
+      setLocalPreview((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return objectUrl;
+      });
 
       setUploading(true);
       const result = await uploadImage(file, folder, fileId);
-      URL.revokeObjectURL(objectUrl);
-      setLocalPreview(null);
-      if (result.success) onUploaded(result.data);
-      else setUploadError(result.error);
+      if (result.success) {
+        onUploaded(result.data);
+        setLocalPreview((prev) => {
+          if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+          return null;
+        });
+      } else {
+        setUploadError(result.error);
+        // Keep local preview so merchant still sees what they picked
+      }
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
@@ -117,7 +190,10 @@ export default function ImageUpload({
       onUploaded("");
       setUploadError(null);
       setValidationError(null);
-      setLocalPreview(null);
+      setLocalPreview((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return null;
+      });
     },
     [onUploaded],
   );
@@ -137,6 +213,9 @@ export default function ImageUpload({
     />
   );
 
+  const imgClass =
+    "h-full w-full object-contain object-center";
+
   /* ── Compact: small inline control (bulk rows) ─────────────────────────── */
   if (variant === "compact") {
     return (
@@ -146,13 +225,13 @@ export default function ImageUpload({
           type="button"
           onClick={openPicker}
           disabled={disabled || uploading}
-          className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-zinc-50 text-zinc-400 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800"
+          className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-zinc-100 text-zinc-400 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900"
         >
           {uploading && !showImage ? (
             <Spinner />
           ) : showImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+            <img src={previewUrl} alt="" className={imgClass} />
           ) : (
             <PlusIcon />
           )}
@@ -177,9 +256,11 @@ export default function ImageUpload({
     );
   }
 
-  /* ── Default: one clean clickable box ──────────────────────────────────── */
+  /* ── Default: roomy frame — full image via object-contain ──────────────── */
   const boxShape =
-    aspect === "video" ? "aspect-video w-full" : "h-40 w-full";
+    aspect === "video"
+      ? "aspect-video w-full min-h-[11rem]"
+      : "h-52 w-full sm:h-56";
 
   return (
     <div className="space-y-1.5">
@@ -189,15 +270,19 @@ export default function ImageUpload({
 
       {fileInput}
 
-      <button
-        type="button"
-        onClick={openPicker}
-        disabled={disabled || uploading}
-        className={`group relative block ${boxShape} overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-50 transition-colors hover:border-emerald-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800`}
-        aria-label={hasImage ? `Change ${label.toLowerCase()}` : `Upload ${label.toLowerCase()}`}
+      <div
+        className={`group relative ${boxShape} overflow-hidden rounded-xl border border-dashed border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900`}
       >
+        <button
+          type="button"
+          onClick={openPicker}
+          disabled={disabled || uploading}
+          className="absolute inset-0 z-0 disabled:opacity-50"
+          aria-label={hasImage ? `Change ${label.toLowerCase()}` : `Upload ${label.toLowerCase()}`}
+        />
+
         {uploading && !showImage ? (
-          <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-zinc-400">
+          <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-zinc-400">
             <Spinner />
             <span className="text-xs font-medium">Uploading…</span>
           </span>
@@ -206,47 +291,69 @@ export default function ImageUpload({
           <img
             src={previewUrl}
             alt={`${label} preview`}
-            className="h-full w-full object-cover"
+            className={`pointer-events-none absolute inset-0 p-2 ${imgClass}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = FALLBACK_URLS.generic;
             }}
           />
         ) : (
-          <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-zinc-400">
+          <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-zinc-400">
             <PlusIcon />
             <span className="text-xs font-medium">Upload</span>
           </span>
         )}
 
+        {uploading && showImage ? (
+          <span className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center bg-black/35">
+            <span className="inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-1.5 text-xs font-semibold text-white">
+              <Spinner /> Uploading…
+            </span>
+          </span>
+        ) : null}
+
         {showImage && !uploading ? (
           <>
-            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/70 to-transparent px-2 pb-1.5 pt-5 text-center text-[10px] font-semibold text-white/95">
-              Tap to change
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-zinc-950/65 to-transparent px-2 pb-1.5 pt-6 text-center text-[10px] font-semibold text-white/95">
+              Tap to change · full image shown
             </span>
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={remove}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  remove(e as unknown as React.MouseEvent);
-                }
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightbox(true);
               }}
-              className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900/60 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-zinc-900/90"
+              className="absolute left-1.5 top-1.5 z-[2] flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/55 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-zinc-900/90"
+              aria-label="View full image"
+              title="View full image"
+            >
+              <ExpandIcon />
+            </button>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={disabled}
+              className="absolute right-1.5 top-1.5 z-[2] flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900/55 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-zinc-900/90 disabled:opacity-50"
               aria-label="Remove image"
             >
               <XIcon />
-            </span>
+            </button>
           </>
         ) : null}
-      </button>
+      </div>
 
       {(uploadError || validationError) && (
         <p className="text-[11px] text-red-500">
           {uploadError || validationError?.message}
         </p>
       )}
+
+      {lightbox && showImage ? (
+        <PreviewLightbox
+          src={previewUrl}
+          alt={`${label} full preview`}
+          onClose={() => setLightbox(false)}
+        />
+      ) : null}
     </div>
   );
 }

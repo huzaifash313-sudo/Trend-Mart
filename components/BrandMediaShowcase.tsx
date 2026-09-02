@@ -3,30 +3,55 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Brand promo video (homepage)                                  */
 /*                                                                            */
-/*  Promo reel: muted autoplay loop while in view. Image carousel removed.    */
+/*  Promo reel: muted autoplay loop while in view. Skips heavy media on        */
+/*  Save-Data / 2G so mid-range Android & iPhone stay responsive.              */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
 import { BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
 
+function shouldSkipHeavyMedia(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const nav = navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    };
+    const c = nav.connection;
+    if (
+      c?.saveData ||
+      c?.effectiveType === "slow-2g" ||
+      c?.effectiveType === "2g"
+    ) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 function BrandVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+  const [skip, setSkip] = useState(false);
 
   useEffect(() => {
+    if (shouldSkipHeavyMedia()) {
+      setSkip(true);
+      return;
+    }
+
     const el = wrapRef.current;
     const video = videoRef.current;
     if (!el || !video) return;
-
-    const reduce =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (reduce) {
-      video.pause();
-      return;
-    }
 
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -45,7 +70,7 @@ function BrandVideo() {
     return () => io.disconnect();
   }, []);
 
-  if (failed) return null;
+  if (failed || skip) return null;
 
   return (
     <div ref={wrapRef} className="tm-brand-video">
@@ -53,11 +78,10 @@ function BrandVideo() {
         ref={videoRef}
         className="tm-brand-video-el"
         src={BRAND_PROMO_VIDEO}
-        autoPlay
         muted
         loop
         playsInline
-        preload="metadata"
+        preload="none"
         aria-label="TrendsMart brand promo"
         onError={() => setFailed(true)}
       />

@@ -3978,8 +3978,9 @@ html.dark .tm-img-upload__clear-btn {
   width: 1.35rem;
   height: 1.35rem;
   border-radius: 0.3rem;
-  object-fit: cover;
+  object-fit: contain;
   flex-shrink: 0;
+  background: #f4f4f5;
 }
 .tm-img-upload__clear {
   display: inline-flex;
@@ -5976,8 +5977,56 @@ html.dark .recharts-label-line {
   92% { transform: scaleY(0.15); }
 }
 
+@keyframes tm-trendbot-jump {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  35% { transform: translateY(-14px) scale(0.96, 1.04); }
+  55% { transform: translateY(-2px) scale(1.04, 0.94); }
+  70% { transform: translateY(-6px) scale(0.98, 1.02); }
+}
+
+@keyframes tm-trendbot-walk-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes tm-trendbot-leg-swing-l {
+  0%, 100% { transform: rotate(12deg); }
+  50% { transform: rotate(-12deg); }
+}
+
+@keyframes tm-trendbot-leg-swing-r {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
+}
+
+@keyframes tm-trendbot-arm-swing-l {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(10deg); }
+}
+
+@keyframes tm-trendbot-arm-swing-r {
+  0%, 100% { transform: rotate(10deg); }
+  50% { transform: rotate(-10deg); }
+}
+
+@keyframes tm-trendbot-arm-wave {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-35deg); }
+  60% { transform: rotate(-10deg); }
+}
+
+@keyframes tm-trendbot-stroll {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(calc(-1 * min(42vw, 180px))); }
+  55% { transform: translateX(calc(-1 * min(42vw, 180px))) scaleX(-1); }
+  95% { transform: translateX(0) scaleX(-1); }
+  100% { transform: translateX(0) scaleX(1); }
+}
+
 .tm-trendbot-float { animation: tm-trendbot-float 2.8s ease-in-out infinite; }
 .tm-trendbot-wiggle { animation: tm-trendbot-wiggle 0.55s ease-in-out; }
+.tm-trendbot-jump { animation: tm-trendbot-jump 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
+.tm-trendbot-walk-bob { animation: tm-trendbot-walk-bob 0.45s ease-in-out infinite; }
 .tm-trendbot-bubble { animation: tm-trendbot-bubble-in 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
 .tm-trendbot-pulse-ring { animation: tm-trendbot-pulse-ring 2.4s ease-in-out infinite; }
 .tm-trendbot-antenna { animation: tm-trendbot-antenna 1.6s ease-in-out infinite; }
@@ -5986,15 +6035,33 @@ html.dark .recharts-label-line {
 .tm-trendbot-eye-r { animation-delay: 0.3s; }
 .tm-trendbot-panel-open { animation: tm-trendbot-bubble-in 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
 
+.tm-trendbot-leg-l { transform-origin: 24px 66px; animation: tm-trendbot-leg-swing-l 0.45s ease-in-out infinite; }
+.tm-trendbot-leg-r { transform-origin: 40px 66px; animation: tm-trendbot-leg-swing-r 0.45s ease-in-out infinite; }
+.tm-trendbot-arm-l { transform-origin: 9px 48px; animation: tm-trendbot-arm-swing-l 0.45s ease-in-out infinite; }
+.tm-trendbot-arm-r { transform-origin: 55px 48px; animation: tm-trendbot-arm-swing-r 0.45s ease-in-out infinite; }
+.tm-trendbot-arm-wave { transform-origin: 9px 48px; animation: tm-trendbot-arm-wave 0.7s ease-in-out; }
+
+.tm-trendbot-fab--stroll {
+  animation: tm-trendbot-stroll 5.5s cubic-bezier(0.4, 0, 0.2, 1) 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tm-trendbot-float,
   .tm-trendbot-wiggle,
+  .tm-trendbot-jump,
+  .tm-trendbot-walk-bob,
   .tm-trendbot-bubble,
   .tm-trendbot-pulse-ring,
   .tm-trendbot-antenna,
   .tm-trendbot-eye-l,
   .tm-trendbot-eye-r,
-  .tm-trendbot-panel-open {
+  .tm-trendbot-panel-open,
+  .tm-trendbot-leg-l,
+  .tm-trendbot-leg-r,
+  .tm-trendbot-arm-l,
+  .tm-trendbot-arm-r,
+  .tm-trendbot-arm-wave,
+  .tm-trendbot-fab--stroll {
     animation: none !important;
   }
 }

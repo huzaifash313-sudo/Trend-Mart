@@ -138,6 +138,15 @@ export function extractProductQuery(message: string): string | null {
 export function looksLikeProductSearch(message: string): boolean {
   const lower = message.toLowerCase();
 
+  // Delivery / fee / radius questions are NOT product searches
+  if (
+    /(delivery\s*(fee|charge|cost)|deliver(y)?\s*kitn|free delivery|min(imum)?\s*order|per[-\s]?km|service\s*radius|kitn[ia]\s*(delivery|fee|charge))/i.test(
+      lower,
+    )
+  ) {
+    return false;
+  }
+
   if (
     /(link|url|kahan|dhund|find|search|milega|milta|chahiye|dedo|de do|dikhao|recommend|suggest|available|stock|price|kitna|rate)/i.test(
       lower,

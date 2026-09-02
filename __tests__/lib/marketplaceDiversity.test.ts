@@ -209,4 +209,35 @@ describe("product popularity signals (reviews / orders / clicks)", () => {
     const feed = diversifyMarketplaceFeed([fresh, popular], "for_you");
     expect(feed[0]?.id).toBe("pop");
   });
+
+  it("prefers a product's own rating over the parent shop rating", () => {
+    const productRated = product({
+      id: "pr",
+      shop_id: "s1",
+      name: "Rated product",
+      avg_rating: 4.9,
+      review_count: 40,
+      shop_avg_rating: 2.1,
+      shop_review_count: 200,
+      orders_count: 10,
+      click_count: 10,
+    });
+    const shopOnly = product({
+      id: "so",
+      shop_id: "s1",
+      name: "Shop only",
+      avg_rating: null,
+      review_count: 0,
+      shop_avg_rating: 2.1,
+      shop_review_count: 200,
+      orders_count: 10,
+      click_count: 10,
+    });
+    expect(scoreProductPopularity(productRated)).toBeGreaterThan(
+      scoreProductPopularity(shopOnly),
+    );
+    expect(scoreProductForSort(productRated, "popular")).toBeGreaterThan(
+      scoreProductForSort(shopOnly, "popular"),
+    );
+  });
 });

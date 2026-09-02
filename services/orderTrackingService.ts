@@ -88,8 +88,17 @@ export function buildStatusTimeline(
   currentStatus: OrderStatus,
   createdAt: string,
   updatedAt?: string,
+  orderType: "delivery" | "pickup" | "dine_in" = "delivery",
 ): StatusTimelineEntry[] {
   const timeline: StatusTimelineEntry[] = [];
+  const isPickupLike = orderType === "pickup" || orderType === "dine_in";
+
+  const labelFor = (status: OrderStatus, defaultLabel: string): string => {
+    if (!isPickupLike) return defaultLabel;
+    if (status === "Dispatched") return "Ready for collection";
+    if (status === "Delivered") return orderType === "dine_in" ? "Served" : "Collected";
+    return defaultLabel;
+  };
 
   // For cancelled orders, show Pending as completed, Cancelled as active (red)
   if (currentStatus === "Cancelled") {
@@ -125,7 +134,7 @@ export function buildStatusTimeline(
 
     timeline.push({
       status: entry.status,
-      label: entry.label,
+      label: labelFor(entry.status, entry.label),
       timestamp: isActive && updatedAt ? updatedAt : isCompleted ? updatedAt ?? createdAt : "",
       completed: isCompleted,
       active: isActive,
@@ -188,7 +197,14 @@ function parseTrackedOrder(row: Record<string, unknown>): TrackedOrder {
         ? (rawType as "pickup" | "dine_in")
         : "delivery",
     tableCode: (row.table_code as string | null | undefined) ?? null,
-    statusHistory: buildStatusTimeline(status, createdAt, updatedAt),
+    statusHistory: buildStatusTimeline(
+      status,
+      createdAt,
+      updatedAt,
+      rawType === "pickup" || rawType === "dine_in"
+        ? (rawType as "pickup" | "dine_in")
+        : "delivery",
+    ),
     trackingNumber: (row.tracking_number as string) ?? null,
     createdAt,
     updatedAt,

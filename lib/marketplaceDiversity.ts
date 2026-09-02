@@ -82,16 +82,19 @@ function logVolume(n: number): number {
  * Orders and clicks weigh most — they prove demand. Rating/reviews support them.
  */
 export function scoreProductPopularity(p: MarketplaceProduct): number {
-  const rating = Number(p.shop_avg_rating) || 0;
-  const reviews = Number(p.shop_review_count) || 0;
+  // Prefer this product's own rating; fall back to parent shop rating.
+  const rating =
+    Number(p.avg_rating) > 0 ? Number(p.avg_rating) : Number(p.shop_avg_rating) || 0;
+  const reviews =
+    Number(p.review_count) > 0 ? Number(p.review_count) : Number(p.shop_review_count) || 0;
   const orders = Number(p.orders_count) || 0;
   const clicks = Number(p.click_count) || 0;
   const ratingSignal = rating > 0 ? Math.min(100, (rating / 5) * 100) : 0;
   return (
-    logVolume(orders) * 0.4 +
-    logVolume(clicks) * 0.3 +
-    ratingSignal * 0.2 +
-    logVolume(reviews) * 0.1
+    logVolume(orders) * 0.35 +
+    logVolume(clicks) * 0.25 +
+    ratingSignal * 0.28 +
+    logVolume(reviews) * 0.12
   );
 }
 
@@ -144,18 +147,19 @@ export function scoreProductForSort(
     case "price_desc":
       return imgBoost + p.price;
     case "popular": {
-      // Real popularity: orders + clicks lead, shop rating & review volume
-      // support them. Kept on a weighted scale so the strongest sellers surface.
-      const rating = Number(p.shop_avg_rating) || 0;
-      const reviews = Number(p.shop_review_count) || 0;
+      // Real popularity: orders + clicks + product rating (shop fallback).
+      const rating =
+        Number(p.avg_rating) > 0 ? Number(p.avg_rating) : Number(p.shop_avg_rating) || 0;
+      const reviews =
+        Number(p.review_count) > 0 ? Number(p.review_count) : Number(p.shop_review_count) || 0;
       const orders = Number(p.orders_count) || 0;
       const clicks = Number(p.click_count) || 0;
       return (
         imgBoost +
-        rating * 100_000 +
+        rating * 120_000 +
         Math.log10(reviews + 1) * 50_000 +
-        Math.log10(orders + 1) * 300_000 +
-        Math.log10(clicks + 1) * 150_000 +
+        Math.log10(orders + 1) * 280_000 +
+        Math.log10(clicks + 1) * 140_000 +
         disc * 100 +
         created / 1_000
       );

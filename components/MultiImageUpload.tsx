@@ -1,15 +1,11 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadImage, validateImage } from "@/services/storageService";
 import { MAX_PRODUCT_IMAGES } from "@/lib/productImages";
 
 /* -------------------------------------------------------------------------- */
-/*  MultiImageUpload — clean multi-photo picker (products, deals).            */
-/*                                                                             */
-/*  A wrapping row of square thumbnails: tap the dashed "+" tile to pick       */
-/*  photos (up to the max), tap a thumbnail to replace it, tap its ✕ to       */
-/*  remove. The first photo is the cover. No verbose helper text.              */
+/*  MultiImageUpload — multi-photo picker with full (uncropped) previews.     */
 /* -------------------------------------------------------------------------- */
 
 interface MultiImageUploadProps {
@@ -41,6 +37,17 @@ function XIcon() {
   );
 }
 
+function ExpandIcon() {
+  return (
+    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
 function Spinner() {
   return (
     <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -50,8 +57,57 @@ function Spinner() {
   );
 }
 
-const TILE = "h-20 w-20";
-const TILE_COMPACT = "h-12 w-12";
+function PreviewLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+        aria-label="Close preview"
+      >
+        <XIcon />
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-[90vh] max-w-[min(96vw,56rem)] object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
+const TILE = "h-28 w-28 sm:h-32 sm:w-32";
+const TILE_COMPACT = "h-14 w-14";
 
 export default function MultiImageUpload({
   urls,
@@ -68,8 +124,29 @@ export default function MultiImageUpload({
   const replaceIndexRef = useRef<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Local blob previews while files upload — full image, no crop. */
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const remaining = Math.max(0, maxImages - urls.length);
+
+  useEffect(() => {
+    return () => {
+      pendingPreviews.forEach((u) => {
+        if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const clearPending = useCallback(() => {
+    setPendingPreviews((prev) => {
+      prev.forEach((u) => {
+        if (u.startsWith("blob:")) URL.revokeObjectURL(u);
+      });
+      return [];
+    });
+  }, []);
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -77,6 +154,8 @@ export default function MultiImageUpload({
       if (list.length === 0) return;
 
       setError(null);
+      const blobs = list.map((f) => URL.createObjectURL(f));
+      setPendingPreviews(blobs);
       setUploading(true);
       const next = [...urls];
 
@@ -99,17 +178,17 @@ export default function MultiImageUpload({
       }
 
       onChange(next);
+      clearPending();
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     },
-    [urls, remaining, fileIdPrefix, folder, maxImages, onChange],
+    [urls, remaining, fileIdPrefix, folder, maxImages, onChange, clearPending],
   );
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) await uploadFiles(e.target.files);
   };
 
-  // Tap a thumbnail to replace that specific photo.
   const openReplace = (index: number) => {
     replaceIndexRef.current = index;
     replaceInputRef.current?.click();
@@ -130,6 +209,8 @@ export default function MultiImageUpload({
       setUploading(false);
       return;
     }
+    const blob = URL.createObjectURL(file);
+    setPendingPreviews([blob]);
     const id = `${fileIdPrefix}-replace-${Date.now()}`;
     const result = await uploadImage(file, folder, id);
     if (result.success) {
@@ -139,6 +220,8 @@ export default function MultiImageUpload({
     } else {
       setError(result.error);
     }
+    URL.revokeObjectURL(blob);
+    setPendingPreviews([]);
     setUploading(false);
   };
 
@@ -148,10 +231,11 @@ export default function MultiImageUpload({
 
   const compact = variant === "compact";
   const tile = compact ? TILE_COMPACT : TILE;
+  const imgFit = "h-full w-full object-contain object-center p-1";
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
           {label}
         </span>
@@ -159,7 +243,9 @@ export default function MultiImageUpload({
           {urls.length}/{maxImages}
         </span>
         {urls.length > 0 ? (
-          <span className="text-[0.65rem] text-zinc-400">· tap a photo to change it</span>
+          <span className="text-[0.65rem] text-zinc-400">
+            · full photo shown · tap ✕ expand to inspect
+          </span>
         ) : null}
         {error ? <span className="text-[11px] text-red-500">{error}</span> : null}
       </div>
@@ -182,11 +268,11 @@ export default function MultiImageUpload({
         disabled={disabled || uploading}
       />
 
-      <div className={`flex flex-wrap items-start gap-2 ${compact ? "" : ""}`}>
+      <div className="flex flex-wrap items-start gap-2.5">
         {urls.map((url, i) => (
           <div
             key={`${url}-${i}`}
-            className={`group relative shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 ${tile} dark:border-zinc-700 dark:bg-zinc-800`}
+            className={`group relative shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 ${tile} dark:border-zinc-700 dark:bg-zinc-900`}
           >
             <button
               type="button"
@@ -196,11 +282,7 @@ export default function MultiImageUpload({
               aria-label={`Change photo ${i + 1}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={url}
-                alt={`Photo ${i + 1}`}
-                className="h-full w-full object-cover"
-              />
+              <img src={url} alt={`Photo ${i + 1}`} className={imgFit} />
             </button>
             {i === 0 ? (
               <span className="pointer-events-none absolute bottom-0.5 left-0.5 rounded bg-zinc-950/70 px-1 py-px text-[8px] font-semibold text-white">
@@ -209,9 +291,21 @@ export default function MultiImageUpload({
             ) : null}
             <button
               type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxSrc(url);
+              }}
+              className="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900/55 text-white opacity-90 transition-opacity hover:bg-zinc-900/90"
+              aria-label={`View photo ${i + 1} full size`}
+              title="View full"
+            >
+              <ExpandIcon />
+            </button>
+            <button
+              type="button"
               onClick={() => removeAt(i)}
               disabled={disabled || uploading}
-              className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900/60 text-white opacity-0 transition-opacity hover:bg-zinc-900/90 group-hover:opacity-100 disabled:opacity-0"
+              className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900/60 text-white opacity-90 transition-opacity hover:bg-zinc-900/90 disabled:opacity-40"
               aria-label={`Remove photo ${i + 1}`}
             >
               <XIcon />
@@ -219,7 +313,20 @@ export default function MultiImageUpload({
           </div>
         ))}
 
-        {remaining > 0 ? (
+        {pendingPreviews.map((src, i) => (
+          <div
+            key={`pending-${i}`}
+            className={`relative shrink-0 overflow-hidden rounded-xl border border-dashed border-emerald-400/60 bg-zinc-100 ${tile} dark:bg-zinc-900`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt="Uploading preview" className={`${imgFit} opacity-80`} />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <Spinner />
+            </span>
+          </div>
+        ))}
+
+        {remaining > 0 && pendingPreviews.length === 0 ? (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -231,6 +338,14 @@ export default function MultiImageUpload({
           </button>
         ) : null}
       </div>
+
+      {lightboxSrc ? (
+        <PreviewLightbox
+          src={lightboxSrc}
+          alt="Full photo preview"
+          onClose={() => setLightboxSrc(null)}
+        />
+      ) : null}
     </div>
   );
 }

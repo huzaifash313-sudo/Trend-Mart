@@ -129,6 +129,56 @@ function MyReviewsModal({
     [onClose],
   );
 
+  const handleSubmitProduct = async (product: {
+    id: string;
+    productId: string;
+    name: string;
+    shopId: string;
+    shopName: string;
+  }) => {
+    const key = product.productId;
+    const rating = ratings[key];
+    if (!rating || rating < 1) {
+      addToast("Please select a star rating.", "error");
+      return;
+    }
+    setSubmitting(true);
+    const result = await submitReview(
+      product.shopId,
+      "",
+      rating,
+      comments[key] ?? "",
+      product.productId,
+    );
+    setSubmitting(false);
+
+    if (!result.success) {
+      addToast(result.error, "error");
+      return;
+    }
+
+    addToast(`Rated ${product.name} — shop rating updated too.`, "success");
+    const submitted = {
+      ...result.data,
+      shop_name: product.shopName,
+      product_name: product.name,
+    };
+    const nextReviews = [submitted, ...data.reviews];
+    const nextRatings = nextReviews
+      .filter((r) => Number.isInteger(r.rating) && Number(r.rating) >= 1 && Number(r.rating) <= 5)
+      .map((r) => Number(r.rating));
+    const total = nextRatings.length;
+    const average =
+      total > 0 ? Math.round((nextRatings.reduce((a, b) => a + b, 0) / total) * 10) / 10 : 0;
+    onChange({
+      reviews: nextReviews,
+      reviewableProducts: (data.reviewableProducts ?? []).filter((p) => p.productId !== product.productId),
+      reviewableShops: data.reviewableShops,
+      stats: { total, average },
+    });
+    setOpenShopId(null);
+  };
+
   const handleSubmit = async (shop: { id: string; name: string }) => {
     const rating = ratings[shop.id];
     if (!rating || rating < 1) {
@@ -158,6 +208,7 @@ function MyReviewsModal({
       total > 0 ? Math.round((nextRatings.reduce((a, b) => a + b, 0) / total) * 10) / 10 : 0;
     onChange({
       reviews: nextReviews,
+      reviewableProducts: data.reviewableProducts ?? [],
       reviewableShops: data.reviewableShops.filter((s) => s.id !== shop.id),
       stats: { total, average },
     });
@@ -178,7 +229,7 @@ function MyReviewsModal({
           <div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Your Reviews</h3>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Rate the shops you ordered from and view your feedback.
+              Rate products you ordered — that also updates the shop rating.
             </p>
           </div>
           <button
@@ -215,17 +266,88 @@ function MyReviewsModal({
                   No reviews yet
                 </p>
                 <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Rate a shop below to get started.
+                  Rate a delivered product below to get started.
                 </p>
               </>
             )}
           </div>
 
-          {/* Shops pending review */}
+          {/* Products pending review (preferred) */}
+          {(data.reviewableProducts?.length ?? 0) > 0 ? (
+            <section className="space-y-2.5">
+              <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                Rate your products
+                <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  {data.reviewableProducts!.length} pending
+                </span>
+              </h4>
+              {data.reviewableProducts!.map((product) => {
+                const key = product.productId;
+                const isOpen = openShopId === key;
+                return (
+                  <div
+                    key={key}
+                    className="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {product.name}
+                        </p>
+                        <p className="truncate text-[11px] text-zinc-500">{product.shopName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setOpenShopId(isOpen ? null : key)}
+                        className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        {isOpen ? "Cancel" : "Rate ★"}
+                      </button>
+                    </div>
+                    {isOpen ? (
+                      <div className="mt-3 space-y-2.5 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                        <div className="flex items-center gap-2">
+                          <Stars
+                            rating={ratings[key] ?? 0}
+                            size="md"
+                            interactive
+                            onChange={(r) => setRatings((prev) => ({ ...prev, [key]: r }))}
+                          />
+                          {ratings[key] ? (
+                            <span className="text-xs text-zinc-500">{ratings[key]} / 5</span>
+                          ) : null}
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={comments[key] ?? ""}
+                          onChange={(e) =>
+                            setComments((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          maxLength={500}
+                          placeholder="Share your experience (optional)"
+                          className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          disabled={submitting}
+                          onClick={() => void handleSubmitProduct(product)}
+                          className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {submitting ? "Submitting…" : "Submit product rating"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </section>
+          ) : null}
+
+          {/* Legacy shops pending review */}
           {data.reviewableShops.length > 0 ? (
             <section className="space-y-2.5">
               <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                Give your review
+                Give your shop review
                 <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                   {data.reviewableShops.length} shop{data.reviewableShops.length !== 1 ? "s" : ""}
                 </span>
@@ -287,16 +409,16 @@ function MyReviewsModal({
                 );
               })}
             </section>
-          ) : data.stats.total === 0 ? (
+          ) : (data.reviewableProducts?.length ?? 0) === 0 && data.stats.total === 0 ? (
             <p className="rounded-xl border border-zinc-200 bg-white px-3 py-3 text-center text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-              You haven&apos;t placed an order yet. Once you order from a shop, you can rate it
+              You haven&apos;t placed an order yet. Once a product is delivered, you can rate it
               right here from your profile.
             </p>
-          ) : (
+          ) : (data.reviewableProducts?.length ?? 0) === 0 ? (
             <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-center text-xs font-medium text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
-              You&apos;ve reviewed every shop you ordered from. Thank you!
+              You&apos;ve rated every delivered product. Thank you!
             </p>
-          )}
+          ) : null}
 
           {/* My reviews */}
           {data.reviews.length > 0 ? (
@@ -311,7 +433,9 @@ function MyReviewsModal({
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {review.shop_name}
+                      {review.product_name
+                        ? `${review.product_name} · ${review.shop_name}`
+                        : review.shop_name}
                     </p>
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
                       {review.created_at ? formatRelativeTime(review.created_at) : ""}
@@ -417,7 +541,8 @@ export default function ProfileReviewsCard() {
     void load();
   }, [load]);
 
-  const pendingCount = data?.reviewableShops.length ?? 0;
+  const pendingCount =
+    (data?.reviewableProducts?.length ?? 0) + (data?.reviewableShops.length ?? 0);
 
   return (
     <>
@@ -434,12 +559,12 @@ export default function ProfileReviewsCard() {
           <div>
             <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Give your review</p>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Rate the shops you ordered from, or view all your reviews.
+              Rate products you ordered, or view all your reviews.
             </p>
           </div>
           {pendingCount > 0 ? (
             <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-              {pendingCount} shop{pendingCount !== 1 ? "s" : ""} to review
+              {pendingCount} to review
             </span>
           ) : (
             <span className="shrink-0 text-zinc-400" aria-hidden>
@@ -463,7 +588,7 @@ export default function ProfileReviewsCard() {
             </>
           ) : data ? (
             <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              No reviews yet — rate the shops you ordered from.
+              No reviews yet — rate products from your delivered orders.
             </span>
           ) : (
             <span className="text-xs text-zinc-500 dark:text-zinc-400">

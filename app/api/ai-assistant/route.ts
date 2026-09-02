@@ -128,7 +128,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     return NextResponse.json({
-      reply: result.reply,
+      reply: result.reply?.trim() || "Main sirf TrendsMart app ke baare mein madad kar sakta hoon. [Support](/support)",
       intent: result.intent,
       confidence: result.confidence,
       suggestions: result.suggestions,
@@ -144,7 +144,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         reply:
           "⚠️ Thori technical issue aa gayi, lekin main madad kar sakta hoon.\n\n" +
           "Try karein:\n• *best mobile ka link do*\n• *order kaise karun*\n• *best deals*\n\n" +
-          "👉 [Browse products](/products) · [Deals](/deals) · [Support](/contact)",
+          "👉 [Browse products](/products) · [Deals](/deals) · [Support](/support)",
         error: "internal_error",
         sessionId,
         suggestions: ["Best mobile ka link do", "Best deals?", "Order kaise karun?"],

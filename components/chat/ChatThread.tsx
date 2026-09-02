@@ -12,6 +12,7 @@ import {
 import { subscribeToConversationMessages } from "@/lib/supabase/realtime";
 import { ChatShellBody, ChatShellFooter, ChatShellHeader } from "@/components/chat/FullScreenChatShell";
 import { useToast } from "@/components/Toast";
+import { getActiveConversationId, setActiveConversationId } from "@/lib/activeChat";
 
 function SendIcon() {
   return (
@@ -71,6 +72,15 @@ export default function ChatThread({
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setActiveConversationId(conversationId);
+    return () => {
+      if (getActiveConversationId() === conversationId) {
+        setActiveConversationId(null);
+      }
+    };
+  }, [conversationId]);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

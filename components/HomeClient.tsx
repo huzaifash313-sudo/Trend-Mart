@@ -38,9 +38,11 @@ import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilt
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
 import { useQueryClient } from "@tanstack/react-query";
-import { useShops, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
+import { useShopsInfinite, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { getTopAffinityCategories } from "@/lib/behavior";
+import VirtualizedGrid from "@/components/VirtualizedGrid";
+import { PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
 });
@@ -141,13 +143,16 @@ function MyStoryRingButton({
   onView: () => void;
   onAdd: () => void;
 }) {
+  const hasLiveStories = stories.length > 0;
   const lead = stories[0];
   const storyThumb =
     lead?.image_url && !brokenStoryImgs.has(lead.id) ? lead.image_url : null;
-  const thumbUrl =
-    storyThumb || shop.logo_url || lead?.shop_logo_url || null;
+  // Empty "Add story": never show shop logo / banner as a fake story preview.
+  // Only show media once this shop actually has a live story.
+  const thumbUrl = hasLiveStories
+    ? storyThumb || shop.logo_url || lead?.shop_logo_url || null
+    : null;
   const initial = shop.name?.trim()?.charAt(0).toUpperCase() || "S";
-  const hasLiveStories = stories.length > 0;
   const totalViews = stories.reduce(
     (sum, s) => sum + Math.max(0, Number(s.view_count) || 0),
     0,
@@ -155,7 +160,7 @@ function MyStoryRingButton({
 
   const avatar = thumbUrl ? (
     <Image
-      src={getSafeImageUrl(thumbUrl, "shop")}
+      src={getSafeImageUrl(thumbUrl, "shop", "thumb")}
       alt=""
       fill
       className="object-cover"
@@ -168,7 +173,7 @@ function MyStoryRingButton({
     />
   ) : (
     <div className="tm-avatar-fallback h-full w-full text-base font-bold">
-      {initial}
+      {hasLiveStories ? initial : <span className="tm-story-empty-plus" aria-hidden>+</span>}
     </div>
   );
 
@@ -228,9 +233,8 @@ function MyStoryRingButton({
   );
 }
 
-/** Shops rendered initially; "Show more" grows the grid without loading 300
- *  cards into the DOM on first paint (major Android perf win). */
-const PAGE_SIZE = 24;
+/** Shops rendered per infinite-scroll page (server + client aligned). */
+const PAGE_SIZE = PUBLIC_SHOP_PAGE_SIZE;
 
 /* -------------------------------------------------------------------------- */
 /*  Memoized shop-card row                                                     */
@@ -244,7 +248,7 @@ interface ShopCardRowProps {
   logoBroken: boolean;
   priority: boolean;
   coupons?: Coupon[];
-  activeDeals: ShopDeal[];
+  shopDeals: ShopDeal[];
   setBrokenImgs: Dispatch<SetStateAction<Set<string>>>;
   setFavorites: Dispatch<SetStateAction<Set<string>>>;
 }
@@ -257,15 +261,12 @@ const ShopCardRow = memo(function ShopCardRow({
   logoBroken,
   priority,
   coupons,
-  activeDeals,
+  shopDeals,
   setBrokenImgs,
   setFavorites,
 }: ShopCardRowProps) {
   const { addToast } = useToast();
-  const deals = useMemo(
-    () => activeDeals.filter((d) => d.shop_id === shop.id),
-    [activeDeals, shop.id],
-  );
+  const deals = shopDeals;
 
   const onBannerError = useCallback(() => {
     setBrokenImgs((prev) => new Set(prev).add(`banner:${shop.id}`));
@@ -367,19 +368,33 @@ function HomeClient({
     [myShopQuery.data],
   );
 
-  const shopsQuery = useShops(initialShops.length > 0 ? { initialData: initialShops } : undefined);
+  const shopsQuery = useShopsInfinite(
+    initialShops.length > 0 ? { initialData: initialShops, pageSize: PAGE_SIZE } : { pageSize: PAGE_SIZE },
+  );
   const shops = useMemo(() => {
-    const all = shopsQuery.data ?? EMPTY_SHOPS;
+    const all = shopsQuery.data?.pages.flat() ?? EMPTY_SHOPS;
     return myShopId ? all.filter((s) => s.id !== myShopId) : all;
   }, [shopsQuery.data, myShopId]);
   const loading = shopsQuery.isLoading;
   const error = shopsQuery.error ? shopsQuery.error.message : null;
+  const hasMoreShops = Boolean(shopsQuery.hasNextPage);
+  const loadingMoreShops = shopsQuery.isFetchingNextPage;
 
   const dealsQuery = useDeals(48);
   const activeDeals = useMemo(() => {
     const all = dealsQuery.data ?? EMPTY_DEALS;
     return myShopId ? all.filter((d) => d.shop_id !== myShopId) : all;
   }, [dealsQuery.data, myShopId]);
+
+  const dealsByShopId = useMemo(() => {
+    const map = new Map<string, ShopDeal[]>();
+    for (const d of activeDeals) {
+      const list = map.get(d.shop_id);
+      if (list) list.push(d);
+      else map.set(d.shop_id, [d]);
+    }
+    return map;
+  }, [activeDeals]);
 
   const storiesQuery = useStories(initialStories.length > 0 ? { initialData: initialStories } : undefined);
   const [storiesVersion, setStoriesVersion] = useState(0);
@@ -438,13 +453,6 @@ function HomeClient({
 
   /** Flat list for the viewer — same order as the grouped tray. */
   const storyViewerList = useMemo(() => storyGroups.flat(), [storyGroups]);
-
-  const shopIds = useMemo(
-    () => shops.map((s) => s.id).filter(Boolean),
-    [shops],
-  );
-  const couponsQuery = useShopCoupons(shopIds);
-  const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
 
   const [searchQuery] = useState(initialQuery);
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(
@@ -658,14 +666,16 @@ function HomeClient({
     router.replace(`/?${params.toString()}`, { scroll: false });
   }, [searchQuery, router]);
 
-  /* Reset the visible grid when filters change so the user sees the new set. */
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const filterSignature = `${activeCategory}|${searchQuery}|${proximityActive}|${geoFilter.scope}|${geoFilter.maxDistanceKm}`;
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [filterSignature]);
+  /* Reset filter-local windowing is no longer needed — server pages accumulate. */
+  const visibleShops = displayShops;
 
-  const visibleShops = displayShops.slice(0, visibleCount);
+  // Coupons only for shops currently on screen — first paint set, grows with pages.
+  const couponShopIds = useMemo(
+    () => visibleShops.slice(0, 48).map((s) => s.id).filter(Boolean),
+    [visibleShops],
+  );
+  const couponsQuery = useShopCoupons(couponShopIds);
+  const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-3 md:pb-6">
@@ -934,7 +944,7 @@ function HomeClient({
         {!loading && error && (
           <div className="py-12 text-center">
             <p className="mb-1 text-sm text-red-600 dark:text-red-400">{error}</p>
-            <button type="button" onClick={() => window.location.reload()} className="text-xs font-medium text-emerald-600 underline underline-offset-2 dark:text-emerald-400">Retry</button>
+            <button type="button" onClick={() => void shopsQuery.refetch()} className="text-xs font-medium text-emerald-600 underline underline-offset-2 dark:text-emerald-400">Retry</button>
           </div>
         )}
 
@@ -987,12 +997,16 @@ function HomeClient({
         {/* Shop cards — 2 mobile / 3 tablet / 4 laptop / 5 wide desktop */}
         {!loading && !error && displayShops.length > 0 && (
           <>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {visibleShops.map((shop, index) => {
+            <VirtualizedGrid
+              items={visibleShops}
+              getKey={(shop) => shop.id}
+              estimateRowHeight={260}
+              gapClassName="gap-2 sm:gap-4"
+              columnBreakpoints={{ base: 2, md: 3, lg: 4, xl: 5 }}
+              renderItem={(shop, index) => {
                 const withDistance = shop as ShopWithDistance;
                 return (
                   <ShopCardRow
-                    key={shop.id}
                     shop={withDistance}
                     priority={index < 2}
                     favorited={favorites.has(shop.id)}
@@ -1000,22 +1014,23 @@ function HomeClient({
                     bannerBroken={brokenImgs.has(`banner:${shop.id}`)}
                     logoBroken={brokenImgs.has(`logo:${shop.id}`)}
                     coupons={shopCoupons[shop.id]}
-                    activeDeals={activeDeals}
+                    shopDeals={dealsByShopId.get(shop.id) ?? EMPTY_DEALS}
                     setBrokenImgs={setBrokenImgs}
                     setFavorites={setFavorites}
                   />
                 );
-              })}
-            </div>
+              }}
+            />
 
-            {displayShops.length > visibleCount && (
+            {(hasMoreShops || loadingMoreShops) && (
               <div className="mt-5 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                  className="tm-btn-secondary rounded-full px-6 py-2 text-xs font-semibold"
+                  disabled={loadingMoreShops || !hasMoreShops}
+                  onClick={() => void shopsQuery.fetchNextPage()}
+                  className="tm-btn-secondary rounded-full px-6 py-2 text-xs font-semibold disabled:opacity-60"
                 >
-                  Show more shops ({displayShops.length - visibleCount} remaining)
+                  {loadingMoreShops ? "Loading more…" : "Show more shops"}
                 </button>
               </div>
             )}

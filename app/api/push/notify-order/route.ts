@@ -103,7 +103,8 @@ export async function POST(request: NextRequest) {
             ? `${order.customer_name || "Customer"} placed an order${amount ? ` — ${amount}` : ""} at ${shop.name || "your shop"}.`
             : `${order.customer_name || "Customer"} — ${shop.name || "Shop"} is now ${status}.`,
         url: "/dashboard/orders",
-        tag: `order-${body.orderId}`,
+        tag: `order-${body.orderId}-${event === "new" ? "new" : status}`,
+        renotify: true,
       });
     }
 
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
           body: `Your order at ${shop?.name || "the shop"} was delivered. Tap to rate the shop.`,
           url: "/account",
           tag: `order-${body.orderId}-review`,
+          renotify: true,
         });
       } else {
         await sendPushToUser(order.customer_user_id, {
@@ -125,7 +127,8 @@ export async function POST(request: NextRequest) {
               ? `Your order at ${shop?.name || "the shop"} was received${amount ? ` (${amount})` : ""}.`
               : `Your order at ${shop?.name || "the shop"} is now ${status}.`,
           url: `/orders/tracking?orderId=${encodeURIComponent(body.orderId)}`,
-          tag: `order-${body.orderId}-customer`,
+          tag: `order-${body.orderId}-customer-${event === "new" ? "new" : status}`,
+          renotify: true,
         });
       }
     }

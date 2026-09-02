@@ -290,10 +290,14 @@ function OrderSummaryInner({ id }: { id: string }) {
             )}
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500 dark:text-zinc-400">
-                {isPickup ? "Pickup" : "Delivery"}
+                {isDineIn ? "Dine-in" : isPickup ? "Pickup" : "Delivery"}
               </span>
               <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                {isPickup ? "—" : recoveredDeliveryFee > 0 ? formatRupees(recoveredDeliveryFee) : "FREE"}
+                {isDineIn || isPickup
+                  ? "—"
+                  : recoveredDeliveryFee > 0
+                    ? formatRupees(recoveredDeliveryFee)
+                    : "FREE"}
               </span>
             </div>
             <div className="flex justify-between border-t border-zinc-100 pt-2 text-base font-bold dark:border-zinc-800">

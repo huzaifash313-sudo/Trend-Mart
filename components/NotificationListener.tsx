@@ -34,9 +34,15 @@ import {
   clearMyNotifications,
   type AppNotification,
 } from "@/services/notificationService";
+import { isViewingConversation } from "@/lib/activeChat";
 
 const HISTORY_KEY_PREFIX = "trendsmart_notif_history_v2";
 const PREFS_KEY = "trendsmart_notifications";
+
+/** Chat messages use unread badges + top banner — never the navbar bell. */
+function isBellType(type: string): boolean {
+  return type !== "message";
+}
 
 /**
  * Notification history is cached per ACCOUNT, never per device. On a shared
@@ -54,7 +60,9 @@ function loadHistory(userId: string): Notification[] {
     const raw = localStorage.getItem(historyKeyFor(userId));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Notification[];
-    return Array.isArray(parsed) ? parsed.slice(0, 50) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((n) => n && isBellType(n.type)).slice(0, 50)
+      : [];
   } catch {
     return [];
   }
@@ -93,6 +101,7 @@ export type NotificationType =
   | "order"
   | "sale"
   | "inquiry"
+  | "message"
   | "system";
 
 export interface Notification {
@@ -113,13 +122,15 @@ const NOTIF_EMOJI: Record<NotificationType, string> = {
   order: "🛒",
   sale: "💰",
   inquiry: "📩",
+  message: "💬",
   system: "🔔",
 };
 
 function mapRow(row: AppNotification): Notification {
+  const type = (row.type as NotificationType) || "system";
   return {
     id: row.id,
-    type: row.type,
+    type: type === "message" ? "message" : type,
     title: row.title,
     body: row.body,
     timestamp: row.created_at,
@@ -225,7 +236,7 @@ export function NotificationListenerProvider({
     isMutedRef.current = isMuted;
   }, [isMuted]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read && isBellType(n.type)).length;
   const openPanel = useCallback(() => setIsPanelOpen(true), []);
   const closePanel = useCallback(() => setIsPanelOpen(false), []);
   const togglePanel = useCallback(() => setIsPanelOpen((v) => !v), []);
@@ -272,6 +283,7 @@ export function NotificationListenerProvider({
   /* ── Live notification handling ─────────────────────────────────────────── */
 
   // Ingest a fresh DB row: dedupe, prepend, cap at 50, chime + toast.
+  // Chat `message` rows never enter the navbar bell — WhatsApp-style banner only.
   const addFromDb = useCallback((row: AppNotification) => {
     // STRICT ACCOUNT SCOPE: only rows addressed to the currently signed-in
     // account may enter this list. With no active account (signed out) or a
@@ -285,6 +297,37 @@ export function NotificationListenerProvider({
     }
     const notif = mapRow(row);
     if (!notif.id || !notif.title) return;
+
+    // Actively viewing this chat → mark read, no banner / no bell.
+    if (notif.type === "message") {
+      const convId = notif.entityId || "";
+      if (isViewingConversation(convId)) {
+        void markNotificationRead(notif.id);
+        return;
+      }
+
+      if (prefsAllow("inquiry") && !isMutedRef.current) {
+        playChimeSound();
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("trendsmart:chat-alert", {
+            detail: {
+              conversationId: convId,
+              title: notif.title,
+              body: notif.body,
+              linkUrl: notif.linkUrl,
+            },
+          }),
+        );
+      }
+
+      // Never add chat rows to the bell list / badge. OS push is handled by
+      // /api/push/notify-chat + service worker when the app is closed.
+      void markNotificationRead(notif.id);
+      return;
+    }
 
     setNotifications((prev) => {
       if (prev.some((n) => n.id === notif.id)) return prev;
@@ -334,7 +377,18 @@ export function NotificationListenerProvider({
         if (result.success) {
           setNotifications((prev) => {
             const byId = new Map(prev.map((n) => [n.id, n]));
-            for (const row of result.data) byId.set(row.id, mapRow(row));
+            for (const row of result.data) {
+              if (!isBellType(row.type)) {
+                // Drain legacy chat rows from the bell so they never reappear.
+                if (!row.read) void markNotificationRead(row.id);
+                continue;
+              }
+              byId.set(row.id, mapRow(row));
+            }
+            // Drop any cached message rows from older clients.
+            for (const [id, n] of byId) {
+              if (!isBellType(n.type)) byId.delete(id);
+            }
             const merged = [...byId.values()]
               .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
               .slice(0, 50);
@@ -559,6 +613,8 @@ export function NotificationPanel({
 
   if (!isOpen) return null;
 
+  const bellNotifications = notifications.filter((n) => isBellType(n.type));
+
   return (
     <div className="fixed inset-0 z-[200] flex justify-end">
       {/* Backdrop */}
@@ -604,7 +660,7 @@ export function NotificationPanel({
         </div>
 
         {/* Actions */}
-        {notifications.length > 0 && (
+        {bellNotifications.length > 0 && (
           <div className="flex gap-2 border-b border-zinc-100 px-4 py-2 dark:border-zinc-800">
             <button
               type="button"
@@ -625,7 +681,7 @@ export function NotificationPanel({
 
         {/* Notification List */}
         <div className="flex-1 overflow-y-auto">
-          {notifications.length === 0 ? (
+          {bellNotifications.length === 0 ? (
             <div className="flex h-full items-center justify-center px-4 py-16 text-center">
               <div>
                 <span className="text-4xl">🔔</span>
@@ -639,7 +695,7 @@ export function NotificationPanel({
             </div>
           ) : (
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {notifications.map((notif) => (
+              {bellNotifications.map((notif) => (
                 <button
                   key={notif.id}
                   type="button"

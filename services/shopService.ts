@@ -13,6 +13,7 @@ import {
   isUuid,
   slugifyShopName,
 } from "@/lib/shopSlug";
+import { SHOP_STOREFRONT_PRODUCT_LIMIT } from "@/lib/mobilePerf";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,8 @@ export async function fetchShops(opts?: {
   publicOnly?: boolean;
   /** Cap rows for customer listings (homepage). Omit for full admin lists. */
   limit?: number;
+  /** 0-based row offset for page-based / infinite scroll. */
+  offset?: number;
 }): Promise<ServiceResult<Shop[]>> {
   const supabase = createClient();
 
@@ -173,8 +176,17 @@ export async function fetchShops(opts?: {
 
     query = query.order("name", { ascending: true });
 
-    if (opts?.limit && opts.limit > 0) {
-      query = query.limit(Math.min(opts.limit, 500));
+    const limit =
+      opts?.limit && opts.limit > 0 ? Math.min(opts.limit, 500) : undefined;
+    const offset =
+      opts?.offset && opts.offset > 0 ? Math.max(0, Math.floor(opts.offset)) : 0;
+
+    if (limit !== undefined) {
+      if (offset > 0) {
+        query = query.range(offset, offset + limit - 1);
+      } else {
+        query = query.limit(limit);
+      }
     }
 
     const { data, error } = await query;
@@ -188,10 +200,14 @@ export async function fetchShops(opts?: {
       if (opts?.category && opts.category !== "All") {
         fallback = fallback.eq("category", opts.category);
       }
-      if (opts?.limit && opts.limit > 0) {
-        fallback = fallback.limit(Math.min(opts.limit, 500));
-      }
       fallback = fallback.order("name", { ascending: true });
+      if (limit !== undefined) {
+        if (offset > 0) {
+          fallback = fallback.range(offset, offset + limit - 1);
+        } else {
+          fallback = fallback.limit(limit);
+        }
+      }
       const retry = await fallback;
       if (retry.error) throw retry.error;
       return { success: true, data: redactOwnerId(retry.data) };
@@ -322,7 +338,7 @@ export async function fetchShopById(
       .select(PRODUCT_SELECT)
       .eq("shop_id", shop.id)
       .order("created_at", { ascending: false })
-      .limit(120);
+      .limit(SHOP_STOREFRONT_PRODUCT_LIMIT);
     products = (first.data as Product[] | null) ?? null;
     productError = first.error;
 
@@ -333,7 +349,7 @@ export async function fetchShopById(
         .select(PRODUCT_SELECT_LEGACY)
         .eq("shop_id", shop.id)
         .order("created_at", { ascending: false })
-        .limit(120);
+        .limit(SHOP_STOREFRONT_PRODUCT_LIMIT);
       products = (retry.data as Product[] | null) ?? null;
       productError = retry.error;
     }
@@ -706,12 +722,14 @@ export async function createShop(
     }
 
     const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
-    // Auto-approve + live on create — no admin gate.
+    // New stores stay off the public marketplace until Super-Admin approves.
+    // Merchants can still open the dashboard and list products while pending.
     const insertPayload: Record<string, unknown> = {
       ...sanitized,
       owner_id: user.id,
-      verification_status: "approved",
-      is_live: true,
+      verification_status: "pending",
+      // Honour form intent for go-live, but public visibility still requires approval.
+      is_live: sanitizeDbBoolean(form.is_live) ?? true,
     };
 
     let { data, error } = await supabase
@@ -725,8 +743,8 @@ export async function createShop(
       const core: Record<string, unknown> = {
         ...stripExtendedShopFields(sanitized),
         owner_id: user.id,
-        is_live: true,
-        verification_status: "approved",
+        is_live: false,
+        verification_status: "pending",
       };
       ({ data, error } = await supabase
         .from("shops")
@@ -735,6 +753,8 @@ export async function createShop(
         .single());
       if (error && isMissingColumnError(error)) {
         delete core.verification_status;
+        // Without a verification column, keep offline until admin tooling exists.
+        core.is_live = false;
         ({ data, error } = await supabase
           .from("shops")
           .insert(core)
@@ -781,6 +801,10 @@ export async function updateShop(
   try {
     const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
     sanitized.slug = generateShopSlug(String(sanitized.name ?? form.name), shopId);
+    // Merchants must never self-approve / self-reject via the update path.
+    delete sanitized.verification_status;
+    delete sanitized.owner_id;
+
     let { data, error } = await supabase
       .from("shops")
       .update(sanitized)

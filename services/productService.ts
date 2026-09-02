@@ -9,6 +9,7 @@ import { logError, toErrorMessage, toServiceError } from "@/services/errorServic
 import { isValidUUID } from "@/lib/sanitization";
 import { generateProductShortCode } from "@/lib/shortCode";
 import { diversifyMarketplaceFeed, scoreProductPopularity } from "@/lib/marketplaceDiversity";
+import { MARKETPLACE_SEARCH_POOL } from "@/lib/mobilePerf";
 import {
   buildFuzzyIlikeOr,
   fuzzyFilterAndRank,
@@ -346,6 +347,12 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
       typeof shop.review_count === "number"
         ? shop.review_count
         : Number(shop.review_count) || null,
+    avg_rating:
+      typeof row.avg_rating === "number" ? row.avg_rating : Number(row.avg_rating) || null,
+    review_count:
+      typeof row.review_count === "number"
+        ? row.review_count
+        : Number(row.review_count) || null,
     shop_free_delivery_threshold:
       typeof shop.free_delivery_threshold === "number"
         ? shop.free_delivery_threshold
@@ -375,7 +382,7 @@ const MARKETPLACE_SELECT = `
   id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
   category_id, sub_category_id, created_at, short_code, variants, price_tiers,
-  orders_count, click_count,
+  orders_count, click_count, avg_rating, review_count,
   shops!inner (
     id, name, logo_url, whatsapp_number, category,
     is_live, verification_status, latitude, longitude, location,
@@ -493,7 +500,7 @@ async function topUpMarketplaceDiversity(
 }
 
 /** How many rows to pull per search so popularity-aware ranking is stable across pages. */
-const SEARCH_POOL_SIZE = 250;
+const SEARCH_POOL_SIZE = MARKETPLACE_SEARCH_POOL;
 
 /** Dedupe marketplace rows keeping order (first list wins). */
 function mergeMarketplaceRows(
@@ -811,13 +818,24 @@ export async function fetchProductByReference(
 
   const supabase = createClient();
   try {
-    const res = await supabase
+    const primary = await supabase
       .from("products")
       .select(MARKETPLACE_SELECT)
       .eq("short_code", trimmed)
       .eq("shops.is_live", true)
       .eq("shops.verification_status", "approved")
       .maybeSingle();
+
+    let res = primary;
+    if (primary.error && isMissingRatingColumnError(primary.error)) {
+      res = await supabase
+        .from("products")
+        .select(MARKETPLACE_SELECT_LEGACY)
+        .eq("short_code", trimmed)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .maybeSingle();
+    }
 
     if (res.error && isMissingColumnError(res.error)) {
       // short_code migration not applied — can't resolve a short code.

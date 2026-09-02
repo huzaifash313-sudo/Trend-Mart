@@ -66,6 +66,7 @@ export function useTrendBotChat({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const lastUserQuery = useRef("");
   const autoSent = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const mem = startTrendBotSession(shopCategory);
@@ -78,6 +79,9 @@ export function useTrendBotChat({
     } catch {
       /* ignore */
     }
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [initialPrompts, shopCategory]);
 
   const dismissOnboarding = useCallback(() => {
@@ -143,11 +147,17 @@ export function useTrendBotChat({
       setLoading(true);
       setThinkingStep(null);
 
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const hardTimeout = setTimeout(() => controller.abort(), 45_000);
+
       try {
         const ctx = buildContextPayload();
         const res = await fetch("/api/ai-assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             message: text,
             role,
@@ -170,20 +180,24 @@ export function useTrendBotChat({
           handoff?: TrendBotMessage["handoff"];
         };
 
-        if (data.thinkingSteps?.length) {
-          for (const step of data.thinkingSteps) {
-            setThinkingStep(step);
-            await new Promise((r) => setTimeout(r, 280 + Math.random() * 220));
+        // Never drop a successful payload — even if abort fires during thinking UI.
+        const commitReply = (textReply: string) => {
+          if (data.suggestions?.length) {
+            setSuggestions(personalizePrompts(data.suggestions));
           }
-        } else {
-          setThinkingStep(`${TREND_BOT_NAME} analyze kar raha hai…`);
-          await new Promise((r) => setTimeout(r, 400));
-        }
-        setThinkingStep(null);
-
-        if (data.suggestions?.length) {
-          setSuggestions(personalizePrompts(data.suggestions));
-        }
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b_${Date.now()}`,
+              role: "bot",
+              text: textReply,
+              timestamp: Date.now(),
+              intent: data.intent,
+              products: data.products,
+              handoff: data.handoff,
+            },
+          ]);
+        };
 
         let reply = data.reply;
         if (!reply) {
@@ -194,34 +208,44 @@ export function useTrendBotChat({
                 `• *best mobile ka link do*\n` +
                 `• *best deals*\n` +
                 `• *order kaise karun*\n\n` +
-                `👉 [Products](/products) · [Deals](/deals) · [Support](/contact)`;
+                `👉 [Products](/products) · [Deals](/deals) · [Support](/support)`;
         }
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `b_${Date.now()}`,
-            role: "bot",
-            text: reply,
-            timestamp: Date.now(),
-            intent: data.intent,
-            products: data.products,
-            handoff: data.handoff,
-          },
-        ]);
-      } catch {
+        if (!controller.signal.aborted && data.thinkingSteps?.length) {
+          for (const step of data.thinkingSteps.slice(0, 3)) {
+            if (controller.signal.aborted) break;
+            setThinkingStep(step);
+            await new Promise((r) => setTimeout(r, 90 + Math.random() * 110));
+          }
+        } else if (!controller.signal.aborted) {
+          setThinkingStep(`${TREND_BOT_NAME} soch raha hai…`);
+          await new Promise((r) => setTimeout(r, 120));
+        }
         setThinkingStep(null);
+        commitReply(reply);
+      } catch (err) {
+        const superseded = abortRef.current !== null && abortRef.current !== controller;
+        if (superseded) return;
+        setThinkingStep(null);
+        const aborted =
+          controller.signal.aborted || (err instanceof Error && err.name === "AbortError");
         setMessages((prev) => [
           ...prev,
           {
             id: `e_${Date.now()}`,
             role: "bot",
-            text: "⚠️ *Connection issue* — internet check karke dubara try karein.",
+            text: aborted
+              ? "⏳ Reply thora late ho gaya — short sawal dubara try karein, ya [Support](/support)."
+              : "⚠️ *Connection issue* — internet check karke dubara try karein.",
             timestamp: Date.now(),
           },
         ]);
       } finally {
-        setLoading(false);
+        clearTimeout(hardTimeout);
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setLoading(false);
+        }
       }
     },
     [

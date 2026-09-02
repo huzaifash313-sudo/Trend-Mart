@@ -13,27 +13,60 @@ import {
   isPushClientSupported,
   syncPushSubscriptionIfGranted,
 } from "@/lib/pushClient";
+import ChatIncomingBanner from "@/components/ChatIncomingBanner";
+import { getActiveConversationId } from "@/lib/activeChat";
 
 function BrowserNotifyBridge() {
   const { notifications, isMuted } = useNotifications();
-  // Each notification should only ever fire ONE system notification. Without
-  // this, marking the top item read (or any array change) re-fired the next
-  // unread item, re-announcing old notifications.
-  const notifiedIds = useRef<Set<string>>(new Set());
+  // Seed historical rows on first paint so reload never re-blasts old unread
+  // as OS notifications. Only brand-new live rows may ping when tab is hidden.
+  const primed = useRef(false);
+  const seenIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
     if (isMuted) return;
+
+    if (!primed.current) {
+      for (const n of notifications) seenIds.current.add(n.id);
+      primed.current = true;
+      return;
+    }
+
+    // Foreground: in-app toast/chime is enough. OS ping only if tab not visible.
+    if (document.visibilityState !== "hidden") {
+      for (const n of notifications) seenIds.current.add(n.id);
+      return;
+    }
+
     const latest = notifications[0];
     if (!latest || latest.read) return;
-    if (notifiedIds.current.has(latest.id)) return;
-    notifiedIds.current.add(latest.id);
+    if (seenIds.current.has(latest.id)) return;
+    seenIds.current.add(latest.id);
+
+    // Respect user prefs — promotions / non-essential stay quiet.
+    try {
+      const raw = localStorage.getItem("trendsmart_notifications");
+      if (raw) {
+        const prefs = JSON.parse(raw) as Record<string, boolean>;
+        if (latest.type === "order" && prefs.order_updates === false) return;
+        if (
+          (latest.type === "sale" || latest.type === "inquiry") &&
+          prefs.merchant_alerts === false
+        ) {
+          return;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
     try {
       const n = new Notification(latest.title, {
         body: latest.body,
         icon: "/icon-192.png?v=10",
-        tag: latest.id,
+        tag: `tm-live-${latest.id}`,
       });
       n.onclick = () => {
         window.focus();
@@ -111,9 +144,15 @@ function AutoSubscribeWebPush() {
 
     let cancelled = false;
     const supabase = createClient();
+    let lastAttempt = 0;
 
     const trySync = async () => {
       if (cancelled) return;
+      // Debounce auth + visibility storms (min 60s between attempts).
+      const now = Date.now();
+      if (now - lastAttempt < 60_000) return;
+      lastAttempt = now;
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -122,27 +161,24 @@ function AutoSubscribeWebPush() {
       const permission = await getPushPermissionState();
       if (permission === "denied" || permission === "unsupported") return;
 
-      // Only re-sync when permission is ALREADY granted (no prompt without gesture).
+      // Only silent re-sync when already granted — never prompt, never OS toast.
       if (permission === "granted") {
-        await syncPushSubscriptionIfGranted();
+        await syncPushSubscriptionIfGranted(false);
       }
     };
 
     void trySync();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) void trySync();
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // Skip noisy TOKEN_REFRESHED / INITIAL_SESSION churn.
+      if (!session?.user) return;
+      if (event !== "SIGNED_IN" && event !== "USER_UPDATED") return;
+      void trySync();
     });
-
-    const onVis = () => {
-      if (document.visibilityState === "visible") void trySync();
-    };
-    document.addEventListener("visibilitychange", onVis);
 
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
-      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 
@@ -152,11 +188,28 @@ function AutoSubscribeWebPush() {
 function NotificationChrome() {
   const { isPanelOpen, closePanel } = useNotifications();
 
+  // Let the service worker ask whether this tab is viewing a chat (suppress push).
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; conversationId?: string } | undefined;
+      if (!data || data.type !== "tm-active-chat-query") return;
+      const viewing =
+        Boolean(data.conversationId) &&
+        getActiveConversationId() === data.conversationId &&
+        document.visibilityState === "visible";
+      event.ports?.[0]?.postMessage({ viewing });
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
+
   return (
     <>
       <BrowserNotifyBridge />
       <AutoRegisterUserNotifications />
       <AutoSubscribeWebPush />
+      <ChatIncomingBanner />
       <NotificationPanel isOpen={isPanelOpen} onClose={closePanel} />
     </>
   );

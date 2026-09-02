@@ -36,10 +36,23 @@ export interface ProductSeoRecord {
   short_code?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
+  /** Product-scoped rating (preferred for JSON-LD). */
+  avg_rating?: number | null;
+  review_count?: number | null;
   shop: ProductSeoShop;
 }
 
 const PRODUCT_SEO_SELECT = `
+  id, name, title, description, price, original_price, compare_at_price,
+  currency, image_url, images, is_available, short_code, updated_at, created_at,
+  avg_rating, review_count,
+  shops!inner (
+    id, name, slug, category, location, logo_url, avg_rating, review_count,
+    is_live, verification_status
+  )
+`;
+
+const PRODUCT_SEO_SELECT_LEGACY = `
   id, name, title, description, price, original_price, compare_at_price,
   currency, image_url, images, is_available, short_code, updated_at, created_at,
   shops!inner (
@@ -63,6 +76,8 @@ type RawProductSeoRow = {
   short_code?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
+  avg_rating?: number | null;
+  review_count?: number | null;
   shops?:
     | (ProductSeoShop & { is_live?: boolean; verification_status?: string })
     | (ProductSeoShop & { is_live?: boolean; verification_status?: string })[]
@@ -97,6 +112,12 @@ function mapProductSeoRow(row: RawProductSeoRow): ProductSeoRecord | null {
     short_code: row.short_code ?? null,
     updated_at: row.updated_at ?? null,
     created_at: row.created_at ?? null,
+    avg_rating:
+      typeof row.avg_rating === "number" ? row.avg_rating : Number(row.avg_rating) || null,
+    review_count:
+      typeof row.review_count === "number"
+        ? row.review_count
+        : Number(row.review_count) || null,
     shop: {
       id: shopRow.id,
       name: shopRow.name?.trim() || "Local store",
@@ -123,20 +144,31 @@ async function queryProductByReference(
 ): Promise<ProductSeoRecord | null> {
   if (!ref.value) return null;
 
-  let query = supabase
-    .from("products")
-    .select(PRODUCT_SEO_SELECT)
-    .eq("shops.is_live", true)
-    .eq("shops.verification_status", "approved")
-    .limit(1);
+  const run = async (select: string) => {
+    let query = supabase
+      .from("products")
+      .select(select)
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved")
+      .limit(1);
 
-  query =
-    ref.kind === "uuid"
-      ? query.eq("id", ref.value)
-      : query.eq("short_code", ref.value);
+    query =
+      ref.kind === "uuid"
+        ? query.eq("id", ref.value)
+        : query.eq("short_code", ref.value);
 
-  const { data } = await query.maybeSingle();
-  return data ? mapProductSeoRow(data as RawProductSeoRow) : null;
+    return query.maybeSingle();
+  };
+
+  const primary = await run(PRODUCT_SEO_SELECT);
+  if (
+    primary.error &&
+    /avg_rating|review_count|column .* does not exist/i.test(primary.error.message || "")
+  ) {
+    const legacy = await run(PRODUCT_SEO_SELECT_LEGACY);
+    return legacy.data ? mapProductSeoRow(legacy.data as RawProductSeoRow) : null;
+  }
+  return primary.data ? mapProductSeoRow(primary.data as RawProductSeoRow) : null;
 }
 
 /** Primary image URL for OG / JSON-LD. */

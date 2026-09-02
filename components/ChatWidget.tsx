@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { getShopCategoryPrompts, getShopWelcomeExtras } from "@/lib/ai/shopCategoryPrompts";
+import {
+  buildContextualWelcome,
+  getTrendBotPagePack,
+} from "@/lib/ai/trendBotContext";
 import { TREND_BOT_NAME, TREND_BOT_WELCOME_SHOP } from "@/lib/ai/trendBotBrand";
 import { TrendBotLauncher } from "@/components/trendbot/TrendBotLauncher";
 import { TrendBotPanel } from "@/components/trendbot/TrendBotPanel";
@@ -19,15 +23,25 @@ export default function ChatWidget({
   shopCategory,
 }: ChatWidgetProps) {
   const [open, setOpen] = useState(false);
+  const shopPack = getTrendBotPagePack("shop");
 
-  const prompts = useMemo(
-    () => getShopCategoryPrompts(shopCategory, shopName),
-    [shopCategory, shopName],
-  );
+  const prompts = useMemo(() => {
+    const category = getShopCategoryPrompts(shopCategory, shopName);
+    // Shop-context prompts first, then category-specific — unique list.
+    const merged = [...shopPack.prompts, ...category];
+    const seen = new Set<string>();
+    return merged.filter((p) => {
+      const key = p.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 6);
+  }, [shopCategory, shopName, shopPack.prompts]);
 
   const welcomeText = useMemo(() => {
     const extra = getShopWelcomeExtras(shopCategory);
-    return `${TREND_BOT_WELCOME_SHOP(shopName)}\n\n_${extra}_`;
+    const base = `${TREND_BOT_WELCOME_SHOP(shopName)}\n\n_${extra}_`;
+    return buildContextualWelcome("shop", base);
   }, [shopCategory, shopName]);
 
   return (

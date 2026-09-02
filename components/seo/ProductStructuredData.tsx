@@ -41,11 +41,17 @@ export default function ProductStructuredData({
     brandName: shop.name,
     url: absoluteUrl(canonicalPath),
     ratingValue:
-      typeof shop.avg_rating === "number" && shop.avg_rating > 0
-        ? shop.avg_rating
-        : undefined,
+      typeof product.avg_rating === "number" && product.avg_rating > 0
+        ? product.avg_rating
+        : typeof shop.avg_rating === "number" && shop.avg_rating > 0
+          ? shop.avg_rating
+          : undefined,
     reviewCount:
-      typeof shop.review_count === "number" ? shop.review_count : undefined,
+      typeof product.review_count === "number" && product.review_count > 0
+        ? product.review_count
+        : typeof shop.review_count === "number"
+          ? shop.review_count
+          : undefined,
   });
 
   return (

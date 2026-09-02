@@ -133,10 +133,16 @@ export function parseCoverageFromZones(
 }
 
 export function cityNamesMatch(a: string, b: string): boolean {
-  const left = a.toLowerCase().trim();
-  const right = b.toLowerCase().trim();
+  const left = a.toLowerCase().trim().replace(/\s+/g, " ");
+  const right = b.toLowerCase().trim().replace(/\s+/g, " ");
   if (!left || !right) return false;
-  return left === right || left.includes(right) || right.includes(left);
+  if (left === right) return true;
+  // Word-boundary containment only — never raw includes ("Gujrat" ⊄ "Gujranwala").
+  const leftWords = left.split(" ");
+  const rightWords = right.split(" ");
+  if (leftWords.length === 1 && rightWords.includes(left)) return true;
+  if (rightWords.length === 1 && leftWords.includes(right)) return true;
+  return false;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -726,8 +732,9 @@ export function isCustomerWithinCoverage(
       };
     }
     // No explicit city resolved — approximate with ~35 km of the shop pin.
+    // Missing distance = cannot confirm; do not invent "within".
     return {
-      within: distanceKm != null ? distanceKm <= 35 : true,
+      within: distanceKm != null ? distanceKm <= 35 : false,
       distanceKm,
       coverageMode: "city",
     };
@@ -735,7 +742,11 @@ export function isCustomerWithinCoverage(
 
   // radius
   const radiusKm = shop.service_radius_km ?? 0;
-  if (radiusKm > 0 && distanceKm != null) {
+  if (radiusKm > 0) {
+    if (distanceKm == null) {
+      // Cannot invent coverage without both pins — block rather than allow.
+      return { within: false, distanceKm: null, coverageMode: "radius" };
+    }
     return { within: distanceKm <= radiusKm, distanceKm, coverageMode: "radius" };
   }
   return { within: true, distanceKm, coverageMode: "radius" };

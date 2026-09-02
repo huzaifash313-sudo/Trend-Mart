@@ -250,12 +250,16 @@ export async function submitReview(
   _customerName: string,
   rating: number,
   comment: string,
+  productId?: string | null,
 ): Promise<ServiceResult<Review>> {
   cleanupRateLimits();
 
   const sanitizedShopId = sanitizeShopId(shopId);
-  if (!sanitizedShopId) {
-    return { success: false, error: "Invalid shop ID." };
+  const sanitizedProductId =
+    productId && /^[0-9a-f-]{36}$/i.test(productId.trim()) ? productId.trim() : "";
+
+  if (!sanitizedProductId && !sanitizedShopId) {
+    return { success: false, error: "Invalid shop or product." };
   }
 
   const sanitizedRating = sanitizeRating(rating);
@@ -278,7 +282,9 @@ export async function submitReview(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        shopId: sanitizedShopId,
+        ...(sanitizedProductId
+          ? { productId: sanitizedProductId }
+          : { shopId: sanitizedShopId }),
         rating: sanitizedRating,
         comment: sanitizedComment,
       }),
@@ -299,7 +305,10 @@ export async function submitReview(
       },
     };
   } catch (err) {
-    logError(err, { module: "reviewService.submitReview", meta: { shopId: sanitizedShopId } });
+    logError(err, {
+      module: "reviewService.submitReview",
+      meta: { shopId: sanitizedShopId, productId: sanitizedProductId || null },
+    });
     return { success: false, error: toError(err) };
   }
 }
@@ -409,12 +418,22 @@ export async function fetchReviewSessionContext(
 
 export interface MyReview extends Review {
   shop_name: string;
+  product_name?: string | null;
 }
 
 export interface MyReviewsPayload {
   reviews: MyReview[];
-  /** Delivered-but-unreviewed shops, each with the latest delivered orderId so
-   *  dismissal is per-order (a later order from the same shop re-triggers). */
+  /** Delivered line-items not yet rated (preferred). */
+  reviewableProducts: {
+    id: string;
+    productId: string;
+    name: string;
+    imageUrl?: string | null;
+    shopId: string;
+    shopName: string;
+    orderId?: string;
+  }[];
+  /** Legacy: delivered shops with no product lines left to rate. */
   reviewableShops: { id: string; name: string; orderId?: string }[];
   stats: { total: number; average: number };
 }
@@ -437,7 +456,16 @@ export async function fetchMyReviews(): Promise<ServiceResult<MyReviewsPayload>>
     if (!res.ok || !payload.success || !payload.data) {
       return { success: false, error: payload.error || "Could not load your reviews." };
     }
-    return { success: true, data: payload.data };
+    const data = payload.data;
+    return {
+      success: true,
+      data: {
+        reviews: data.reviews ?? [],
+        reviewableProducts: data.reviewableProducts ?? [],
+        reviewableShops: data.reviewableShops ?? [],
+        stats: data.stats ?? { total: 0, average: 0 },
+      },
+    };
   } catch (err) {
     logError(err, { module: "reviewService.fetchMyReviews" });
     return { success: false, error: toError(err) };

@@ -23,7 +23,7 @@ import type { Shop, ShopFormData } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
-import { computeDeliveryFee } from "@/lib/deliveryFee";
+import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -373,7 +373,7 @@ export default function DashboardSettingsPage() {
     }
 
     const feeAt = (km: number) => {
-      const amount = computeDeliveryFee({
+      const b = computeDeliveryFeeBreakdown({
         flat,
         perKm,
         distanceKm: km,
@@ -382,13 +382,19 @@ export default function DashboardSettingsPage() {
         isPickup: false,
       });
       return {
-        label: amount > 0 ? `Rs. ${amount.toLocaleString()}` : "FREE",
+        label: b.freeReason
+          ? "FREE"
+          : !b.isFinal
+            ? "—"
+            : `Rs. ${b.fee.toLocaleString()}`,
         hint:
           freeThreshold > 0
             ? `below Rs. ${freeThreshold.toLocaleString()} offer`
-            : amount > 0
-              ? "delivery charge"
-              : "no charge set",
+            : b.unconfigured
+              ? "set flat or per-km"
+              : b.fee > 0
+                ? "delivery charge"
+                : "exact fee",
       };
     };
 
@@ -506,7 +512,7 @@ export default function DashboardSettingsPage() {
     setPushBusy(true);
     setPushStatus("checking");
     const { pushFailMessage } = await import("@/lib/pushClient");
-    const result = await subscribeToPushNotifications();
+    const result = await subscribeToPushNotifications({ confirmOs: true, forceSync: true });
 
     if (result.ok) {
       setPushStatus("enabled");
@@ -606,9 +612,13 @@ export default function DashboardSettingsPage() {
                 Store visibility
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
-                {form.is_live
-                  ? "Your dukaan is live on TrendsMart. Customers can browse and place orders."
-                  : "Your dukaan is hidden from customers while you make changes."}
+                {(shop?.verification_status ?? "approved") === "pending"
+                  ? "Your store is waiting for TrendsMart admin approval. Turning Live on prepares it — customers will only see it after approval."
+                  : (shop?.verification_status ?? "approved") === "rejected"
+                    ? "This store was not approved. Update your details and contact support, or wait for a re-review."
+                    : form.is_live
+                      ? "Your dukaan is live on TrendsMart. Customers can browse and place orders."
+                      : "Your dukaan is hidden from customers while you make changes."}
               </p>
             </div>
             <ToggleSwitch
@@ -695,14 +705,14 @@ export default function DashboardSettingsPage() {
             />
             <MoneyInput
               label="Flat delivery fee (Rs.)"
-              helper="Base delivery fee before any distance charge."
+              helper="Base fee when delivery is not free. If you also set per-km, customers pay: flat + (per-km × distance)."
               value={form.delivery_fee_flat}
               onChange={(value) => setForm((current) => ({ ...current, delivery_fee_flat: value }))}
               placeholder="Delivery fee"
             />
             <MoneyInput
               label="Per-km delivery fee (Rs.)"
-              helper="Extra fee added for each km of customer distance."
+              helper="Added on top of flat fee using GPS distance. Leave 0 for flat-only shops. Checkout requires location when this is set."
               value={form.delivery_fee_per_km}
               onChange={(value) => setForm((current) => ({ ...current, delivery_fee_per_km: value }))}
               placeholder="Per km fee"
@@ -745,7 +755,7 @@ export default function DashboardSettingsPage() {
                 ? `Auto-calculated: flat Rs. ${feePreview.flat.toLocaleString()} + Rs. ${feePreview.perKm} × customer distance${feePreview.freeThreshold > 0 ? ` — FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
                 : feePreview.flat > 0
                   ? `Flat delivery charge of Rs. ${feePreview.flat.toLocaleString()}${feePreview.freeThreshold > 0 ? `, FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
-                  : "No delivery fee set — delivery will show as FREE."}
+                  : "No delivery fee set — checkout will block delivery until you set flat and/or per-km (or a free threshold customers can reach)."}
               {feePreview.freeThreshold > 0
                 ? ` Distance samples assume a Rs. ${feePreview.previewSubtotal.toLocaleString()} cart (below the free-delivery offer).`
                 : ""}

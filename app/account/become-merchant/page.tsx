@@ -136,6 +136,7 @@ export default function BecomeMerchantPage() {
     setSubmitting(true);
     try {
       // Create store first — DB trigger promotes to merchant. Avoid orphan merchant role on failure.
+      // Store stays pending admin approval (createShop forces verification_status=pending).
       const shopResult = await createShop({
         ...form,
         name: form.name.trim(),
@@ -161,12 +162,15 @@ export default function BecomeMerchantPage() {
         console.warn("[become-merchant] claimSignupRole:", roleResult.error);
       }
 
-      // Invalidate storefront cache so the new shop shows up on the homepage.
+      // Invalidate storefront cache (shop still hidden until admin approves).
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("trendsmart:shops-updated"));
       }
 
-      addToast("Store created — welcome to your merchant dashboard!", "success");
+      addToast(
+        "Store created! It is pending admin approval — you can set up products now.",
+        "success",
+      );
       window.location.href = "/dashboard";
     } catch {
       addToast("Something went wrong. Please try again.", "error");
@@ -339,10 +343,14 @@ export default function BecomeMerchantPage() {
               I agree to TrendsMart&apos;s{" "}
               <Link href="/legal/merchant-guidelines" target="_blank" className="font-medium text-emerald-600 underline">
                 Merchant Security Guidelines
-              </Link>{" "}
-              and{" "}
+              </Link>
+              ,{" "}
               <Link href="/legal/terms" target="_blank" className="font-medium text-emerald-600 underline">
                 Terms &amp; Conditions
+              </Link>
+              , and{" "}
+              <Link href="/legal/privacy" target="_blank" className="font-medium text-emerald-600 underline">
+                Privacy Policy
               </Link>
               .
             </span>

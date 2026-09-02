@@ -22,13 +22,11 @@ import { ToastProvider } from "@/components/Toast";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
-import ReviewReminderPopup from "@/components/ReviewReminderPopup";
-import TrendBotHost from "@/components/trendbot/TrendBotHost";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
-import OnboardingWizard from "@/components/OnboardingWizard";
 import PolicyNotice from "@/components/PolicyNotice";
 import ScrollToTop from "@/components/ScrollToTop";
 import TurnstileScript from "@/components/TurnstileScript";
+import DeferredAppChrome from "@/components/DeferredAppChrome";
 import { ScrollToTopSuspense } from "@/components/PageLoadingShell";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
 import type { ReactNode } from "react";
@@ -157,15 +155,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <ErrorBoundary name="CartBar" autoResetMs={2500}>
                 <CartBar />
               </ErrorBoundary>
-              <ErrorBoundary name="TrendBot" autoResetMs={2500}>
-                <TrendBotHost />
+              <ErrorBoundary name="DeferredChrome" autoResetMs={2500}>
+                <DeferredAppChrome />
               </ErrorBoundary>
               <MerchantQuickAddHost />
-              <OnboardingWizard />
               <PolicyNotice />
               <PwaRegister />
               <TurnstileScript />
-              <ReviewReminderPopup />
               </AppNotifications>
               </ShopReviewsProvider>
               </MerchantQuickAddProvider>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queries";
+import { PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
 import { fetchShops } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import { fetchActiveDeals } from "@/services/dealService";
@@ -28,26 +29,37 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  * boot cover or abort a first-run play.
  */
 const STAGE_MS = {
-  logoHold: 750,
-  brand: 950,
-  details: 1250,
-  holdMin: 800,
+  logoHold: 420,
+  brand: 520,
+  details: 640,
+  holdMin: 280,
   /** Keep in sync with `.tm-splash--exit` animation duration in globals.css */
-  exit: 520,
+  exit: 420,
   /** Never block home forever if network is slow. */
-  maxWaitForData: 1500,
+  maxWaitForData: 700,
   /** Hard cap for the whole hold phase before we bail out to home. */
-  hardCapWait: 5500,
+  hardCapWait: 1800,
 };
 
 const REDUCED_MS = {
+  logoHold: 80,
+  brand: 100,
+  details: 120,
+  holdMin: 80,
+  exit: 180,
+  maxWaitForData: 200,
+  hardCapWait: 400,
+};
+
+/** Slow networks / Save-Data: skip the marketing beat and open the app. */
+const SLOW_NET_MS = {
   logoHold: 160,
-  brand: 200,
-  details: 300,
-  holdMin: 300,
-  exit: 260,
-  maxWaitForData: 400,
-  hardCapWait: 900,
+  brand: 180,
+  details: 200,
+  holdMin: 100,
+  exit: 220,
+  maxWaitForData: 300,
+  hardCapWait: 700,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -120,6 +132,29 @@ function stageTiming(): StageTiming {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return REDUCED_MS;
     }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const nav = navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    };
+    const c = nav.connection;
+    if (
+      c?.saveData ||
+      c?.effectiveType === "slow-2g" ||
+      c?.effectiveType === "2g" ||
+      c?.effectiveType === "3g"
+    ) {
+      return SLOW_NET_MS;
+    }
+  } catch {
+    /* ignore */
+  }
+  // SSR already seeded React Query — don't make the user wait on a long intro.
+  try {
+    // Soft signal: if shops are already cached, use the fast path.
+    // (queryClient is not available here; rely on session + boot only.)
   } catch {
     /* ignore */
   }
@@ -206,9 +241,17 @@ export default function AppSplash() {
 
     // Warm the homepage cache while the customer watches the intro.
     const prefetch = Promise.allSettled([
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.shops,
-        queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 300 })),
+      queryClient.prefetchInfiniteQuery({
+        queryKey: [...queryKeys.shopsInfinite, PUBLIC_SHOP_PAGE_SIZE],
+        queryFn: ({ pageParam }) =>
+          unwrap(
+            fetchShops({
+              publicOnly: true,
+              limit: PUBLIC_SHOP_PAGE_SIZE,
+              offset: pageParam as number,
+            }),
+          ),
+        initialPageParam: 0,
         staleTime: 2 * 60_000,
       }),
       queryClient.prefetchQuery({

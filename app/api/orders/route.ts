@@ -23,7 +23,7 @@ import { normalizePkPhoneDigits, isValidUUID } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { computeVariantPricing } from "@/lib/variantPricing";
 import { hasPriceTiers, priceForQuantity } from "@/lib/priceTiers";
-import { computeDeliveryFee } from "@/lib/deliveryFee";
+import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { sendPushToUser } from "@/lib/webPush";
 import type { Order, OrderItem, PriceTier, VariantGroup } from "@/types";
@@ -121,6 +121,13 @@ function toNumber(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Lat/lng only — never coerce null/undefined to 0 (Gulf of Guinea bug). */
+function toCoord(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Parse a money value; returns null for invalid (non-numeric) or negative values. */
 function toMoney(v: unknown): number | null {
   if (typeof v !== "number" && typeof v !== "string") return null;
@@ -215,10 +222,16 @@ function parseCoverage(zones: string[] | null | undefined): {
 }
 
 function cityMatch(a: string, b: string): boolean {
-  const l = a.toLowerCase().trim();
-  const r = b.toLowerCase().trim();
+  const l = a.toLowerCase().trim().replace(/\s+/g, " ");
+  const r = b.toLowerCase().trim().replace(/\s+/g, " ");
   if (!l || !r) return false;
-  return l === r || l.includes(r) || r.includes(l);
+  if (l === r) return true;
+  // Word-boundary only — "Gujrat" must NOT match "Gujranwala".
+  const lw = l.split(" ");
+  const rw = r.split(" ");
+  if (lw.length === 1 && rw.includes(l)) return true;
+  if (rw.length === 1 && lw.includes(r)) return true;
+  return false;
 }
 
 /* ─── POST handler ──────────────────────────────────────────────────────────── */
@@ -694,26 +707,61 @@ export async function POST(request: Request) {
     custLng != null &&
     Number.isFinite(custLat) &&
     Number.isFinite(custLng);
-  const shopLat = toNumber(shopRow.latitude);
-  const shopLng = toNumber(shopRow.longitude);
+  const shopLat = toCoord(shopRow.latitude);
+  const shopLng = toCoord(shopRow.longitude);
+  const hasShopCoords =
+    shopLat != null &&
+    shopLng != null &&
+    shopLat >= -90 &&
+    shopLat <= 90 &&
+    shopLng >= -180 &&
+    shopLng <= 180;
   let distanceKm: number | null = null;
-  if (hasCustomerCoords && Number.isFinite(shopLat) && Number.isFinite(shopLng)) {
-    distanceKm = haversineKm(custLat, custLng, shopLat, shopLng);
+  if (hasCustomerCoords && hasShopCoords) {
+    distanceKm = haversineKm(custLat!, custLng!, shopLat!, shopLng!);
   }
 
+  const perKmFee = toNumber(shopRow.delivery_fee_per_km, 0);
+  const flatFee = toNumber(shopRow.delivery_fee_flat, 0);
+
   if (orderType !== "pickup") {
+    // Delivery always needs a live customer pin (coverage + optional per-km).
+    if (!hasCustomerCoords) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Share your live delivery location so we can confirm coverage and fees.",
+        },
+        { status: 409 },
+      );
+    }
+
     let coverageError: string | null = null;
     if (coverage.mode === "city") {
       const target = coverage.city || (shopRow.location ?? "");
-      if (customerCity && target && !cityMatch(target, customerCity)) {
+      if (!target) {
+        coverageError =
+          "This shop's city coverage is incomplete — delivery cannot be confirmed.";
+      } else if (customerCity && !cityMatch(target, customerCity)) {
         coverageError = `This shop only delivers in ${target}.`;
       } else if (!customerCity && distanceKm != null && distanceKm > 35) {
         coverageError = "You appear to be outside this shop's delivery city.";
+      } else if (!customerCity && distanceKm == null) {
+        coverageError =
+          "Could not verify city coverage — shop location or your pin is missing.";
       }
     } else if (coverage.mode === "radius") {
-      if (radiusKm > 0 && distanceKm != null && distanceKm > radiusKm) {
+      if (!hasShopCoords) {
+        coverageError =
+          "This shop has not set its map pin yet — delivery cannot be confirmed.";
+      } else if (radiusKm > 0 && distanceKm == null) {
+        coverageError = "Could not calculate distance for delivery coverage.";
+      } else if (radiusKm > 0 && distanceKm != null && distanceKm > radiusKm) {
         coverageError = `You are about ${distanceKm.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`;
       }
+    } else if (perKmFee > 0 && !hasShopCoords) {
+      coverageError =
+        "This shop charges per-km delivery but has no map pin — fee cannot be calculated.";
     }
     if (coverageError) {
       return NextResponse.json({ success: false, error: coverageError }, { status: 409 });
@@ -740,7 +788,10 @@ export async function POST(request: Request) {
       const usageLimit = toNumber(coupon.usage_limit, 0);
       const usageCount = toNumber(coupon.usage_count, 0);
       if (expired) {
-        discount = 0;
+        return NextResponse.json(
+          { success: false, error: "This coupon has expired." },
+          { status: 409 },
+        );
       } else if (minCouponOrder > 0 && subtotal < minCouponOrder) {
         return NextResponse.json(
           {
@@ -782,14 +833,48 @@ export async function POST(request: Request) {
 
   // 10. Delivery fee (server-side) — self-pickup is never charged delivery.
   //     Shared helper = exactly what the customer saw in checkout.
-  const deliveryFee = computeDeliveryFee({
-    flat: toNumber(shopRow.delivery_fee_flat, 0),
-    perKm: toNumber(shopRow.delivery_fee_per_km, 0),
+  const feeBreakdown = computeDeliveryFeeBreakdown({
+    flat: flatFee,
+    perKm: perKmFee,
     distanceKm,
     freeThreshold: toNumber(shopRow.free_delivery_threshold, 0),
     subtotal,
     isPickup: orderType === "pickup",
   });
+
+  if (orderType === "delivery" && feeBreakdown.incompleteDistance) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "This shop charges per-km delivery. Share your live location / pin so the exact fee can be calculated.",
+      },
+      { status: 409 },
+    );
+  }
+
+  if (orderType === "delivery" && feeBreakdown.unconfigured) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "This shop has not set delivery charges yet. Try pickup, or contact the shop / support.",
+      },
+      { status: 409 },
+    );
+  }
+
+  if (orderType === "delivery" && !feeBreakdown.isFinal) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Delivery fee could not be calculated exactly. Check your location and try again.",
+      },
+      { status: 409 },
+    );
+  }
+
+  const deliveryFee = feeBreakdown.fee;
 
   const total = Math.max(0, Math.round((subtotal - discount + deliveryFee) * 100) / 100);
 

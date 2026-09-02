@@ -1,25 +1,37 @@
 "use client";
 
+export type TrendBotPose = "idle" | "wave" | "jump" | "walk";
+
 interface TrendBotAvatarProps {
   size?: "sm" | "md" | "lg";
   animated?: boolean;
+  /** One-shot / pose class — jump, wave, walk legs */
+  pose?: TrendBotPose;
   wiggle?: boolean;
   className?: string;
 }
 
-const SIZES = { sm: 40, md: 56, lg: 72 };
+/** Pixel box — taller than wide so full body fits the FAB. */
+const SIZES = { sm: { w: 44, h: 58 }, md: { w: 56, h: 74 }, lg: { w: 72, h: 94 } };
 
-/** Animated TrendBot mascot — sea-green robot face. */
+/**
+ * Cute full-body TrendBot mascot (head + belly + arms + feet).
+ * Matches the teal screen-face brand, now with a tiny body for walk/jump poses.
+ */
 export function TrendBotAvatar({
   size = "md",
   animated = true,
+  pose = "idle",
   wiggle = false,
   className = "",
 }: TrendBotAvatarProps) {
-  const px = SIZES[size];
+  const { w, h } = SIZES[size];
+  const uid = `tb${size}${pose}`;
   const anim = [
-    animated ? "tm-trendbot-float" : "",
-    wiggle ? "tm-trendbot-wiggle" : "",
+    animated && pose === "idle" ? "tm-trendbot-float" : "",
+    pose === "jump" ? "tm-trendbot-jump" : "",
+    pose === "walk" ? "tm-trendbot-walk-bob" : "",
+    pose === "wave" || wiggle ? "tm-trendbot-wiggle" : "",
     className,
   ]
     .filter(Boolean)
@@ -27,54 +39,111 @@ export function TrendBotAvatar({
 
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center ${anim}`}
-      style={{ width: px, height: px }}
+      className={`relative flex shrink-0 items-end justify-center ${anim}`}
+      style={{ width: w, height: h }}
       aria-hidden="true"
     >
-      {/* Glow ring */}
       <span
-        className={`absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400/30 to-teal-500/20 ${animated ? "tm-trendbot-pulse-ring" : ""}`}
+        className={`pointer-events-none absolute bottom-0 left-1/2 h-3 w-10 -translate-x-1/2 rounded-full bg-emerald-500/25 blur-[2px] ${
+          animated ? "tm-trendbot-pulse-ring" : ""
+        }`}
       />
       <svg
-        viewBox="0 0 64 64"
-        width={px}
-        height={px}
+        viewBox="0 0 64 88"
+        width={w}
+        height={h}
         className="relative drop-shadow-md"
         role="img"
         aria-label="TrendBot"
       >
         <defs>
-          <linearGradient id="tb-body" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={`${uid}-body`} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#10b981" />
-            <stop offset="50%" stopColor="#0d9488" />
+            <stop offset="55%" stopColor="#0d9488" />
             <stop offset="100%" stopColor="#14b8a6" />
           </linearGradient>
-          <linearGradient id="tb-face" x1="0%" y1="0%" x2="0%" y2="100%">
+          <linearGradient id={`${uid}-face`} x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#ffffff" />
             <stop offset="100%" stopColor="#ecfdf5" />
           </linearGradient>
         </defs>
+
         {/* Antenna */}
-        <line x1="32" y1="6" x2="32" y2="14" stroke="#0f766e" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="32" cy="5" r="3.5" fill="#34d399" className={animated ? "tm-trendbot-antenna" : ""} />
-        {/* Head */}
-        <rect x="10" y="14" width="44" height="38" rx="12" fill="url(#tb-body)" />
-        <rect x="14" y="20" width="36" height="26" rx="8" fill="url(#tb-face)" />
-        {/* Eyes */}
-        <ellipse cx="24" cy="32" rx="5" ry="6" fill="#0f766e" className={animated ? "tm-trendbot-eye-l" : ""} />
-        <ellipse cx="40" cy="32" rx="5" ry="6" fill="#0f766e" className={animated ? "tm-trendbot-eye-r" : ""} />
-        <circle cx="25" cy="30" r="1.8" fill="#a7f3d0" />
-        <circle cx="41" cy="30" r="1.8" fill="#a7f3d0" />
-        {/* Smile */}
-        <path
-          d="M 24 40 Q 32 46 40 40"
-          fill="none"
+        <line
+          x1="32"
+          y1="4"
+          x2="32"
+          y2="12"
           stroke="#0f766e"
-          strokeWidth="2"
+          strokeWidth="2.4"
           strokeLinecap="round"
         />
-        {/* Body nub */}
-        <rect x="22" y="52" width="20" height="8" rx="4" fill="#0d9488" />
+        <circle
+          cx="32"
+          cy="3.5"
+          r="3.2"
+          fill="#34d399"
+          className={animated ? "tm-trendbot-antenna" : ""}
+        />
+
+        {/* Head */}
+        <rect x="12" y="12" width="40" height="32" rx="11" fill={`url(#${uid}-body)`} />
+        <rect x="16" y="17" width="32" height="22" rx="7" fill={`url(#${uid}-face)`} />
+
+        {/* Eyes */}
+        <ellipse
+          cx="24"
+          cy="27"
+          rx="4.4"
+          ry="5.2"
+          fill="#0f766e"
+          className={animated ? "tm-trendbot-eye-l" : ""}
+        />
+        <ellipse
+          cx="40"
+          cy="27"
+          rx="4.4"
+          ry="5.2"
+          fill="#0f766e"
+          className={animated ? "tm-trendbot-eye-r" : ""}
+        />
+        <circle cx="25" cy="25.2" r="1.5" fill="#a7f3d0" />
+        <circle cx="41" cy="25.2" r="1.5" fill="#a7f3d0" />
+
+        {/* Smile */}
+        <path
+          d="M 24 34 Q 32 39.5 40 34"
+          fill="none"
+          stroke="#0f766e"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+        />
+
+        {/* Left arm */}
+        <g className={pose === "wave" ? "tm-trendbot-arm-wave" : pose === "walk" ? "tm-trendbot-arm-l" : ""}>
+          <rect x="4" y="48" width="10" height="16" rx="5" fill="#0d9488" />
+          <circle cx="9" cy="65" r="4.2" fill="#14b8a6" />
+        </g>
+
+        {/* Right arm */}
+        <g className={pose === "walk" ? "tm-trendbot-arm-r" : ""}>
+          <rect x="50" y="48" width="10" height="16" rx="5" fill="#0d9488" />
+          <circle cx="55" cy="65" r="4.2" fill="#14b8a6" />
+        </g>
+
+        {/* Belly / torso */}
+        <rect x="18" y="44" width="28" height="24" rx="10" fill={`url(#${uid}-body)`} />
+        <ellipse cx="32" cy="56" rx="8" ry="6" fill="#5eead4" opacity="0.35" />
+
+        {/* Legs + feet */}
+        <g className={pose === "walk" ? "tm-trendbot-leg-l" : ""}>
+          <rect x="20" y="66" width="9" height="14" rx="4.5" fill="#0f766e" />
+          <ellipse cx="24.5" cy="82" rx="7" ry="3.5" fill="#134e4a" />
+        </g>
+        <g className={pose === "walk" ? "tm-trendbot-leg-r" : ""}>
+          <rect x="35" y="66" width="9" height="14" rx="4.5" fill="#0f766e" />
+          <ellipse cx="39.5" cy="82" rx="7" ry="3.5" fill="#134e4a" />
+        </g>
       </svg>
     </div>
   );

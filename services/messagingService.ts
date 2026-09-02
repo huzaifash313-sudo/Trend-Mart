@@ -235,11 +235,24 @@ export async function sendMessage(
       .single();
 
     if (error) throw error;
-    return { success: true, data: data as ChatMessage };
+    const message = data as ChatMessage;
+    notifyChatPush(params.conversationId, message.body);
+    return { success: true, data: message };
   } catch (err) {
     logError(err, { module: "messagingService.sendMessage", meta: { conversationId: params.conversationId } });
     return { success: false, error: toError(err) };
   }
+}
+
+/** Fire-and-forget background push to the other party (app closed / background). */
+function notifyChatPush(conversationId: string, preview: string): void {
+  if (typeof window === "undefined") return;
+  void fetch("/api/push/notify-chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ conversationId, preview }),
+  }).catch(() => undefined);
 }
 
 export async function fetchMerchantConversations(

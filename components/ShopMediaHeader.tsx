@@ -69,7 +69,7 @@ export function ShopLogoAvatar({
       {showLogo ? (
         useNextImage ? (
           <Image
-            src={getSafeImageUrl(logo, "shop")}
+            src={getSafeImageUrl(logo, "shop", "logo")}
             alt={logoAlt}
             fill
             className="object-cover"
@@ -149,7 +149,7 @@ export default function ShopMediaHeader({
         {showBanner ? (
           useNextImage ? (
             <Image
-              src={getSafeImageUrl(banner, "shop")}
+              src={getSafeImageUrl(banner, "shop", "banner")}
               alt={bannerAlt}
               fill
               className="object-cover object-center"
@@ -208,7 +208,7 @@ export default function ShopMediaHeader({
           {showLogo ? (
             useNextImage ? (
               <Image
-                src={getSafeImageUrl(logo, "shop")}
+                src={getSafeImageUrl(logo, "shop", "logo")}
                 alt={logoAlt}
                 fill
                 className="object-cover"

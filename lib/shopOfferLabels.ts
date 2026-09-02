@@ -1,6 +1,7 @@
 /* Shared shop offer ticker labels — coupons, delivery, deals. */
 
 import { isOfferActive } from "@/lib/shopOfferTicker";
+import { describeDeliveryPricing } from "@/lib/deliveryFee";
 import type { Coupon } from "@/services/couponService";
 
 export function buildDeliveryTickerLabel(input: {
@@ -8,19 +9,7 @@ export function buildDeliveryTickerLabel(input: {
   deliveryFeeFlat?: number | null;
   deliveryFeePerKm?: number | null;
 }): string | null {
-  const free = input.freeDeliveryThreshold;
-  if (free != null && free > 0) {
-    return `Free delivery over Rs. ${Math.round(free).toLocaleString()}`;
-  }
-  const flat = input.deliveryFeeFlat;
-  if (flat != null && flat > 0) {
-    return `Delivery Rs. ${Math.round(flat).toLocaleString()}`;
-  }
-  const perKm = input.deliveryFeePerKm;
-  if (perKm != null && perKm > 0) {
-    return `Delivery Rs. ${Math.round(perKm).toLocaleString()}/km`;
-  }
-  return null;
+  return describeDeliveryPricing(input);
 }
 
 export function formatCouponTickerLabels(
@@ -75,7 +64,7 @@ export function buildShopTickerTags(input: ShopTickerInput): string[] {
   for (const label of couponLabels) {
     const trimmed = label.trim();
     if (!trimmed) continue;
-    const short = trimmed.length > 32 ? `${trimmed.slice(0, 30)}…` : trimmed;
+    const short = trimmed.length > 36 ? `${trimmed.slice(0, 34)}…` : trimmed;
     if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) tags.push(short);
   }
 
@@ -84,8 +73,11 @@ export function buildShopTickerTags(input: ShopTickerInput): string[] {
     deliveryFeeFlat: input.deliveryFeeFlat,
     deliveryFeePerKm: input.deliveryFeePerKm,
   });
-  if (delivery && !tags.some((t) => t.toLowerCase() === delivery.toLowerCase())) {
-    tags.push(delivery);
+  if (delivery) {
+    const short = delivery.length > 42 ? `${delivery.slice(0, 40)}…` : delivery;
+    if (!tags.some((t) => t.toLowerCase() === short.toLowerCase())) {
+      tags.push(short);
+    }
   }
 
   for (const label of input.dealLabels ?? []) {

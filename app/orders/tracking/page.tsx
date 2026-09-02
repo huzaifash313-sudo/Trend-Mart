@@ -402,16 +402,23 @@ function OrderCard({
                       : "#f59e0b",
           }}
         >
-          {order.status === "Delivered"
-            ? "✅"
-            : order.status === "Cancelled"
-              ? "❌"
-              : order.status === "Dispatched"
-                ? "🚚"
-                : order.status === "Processing"
-                  ? "⚙️"
-                  : "📋"}{" "}
-          {order.status}
+          {(() => {
+            const pickupLike =
+              order.orderType === "pickup" || order.orderType === "dine_in";
+            if (order.status === "Delivered") {
+              return pickupLike
+                ? order.orderType === "dine_in"
+                  ? "✅ Served"
+                  : "✅ Collected"
+                : "✅ Delivered";
+            }
+            if (order.status === "Cancelled") return "❌ Cancelled";
+            if (order.status === "Dispatched") {
+              return pickupLike ? "🛍️ Ready for collection" : "🚚 Dispatched";
+            }
+            if (order.status === "Processing") return "⚙️ Processing";
+            return "📋 Pending";
+          })()}
         </span>
       </div>
 
@@ -453,7 +460,7 @@ function OrderCard({
                 )}
               </span>
               <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                {formatRupees(item.price)}
+                {formatRupees(item.price * (item.quantity ?? 1))}
               </span>
             </div>
           ))}
@@ -611,6 +618,7 @@ function OrderTrackingInner() {
                     notification.newStatus,
                     o.createdAt,
                     notification.timestamp,
+                    o.orderType ?? "delivery",
                   ),
                 }
               : o,

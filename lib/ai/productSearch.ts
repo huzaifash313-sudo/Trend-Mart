@@ -22,6 +22,8 @@ export interface ProductSearchHit {
   shopPath: string;
   imageUrl: string | null;
   distanceKm: number | null;
+  avgRating?: number;
+  reviewCount?: number;
 }
 
 type ProductRow = {
@@ -34,6 +36,8 @@ type ProductRow = {
   image_url: string | null;
   images: string[] | null;
   shop_id: string;
+  avg_rating?: number | null;
+  review_count?: number | null;
   shops: {
     id: string;
     name: string;
@@ -66,6 +70,11 @@ function rankBoost(query: string, hit: ProductSearchHit, sortMode?: SearchSortMo
   if (name.startsWith(q)) boost += 8;
   if (hit.discountPct >= 5) boost += Math.min(hit.discountPct / 2, 12);
   if (sortMode === "best_pick" && hit.discountPct >= 3) boost += hit.discountPct;
+  // Denormalized product rating — no extra query; lifts trusted items.
+  const rating = Number(hit.avgRating) || 0;
+  const reviews = Number(hit.reviewCount) || 0;
+  if (rating >= 4 && reviews > 0) boost += Math.min(rating * 1.5 + Math.log10(reviews + 1) * 2, 10);
+  else if (rating > 0 && reviews > 0) boost += Math.min(rating, 5);
   return boost;
 }
 
@@ -91,7 +100,7 @@ export async function searchProductsForAssistant(
   let dbQuery = supabase
     .from("products")
     .select(
-      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, latitude, longitude)",
+      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, avg_rating, review_count, shops!inner(id, name, location, is_live, latitude, longitude)",
     )
     .eq("is_available", true)
     .eq("shops.is_live", true);
@@ -102,7 +111,25 @@ export async function searchProductsForAssistant(
 
   dbQuery = dbQuery.or(buildSupabaseOrFilter(expandedTerms));
 
-  const { data, error } = await dbQuery.limit(150);
+  let { data, error } = await dbQuery.limit(150);
+
+  // Pre-migration: product rating columns may be missing.
+  if (error && /avg_rating|review_count|column .* does not exist/i.test(error.message || "")) {
+    let legacy = supabase
+      .from("products")
+      .select(
+        "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, latitude, longitude)",
+      )
+      .eq("is_available", true)
+      .eq("shops.is_live", true);
+    if (options.shopId) {
+      legacy = legacy.eq("shop_id", sanitizeChatString(options.shopId, 100));
+    }
+    legacy = legacy.or(buildSupabaseOrFilter(expandedTerms));
+    const fallback = await legacy.limit(150);
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   let rows: ProductRow[] = [];
   if (!error && data?.length) {
@@ -154,6 +181,8 @@ export async function searchProductsForAssistant(
       shopPath: `/shop/${shopId}`,
       imageUrl,
       distanceKm,
+      avgRating: Number(item.avg_rating) || 0,
+      reviewCount: Number(item.review_count) || 0,
     };
     hit.score += rankBoost(query, hit, sortMode);
     if (distanceKm != null && distanceKm < 5) hit.score += 6;
@@ -343,13 +372,13 @@ export function formatProductSearchReply(
 
   const top = hits[0];
   const topSection = top
-    ? `🏆 *Top pick:* *${top.name}* — ${rs(top.price)}${
+    ? `🔎 *Closest match:* *${top.name}* — ${rs(top.price)}${
         top.discountPct > 0 ? ` (*${top.discountPct}% OFF*)` : ""
       }\n` +
       `📍 *${top.shopName}*${top.shopLocation ? ` · ${top.shopLocation}` : ""}${
         top.distanceKm != null ? ` · ~${top.distanceKm < 1 ? `${Math.round(top.distanceKm * 1000)}m` : `${top.distanceKm.toFixed(1)}km`}` : ""
       }\n` +
-      `👉 [Open product now](${top.productPath}) · [Visit shop](${top.shopPath})\n`
+      `👉 [Open product](${top.productPath}) · [Visit shop](${top.shopPath})\n`
     : "";
 
   const rest = hits.slice(1).map((h, i) => {
@@ -375,7 +404,7 @@ export function formatProductSearchReply(
 
   return {
     intent: "product_search",
-    confidence: 0.96,
+    confidence: Math.min(0.94, 0.55 + (hits[0]?.score ?? 0) / 200),
     suggestions:
       role === "customer"
         ? ["Sasta mobile dhundo", "Electronics shop dhundo", "Best deals?", "Order kaise karun?"]

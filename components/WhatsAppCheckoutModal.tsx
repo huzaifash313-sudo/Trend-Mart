@@ -34,7 +34,7 @@ import { formatRupees } from "@/lib/formatters";
 import { priceForQuantity, hasPriceTiers } from "@/lib/priceTiers";
 import { computeVariantPricing, parseVariantLabel } from "@/lib/variantPricing";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
-import { computeDeliveryFee } from "@/lib/deliveryFee";
+import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 import { sanitizeText } from "@/lib/validations";
 import { useLocation } from "@/context/LocationContext";
 import {
@@ -348,9 +348,11 @@ function buildWhatsAppMessage(
   }
 
   lines.push(
-    safeDeliveryFee > 0
-      ? `🚚 *Delivery Fee:* ${formatRupees(safeDeliveryFee)}`
-      : `🚚 *Delivery Fee:* FREE`,
+    isPickup
+      ? `🛍️ *Pickup* — no delivery fee`
+      : safeDeliveryFee > 0
+        ? `🚚 *Delivery Fee:* ${formatRupees(safeDeliveryFee)}`
+        : `🚚 *Delivery Fee:* FREE (threshold / shop offer)`,
   );
 
   lines.push(`✅ *Grand Total:* ${formatRupees(safeGrandTotal)}`);
@@ -567,9 +569,37 @@ export default function WhatsAppCheckoutModal({
     shop.free_delivery_threshold > 0 &&
     subtotal >= shop.free_delivery_threshold;
 
-  const perKmFee = shop.delivery_fee_per_km ?? 0;
-  const needsDistanceForFee = !isPickup && perKmFee > 0 && !qualifiesForFreeDelivery;
-  const missingDistanceForFee = needsDistanceForFee && distanceKm == null;
+  const deliveryBreakdown = useMemo(() => {
+    if (isPickup) {
+      return computeDeliveryFeeBreakdown({ isPickup: true });
+    }
+    return computeDeliveryFeeBreakdown({
+      flat: shop.delivery_fee_flat,
+      perKm: shop.delivery_fee_per_km,
+      distanceKm,
+      freeThreshold: shop.free_delivery_threshold,
+      subtotal,
+      isPickup: false,
+    });
+  }, [
+    shop.delivery_fee_flat,
+    shop.delivery_fee_per_km,
+    distanceKm,
+    shop.free_delivery_threshold,
+    subtotal,
+    isPickup,
+  ]);
+
+  const deliveryFee = deliveryBreakdown.isFinal ? deliveryBreakdown.fee : 0;
+  const missingDistanceForFee = !isPickup && deliveryBreakdown.incompleteDistance;
+  const deliveryFeeUnconfigured = !isPickup && deliveryBreakdown.unconfigured;
+  const deliveryFeeNotReady =
+    !isPickup && (!deliveryBreakdown.isFinal || missingDistanceForFee || deliveryFeeUnconfigured);
+
+  const grandTotal = useMemo(
+    () => Math.max(0, subtotal - discountAmount + deliveryFee),
+    [subtotal, discountAmount, deliveryFee],
+  );
 
   const shopHours = useMemo(
     () =>
@@ -581,13 +611,16 @@ export default function WhatsAppCheckoutModal({
   );
   const shopClosed = shopHours.state === "closed";
 
-  const radiusKm = shop.service_radius_km ?? 0;
   const coverageMode = useMemo(
     () => parseCoverageFromZones(shop.delivery_zones).mode,
     [shop.delivery_zones],
   );
   const outsideServiceRadius = useMemo(() => {
-    if (isPickup || !location?.coordinates) return false;
+    if (isPickup) return false;
+    // Delivery without a pin cannot confirm radius/city — block (nationwide OK).
+    if (!location?.coordinates) {
+      return coverageMode === "radius" || coverageMode === "city";
+    }
     const gate = isCustomerWithinCoverage(
       shop,
       location.coordinates.latitude,
@@ -595,25 +628,7 @@ export default function WhatsAppCheckoutModal({
       location.city,
     );
     return !gate.within;
-  }, [shop, location, isPickup]);
-
-  const deliveryFee = useMemo(() => {
-    // Single shared helper — identical to the server-side calculation, so the
-    // fee shown here is always the fee stored on the order.
-    return computeDeliveryFee({
-      flat: shop.delivery_fee_flat,
-      perKm: shop.delivery_fee_per_km,
-      distanceKm,
-      freeThreshold: shop.free_delivery_threshold,
-      subtotal,
-      isPickup,
-    });
-  }, [shop.delivery_fee_flat, shop.delivery_fee_per_km, distanceKm, shop.free_delivery_threshold, subtotal, isPickup]);
-
-  const grandTotal = useMemo(
-    () => Math.max(0, subtotal - discountAmount + deliveryFee),
-    [subtotal, discountAmount, deliveryFee],
-  );
+  }, [shop, location, isPickup, coverageMode]);
 
   const phone = toWhatsAppDigits(shop.whatsapp_number ?? "");
 
@@ -1022,8 +1037,23 @@ export default function WhatsAppCheckoutModal({
         throw new Error(
           coverageMode === "city"
             ? "You are outside this shop's delivery area (city)."
-            : `You are outside this shop's delivery radius (${radiusKm} km).`,
+            : `You are outside this shop's delivery radius${
+                shop.service_radius_km != null ? ` (${shop.service_radius_km} km)` : ""
+              }.`,
         );
+      }
+      if (missingDistanceForFee) {
+        throw new Error(
+          "This shop charges per-km delivery. Set your location pin so the exact fee can be calculated.",
+        );
+      }
+      if (deliveryFeeUnconfigured) {
+        throw new Error(
+          "This shop has not set delivery charges yet. Choose pickup, or contact the shop.",
+        );
+      }
+      if (deliveryFeeNotReady) {
+        throw new Error("Delivery fee could not be calculated exactly. Check your location.");
       }
 
       // Prefer cart WhatsApp; if stale/empty, refresh from shop row so checkout still works.
@@ -1133,11 +1163,29 @@ export default function WhatsAppCheckoutModal({
       const ref = orderResult.data.id;
       setOrderRef(ref);
 
+      // Server fee is authoritative (API recomputes) — never invent WhatsApp totals.
+      const serverDeliveryFee =
+        orderResult.data.delivery_fee != null
+          ? Number(orderResult.data.delivery_fee)
+          : deliveryFee;
+      const serverDiscount =
+        orderResult.data.discount_amount != null
+          ? Number(orderResult.data.discount_amount)
+          : discountAmount;
+      const serverSubtotal =
+        orderResult.data.subtotal_amount != null
+          ? Number(orderResult.data.subtotal_amount)
+          : subtotal;
+      const serverGrandTotal =
+        orderResult.data.total_amount != null
+          ? Number(orderResult.data.total_amount)
+          : Math.max(0, serverSubtotal - serverDiscount + serverDeliveryFee);
+
       logLead({
         shopId: shop.id,
         customerName: shipping.customerName.trim(),
         customerPhone: shipping.customerPhone,
-        serviceContext: `Order ${ref.slice(0, 8)} — Rs ${grandTotal}`,
+        serviceContext: `Order ${ref.slice(0, 8)} — Rs ${serverGrandTotal}`,
         source: "whatsapp",
       });
 
@@ -1147,8 +1195,8 @@ export default function WhatsAppCheckoutModal({
         shopName: shop.name,
         productName: resolvedItems.map(i => i.name).join(", "),
         quantity: Object.values(quantities).reduce((a, b) => a + b, 0),
-        totalAmount: grandTotal,
-        discountAmount,
+        totalAmount: serverGrandTotal,
+        discountAmount: serverDiscount,
         couponCode,
         notes: shipping.deliveryNotes,
         items: resolvedItems.map((i) => ({
@@ -1166,10 +1214,10 @@ export default function WhatsAppCheckoutModal({
         resolvedItems,
         quantities,
         shipping,
-        subtotal,
-        discountAmount,
-        deliveryFee,
-        grandTotal,
+        serverSubtotal,
+        serverDiscount,
+        serverDeliveryFee,
+        serverGrandTotal,
         couponCode,
         ref,
         { latitude: pinLat ?? 0, longitude: pinLng ?? 0 },
@@ -1234,7 +1282,9 @@ export default function WhatsAppCheckoutModal({
     shopClosed,
     shopHours.hoursText,
     outsideServiceRadius,
-    radiusKm,
+    missingDistanceForFee,
+    deliveryFeeUnconfigured,
+    deliveryFeeNotReady,
     location,
     detectLocationDetailed,
     addToast,
@@ -1618,10 +1668,29 @@ export default function WhatsAppCheckoutModal({
                 )}
                 <div className="flex justify-between text-sm border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
                   <span className="text-emerald-700 dark:text-emerald-300">Delivery Fee</span>
-                  <span className={`font-semibold ${deliveryFee === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-emerald-700 dark:text-emerald-300"}`}>
-                    {deliveryFee === 0 ? "FREE" : formatRupees(deliveryFee)}
+                  <span
+                    className={`font-semibold ${
+                      deliveryBreakdown.freeReason === "threshold"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : deliveryFeeNotReady || deliveryBreakdown.freeReason === "pickup"
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-emerald-700 dark:text-emerald-300"
+                    }`}
+                  >
+                    {deliveryBreakdown.freeReason === "threshold"
+                      ? "FREE"
+                      : deliveryBreakdown.freeReason === "pickup"
+                        ? "N/A (pickup)"
+                        : deliveryFeeNotReady
+                          ? "—"
+                          : formatRupees(deliveryFee)}
                   </span>
                 </div>
+                {!isPickup && deliveryBreakdown.formulaLabel ? (
+                  <p className="text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">
+                    {deliveryBreakdown.formulaLabel}
+                  </p>
+                ) : null}
                 <div className="flex justify-between text-sm border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
                   <span className="font-bold text-emerald-800 dark:text-emerald-200">Total</span>
                   <span className="font-bold text-emerald-700 dark:text-emerald-300">{formatRupees(grandTotal)}</span>
@@ -1654,7 +1723,16 @@ export default function WhatsAppCheckoutModal({
                   <InfoIcon />
                   <span className="text-amber-700 dark:text-amber-400">
                     This shop charges per-km delivery. Share your location (or set it in Settings)
-                    for an accurate fee — right now only the flat fee ({formatRupees(shop.delivery_fee_flat ?? 0)}) is applied.
+                    so the <strong>exact</strong> fee can be calculated — checkout stays locked until then.
+                  </span>
+                </div>
+              )}
+
+              {!isPickup && deliveryFeeUnconfigured && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs dark:bg-amber-900/20">
+                  <InfoIcon />
+                  <span className="text-amber-700 dark:text-amber-400">
+                    This shop has not set delivery charges yet. Choose <strong>pickup</strong>, or ask the shop to set fees.
                   </span>
                 </div>
               )}
@@ -1674,7 +1752,9 @@ export default function WhatsAppCheckoutModal({
                   <span className="text-red-700 dark:text-red-400">
                     {coverageMode === "city"
                       ? "This shop only delivers within its selected city, which doesn't match your current location."
-                      : `You are about ${distanceKm?.toFixed(1)} km away — this shop delivers within ${radiusKm} km only.`}
+                      : `You are about ${distanceKm?.toFixed(1)} km away — this shop delivers within ${
+                          shop.service_radius_km != null ? `${shop.service_radius_km} km` : "its coverage area"
+                        } only.`}
                   </span>
                 </div>
               )}
@@ -1712,7 +1792,7 @@ export default function WhatsAppCheckoutModal({
               <button
                 type="button"
                 onClick={handleGoToShipping}
-                disabled={items.length === 0 || itemsNeedingVariant.length > 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || noFulfillment}
+                disabled={items.length === 0 || itemsNeedingVariant.length > 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment}
                 className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {noFulfillment
@@ -1956,7 +2036,15 @@ export default function WhatsAppCheckoutModal({
                 )}
                 <div className="flex justify-between text-sm border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
                   <span className="text-emerald-700 dark:text-emerald-300">Delivery Fee</span>
-                  <span className="font-semibold">{deliveryFee === 0 ? "FREE" : formatRupees(deliveryFee)}</span>
+                  <span className="font-semibold">
+                    {deliveryBreakdown.freeReason === "threshold"
+                      ? "FREE"
+                      : deliveryBreakdown.freeReason === "pickup"
+                        ? "N/A (pickup)"
+                        : deliveryFeeNotReady
+                          ? "—"
+                          : formatRupees(deliveryFee)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-base font-bold border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
                   <span className="text-emerald-800 dark:text-emerald-200">Grand Total</span>
@@ -2030,7 +2118,7 @@ export default function WhatsAppCheckoutModal({
               <button
                 type="button"
                 onClick={handlePlaceOrder}
-                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || noFulfillment}
+                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting ? (

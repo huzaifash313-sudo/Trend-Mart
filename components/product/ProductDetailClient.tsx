@@ -24,6 +24,7 @@ import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { ProductDetailSkeleton } from "@/components/Skeletons";
+import CompactRating from "@/components/CompactRating";
 
 function BackIcon() {
   return (
@@ -348,6 +349,21 @@ export default function ProductDetailClient({ code }: { code: string }) {
             <h1 className="text-lg font-bold leading-snug text-zinc-900 dark:text-zinc-100">
               {product.name}
             </h1>
+            <div className="mt-1.5">
+              <CompactRating
+                average={
+                  Number(product.avg_rating) > 0
+                    ? product.avg_rating
+                    : product.shop_avg_rating
+                }
+                count={
+                  Number(product.review_count) > 0
+                    ? product.review_count
+                    : product.shop_review_count
+                }
+                size="sm"
+              />
+            </div>
             {product.description && (
               <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
                 {product.description}

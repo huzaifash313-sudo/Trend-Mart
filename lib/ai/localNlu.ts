@@ -122,6 +122,17 @@ export function runLocalNlu(rawMessage: string): LocalNluResult {
     };
   }
 
+  // Delivery fees / radius — before order-status so "delivery fee" ≠ tracking
+  if (DELIVERY.test(lower)) {
+    return {
+      intent: "delivery_help",
+      searchQuery: "",
+      sortMode,
+      confidence: 0.9,
+      normalizedMessage: text,
+    };
+  }
+
   if (ORDER.test(lower) && !/(order kar|place order|order kaise)/i.test(lower)) {
     // status-ish vs how-to: how-to caught below via knowledge
     if (/(status|track|mera order|my order|kahan hai order|dispatched|delivered)/i.test(lower)) {
@@ -158,16 +169,6 @@ export function runLocalNlu(rawMessage: string): LocalNluResult {
   if (MERCHANT.test(lower) && !looksLikeProductSearch(lower)) {
     return {
       intent: "merchant_help",
-      searchQuery: "",
-      sortMode,
-      confidence: 0.88,
-      normalizedMessage: text,
-    };
-  }
-
-  if (DELIVERY.test(lower) && !looksLikeProductSearch(lower)) {
-    return {
-      intent: "delivery_help",
       searchQuery: "",
       sortMode,
       confidence: 0.88,

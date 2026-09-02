@@ -2,6 +2,15 @@
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 const SUB_FLAG = "trendsmart_push_subscribed";
+/** Permanent / daily cap for the one-shot “alerts ready” OS toast. */
+const CONFIRM_FLAG = "trendsmart_push_confirm_v2";
+const LAST_SYNC_AT = "trendsmart_push_last_sync_at";
+/** Silent server re-sync at most every 12h (plus explicit Enable / Resync). */
+const SYNC_MIN_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export type PushFailReason =
   | "unsupported"
@@ -18,6 +27,16 @@ export type PushDeviceStatus =
   | { state: "off"; permission: NotificationPermission }
   | { state: "on"; endpoint: string }
   | { state: "checking" };
+
+export type SubscribePushOptions = {
+  /**
+   * Show a one-time OS confirmation that alerts work.
+   * Must stay false for background sync — otherwise every tab focus spams.
+   */
+  confirmOs?: boolean;
+  /** Force server sync even if we synced recently (Enable / Resync buttons). */
+  forceSync?: boolean;
+};
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -90,6 +109,68 @@ function setSubFlag(on: boolean) {
   }
 }
 
+/**
+ * Enable-toast is at most once per calendar day (and never on silent sync).
+ * Legacy v1 flag "1" still counts as already shown forever.
+ */
+function hasShownPushConfirmToday(): boolean {
+  try {
+    const v1 = localStorage.getItem("trendsmart_push_confirm_v1");
+    if (v1 === "1") return true;
+    const v = localStorage.getItem(CONFIRM_FLAG);
+    if (v === "1") return true;
+    return v === todayKey();
+  } catch {
+    return true;
+  }
+}
+
+function markPushConfirmShown() {
+  try {
+    localStorage.setItem(CONFIRM_FLAG, todayKey());
+    // Migrate: stop any old v1 re-prompts after first quiet sync.
+    localStorage.setItem("trendsmart_push_confirm_v1", "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Close leftover “alerts ready / on” toasts so they never stick across app opens. */
+async function dismissEnableToasts(registration: ServiceWorkerRegistration) {
+  try {
+    const notes = await registration.getNotifications({ tag: "tm-push-enabled" });
+    for (const n of notes) n.close();
+  } catch {
+    /* ignore */
+  }
+}
+
+function getLastSyncAt(): number {
+  try {
+    return Number(localStorage.getItem(LAST_SYNC_AT) || 0) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markSyncedNow() {
+  try {
+    localStorage.setItem(LAST_SYNC_AT, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True when a silent background sync should be skipped (already healthy + recent). */
+function shouldSkipSilentSync(): boolean {
+  try {
+    if (localStorage.getItem(SUB_FLAG) !== "true") return false;
+    return Date.now() - getLastSyncAt() < SYNC_MIN_INTERVAL_MS;
+  } catch {
+    return false;
+  }
+}
+
 export async function getPushPermissionState(): Promise<NotificationPermission | "unsupported"> {
   if (!("Notification" in window)) return "unsupported";
   if (!isPushClientSupported() && !(isIosSafari() && !isStandalonePwa())) {
@@ -142,9 +223,16 @@ export async function getPushDeviceStatus(): Promise<PushDeviceStatus> {
   }
 }
 
-export async function subscribeToPushNotifications(): Promise<
-  { ok: true } | { ok: false; reason: PushFailReason; detail?: string }
-> {
+export async function subscribeToPushNotifications(
+  options: SubscribePushOptions = {},
+): Promise<{ ok: true } | { ok: false; reason: PushFailReason; detail?: string }> {
+  const confirmOs = options.confirmOs === true;
+  const forceSync = options.forceSync === true || confirmOs;
+
+  if (!forceSync && shouldSkipSilentSync() && Notification.permission === "granted") {
+    return { ok: true };
+  }
+
   if (!isSecureContextForPush()) {
     return { ok: false, reason: "insecure", detail: "Open TrendsMart on HTTPS, then try again." };
   }
@@ -213,18 +301,26 @@ export async function subscribeToPushNotifications(): Promise<
     }
 
     setSubFlag(true);
+    markSyncedNow();
+    await dismissEnableToasts(registration);
 
-    // Confirm OS can show a notification from the SW path (same path as closed-app).
-    try {
-      await registration.showNotification("TrendsMart alerts on", {
-        body: "App band ho to bhi order updates yahan aayenge.",
-        icon: "/trendsmart-mark.png?v=10",
-        badge: "/trendsmart-mark.png?v=10",
-        tag: "tm-push-enabled",
-        data: { url: "/settings/notifications" },
-      });
-    } catch {
-      /* some browsers block while tab focused — still subscribed */
+    // One-time / once-a-day OS proof only when user explicitly enables — never on auto-sync.
+    if (confirmOs && !hasShownPushConfirmToday()) {
+      try {
+        await registration.showNotification("TrendsMart alerts ready", {
+          body: "Ab sirf zaroori order updates aayenge — app band ho to bhi.",
+          icon: "/trendsmart-mark.png?v=10",
+          badge: "/trendsmart-mark.png?v=10",
+          tag: "tm-push-enabled",
+          data: { url: "/settings/notifications" },
+        } as NotificationOptions);
+      } catch {
+        /* some browsers block while tab focused — still subscribed */
+      }
+      markPushConfirmShown();
+    } else {
+      // Silent sync / already confirmed today — never re-show enable spam.
+      markPushConfirmShown();
     }
 
     return { ok: true };
@@ -264,12 +360,15 @@ export async function unsubscribeFromPushNotifications(): Promise<
   }
 }
 
-/** Re-sync browser subscription → server when permission already granted. */
-export async function syncPushSubscriptionIfGranted(): Promise<boolean> {
+/** Re-sync browser subscription → server when permission already granted (silent). */
+export async function syncPushSubscriptionIfGranted(force = false): Promise<boolean> {
   const status = await getPushDeviceStatus();
   if (status.state !== "on" && status.state !== "off") return false;
   if (Notification.permission !== "granted") return false;
-  const result = await subscribeToPushNotifications();
+  const result = await subscribeToPushNotifications({
+    confirmOs: false,
+    forceSync: force,
+  });
   return result.ok;
 }
 

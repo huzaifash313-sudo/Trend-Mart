@@ -332,8 +332,12 @@ export function subscribeToOrderUpdates(
 
           if (!newRecord || !oldRecord) return;
 
-          const previousStatus = oldRecord.status as OrderStatus;
+          const previousStatus = oldRecord.status as OrderStatus | undefined;
           const newStatus = newRecord.status as OrderStatus;
+
+          // Without REPLICA IDENTITY FULL, old.status may be missing — ignore
+          // non-status updates (e.g. whatsapp_sent_at) that would flash UI.
+          if (previousStatus == null || previousStatus === newStatus) return;
 
           // Build notification from the DB change event
           const notification: OrderStatusNotification = {
@@ -443,12 +447,16 @@ export function subscribeToShopOrderUpdates(
 
         if (!newRecord || !oldRecord) return;
 
+        const previousStatus = oldRecord.status as OrderStatus | undefined;
+        const newStatus = newRecord.status as OrderStatus;
+        if (previousStatus == null || previousStatus === newStatus) return;
+
         const notification: OrderStatusNotification = {
           orderId: newRecord.id as string,
           shopId,
           shopName: "", // Shop name can be resolved by the consumer
-          previousStatus: oldRecord.status as OrderStatus,
-          newStatus: newRecord.status as OrderStatus,
+          previousStatus,
+          newStatus,
           customerName: (newRecord.customer_name as string) ?? "",
           customerPhone: (newRecord.customer_phone as string) ?? "",
           customerUserId: (newRecord.customer_user_id as string | null) ?? null,
@@ -767,6 +775,7 @@ export type AppNotificationType =
   | "order"
   | "sale"
   | "inquiry"
+  | "message"
   | "system";
 
 export interface AppNotification {

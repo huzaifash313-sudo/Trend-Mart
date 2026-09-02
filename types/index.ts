@@ -420,6 +420,10 @@ export interface Product {
   shop_avg_rating?: number | null;
   /** Parent shop review count (for marketplace cards). */
   shop_review_count?: number | null;
+  /** This product's own average rating (denormalized). */
+  avg_rating?: number | null;
+  /** This product's own review count (denormalized). */
+  review_count?: number | null;
   /** Parent shop free-delivery threshold (for product image offer tags). */
   shop_free_delivery_threshold?: number | null;
   /** Parent shop flat delivery fee. */
@@ -467,6 +471,7 @@ export interface ProductFormData {
 export interface Review {
   id: string;
   shop_id: string;
+  product_id?: string | null;
   customer_name: string;
   rating: number; // 1-5
   comment: string;

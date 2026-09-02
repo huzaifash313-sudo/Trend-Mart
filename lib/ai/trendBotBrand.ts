@@ -15,11 +15,11 @@ export const TREND_BOT_TEASERS = [
 ];
 
 export const TREND_BOT_WELCOME_CUSTOMER =
-  `👋 *Salam! Main TrendBot hoon* — TrendsMart ka AI assistant.\n\n` +
+  `👋 *Salam! Main TrendBot hoon* — TrendsMart ka cute AI assistant.\n\n` +
   `• Product links — *"best mobile ka link do"*\n` +
   `• App help — cart, orders, delivery, deals\n` +
-  `• Business ideas — live marketplace se\n\n` +
-  `_Neeche prompts tap karein ya apna sawal likhein._`;
+  `• Suggested prompts neeche — ya apna sawal likho\n\n` +
+  `_Galat guess nahi karta — nahi pata to seedha keh deta hoon._`;
 
 export const TREND_BOT_WELCOME_SHOP = (shopName: string) =>
   `👋 *Salam!* Main *${shopName}* ka TrendBot hoon.\n\n` +

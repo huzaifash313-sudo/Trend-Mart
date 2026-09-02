@@ -82,16 +82,64 @@ export function extractCloudinaryPublicId(url: string): string | null {
  * passthrough) — already-optimized WebP images keep their exact bytes.
  */
 export function withAutoFormat(url: string): string {
+  return withCloudinaryDelivery(url, { formatAuto: true });
+}
+
+export type CloudinaryDeliveryOpts = {
+  /** Max width in CSS pixels (CDN resize). */
+  width?: number;
+  /** Max height in CSS pixels. */
+  height?: number;
+  /** Cloudinary crop mode — default `limit` (never upscale / distort). */
+  crop?: "limit" | "fill" | "fit" | "thumb";
+  /** Prefer eco quality on mobile list cards. */
+  quality?: "auto" | "eco" | "good" | number;
+  /** Force f_auto (default true). */
+  formatAuto?: boolean;
+};
+
+/**
+ * Rewrite a Cloudinary delivery URL with mobile-friendly transforms
+ * (`f_auto`, `q_auto`, optional `w_` / `h_`). Non-Cloudinary URLs pass through.
+ * Replaces any prior transform segment after `/upload/` so cards never pull
+ * full-resolution originals on 3G / mid-range phones.
+ */
+export function withCloudinaryDelivery(
+  url: string,
+  opts: CloudinaryDeliveryOpts = {},
+): string {
   try {
     const parsed = new URL(url);
     if (!parsed.hostname.endsWith("cloudinary.com")) return url;
     const parts = parsed.pathname.split("/");
     const uploadIdx = parts.indexOf("upload");
     if (uploadIdx === -1) return url;
+
     const before = parts.slice(0, uploadIdx + 1);
-    const after = parts.slice(uploadIdx + 1);
-    if (after[0] === "f_auto") return url; // already optimized
-    parsed.pathname = [...before, "f_auto", ...after].join("/");
+    let after = parts.slice(uploadIdx + 1);
+    // Drop an existing transformation segment (comma-separated ops, no slash).
+    if (
+      after.length > 0 &&
+      after[0] &&
+      !/^v\d+$/.test(after[0]) &&
+      (after[0].includes(",") ||
+        /^(f_|q_|w_|h_|c_|e_|dpr_)/.test(after[0]))
+    ) {
+      after = after.slice(1);
+    }
+
+    const transforms: string[] = [];
+    if (opts.formatAuto !== false) transforms.push("f_auto");
+    const q = opts.quality ?? "auto";
+    if (typeof q === "number") transforms.push(`q_${Math.max(1, Math.min(100, q))}`);
+    else if (q === "eco") transforms.push("q_auto:eco");
+    else if (q === "good") transforms.push("q_auto:good");
+    else transforms.push("q_auto");
+    if (opts.crop) transforms.push(`c_${opts.crop}`);
+    if (opts.width && opts.width > 0) transforms.push(`w_${Math.round(opts.width)}`);
+    if (opts.height && opts.height > 0) transforms.push(`h_${Math.round(opts.height)}`);
+
+    parsed.pathname = [...before, transforms.join(","), ...after].join("/");
     return parsed.toString();
   } catch {
     return url;

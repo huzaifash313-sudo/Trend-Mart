@@ -489,14 +489,22 @@ export default function DashboardOverviewPage() {
                   <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
                     {isShopPubliclyVisible(activeShop)
                       ? "Your store is live and discoverable"
-                      : "Your store is hidden"}
+                      : (activeShop.verification_status ?? "approved") === "pending"
+                        ? "Pending admin approval"
+                        : (activeShop.verification_status ?? "approved") === "rejected"
+                          ? "Store was not approved"
+                          : "Your store is hidden"}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-300">
                     {isShopPubliclyVisible(activeShop)
                       ? "Customers can browse and place orders right now."
-                      : activeShop.is_live
-                        ? "Waiting for admin approval before it goes public."
-                        : "Turn it on in Store settings when you're ready."}
+                      : (activeShop.verification_status ?? "approved") === "pending"
+                        ? "You can add products now — customers will see the store after TrendsMart approves it."
+                        : (activeShop.verification_status ?? "approved") === "rejected"
+                          ? "Contact support if you believe this was a mistake, or update your store details."
+                          : activeShop.is_live
+                            ? "Waiting for admin approval before it goes public."
+                            : "Turn it on in Store settings when you're ready."}
                   </p>
                 </div>
                 <Link

@@ -121,7 +121,7 @@ export const BRAND_KNOWLEDGE: BrandKnowledgeEntry[] = [
     q: "Merchant Security Guidelines",
     a:
       `🛡️ *Merchant Guidelines (summary)*\n\n` +
-      `• Email verify ke baad store live (auto)\n` +
+      `• Email verify + *admin approval* ke baad store live hota hai\n` +
       `• Strong password; WhatsApp active rakhein\n` +
       `• Real photos + sahi price; fake % OFF banned\n` +
       `• Out of Stock toggle use karein — galat availability na rakhein\n` +

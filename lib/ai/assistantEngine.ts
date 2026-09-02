@@ -1,6 +1,6 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Free AI Assistant Engine (no external API)                    */
-/*  Data-driven responses for customer, merchant, and shop storefront roles.   */
+/*  TrendsMart — AI Assistant Engine                                           */
+/*  Deterministic catalog/analytics + optional Groq grounded polish (server).  */
 /* -------------------------------------------------------------------------- */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -36,7 +36,13 @@ import { buildHonestFallbackReply } from "@/lib/ai/smartFallback";
 import { normalizeUserLanguage } from "@/lib/ai/languageNormalize";
 import { runLocalNlu } from "@/lib/ai/localNlu";
 import {
-  buildHelpfulGuideReply,
+  composeGroundedReplyWithLlm,
+  hasFreeLlmKey,
+  understandWithFreeLlm,
+} from "@/lib/ai/llmBridge";
+import {
+  buildHonestRefuseReply,
+  ensureAssistantReply,
   isOutOfScope,
   MIN_KNOWLEDGE_CONFIDENCE,
   MIN_PRODUCT_SCORE,
@@ -148,9 +154,11 @@ interface MerchantContext {
   operatingStatus: string;
   businessHours: string;
   whatsapp: string;
-  deliveryRadius: number;
+  deliveryRadius: number | null;
   minOrder: number;
   freeDeliveryThreshold: number;
+  deliveryFeeFlat: number;
+  deliveryFeePerKm: number;
   products: ProductRow[];
   totalRevenue: number;
   pendingOrders: number;
@@ -196,6 +204,11 @@ interface ShopContext {
   location: string;
   operatingStatus: string;
   businessHours: string;
+  deliveryRadius: number | null;
+  minOrder: number;
+  freeDeliveryThreshold: number;
+  deliveryFeeFlat: number;
+  deliveryFeePerKm: number;
   products: {
     id: string;
     name: string;
@@ -277,10 +290,21 @@ export function detectCustomerIntent(message: string): { intent: CustomerIntent;
   if (matchAny(t, [/^(hi|hello|salam|aoa|assalam|hey)/i, /\b(salam|aoa)\b/])) {
     return { intent: "greeting", confidence: 0.95 };
   }
+  // Fee / delivery policy BEFORE product or order-status (kitni fee ≠ product search)
+  if (
+    matchAny(t, [
+      /delivery\s*(fee|charge|cost|kitn)/i,
+      /deliver(y)?\s*(kitn|fee|charges?)/i,
+      /\b(free delivery|min(imum)? order|per[-\s]?km|radius|doorstep)\b/i,
+      /kitn[ia]\s*(delivery|fee|charge)/i,
+    ])
+  ) {
+    return { intent: "delivery_help", confidence: 0.93 };
+  }
   if (matchAny(t, [/link|url|dhund|find|search|milega|milta|chahiye|dedo|de do|dikhao|best.*(mobile|phone|laptop|iphone)|available|stock mein|kitne|price of|rate of/i, /sasta.*(mobile|phone)/i])) {
     return { intent: "product_search", confidence: 0.92 };
   }
-  if (matchAny(t, [/order.*status|mera order|my order|kahan hai order|track|tracking|deliver/i])) {
+  if (matchAny(t, [/order.*status|mera order|my order|kahan hai order|track(ing)?(\s+order)?|deliver(ed|y)?\s+status|\bdispatched\b/i])) {
     return { intent: "order_status", confidence: 0.92 };
   }
   if (matchAny(t, [/how.*order|order kaise|place order|checkout|cart|whatsapp order/i, /kese order|kaise kharid/i])) {
@@ -329,7 +353,7 @@ export function detectShopIntent(message: string): { intent: ShopIntent; confide
   if (matchAny(t, [/price|cost|kitna|rate|rupees|rs\.?|daam/i])) {
     return { intent: "pricing_inquiry", confidence: 0.9 };
   }
-  if (matchAny(t, [/product|item|stock|available|sell|bech|sam|hai|maujood|list/i])) {
+  if (matchAny(t, [/product|item|stock|available|sell|bech|maujood|list|catalogue|catalog/i])) {
     return { intent: "product_inquiry", confidence: 0.85 };
   }
   if (matchAny(t, [/open|close|time|hour|timing|subah|sham|kab khul/i])) {
@@ -369,7 +393,7 @@ export async function buildMerchantContext(
   const { data: shop } = await supabase
     .from("shops")
     .select(
-      "id, name, category, location, operating_status, business_hours, whatsapp_number, service_radius_km, min_order_amount, free_delivery_threshold, owner_id",
+      "id, name, category, location, operating_status, business_hours, whatsapp_number, service_radius_km, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, owner_id",
     )
     .eq("id", safeShopId)
     .single();
@@ -572,12 +596,23 @@ export async function buildMerchantContext(
     shopName: sanitizeChatString(shop.name, 100),
     category: sanitizeChatString(shop.category, 50),
     location: sanitizeChatString(shop.location, 100),
-    operatingStatus: sanitizeChatString(shop.operating_status, 80) || "Operational",
+    operatingStatus: sanitizeChatString(shop.operating_status, 80) || "Not set",
     businessHours: sanitizeChatString(shop.business_hours, 100) || "Not specified",
     whatsapp: sanitizeChatString(shop.whatsapp_number, 30),
-    deliveryRadius: sanitizeChatNumber(shop.service_radius_km, 5),
+    deliveryRadius:
+      shop.service_radius_km != null && Number.isFinite(Number(shop.service_radius_km))
+        ? Number(shop.service_radius_km)
+        : null,
     minOrder: sanitizeChatNumber(shop.min_order_amount, 0),
     freeDeliveryThreshold: sanitizeChatNumber(shop.free_delivery_threshold, 0),
+    deliveryFeeFlat: sanitizeChatNumber(
+      (shop as { delivery_fee_flat?: unknown }).delivery_fee_flat,
+      0,
+    ),
+    deliveryFeePerKm: sanitizeChatNumber(
+      (shop as { delivery_fee_per_km?: unknown }).delivery_fee_per_km,
+      0,
+    ),
     products,
     totalRevenue,
     pendingOrders,
@@ -701,7 +736,9 @@ export async function buildShopContext(
 
   const { data: shop } = await supabase
     .from("shops")
-    .select("name, category, location, operating_status, business_hours, whatsapp_number")
+    .select(
+      "name, category, location, operating_status, business_hours, whatsapp_number, service_radius_km, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km",
+    )
     .eq("id", safeShopId)
     .single();
 
@@ -719,8 +756,16 @@ export async function buildShopContext(
     name: sanitizeChatString(shop.name, 100),
     category: sanitizeChatString(shop.category, 50),
     location: sanitizeChatString(shop.location, 100),
-    operatingStatus: sanitizeChatString(shop.operating_status, 100) || "Operational",
+    operatingStatus: sanitizeChatString(shop.operating_status, 100) || "Not set",
     businessHours: sanitizeChatString(shop.business_hours, 100) || "Not specified",
+    deliveryRadius:
+      shop.service_radius_km != null && Number.isFinite(Number(shop.service_radius_km))
+        ? Number(shop.service_radius_km)
+        : null,
+    minOrder: sanitizeChatNumber(shop.min_order_amount, 0),
+    freeDeliveryThreshold: sanitizeChatNumber(shop.free_delivery_threshold, 0),
+    deliveryFeeFlat: sanitizeChatNumber(shop.delivery_fee_flat, 0),
+    deliveryFeePerKm: sanitizeChatNumber(shop.delivery_fee_per_km, 0),
     whatsapp: sanitizeChatString(shop.whatsapp_number, 30),
     products: (products ?? []).map((p: Record<string, unknown>) => {
       const name = sanitizeChatString(p.name, 100);
@@ -869,7 +914,7 @@ export function generateMerchantResponse(
         intent,
         confidence: 0.9,
         suggestions,
-        reply: `🚀 *Growth Strategy for ${ctx.shopName}*\n\nAapke data ke hisaab se yeh steps sab se zyada impact denge:\n\n${tips.join("\n")}\n\n📍 Location: ${ctx.location} · Radius: ${ctx.deliveryRadius}km\n🛒 Min order: ${ctx.minOrder > 0 ? rs(ctx.minOrder) : "None"} · Free delivery: ${ctx.freeDeliveryThreshold > 0 ? `above ${rs(ctx.freeDeliveryThreshold)}` : "Not set"}`,
+        reply: `🚀 *Growth Strategy for ${ctx.shopName}*\n\nAapke data ke hisaab se yeh steps sab se zyada impact denge:\n\n${tips.join("\n")}\n\n📍 Location: ${ctx.location} · Radius: ${ctx.deliveryRadius != null ? `${ctx.deliveryRadius}km` : "not set"}\n🛒 Min order: ${ctx.minOrder > 0 ? rs(ctx.minOrder) : "None"} · Free delivery: ${ctx.freeDeliveryThreshold > 0 ? `above ${rs(ctx.freeDeliveryThreshold)}` : "Not set"} · Fees: ${ctx.deliveryFeeFlat > 0 || ctx.deliveryFeePerKm > 0 ? `${ctx.deliveryFeeFlat > 0 ? rs(ctx.deliveryFeeFlat) + " flat" : ""}${ctx.deliveryFeeFlat > 0 && ctx.deliveryFeePerKm > 0 ? " + " : ""}${ctx.deliveryFeePerKm > 0 ? rs(ctx.deliveryFeePerKm) + "/km" : ""}` : "not set (not FREE)"}`,
       };
     }
 
@@ -1143,9 +1188,17 @@ export function generateCustomerResponse(
     case "delivery_help":
       return {
         intent,
-        confidence: 0.85,
+        confidence: 0.9,
         suggestions,
-        reply: `🚚 *Delivery*\n\nHar shop apna delivery radius set karti hai.\n\nCheckout par address add karein — agar shop ke radius ke andar hain to delivery possible hai.\n\nKuch shops free delivery threshold bhi set karti hain (jaise Rs. 2000+ par free).`,
+        reply:
+          `🚚 *Delivery (confirmed TrendsMart rules)*\n\n` +
+          `1️⃣ *Pickup* → fee Rs 0\n` +
+          `2️⃣ Cart (before coupon) ≥ shop *free-delivery threshold* → fee Rs 0\n` +
+          `3️⃣ Warna: *flat + (per-km × GPS distance)* — dono shop set karti hai\n` +
+          `4️⃣ Fees set nahi → delivery *FREE nahi* — checkout block / shop se confirm\n` +
+          `5️⃣ *Radius/zones* = deliver hoga ya nahi (coverage), fee auto-zero nahi\n\n` +
+          `Exact amount sirf checkout par live GPS se nikalta hai — main koi number invent nahi karta.\n\n` +
+          `👉 [Cart / Checkout](/cart)`,
       };
 
     case "account_help":
@@ -1153,7 +1206,7 @@ export function generateCustomerResponse(
         intent,
         confidence: 0.85,
         suggestions,
-        reply: `👤 *Account Help*\n\n• Profile: /account\n• Settings & password: /auth/settings\n• Addresses: /account/addresses\n• Phone OTP checkout par verify hota hai\n\nKoi masla ho to Support section se ticket raise karein.`,
+        reply: `👤 *Account Help*\n\n• Profile: /account\n• Settings & password: /auth/settings\n• Addresses: /account/addresses\n• Checkout identity: *email OTP verify* (SMS OTP currently off)\n\nKoi masla ho to [Support](/support) se ticket raise karein.`,
       };
 
     case "become_merchant":
@@ -1161,7 +1214,7 @@ export function generateCustomerResponse(
         intent,
         confidence: 0.88,
         suggestions,
-        reply: `🏪 *Apni dukan TrendsMart par*\n\n1. /account/become-merchant\n2. Store name, category, WhatsApp, logo add karein\n3. Admin approval ke baad Dashboard khulega\n4. Products add karein aur orders receive karein\n\nMerchants ke liye AI Business Coach bhi hai: /dashboard/assistant`,
+        reply: `🏪 *Apni dukan TrendsMart par*\n\n1. /account/become-merchant\n2. Store name, category, WhatsApp, logo add karein\n3. *Admin approval* ke baad store public hota hai (pending reh sakta hai)\n4. Products add karein — Dashboard se radius / fees / free delivery set karein\n\nAI Business Coach: /dashboard/assistant`,
       };
 
     case "help":
@@ -1184,6 +1237,34 @@ export function generateCustomerResponse(
 
 export function generateShopResponse(intent: ShopIntent, ctx: ShopContext): AssistantResponse {
   const suggestions = getShopCategoryPrompts(ctx.category, ctx.name);
+
+  const formatShopDeliveryRules = (c: ShopContext): string => {
+    const lines: string[] = ["*Delivery rules (is shop):*"];
+    if (c.minOrder > 0) lines.push(`• Min order: ${rs(c.minOrder)}`);
+    if (c.freeDeliveryThreshold > 0) {
+      lines.push(`• FREE delivery only when cart ≥ ${rs(c.freeDeliveryThreshold)}`);
+    }
+    if (c.deliveryFeeFlat > 0 && c.deliveryFeePerKm > 0) {
+      lines.push(
+        `• Else: ${rs(c.deliveryFeeFlat)} flat + ${rs(c.deliveryFeePerKm)}/km (GPS distance — exact at checkout)`,
+      );
+    } else if (c.deliveryFeeFlat > 0) {
+      lines.push(`• Delivery fee: ${rs(c.deliveryFeeFlat)} flat`);
+    } else if (c.deliveryFeePerKm > 0) {
+      lines.push(`• Delivery fee: ${rs(c.deliveryFeePerKm)}/km (GPS required)`);
+    } else if (c.freeDeliveryThreshold <= 0) {
+      lines.push("• Delivery fee: *not set* by shop — checkout delivery is blocked (not FREE)");
+    } else {
+      lines.push(
+        `• Below ${rs(c.freeDeliveryThreshold)}: fee not set — delivery may be blocked until shop sets rates`,
+      );
+    }
+    if (c.deliveryRadius != null && c.deliveryRadius > 0) {
+      lines.push(`• Coverage radius: ${c.deliveryRadius} km (eligibility only — not automatic free)`);
+    }
+    lines.push("• Pickup = no delivery fee");
+    return lines.join("\n");
+  };
 
   switch (intent) {
     case "greeting":
@@ -1252,7 +1333,12 @@ export function generateShopResponse(intent: ShopIntent, ctx: ShopContext): Assi
         intent,
         confidence: 0.9,
         suggestions,
-        reply: `📍 *${ctx.name}* — ${ctx.location}\n\nDelivery options WhatsApp par confirm karein: +${ctx.whatsapp}`,
+        reply:
+          `📍 *${ctx.name}* — ${ctx.location}\n` +
+          (ctx.deliveryRadius != null
+            ? `\nDelivery coverage radius: *${ctx.deliveryRadius} km*`
+            : "\nDelivery coverage: *shop ne radius set nahi kiya* — WhatsApp par confirm karein") +
+          `\n\n${formatShopDeliveryRules(ctx)}\n\n📞 +${ctx.whatsapp}`,
       };
 
     case "order_booking":
@@ -1260,7 +1346,13 @@ export function generateShopResponse(intent: ShopIntent, ctx: ShopContext): Assi
         intent,
         confidence: 0.85,
         suggestions,
-        reply: `🛒 *Order from ${ctx.name}*\n\n1. Shop page se products cart mein add karein\n2. Checkout → Order via WhatsApp\n3. Hum confirm karenge!\n\n📞 +${ctx.whatsapp}`,
+        reply:
+          `🛒 *Order from ${ctx.name}*\n\n` +
+          `1. Shop page se products cart mein add karein\n` +
+          `2. Checkout → location pin → fee auto-calculate\n` +
+          `3. WhatsApp par shop ko message\n\n` +
+          `${formatShopDeliveryRules(ctx)}\n\n` +
+          `🛒 [Open shop](/shop/${ctx.shopId})\n📞 +${ctx.whatsapp}`,
       };
 
     case "contact_info":
@@ -1300,6 +1392,93 @@ function withThinking(
     ...res,
     thinkingSteps: getThinkingSteps(res.intent, role, query),
   };
+}
+
+/** Merge local rules with Groq NLU — never let LLM invent a catalog query alone. */
+function mergeLocalAndLlmNlu(
+  local: ReturnType<typeof runLocalNlu>,
+  llm: Awaited<ReturnType<typeof understandWithFreeLlm>>,
+): ReturnType<typeof runLocalNlu> {
+  if (!llm || llm.confidence < 0.55) return local;
+
+  const next = { ...local };
+  if (llm.categoryHint && (!local.categoryHint || llm.confidence >= local.confidence)) {
+    next.categoryHint = llm.categoryHint;
+  }
+  if (llm.searchQuery && llm.searchQuery.length >= 2) {
+    if (!local.searchQuery || llm.confidence >= local.confidence - 0.05) {
+      next.searchQuery = llm.searchQuery;
+    }
+  }
+
+  const map: Record<string, ReturnType<typeof runLocalNlu>["intent"] | null> = {
+    product_search: "product_search",
+    shop_search: "shop_search",
+    app_help: "how_it_works",
+    order_help: "order_help",
+    merchant_help: "merchant_help",
+    category_browse: "category_browse",
+    brand_owner: "brand_owner",
+    analytics: "merchant_help",
+    out_of_scope: null,
+    unclear: null,
+  };
+  const mapped = map[llm.intent];
+  if (
+    mapped &&
+    (llm.confidence >= local.confidence || local.intent === "unclear" || local.confidence < 0.7)
+  ) {
+    next.intent = mapped;
+    next.confidence = Math.max(local.confidence, Math.min(0.96, llm.confidence));
+  }
+  return next;
+}
+
+/**
+ * Optional Groq polish — FACTS = draft only. Never polish product cards (links stay exact).
+ * Never polish refuses (stay exact). Reject polish that invents new http(s) links.
+ */
+async function finalizeAssistantReply(
+  res: AssistantResponse,
+  role: AssistantRole,
+  userMessage: string,
+): Promise<AssistantResponse> {
+  const gated = ensureAssistantReply(res, role, userMessage) as AssistantResponse;
+
+  if (!hasFreeLlmKey()) return gated;
+  if (gated.products?.length) return gated;
+  if (gated.intent === "honest_refuse" || gated.intent === "empty") return gated;
+  if (gated.intent === "delivery_help") return gated;
+  if (gated.confidence < 0.55) return gated;
+  if (["auth", "no_shop"].includes(gated.intent)) return gated;
+
+  try {
+    const polished = await composeGroundedReplyWithLlm({
+      userMessage,
+      role,
+      facts:
+        `Intent=${gated.intent}; confidence=${gated.confidence}\n` +
+        (gated.suggestions?.length ? `Allowed suggestions: ${gated.suggestions.join(" | ")}\n` : "") +
+        `Confirmed draft (do not invent beyond this):\n${gated.reply}`,
+      draftReply: gated.reply,
+    });
+    if (polished && polished.length >= 24) {
+      const draftLinks = new Set(
+        [...gated.reply.matchAll(/https?:\/\/[^\s)]+|\]\((\/[^)]+)\)/g)].map((m) => m[0]),
+      );
+      const polishLinks = [...polished.matchAll(/https?:\/\/[^\s)]+/g)].map((m) => m[0]);
+      const inventedExternal = polishLinks.some((u) => !draftLinks.has(u) && !gated.reply.includes(u));
+      if (inventedExternal) return gated;
+      return ensureAssistantReply(
+        { ...gated, reply: polished.slice(0, 2500) },
+        role,
+        userMessage,
+      ) as AssistantResponse;
+    }
+  } catch {
+    /* keep deterministic reply */
+  }
+  return gated;
 }
 
 function isShortGreeting(message: string): boolean {
@@ -1355,7 +1534,7 @@ async function tryProductSearch(
   }
 
   if (looksLikeProductSearch(message)) {
-    return buildHelpfulGuideReply({
+    return buildHonestRefuseReply({
       reason: "no_match",
       query,
       role,
@@ -1430,11 +1609,51 @@ export async function runAssistant(
   }
 
   const historyResolved = resolveMessageWithHistory(rawMessage, req.history);
-  const nlu = runLocalNlu(historyResolved);
+  const role = req.role;
+  const result = await runAssistantCore(supabase, req, historyResolved, role);
+  return finalizeAssistantReply(result, role, historyResolved);
+}
+
+async function runAssistantCore(
+  supabase: SupabaseClient,
+  req: AssistantRequest,
+  historyResolved: string,
+  role: AssistantRole,
+): Promise<AssistantResponse> {
+  const localNlu = runLocalNlu(historyResolved);
+
+  let llmNlu: Awaited<ReturnType<typeof understandWithFreeLlm>> = null;
+  if (hasFreeLlmKey()) {
+    try {
+      llmNlu = await Promise.race([
+        understandWithFreeLlm(historyResolved, role),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000)),
+      ]);
+    } catch {
+      llmNlu = null;
+    }
+  }
+
+  if (
+    llmNlu?.intent === "out_of_scope" &&
+    llmNlu.confidence >= 0.62 &&
+    localNlu.confidence < 0.9 &&
+    !isShortGreeting(historyResolved)
+  ) {
+    return withThinking(
+      buildHonestRefuseReply({
+        reason: "out_of_scope",
+        query: historyResolved.slice(0, 40),
+        role,
+      }),
+      role,
+    );
+  }
+
+  const nlu = mergeLocalAndLlmNlu(localNlu, llmNlu);
   const lang = normalizeUserLanguage(historyResolved);
   const message =
     nlu.normalizedMessage.length >= 2 ? nlu.normalizedMessage : historyResolved;
-  const role = req.role;
   let shopCategoryHint = req.shopCategory ?? nlu.categoryHint ?? lang.likelyCategory;
 
   const honestFallback = (preferredQuery?: string) =>
@@ -1450,9 +1669,41 @@ export async function runAssistant(
 
   if (isOutOfScope(historyResolved)) {
     return withThinking(
-      buildHelpfulGuideReply({ reason: "out_of_scope", query: historyResolved.slice(0, 40), role }),
+      buildHonestRefuseReply({ reason: "out_of_scope", query: historyResolved.slice(0, 40), role }),
       role,
     );
+  }
+
+  // Delivery fee / coverage — before brand/product so "fee kitni" never becomes catalog
+  if (nlu.intent === "delivery_help") {
+    if (role === "shop" && req.shopId) {
+      const shopCtx = await buildShopContext(supabase, req.shopId);
+      if (shopCtx) {
+        return withThinking(generateShopResponse("order_booking", shopCtx), role);
+      }
+    }
+    if (role === "customer" || role === "shop") {
+      return withThinking(
+        {
+          intent: "delivery_help",
+          confidence: 0.92,
+          suggestions:
+            role === "merchant"
+              ? ["Meri shop ki live summary", "Growth tips"]
+              : ["Order kaise karun?", "Best deals?", "Support"],
+          reply:
+            `🚚 *Delivery (confirmed TrendsMart rules)*\n\n` +
+            `1️⃣ *Pickup* → fee Rs 0\n` +
+            `2️⃣ Cart (before coupon) ≥ shop *free-delivery threshold* → fee Rs 0\n` +
+            `3️⃣ Warna: *flat + (per-km × GPS distance)*\n` +
+            `4️⃣ Fees unset → *not FREE* — checkout blocks delivery\n` +
+            `5️⃣ Radius = coverage only (not automatic free fee)\n\n` +
+            `Exact Rs sirf checkout par GPS se — main invent nahi karta.\n\n` +
+            `👉 [Cart](/cart) · [Support](/support)`,
+        },
+        role,
+      );
+    }
   }
 
   // Brand / owner / policies / how-it-works — FIRST (100% local, no API)
@@ -1504,7 +1755,7 @@ export async function runAssistant(
         handoff:
           role === "shop" && req.shopId
             ? { type: "shop", href: `/shop/${req.shopId}`, label: "Message seller" }
-            : { type: "support", href: "/contact", label: "Contact support" },
+            : { type: "support", href: "/support", label: "Contact support" },
       },
       role,
     );
@@ -1590,7 +1841,10 @@ export async function runAssistant(
       return { reply: "Could not load your shop data. Register a store first.", intent: "no_shop", confidence: 0 };
     }
 
-    if (looksLikeLiveAnalytics(historyResolved)) {
+    if (
+      looksLikeLiveAnalytics(historyResolved) ||
+      (llmNlu?.intent === "analytics" && llmNlu.confidence >= 0.7)
+    ) {
       return withThinking(
         {
           reply: formatMerchantLivePulse({
@@ -1620,10 +1874,13 @@ export async function runAssistant(
     const res = generateMerchantResponse(intent, ctx);
     if (intent === "general" || res.reply === "MAIN_NEEDS_FALLBACK" || confidence < 0.7) {
       const fallback = await honestFallback(searchQuery);
+      // Keep honest refuses — do not override with a fake coach menu.
+      if (fallback.intent === "honest_refuse") {
+        return withThinking(fallback, role, message);
+      }
       if (
         fallback.intent !== "helpful_guide" &&
-        fallback.intent !== "helpful_redirect" &&
-        fallback.intent !== "honest_refuse"
+        fallback.intent !== "helpful_redirect"
       ) {
         return withThinking(fallback, role, message);
       }
@@ -1685,7 +1942,10 @@ export async function runAssistant(
     confidence < 0.7
   ) {
     const fallback = await honestFallback(searchQuery);
-    if (fallback.intent !== "helpful_guide" && fallback.intent !== "helpful_redirect" && fallback.intent !== "honest_refuse") {
+    if (fallback.intent === "honest_refuse") {
+      return withThinking(fallback, role, message);
+    }
+    if (fallback.intent !== "helpful_guide" && fallback.intent !== "helpful_redirect") {
       return withThinking(fallback, role, message);
     }
     if (shopCtx.products.length > 0 && intent === "product_search") {

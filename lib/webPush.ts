@@ -7,6 +7,10 @@ export interface PushPayload {
   body: string;
   url?: string;
   tag?: string;
+  /** When true, OS re-alerts even if same tag (use for real order events). */
+  renotify?: boolean;
+  /** Chat conversation — SW can suppress if user is viewing that thread. */
+  conversationId?: string;
 }
 
 type PushSubscriptionRow = {

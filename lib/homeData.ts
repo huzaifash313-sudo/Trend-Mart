@@ -16,6 +16,7 @@
 import { unstable_cache } from "next/cache";
 import { createClient as createAnonClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { PUBLIC_SHOP_PAGE_SIZE, PUBLIC_STORY_LIMIT } from "@/lib/mobilePerf";
 import type { Shop, Story } from "@/types";
 
 export interface HomeInitialData {
@@ -72,7 +73,7 @@ async function fetchPublicShops(supabase: AnonClient): Promise<Shop[]> {
       .eq("is_live", true)
       .eq("verification_status", "approved")
       .order("name", { ascending: true })
-      .limit(300);
+      .limit(PUBLIC_SHOP_PAGE_SIZE);
 
     const { data, error } = await query;
     if (error && /column .* does not exist|PGRST204|schema cache/i.test(String(error.message))) {
@@ -81,7 +82,7 @@ async function fetchPublicShops(supabase: AnonClient): Promise<Shop[]> {
         .select("*")
         .eq("is_live", true)
         .eq("verification_status", "approved")
-        .limit(300);
+        .limit(PUBLIC_SHOP_PAGE_SIZE);
       if (retry.error) throw retry.error;
       return (retry.data as unknown as Shop[]) ?? [];
     }
@@ -103,7 +104,7 @@ async function fetchActiveStories(supabase: AnonClient): Promise<Story[]> {
       )
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(150);
+      .limit(PUBLIC_STORY_LIMIT);
 
     if (!withShop.error && withShop.data) {
       return (withShop.data as Record<string, unknown>[]).map((row) => {
@@ -144,7 +145,7 @@ async function fetchActiveStories(supabase: AnonClient): Promise<Story[]> {
       .select("*")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(150);
+      .limit(PUBLIC_STORY_LIMIT);
     if (error) throw error;
     return (data as unknown as Story[]) ?? [];
   } catch {

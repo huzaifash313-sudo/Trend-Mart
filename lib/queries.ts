@@ -22,6 +22,7 @@ import { fetchCouponsByShopId, type Coupon } from "@/services/couponService";
 import { fetchDealsByShopId } from "@/services/dealService";
 import type { ShopDeal } from "@/lib/dealSchedule";
 import { createClient } from "@/lib/supabase/client";
+import { PUBLIC_SHOP_LIMIT, PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
 import type { Product, Shop, Story } from "@/types";
 
 type ServiceResult<T> =
@@ -44,6 +45,7 @@ function idsKey(ids: string[]): string {
 
 export const queryKeys = {
   shops: ["shops", "public"] as const,
+  shopsInfinite: ["shops", "public", "infinite"] as const,
   stories: ["stories"] as const,
   deals: (limit: number) => ["deals", limit] as const,
   coupons: (shopIds: string[]) => ["coupons", idsKey(shopIds)] as const,
@@ -55,13 +57,44 @@ export const queryKeys = {
 export function useShops(options?: { initialData?: Shop[] }) {
   return useQuery({
     queryKey: queryKeys.shops,
-    queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: 300 })),
+    queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: PUBLIC_SHOP_LIMIT })),
     staleTime: 2 * 60_000,
     // Keep the previous list on screen during refetch so content never flashes
     // blank / skeletons when a merchant publishes or the user pulls to refresh.
     placeholderData: keepPreviousData,
     ...(options?.initialData !== undefined
       ? { initialData: options.initialData }
+      : {}),
+  });
+}
+
+/** Paginated public shops for the homepage — never downloads the full catalog. */
+export function useShopsInfinite(options?: { initialData?: Shop[]; pageSize?: number }) {
+  const pageSize = options?.pageSize ?? PUBLIC_SHOP_PAGE_SIZE;
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.shopsInfinite, pageSize] as const,
+    queryFn: ({ pageParam }) =>
+      unwrap(
+        fetchShops({
+          publicOnly: true,
+          limit: pageSize,
+          offset: pageParam as number,
+        }),
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const fetched = allPages.reduce((n, p) => n + p.length, 0);
+      return lastPage.length >= pageSize ? fetched : undefined;
+    },
+    staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
+    ...(options?.initialData !== undefined
+      ? {
+          initialData: {
+            pages: [options.initialData],
+            pageParams: [0],
+          },
+        }
       : {}),
   });
 }

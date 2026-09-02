@@ -12,6 +12,7 @@ import {
   uploadToCloudinary,
   extractCloudinaryPublicId,
   withAutoFormat,
+  withCloudinaryDelivery,
 } from "@/lib/cloudinary";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -544,9 +545,39 @@ export function extractPathFromUrl(url: string): string | null {
   }
 }
 
+/** Delivery presets for list cards — keeps mobile payloads tiny on Cloudinary. */
+export type ImageDeliveryRole = "card" | "banner" | "logo" | "thumb" | "full";
+
+const DELIVERY_BY_ROLE: Record<
+  ImageDeliveryRole,
+  { width?: number; height?: number; crop?: "limit" | "fill" | "fit" | "thumb"; quality?: "auto" | "eco" | "good" }
+> = {
+  /** Product / deal grid tiles */
+  card: { width: 400, height: 400, crop: "limit", quality: "eco" },
+  /** Shop / promo banners on cards — fit full art, no hard crop */
+  banner: { width: 960, height: 540, crop: "fit", quality: "eco" },
+  /** Avatars / shop logos — keep whole mark visible */
+  logo: { width: 256, height: 256, crop: "fit", quality: "eco" },
+  /** Story rings & tiny thumbs */
+  thumb: { width: 96, height: 96, crop: "fill", quality: "eco" },
+  /** Detail / lightbox / upload preview — full image, still capped */
+  full: { width: 1400, height: 1400, crop: "limit", quality: "good" },
+};
+
+function defaultRoleForFallback(
+  fallbackType: "shop" | "product" | "generic",
+): ImageDeliveryRole {
+  if (fallbackType === "product") return "card";
+  if (fallbackType === "shop") return "logo";
+  return "card";
+}
+
 /**
  * Return a reliable image URL, falling back to a placeholder if the provided
  * URL is empty, null, undefined, or a data URI (already a fallback).
+ *
+ * Cloudinary URLs are rewritten with `f_auto` / `q_auto` / size transforms so
+ * Android & iPhone list views never download full DSLR originals.
  *
  * Use this in `<img src={getSafeImageUrl(url, "product")} />` components.
  *
@@ -557,11 +588,14 @@ export function extractPathFromUrl(url: string): string | null {
 export function getSafeImageUrl(
   url: string | null | undefined,
   fallbackType: "shop" | "product" | "generic" = "generic",
+  role?: ImageDeliveryRole,
 ): string {
   if (!url || url.trim() === "") {
     return FALLBACK_URLS[fallbackType];
   }
-  return url;
+  if (url.startsWith("data:")) return url;
+  const preset = DELIVERY_BY_ROLE[role ?? defaultRoleForFallback(fallbackType)];
+  return withCloudinaryDelivery(url, preset);
 }
 
 /**

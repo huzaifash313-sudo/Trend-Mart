@@ -153,7 +153,7 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
   {
     keys: ["review", "rating", "stars", "feedback product"],
     q: "Reviews & ratings",
-    a: "Delivered orders ke baad review reminder aata hai. Shop aur product ratings trust build karti hain. Apni reviews: account profile section.",
+    a: "Delivered order ke baad product rate karo — stars product ki rating badhati hain aur shop ki average rating bhi auto update hoti hai. Apni reviews: account profile.",
     roles: "customer",
   },
   {
@@ -222,7 +222,7 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
   {
     keys: ["minimum order", "delivery fee", "free delivery", "slab"],
     q: "Delivery fees & minimum order",
-    a: "Har shop apna minimum order aur delivery slabs set karti hai — checkout par clearly dikhte hain. Free delivery threshold shop settings mein hota hai.",
+    a: "Har shop apna *minimum order*, *flat fee*, *per-km fee*, aur *free-delivery threshold* khud set karti hai. Exact amount checkout par GPS distance ke sath calculate hota hai. Fees set na hon to delivery *FREE nahi* hoti — checkout block ho sakta hai. Radius sirf coverage (deliver hoga ya nahi) decide karta hai.",
     roles: "all",
   },
   {
@@ -255,7 +255,7 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
   {
     keys: ["safe", "secure", "scam", "trust", "reliable"],
     q: "Kya TrendsMart safe hai?",
-    a: "Merchants admin approval ke baad live hote hain. Order WhatsApp par shop se direct confirm hota hai. Issues ke liye pehle shop, phir [Support](/contact).",
+    a: "Nayi merchant shops *admin approval* ke baad hi public hoti hain. Order WhatsApp par shop se direct confirm hota hai. Issues: pehle shop, phir [Support](/support).",
     roles: "all",
     link: "/legal/merchant-guidelines",
   },

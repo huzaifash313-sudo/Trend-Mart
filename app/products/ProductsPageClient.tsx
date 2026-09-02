@@ -23,6 +23,7 @@ import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMarketplaceProductsInfinite, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { type Coupon } from "@/services/couponService";
+import { MAX_MOUNTED_PRODUCTS } from "@/lib/mobilePerf";
 import {
   isDealActiveOnDate,
   toPkDateKey,
@@ -460,9 +461,12 @@ function ProductsPageInner() {
     return suggestSearchCorrections(qParam, 4);
   }, [qParam, displayProducts.length]);
 
-  // All accumulated + filtered products render directly (infinite scroll pages
-  // load lazily via the sentinel below, so we never mount a huge list up front).
-  const visibleProducts = displayProducts;
+  // All accumulated + filtered products — cap mounted DOM for mobile scroll.
+  // VirtualizedGrid in ProductGrid windows further; this prevents unbounded growth.
+  const visibleProducts = useMemo(() => {
+    if (displayProducts.length <= MAX_MOUNTED_PRODUCTS) return displayProducts;
+    return displayProducts.slice(displayProducts.length - MAX_MOUNTED_PRODUCTS);
+  }, [displayProducts]);
 
   const handleCategoryChange = useCallback(
     (category: ShopCategory) => {

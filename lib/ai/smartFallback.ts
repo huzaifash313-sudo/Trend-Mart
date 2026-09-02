@@ -7,7 +7,7 @@ import {
   matchCategoryFromMessage,
 } from "@/lib/ai/categoryIntel";
 import {
-  buildHelpfulGuideReply,
+  buildHonestRefuseReply,
   isOutOfScope,
   MIN_ANSWER_CONFIDENCE,
   MIN_KNOWLEDGE_CONFIDENCE,
@@ -152,7 +152,7 @@ export async function buildHonestFallbackReply(
   const { message, role, shopId, shopCategory, shopName, location, preferredQuery } = options;
 
   if (isOutOfScope(message)) {
-    return buildHelpfulGuideReply({ reason: "out_of_scope", query: message.slice(0, 40), role });
+    return buildHonestRefuseReply({ reason: "out_of_scope", query: message.slice(0, 40), role });
   }
 
   const brand = matchBrandKnowledge(message, role);
@@ -205,44 +205,17 @@ export async function buildHonestFallbackReply(
     return soft;
   }
 
+  // Do NOT invent trending products for an unrelated question — admit unknown.
   let topCategories: string[] | undefined;
   try {
     const snap = await fetchPlatformSnapshot(supabase);
     topCategories = snap.topCategories;
-    // Last useful try: top trending category products
-    if (topCategories?.[0] && role !== "merchant") {
-      const trendHits = await searchProductsByCategory(supabase, {
-        category: topCategories[0],
-        limit: 4,
-        userLat: location?.lat,
-        userLng: location?.lng,
-      });
-      if (trendHits.length) {
-        return {
-          ...formatProductSearchReply(
-            trendHits,
-            topCategories[0],
-            role,
-            "best_pick",
-            topCategories[0],
-            shopName,
-          ),
-          products: trendHits,
-          confidence: 0.78,
-          reply:
-            `🔥 *Abhi TrendsMart par chal raha (live):*\n\n` +
-            formatProductSearchReply(trendHits, topCategories[0], role, "best_pick", topCategories[0], shopName)
-              .reply.replace(/^✨[^\n]*\n\n/, "") +
-            `\n\n_Specific item chahiye? Naam likhein — main exact link dunga._`,
-        };
-      }
-    }
   } catch {
     topCategories = undefined;
   }
 
-  return buildHelpfulGuideReply({
-    reason: preferredQuery || !catalog ? "no_match" : "unclear",
+  return buildHonestRefuseReply({
+    reason: preferredQuery || !catalog ? "no_match" : "low_confidence",
     query: (preferredQuery || message).slice(0, 40),
     role,
     topCategories,

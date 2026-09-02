@@ -118,14 +118,11 @@ export default function NotificationsPage() {
     const onVis = () => {
       if (document.visibilityState === "visible") {
         void refreshPushStatus();
-        void syncPushSubscriptionIfGranted();
       }
     };
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onVis);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", onVis);
     };
   }, [refreshPushStatus]);
 
@@ -145,7 +142,7 @@ export default function NotificationsPage() {
 
   const handleEnablePush = useCallback(async () => {
     setPushBusy(true);
-    const result = await subscribeToPushNotifications();
+    const result = await subscribeToPushNotifications({ confirmOs: true, forceSync: true });
     setPushBusy(false);
     await refreshPushStatus();
     if (result.ok) {
@@ -176,7 +173,7 @@ export default function NotificationsPage() {
 
   const handleResync = useCallback(async () => {
     setPushBusy(true);
-    const ok = await syncPushSubscriptionIfGranted();
+    const ok = await syncPushSubscriptionIfGranted(true);
     await refreshPushStatus();
     setPushBusy(false);
     addToast(

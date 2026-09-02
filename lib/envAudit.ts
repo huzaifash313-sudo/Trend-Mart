@@ -91,9 +91,9 @@ const REQUIRED_SERVER_VARS = [
   // Storage
   "SUPABASE_STORAGE_BUCKET",
 
-  // Optional but recommended for production
-  // "SENTRY_DSN",
-  // "UPSTASH_REDIS_URL",
+  // Transactional email — checkout / signup OTP cannot work without this.
+  "RESEND_API_KEY",
+  "EMAIL_FROM",
 ] as const;
 
 /**
@@ -111,12 +111,15 @@ const RECOMMENDED_SERVER_VARS = [
   "NEXT_PUBLIC_SITE_NAME",
   "NEXTAUTH_URL",
   "NEXTAUTH_SECRET",
-  "RESEND_API_KEY",
-  "EMAIL_FROM",
   "SUPPORT_TEAM_EMAIL",
   "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
   "VAPID_SUBJECT",
+  "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME",
+  "NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+  "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+  "TURNSTILE_SECRET_KEY",
+  "GROQ_API_KEY",
 ] as const;
 
 /**
@@ -137,6 +140,9 @@ const FORBIDDEN_PUBLIC_PREFIXES = [
   "SMTP_PASSWORD",
   "AWS_SECRET_ACCESS_KEY",
   "TURNSTILE_SECRET_KEY",
+  "GROQ_API_KEY",
+  "GEMINI_API_KEY",
+  "GOOGLE_AI_API_KEY",
 ] as const;
 
 // ─── Audit Implementation ────────────────────────────────────────────────────
