@@ -158,9 +158,9 @@ export default function ChatThread({
   const isOwn = (msg: ChatMessage) => msg.sender_role === viewerRole;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-900/30 dark:bg-zinc-900">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+      <div className="flex shrink-0 items-center gap-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-600/10 to-teal-500/10 px-4 py-3 dark:border-emerald-900/30">
         {onBack ? (
           <button
             type="button"
@@ -189,7 +189,7 @@ export default function ChatThread({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4">
+      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white to-emerald-50/20 px-3 py-4 dark:from-zinc-950 dark:to-emerald-950/10 sm:px-4">
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <div className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
@@ -209,10 +209,10 @@ export default function ChatThread({
                   className={`group flex ${own ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`relative max-w-[85%] rounded-2xl px-3.5 py-2 text-sm shadow-sm sm:max-w-[75%] ${
+                    className={`relative max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm sm:max-w-[75%] ${
                       own
-                        ? "rounded-br-md bg-emerald-600 text-white"
-                        : "rounded-bl-md bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                        ? "rounded-br-md bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-emerald-600/20"
+                        : "rounded-bl-md border border-emerald-100 bg-white text-zinc-900 dark:border-emerald-900/40 dark:bg-zinc-800 dark:text-zinc-100"
                     }`}
                   >
                     <p className="whitespace-pre-wrap break-words">{msg.body}</p>
@@ -244,7 +244,7 @@ export default function ChatThread({
       </div>
 
       {/* Composer */}
-      <div className="shrink-0 border-t border-zinc-100 p-3 dark:border-zinc-800">
+      <div className="shrink-0 border-t border-emerald-100 bg-white p-3 dark:border-emerald-900/30 dark:bg-zinc-950">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
@@ -252,14 +252,14 @@ export default function ChatThread({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message…"
-            className="max-h-28 min-h-[44px] flex-1 resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            placeholder="Message likhein…"
+            className="max-h-28 min-h-[44px] flex-1 resize-none rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-900/40 dark:bg-zinc-800 dark:text-zinc-100"
           />
           <button
             type="button"
             disabled={sending || !text.trim()}
             onClick={() => void handleSend()}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white transition hover:bg-emerald-700 disabled:opacity-40"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white transition hover:opacity-90 disabled:opacity-40"
             aria-label="Send message"
           >
             <SendIcon />

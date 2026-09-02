@@ -18,8 +18,11 @@ interface AiAssistantBody {
   message: string;
   role: AssistantRole;
   shopId?: string;
+  shopCategory?: string;
+  shopName?: string;
   sessionId?: string;
   history?: { role: "user" | "assistant"; text: string }[];
+  memoryHints?: string[];
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -63,6 +66,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   } = await supabase.auth.getUser();
 
   const shopId = body.shopId ? sanitizeChatString(body.shopId, 100) : undefined;
+  const shopCategory = body.shopCategory ? sanitizeChatString(body.shopCategory, 80) : undefined;
+  const shopName = body.shopName ? sanitizeChatString(body.shopName, 100) : undefined;
   const sessionId = body.sessionId
     ? sanitizeChatString(body.sessionId, 50)
     : `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -87,8 +92,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       message,
       role,
       shopId,
+      shopCategory,
+      shopName,
       userId: user?.id,
       history,
+      memoryHints: (body.memoryHints ?? []).slice(0, 5).map((h) => sanitizeChatString(h, 80)),
     });
 
     if (role === "shop" && shopId) {

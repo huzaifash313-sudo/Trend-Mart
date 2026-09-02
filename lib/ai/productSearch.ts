@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { buildSupabaseOrFilter, detectSortMode, expandSearchTerms, type SearchSortMode } from "@/lib/ai/queryExpand";
+import { getShopCategoryPrompts } from "@/lib/ai/shopCategoryPrompts";
 import { sanitizeChatNumber, sanitizeChatString } from "@/lib/ai/sanitize";
 
 export interface ProductSearchHit {
@@ -141,6 +142,8 @@ export function formatProductSearchReply(
   query: string,
   role: "customer" | "merchant" | "shop",
   sortMode: SearchSortMode = "relevance",
+  shopCategory?: string,
+  shopName?: string,
 ): { reply: string; intent: string; confidence: number; suggestions: string[] } {
   const uniqueShops = new Set(hits.map((h) => h.shopId)).size;
   const sortLabel =
@@ -195,7 +198,9 @@ export function formatProductSearchReply(
     suggestions:
       role === "customer"
         ? ["Sasta mobile dhundo", "Electronics shop dhundo", "Best deals?", "Order kaise karun?"]
-        : ["Meri shop ki live summary", "Best selling product?", "Growth strategy"],
+        : role === "merchant"
+          ? ["Meri shop ki live summary", "Best selling product?", "Growth strategy"]
+          : getShopCategoryPrompts(shopCategory, shopName),
     reply: `✨ *${title}*\n\n${topSection}${body}${browseLink}\n\n_Tap green links to open product or shop instantly._`,
   };
 }

@@ -5999,3 +5999,10 @@ html.dark .recharts-label-line {
   }
 }
 
+/* Hide floating launchers behind full-screen TrendBot */
+html.tm-trendbot-open .tm-trendbot-launcher-pill,
+html.tm-trendbot-open .tm-trendbot-bubble {
+  opacity: 0;
+  pointer-events: none;
+}
+

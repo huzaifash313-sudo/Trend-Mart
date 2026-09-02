@@ -1488,7 +1488,7 @@ function ShopDetailInner({ id }: { id: string }) {
 
       {/* ── Free AI shop assistant (products, prices, hours) ─────────── */}
       {shop && !isOwner && (
-        <ChatWidget shopId={shop.id} shopName={shop.name} accentHex={theme.accentHex} />
+        <ChatWidget shopId={shop.id} shopName={shop.name} shopCategory={shop.category} />
       )}
     </div>
   );

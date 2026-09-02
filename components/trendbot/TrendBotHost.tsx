@@ -9,11 +9,11 @@ import {
   TREND_BOT_TEASERS,
   TREND_BOT_WELCOME_CUSTOMER,
 } from "@/lib/ai/trendBotBrand";
-import { TrendBotAvatar } from "@/components/trendbot/TrendBotAvatar";
+import { TrendBotLauncher } from "@/components/trendbot/TrendBotLauncher";
 import { TrendBotPanel } from "@/components/trendbot/TrendBotPanel";
 
-const SCROLL_TEASE_MIN_PX = 380;
-const TEASE_COOLDOWN_MS = 42_000;
+const SCROLL_TEASE_MIN_PX = 400;
+const TEASE_COOLDOWN_MS = 45_000;
 const TEASE_VISIBLE_MS = 6_500;
 
 export default function TrendBotHost() {
@@ -68,12 +68,12 @@ export default function TrendBotHost() {
 
   useEffect(() => {
     if (hidden || open) return;
-    const key = "tm_trendbot_teased_v1";
+    const key = "tm_trendbot_teased_v2";
     if (sessionStorage.getItem(key)) return;
     const t = setTimeout(() => {
       sessionStorage.setItem(key, "1");
       showTeaser(TREND_BOT_TEASERS[0]!);
-    }, 8_000);
+    }, 10_000);
     return () => clearTimeout(t);
   }, [hidden, open, showTeaser]);
 
@@ -88,7 +88,8 @@ export default function TrendBotHost() {
             setTeaser(null);
             setOpen(true);
           }}
-          className="tm-trendbot-bubble fixed bottom-[7.5rem] left-4 z-[131] max-w-[min(280px,calc(100vw-5.5rem))] rounded-2xl rounded-bl-sm border border-emerald-100 bg-white px-3.5 py-2.5 text-left text-xs font-medium leading-snug text-zinc-700 shadow-lg shadow-emerald-900/10 md:bottom-[5.5rem]"
+          className="tm-trendbot-bubble fixed left-3 z-[121] max-w-[min(260px,calc(100vw-5rem))] rounded-2xl rounded-bl-sm border border-emerald-100 bg-white px-3.5 py-2.5 text-left text-xs font-medium leading-snug text-zinc-700 shadow-lg dark:bg-zinc-900 dark:text-zinc-200"
+          style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))" }}
           aria-label="Open TrendBot chat"
         >
           <span className="block text-[0.6rem] font-bold uppercase tracking-wide text-emerald-600">
@@ -99,21 +100,7 @@ export default function TrendBotHost() {
       ) : null}
 
       {!open ? (
-        <button
-          type="button"
-          onClick={() => {
-            setTeaser(null);
-            setOpen(true);
-          }}
-          className="group fixed bottom-24 left-4 z-[130] flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 via-teal-500 to-teal-600 shadow-xl shadow-emerald-600/30 transition hover:scale-105 active:scale-95 md:bottom-8"
-          aria-label={`Open ${TREND_BOT_NAME}`}
-        >
-          <span className="absolute inset-0 rounded-full bg-emerald-400/20 tm-trendbot-pulse-ring" />
-          <TrendBotAvatar size="md" animated wiggle={wiggle} />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[0.55rem] font-black text-emerald-600 shadow">
-            AI
-          </span>
-        </button>
+        <TrendBotLauncher variant="fab" wiggle={wiggle} onOpen={() => { setTeaser(null); setOpen(true); }} />
       ) : null}
 
       <TrendBotPanel
@@ -122,7 +109,6 @@ export default function TrendBotHost() {
         initialPrompts={CUSTOMER_PROMPTS}
         open={open}
         onClose={() => setOpen(false)}
-        anchor="left"
       />
     </>
   );

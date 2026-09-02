@@ -28,6 +28,7 @@ import {
   looksLikePlatformTrends,
 } from "@/lib/ai/platformIntel";
 import { resolveMessageWithHistory, type HistoryMessage } from "@/lib/ai/sessionContext";
+import { getShopCategoryPrompts } from "@/lib/ai/shopCategoryPrompts";
 import { getThinkingSteps } from "@/lib/ai/thinkingSteps";
 import { looksLikeUniversalSearch, runUniversalSearch } from "@/lib/ai/universalSearch";
 
@@ -39,8 +40,11 @@ export interface AssistantRequest {
   message: string;
   role: AssistantRole;
   shopId?: string;
+  shopCategory?: string;
+  shopName?: string;
   userId?: string;
   history?: HistoryMessage[];
+  memoryHints?: string[];
 }
 
 export interface AssistantResponse {
@@ -1161,12 +1165,7 @@ export function generateCustomerResponse(
 }
 
 export function generateShopResponse(intent: ShopIntent, ctx: ShopContext): AssistantResponse {
-  const suggestions = [
-    "Products aur prices?",
-    "Kab khulte hain?",
-    "Order kaise karun?",
-    "Location kya hai?",
-  ];
+  const suggestions = getShopCategoryPrompts(ctx.category, ctx.name);
 
   switch (intent) {
     case "greeting":
@@ -1174,7 +1173,7 @@ export function generateShopResponse(intent: ShopIntent, ctx: ShopContext): Assi
         intent,
         confidence: 0.95,
         suggestions,
-        reply: `👋 *Salam! Welcome to ${ctx.name}* on TrendsMart!\n\n*${ctx.category}* · ${ctx.location}\n\nPooch sakte hain products, prices, timings, delivery.\n\nHuman reply ke liye "Chat with seller" use karein.`,
+        reply: `👋 *Salam!* Main *TrendBot* hoon — *${ctx.name}* ka AI assistant.\n\n*${ctx.category}* · ${ctx.location}\n\nPooch sakte hain products, prices, timings, delivery.\n\nHuman reply: *Message seller* button.`,
       };
 
     case "product_inquiry":
@@ -1295,6 +1294,8 @@ async function tryProductSearch(
   message: string,
   role: AssistantRole,
   shopId?: string,
+  shopCategory?: string,
+  shopName?: string,
 ): Promise<AssistantResponse | null> {
   if (isShortGreeting(message)) return null;
   if (!shouldRunProductSearch(message, role)) return null;
@@ -1312,7 +1313,7 @@ async function tryProductSearch(
   });
 
   if (hits.length > 0) {
-    return formatProductSearchReply(hits, query, role, sortMode);
+    return formatProductSearchReply(hits, query, role, sortMode, shopCategory, shopName);
   }
 
   if (looksLikeProductSearch(message)) {
@@ -1366,7 +1367,14 @@ export async function runAssistant(
   }
 
   // ── Product search ──────────────────────────────────────────────────────
-  const productHit = await tryProductSearch(supabase, message, role, req.shopId);
+  const productHit = await tryProductSearch(
+    supabase,
+    message,
+    role,
+    req.shopId,
+    req.shopCategory,
+    req.shopName,
+  );
   if (productHit) {
     return withThinking(productHit, role, extractProductQuery(message) ?? message);
   }
