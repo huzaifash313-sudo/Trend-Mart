@@ -23,6 +23,7 @@ import type { Shop, ShopFormData } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
+import { computeDeliveryFee } from "@/lib/deliveryFee";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -356,23 +357,45 @@ export default function DashboardSettingsPage() {
   const [pushBusy, setPushBusy] = useState(false);
   const { addToast } = useToast();
 
-  // Live delivery-charge preview — mirrors what the customer sees at checkout.
-  // Free-delivery offer applies above the threshold; otherwise flat + per-km.
+  // Live delivery-charge preview — uses the same helper as checkout so merchants
+  // see exactly what customers pay (below the free-delivery threshold).
   const feePreview = useMemo(() => {
     const flat = Number(form.delivery_fee_flat) || 0;
     const perKm = Number(form.delivery_fee_per_km) || 0;
     const freeThreshold = Number(form.free_delivery_threshold) || 0;
     const minOrder = Number(form.min_order_amount) || 0;
     const radius = form.service_radius_km ?? 10;
+
+    // Preview subtotal: representative order below the free-delivery offer.
+    let previewSubtotal = minOrder > 0 ? minOrder : 1;
+    if (freeThreshold > 0 && previewSubtotal >= freeThreshold) {
+      previewSubtotal = Math.max(1, freeThreshold - 1);
+    }
+
     const feeAt = (km: number) => {
-      if (freeThreshold > 0) return { label: "FREE", hint: "above free-delivery offer" };
-      const amount = Math.round((flat + perKm * km) * 100) / 100;
-      return { label: amount > 0 ? `Rs. ${amount.toLocaleString()}` : "FREE", hint: amount > 0 ? "delivery charge" : "no charge set" };
+      const amount = computeDeliveryFee({
+        flat,
+        perKm,
+        distanceKm: km,
+        freeThreshold,
+        subtotal: previewSubtotal,
+        isPickup: false,
+      });
+      return {
+        label: amount > 0 ? `Rs. ${amount.toLocaleString()}` : "FREE",
+        hint:
+          freeThreshold > 0
+            ? `below Rs. ${freeThreshold.toLocaleString()} offer`
+            : amount > 0
+              ? "delivery charge"
+              : "no charge set",
+      };
     };
+
     const samples = [2, 5, radius === 2 || radius === 5 ? radius + 1 : radius]
       .filter((km, i, arr) => arr.indexOf(km) === i)
       .slice(0, 3);
-    return { flat, perKm, freeThreshold, minOrder, radius, samples, feeAt };
+    return { flat, perKm, freeThreshold, minOrder, radius, samples, feeAt, previewSubtotal };
   }, [form.delivery_fee_flat, form.delivery_fee_per_km, form.free_delivery_threshold, form.min_order_amount, form.service_radius_km]);
 
   // Seed the editable form from the shop once it's available (on first load or
@@ -685,7 +708,7 @@ export default function DashboardSettingsPage() {
               helper="Extra fee added for each km of customer distance."
               value={form.delivery_fee_per_km}
               onChange={(value) => setForm((current) => ({ ...current, delivery_fee_per_km: value }))}
-              placeholder="Radius"
+              placeholder="Per km fee"
             />
           </div>
 
@@ -726,6 +749,9 @@ export default function DashboardSettingsPage() {
                 : feePreview.flat > 0
                   ? `Flat delivery charge of Rs. ${feePreview.flat.toLocaleString()}${feePreview.freeThreshold > 0 ? `, FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
                   : "No delivery fee set — delivery will show as FREE."}
+              {feePreview.freeThreshold > 0
+                ? ` Distance samples assume a Rs. ${feePreview.previewSubtotal.toLocaleString()} cart (below the free-delivery offer).`
+                : ""}
               {feePreview.minOrder > 0
                 ? ` Minimum order: Rs. ${feePreview.minOrder.toLocaleString()}.`
                 : ""}

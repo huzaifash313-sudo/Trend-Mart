@@ -397,7 +397,7 @@ export default function BottomNav() {
           : "Sign in to open a store";
 
   const sideTabClass = (active: boolean) =>
-    `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 py-1 text-[0.65rem] font-medium whitespace-nowrap transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
+    `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
       active
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-zinc-500 hover:text-zinc-700 dark:text-[color:var(--tm-muted)] dark:hover:text-[color:var(--tm-text)]"
@@ -408,7 +408,7 @@ export default function BottomNav() {
       className={`bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden${keyboardOpen ? " hidden" : ""}`}
       aria-label="Main navigation"
     >
-      <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-center px-1 pb-1">
+      <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-end px-1 pb-1">
         <Link href="/" className={sideTabClass(isHomeActive)} aria-label="Home" aria-current={isHomeActive ? "page" : undefined}>
           <HomeIcon active={isHomeActive} />
           <span>Home</span>
@@ -424,16 +424,16 @@ export default function BottomNav() {
           <span>Deals</span>
         </Link>
 
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-end">
           <button
             type="button"
             onClick={handleCenterAdd}
-            className="-mt-5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/35 ring-4 ring-white transition hover:bg-emerald-700 active:scale-95 dark:ring-[color:var(--tm-surface)]"
+            className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/35 ring-4 ring-white transition hover:bg-emerald-700 active:scale-95 dark:ring-[color:var(--tm-surface)]"
             aria-label={centerAria}
           >
             <PlusIcon />
           </button>
-          <span className="mt-0.5 whitespace-nowrap text-[0.62rem] font-semibold text-emerald-700 dark:text-emerald-400">
+          <span className="mt-0.5 text-[0.58rem] font-semibold text-emerald-700 dark:text-emerald-400">
             {centerLabel}
           </span>
         </div>
