@@ -10,6 +10,7 @@ import {
   type MessageSenderRole,
 } from "@/services/messagingService";
 import { subscribeToConversationMessages } from "@/lib/supabase/realtime";
+import { ChatShellBody, ChatShellFooter, ChatShellHeader } from "@/components/chat/FullScreenChatShell";
 import { useToast } from "@/components/Toast";
 
 function SendIcon() {
@@ -49,6 +50,8 @@ interface ChatThreadProps {
   avatarUrl?: string | null;
   onBack?: () => void;
   headerAction?: React.ReactNode;
+  /** WhatsApp-style — fills parent FullScreenChatShell */
+  fullScreen?: boolean;
 }
 
 export default function ChatThread({
@@ -59,6 +62,7 @@ export default function ChatThread({
   avatarUrl,
   onBack,
   headerAction,
+  fullScreen = false,
 }: ChatThreadProps) {
   const { addToast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -157,9 +161,97 @@ export default function ChatThread({
 
   const isOwn = (msg: ChatMessage) => msg.sender_role === viewerRole;
 
+  const avatarNode = avatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/30" />
+  ) : (
+    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-bold text-white">
+      {title.charAt(0).toUpperCase()}
+    </div>
+  );
+
+  const messageList = loading ? (
+    <div className="flex h-full min-h-[200px] items-center justify-center">
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+    </div>
+  ) : messages.length === 0 ? (
+    <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
+      <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">No messages yet</p>
+      <p className="mt-1 text-xs text-zinc-400">Salam bhej kar baat shuru karein</p>
+    </div>
+  ) : (
+    <div className="space-y-2 py-1">
+      {messages.map((msg) => {
+        const own = isOwn(msg);
+        return (
+          <div key={msg.id} className={`group flex ${own ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`relative max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm sm:max-w-[80%] ${
+                own
+                  ? "rounded-br-sm bg-gradient-to-br from-emerald-600 to-teal-600 text-white"
+                  : "rounded-bl-sm border border-white/80 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              }`}
+            >
+              <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+              <div
+                className={`mt-1 flex items-center gap-1.5 text-[0.65rem] ${
+                  own ? "text-emerald-100" : "text-zinc-400"
+                }`}
+              >
+                <span>{formatTime(msg.created_at)}</span>
+                {own && msg.read_at ? <span>· Seen</span> : null}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div ref={bottomRef} />
+    </div>
+  );
+
+  const composer = (
+    <div className="flex items-end gap-2">
+      <textarea
+        ref={inputRef}
+        rows={1}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="Message…"
+        className="max-h-28 min-h-[44px] flex-1 resize-none rounded-3xl border border-emerald-100 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-900/40 dark:bg-zinc-900 dark:text-zinc-100"
+      />
+      <button
+        type="button"
+        disabled={sending || !text.trim()}
+        onClick={() => void handleSend()}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-md transition hover:opacity-90 disabled:opacity-40"
+        aria-label="Send message"
+      >
+        <SendIcon />
+      </button>
+    </div>
+  );
+
+  if (fullScreen) {
+    return (
+      <>
+        <ChatShellHeader
+          title={title}
+          subtitle={subtitle}
+          onBack={onBack}
+          backLabel="Back to chats"
+          avatar={avatarNode}
+          action={headerAction}
+          gradient
+        />
+        <ChatShellBody>{messageList}</ChatShellBody>
+        <ChatShellFooter>{composer}</ChatShellFooter>
+      </>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-900/30 dark:bg-zinc-900">
-      {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-600/10 to-teal-500/10 px-4 py-3 dark:border-emerald-900/30">
         {onBack ? (
           <button
@@ -188,83 +280,12 @@ export default function ChatThread({
         {headerAction}
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white to-emerald-50/20 px-3 py-4 dark:from-zinc-950 dark:to-emerald-950/10 sm:px-4">
-        {loading ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">No messages yet</p>
-            <p className="mt-1 text-xs text-zinc-400">Say hello to start the conversation</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {messages.map((msg) => {
-              const own = isOwn(msg);
-              return (
-                <div
-                  key={msg.id}
-                  className={`group flex ${own ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`relative max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm sm:max-w-[75%] ${
-                      own
-                        ? "rounded-br-md bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-emerald-600/20"
-                        : "rounded-bl-md border border-emerald-100 bg-white text-zinc-900 dark:border-emerald-900/40 dark:bg-zinc-800 dark:text-zinc-100"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{msg.body}</p>
-                    <div
-                      className={`mt-1 flex items-center gap-1.5 text-[0.65rem] ${
-                        own ? "text-emerald-100" : "text-zinc-400"
-                      }`}
-                    >
-                      <span>{formatTime(msg.created_at)}</span>
-                      {own && msg.read_at ? <span>· Seen</span> : null}
-                    </div>
-                    {own && !msg.is_deleted ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(msg.id)}
-                        className="absolute -left-8 top-1/2 hidden -translate-y-1/2 rounded p-1 text-xs text-zinc-400 opacity-0 transition group-hover:opacity-100 hover:text-red-500 sm:block"
-                        title="Delete message"
-                      >
-                        ×
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={bottomRef} />
-          </div>
-        )}
+        {messageList}
       </div>
 
-      {/* Composer */}
       <div className="shrink-0 border-t border-emerald-100 bg-white p-3 dark:border-emerald-900/30 dark:bg-zinc-950">
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            rows={1}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Message likhein…"
-            className="max-h-28 min-h-[44px] flex-1 resize-none rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-900/40 dark:bg-zinc-800 dark:text-zinc-100"
-          />
-          <button
-            type="button"
-            disabled={sending || !text.trim()}
-            onClick={() => void handleSend()}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white transition hover:opacity-90 disabled:opacity-40"
-            aria-label="Send message"
-          >
-            <SendIcon />
-          </button>
-        </div>
+        {composer}
       </div>
     </div>
   );

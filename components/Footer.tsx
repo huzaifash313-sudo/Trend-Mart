@@ -61,7 +61,7 @@ export default function Footer() {
     : "pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))]";
 
   return (
-    <footer className="mt-auto border-t border-zinc-200 bg-white dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-bg)]">
+    <footer className="tm-site-footer mt-auto border-t border-zinc-200 bg-white dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-bg)]">
       {/* ── Mobile: compact, clears BottomNav ───────────────────────── */}
       <div className={`mx-auto max-w-6xl px-4 pt-5 md:hidden ${mobilePad}`}>
         <Link

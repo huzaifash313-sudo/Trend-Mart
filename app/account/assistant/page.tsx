@@ -42,7 +42,6 @@ export default function CustomerAssistantPage() {
       role="customer"
       title="TrendBot"
       subtitle="Personal orders, deals & tracking — signed in."
-      accentClass="from-violet-600 to-indigo-600"
       backHref="/account"
       backLabel="← Account"
     />

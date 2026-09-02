@@ -6,6 +6,12 @@ import { AssistantMessage } from "@/components/ai/AssistantMessage";
 import { TrendBotAvatar } from "@/components/trendbot/TrendBotAvatar";
 import { useTrendBotChat } from "@/hooks/useTrendBotChat";
 import { TREND_BOT_NAME, TREND_BOT_TAGLINE } from "@/lib/ai/trendBotBrand";
+import {
+  ChatShellBody,
+  ChatShellFooter,
+  ChatShellHeader,
+  FullScreenChatShell,
+} from "@/components/chat/FullScreenChatShell";
 
 export interface TrendBotPanelProps {
   role: AssistantRole;
@@ -78,20 +84,20 @@ export function TrendBotPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const headerTitle = role === "shop" && shopName ? shopName : TREND_BOT_NAME;
-  const headerSub = subtitle ?? TREND_BOT_TAGLINE;
-
   useEffect(() => {
     if (!open) return;
     document.documentElement.classList.add("tm-trendbot-open");
-    document.body.style.overflow = "hidden";
-    const t = setTimeout(() => inputRef.current?.focus(), 150);
     return () => {
       document.documentElement.classList.remove("tm-trendbot-open");
-      document.body.style.overflow = "";
-      clearTimeout(t);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 150);
+  }, [open]);
+
+  const headerTitle = role === "shop" && shopName ? shopName : TREND_BOT_NAME;
+  const headerSub = subtitle ?? TREND_BOT_TAGLINE;
 
   useEffect(() => {
     if (open) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -104,46 +110,21 @@ export function TrendBotPanel({
     }
   };
 
-  return (
-    <div
-      className={`tm-trendbot-fullscreen fixed inset-x-0 z-[125] flex flex-col bg-white transition-transform duration-300 ease-out dark:bg-zinc-950 ${
-        open ? "translate-y-0" : "pointer-events-none translate-y-full"
-      }`}
-      style={{
-        top: "var(--tm-navbar-sticky-offset, 62px)",
-        bottom: "calc(3.75rem + env(safe-area-inset-bottom, 0px))",
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${TREND_BOT_NAME} chat`}
-      aria-hidden={!open}
-    >
-      <div className="relative shrink-0 overflow-hidden bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-500 px-4 py-3 text-white shadow-md">
-        <div className="relative flex items-center gap-3">
-          <TrendBotAvatar size="md" animated={!loading} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="truncate text-base font-bold tracking-tight">{headerTitle}</p>
-              <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[0.55rem] font-bold uppercase">
-                AI
-              </span>
-            </div>
-            <p className="truncate text-xs opacity-90">{headerSub}</p>
-            <p className="mt-0.5 truncate text-[0.65rem] opacity-75">{sessionLabel}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-white/15 p-2 transition hover:bg-white/25"
-            aria-label="Close TrendBot"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-      </div>
+  if (!open) return null;
 
-      <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white via-emerald-50/20 to-white px-4 py-4 dark:from-zinc-950 dark:via-emerald-950/10 dark:to-zinc-950">
-        <div className="mx-auto max-w-2xl space-y-4">
+  return (
+    <FullScreenChatShell className="z-[130]">
+      <ChatShellHeader
+        title={headerTitle}
+        subtitle={`${headerSub} · ${sessionLabel}`}
+        onBack={onClose}
+        backLabel="Close TrendBot"
+        avatar={<TrendBotAvatar size="sm" animated={!loading} />}
+        badge="AI"
+      />
+
+      <ChatShellBody>
+        <div className="space-y-3 py-1">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -210,20 +191,17 @@ export function TrendBotPanel({
           ) : null}
           <div ref={messagesEndRef} />
         </div>
-      </div>
+      </ChatShellBody>
 
       {!loading && suggestions.length > 0 ? (
-        <div className="shrink-0 border-t border-emerald-100 bg-white/95 px-4 py-2.5 backdrop-blur-sm dark:border-emerald-900/30 dark:bg-zinc-950/95">
-          <p className="mb-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-600/80">
-            Suggested for you
-          </p>
-          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+        <div className="shrink-0 border-t border-emerald-100 bg-white px-3 py-2 dark:border-emerald-900/30 dark:bg-zinc-950">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
             {suggestions.map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => void sendMessage(p)}
-                className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 active:scale-95 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800"
               >
                 {p}
               </button>
@@ -232,32 +210,29 @@ export function TrendBotPanel({
         </div>
       ) : null}
 
-      <div className="shrink-0 border-t border-emerald-100 bg-white px-4 py-3 dark:border-emerald-900/30 dark:bg-zinc-950">
-        <div className="mx-auto flex max-w-2xl items-end gap-2">
+      <ChatShellFooter>
+        <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
             rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="TrendBot se kuch bhi pucho… (Urdu / English)"
+            placeholder="Message…"
             disabled={loading}
-            className="max-h-28 min-h-[48px] flex-1 resize-none rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50 dark:border-emerald-900/40 dark:bg-zinc-900 dark:text-zinc-100"
+            className="max-h-28 min-h-[48px] flex-1 resize-none rounded-3xl border border-emerald-100 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-500 focus:outline-none dark:border-emerald-900/40 dark:bg-zinc-900 dark:text-zinc-100"
           />
           <button
             type="button"
             onClick={() => void sendMessage()}
             disabled={loading || !input.trim()}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30 transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-md disabled:opacity-40"
             aria-label="Send"
           >
             <SendIcon />
           </button>
         </div>
-        <p className="mx-auto mt-2 max-w-2xl text-center text-[0.65rem] text-emerald-600/70">
-          {TREND_BOT_NAME} · Powered by TrendsMart · Learns from your feedback
-        </p>
-      </div>
-    </div>
+      </ChatShellFooter>
+    </FullScreenChatShell>
   );
 }

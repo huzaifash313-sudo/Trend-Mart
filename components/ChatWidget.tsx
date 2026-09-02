@@ -12,7 +12,7 @@ interface ChatWidgetProps {
   shopCategory?: string | null;
 }
 
-/** Shop-scoped TrendBot — pill launcher above bottom nav (no overlap). */
+/** Shop-scoped TrendBot — side FAB above WhatsApp float. */
 export default function ChatWidget({
   shopId,
   shopName = "Shop",
@@ -33,7 +33,12 @@ export default function ChatWidget({
   return (
     <>
       {!open ? (
-        <TrendBotLauncher variant="pill" shopName={shopName} onOpen={() => setOpen(true)} />
+        <TrendBotLauncher
+          side="right"
+          bottomOffset="raised"
+          shopName={shopName}
+          onOpen={() => setOpen(true)}
+        />
       ) : null}
 
       <TrendBotPanel

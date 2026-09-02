@@ -5999,10 +5999,41 @@ html.dark .recharts-label-line {
   }
 }
 
-/* Hide floating launchers behind full-screen TrendBot */
-html.tm-trendbot-open .tm-trendbot-launcher-pill,
+/* Hide floating launchers while TrendBot chat is open */
+html.tm-chat-fullscreen .tm-trendbot-fab,
+html.tm-chat-fullscreen .tm-trendbot-bubble,
+html.tm-trendbot-open .tm-trendbot-fab,
 html.tm-trendbot-open .tm-trendbot-bubble {
   opacity: 0;
   pointer-events: none;
+  visibility: hidden;
+}
+
+/* WhatsApp-style full-screen chat — hide site footer & cart bar only */
+html.tm-chat-fullscreen .tm-site-footer,
+html.tm-trendbot-open .tm-site-footer {
+  display: none !important;
+}
+
+html.tm-chat-fullscreen .tm-main,
+html.tm-trendbot-open .tm-main {
+  padding-bottom: 0 !important;
+}
+
+html.tm-chat-fullscreen .tm-cartbar-root,
+html.tm-trendbot-open .tm-cartbar-root {
+  display: none !important;
+}
+
+html.tm-chat-fullscreen {
+  --tm-chat-bg: #e8f5f0;
+}
+
+html.dark.tm-chat-fullscreen {
+  --tm-chat-bg: #0c1412;
+}
+
+.tm-chat-shell {
+  -webkit-overflow-scrolling: touch;
 }
 

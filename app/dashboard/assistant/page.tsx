@@ -63,7 +63,6 @@ export default function MerchantAssistantPage() {
       shopId={shopId}
       title={`TrendBot Coach — ${shopName}`}
       subtitle="Live analytics, growth strategy, revenue & stock — from your real store data."
-      accentClass="from-emerald-600 to-teal-600"
       backHref="/dashboard"
       backLabel="← Dashboard"
     />

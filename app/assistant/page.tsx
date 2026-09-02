@@ -32,7 +32,6 @@ export default function PublicAssistantPage() {
         role="customer"
         title={TREND_BOT_NAME}
         subtitle="Product links, deals & shop finder — no sign-in required."
-        accentClass="from-emerald-600 via-teal-600 to-teal-500"
         backHref="/"
         backLabel="← Home"
       />

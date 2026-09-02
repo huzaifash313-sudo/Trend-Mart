@@ -88,8 +88,8 @@ export default function TrendBotHost() {
             setTeaser(null);
             setOpen(true);
           }}
-          className="tm-trendbot-bubble fixed left-3 z-[121] max-w-[min(260px,calc(100vw-5rem))] rounded-2xl rounded-bl-sm border border-emerald-100 bg-white px-3.5 py-2.5 text-left text-xs font-medium leading-snug text-zinc-700 shadow-lg dark:bg-zinc-900 dark:text-zinc-200"
-          style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))" }}
+          className="tm-trendbot-bubble fixed right-3 z-[119] max-w-[min(260px,calc(100vw-5rem))] rounded-2xl rounded-br-sm border border-emerald-100 bg-white px-3.5 py-2.5 text-left text-xs font-medium leading-snug text-zinc-700 shadow-lg dark:bg-zinc-900 dark:text-zinc-200"
+          style={{ bottom: "calc(6.75rem + env(safe-area-inset-bottom, 0px))" }}
           aria-label="Open TrendBot chat"
         >
           <span className="block text-[0.6rem] font-bold uppercase tracking-wide text-emerald-600">
@@ -100,7 +100,7 @@ export default function TrendBotHost() {
       ) : null}
 
       {!open ? (
-        <TrendBotLauncher variant="fab" wiggle={wiggle} onOpen={() => { setTeaser(null); setOpen(true); }} />
+        <TrendBotLauncher side="right" wiggle={wiggle} onOpen={() => { setTeaser(null); setOpen(true); }} />
       ) : null}
 
       <TrendBotPanel
