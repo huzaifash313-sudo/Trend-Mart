@@ -1,6 +1,7 @@
 /* Simulated “AI thinking” steps — returned to UI for premium feel */
 
 import type { AssistantRole } from "@/lib/ai/assistantEngine";
+import { TREND_BOT_NAME } from "@/lib/ai/trendBotBrand";
 
 export function getThinkingSteps(
   intent: string,
@@ -10,9 +11,9 @@ export function getThinkingSteps(
   switch (intent) {
     case "product_search":
       return [
-        "TrendsMart catalog scan ho raha hai…",
-        query ? `"${query}" ke matches rank ho rahe hain…` : "Best matches dhundh raha hoon…",
-        "Links tayyar ho rahi hain…",
+        `${TREND_BOT_NAME} TrendsMart catalog scan kar raha hai…`,
+        query ? `"${query}" ke best matches rank ho rahe hain…` : "Best matches dhundh raha hoon…",
+        "Product aur shop links tayyar ho rahi hain…",
       ];
     case "universal_search":
       return [
@@ -40,11 +41,11 @@ export function getThinkingSteps(
       return ["Aapke orders fetch ho rahe hain…", "Status update check ho raha hai…"];
     default:
       if (role === "merchant") {
-        return ["Store data analyze ho raha hai…", "Jawab tayyar ho raha hai…"];
+        return [`${TREND_BOT_NAME} store data analyze kar raha hai…`, "Business jawab compile ho raha hai…"];
       }
-      if (role === "customer") {
-        return ["Samajh raha hoon…", "TrendsMart se best jawab la raha hoon…"];
+      if (role === "customer" || role === "shop") {
+        return [`${TREND_BOT_NAME} samajh raha hai…`, "TrendsMart se best jawab la raha hoon…"];
       }
-      return ["Ek second…", "Jawab tayyar kar raha hoon…"];
+      return [`${TREND_BOT_NAME}…`, "Jawab tayyar kar raha hoon…"];
   }
 }

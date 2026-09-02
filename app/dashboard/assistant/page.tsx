@@ -61,8 +61,8 @@ export default function MerchantAssistantPage() {
     <AiAssistantChat
       role="merchant"
       shopId={shopId}
-      title={`AI Coach — ${shopName}`}
-      subtitle="Best products, growth strategy, revenue & stock — from your live store data."
+      title={`TrendBot Coach — ${shopName}`}
+      subtitle="Live analytics, growth strategy, revenue & stock — from your real store data."
       accentClass="from-emerald-600 to-teal-600"
       backHref="/dashboard"
       backLabel="← Dashboard"

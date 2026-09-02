@@ -2,12 +2,13 @@
 
 import { CUSTOMER_FAQS, MERCHANT_FAQS, type FaqItem } from "@/lib/content/faq";
 import type { AssistantRole } from "@/lib/ai/assistantEngine";
+import { TREND_BOT_NAME } from "@/lib/ai/trendBotBrand";
 
 interface KnowledgeEntry {
   keys: string[];
   q: string;
   a: string;
-  roles: AssistantRole[] | "all";
+  roles: AssistantRole | AssistantRole[] | "all";
   link?: string;
 }
 
@@ -107,6 +108,129 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
     roles: "merchant",
     link: "/dashboard/ads",
   },
+  {
+    keys: ["trendbot", "ai assistant", "ai bot", "chatbot", "bot kahan", "ai kahan"],
+    q: "TrendBot kya hai?",
+    a: "*TrendBot* TrendsMart ka free AI assistant hai. Product links, app help, deals, orders — sab pooch sakte hain. [TrendBot kholein](/assistant) ya neeche floating bot tap karein.",
+    roles: "all",
+    link: "/assistant",
+  },
+  {
+    keys: ["dark mode", "light mode", "theme", "appearance", "font size", "dark theme"],
+    q: "Theme & appearance",
+    a: "[Settings → Appearance](/settings/appearance) se dark/light mode, font size, grid layout aur card style change karein.",
+    roles: "all",
+    link: "/settings/appearance",
+  },
+  {
+    keys: ["location", "gps", "pin", "live location", "meri location", "address save"],
+    q: "Location & addresses",
+    a: "Browse filter ke liye [Location settings](/settings/location). Saved delivery addresses: [My Addresses](/account/addresses). Checkout par live GPS share karna zaroori hai.",
+    roles: "customer",
+    link: "/settings/location",
+  },
+  {
+    keys: ["search", "global search", "dhundho", "filter", "category", "sub category"],
+    q: "Search & categories",
+    a: "Navbar search se poore marketplace mein dhundhein. [Products](/products) par category pills aur radius filter use karein. TrendBot se bhi link maang sakte hain.",
+    roles: "all",
+    link: "/products",
+  },
+  {
+    keys: ["stories", "highlights", "story tray"],
+    q: "Stories",
+    a: "Homepage par shops ki promotional *Stories* tray hoti hai — tap karke highlights dekhein.",
+    roles: "all",
+    link: "/",
+  },
+  {
+    keys: ["coupon", "promo code", "discount code", "voucher"],
+    q: "Coupons",
+    a: "Kuch shops checkout par coupon codes support karti hain. Shop deals aur product markdown badges alag cheez hain — dono [Deals](/deals) aur product pages par dekhein.",
+    roles: "all",
+    link: "/deals",
+  },
+  {
+    keys: ["review", "rating", "stars", "feedback product"],
+    q: "Reviews & ratings",
+    a: "Delivered orders ke baad review reminder aata hai. Shop aur product ratings trust build karti hain. Apni reviews: account profile section.",
+    roles: "customer",
+  },
+  {
+    keys: ["refund", "return", "cancel order", "policy", "dispute"],
+    q: "Refund & cancel",
+    a: "Pending orders cancel ho sakte hain. Returns/disputes ke liye pehle shop se WhatsApp par baat karein, phir [Refund Policy](/legal/refund-policy) dekhein.",
+    roles: "all",
+    link: "/legal/refund-policy",
+  },
+  {
+    keys: ["terms", "privacy", "legal", "guidelines", "policy page"],
+    q: "Legal pages",
+    a: "[Terms](/legal/terms) · [Privacy](/legal/privacy) · [Merchant Guidelines](/legal/merchant-guidelines) · [Refund Policy](/legal/refund-policy)",
+    roles: "all",
+    link: "/legal/terms",
+  },
+  {
+    keys: ["otp", "verify email", "sign up", "register", "login", "account ban"],
+    q: "Account & auth",
+    a: "Sign up → email verify → profile complete. Login: [Login](/login). Phone OTP abhi optional hai; email verification zaroori hai orders ke liye.",
+    roles: "all",
+    link: "/login",
+  },
+  {
+    keys: ["notification", "push", "alert", "bell"],
+    q: "Notifications",
+    a: "[Notification settings](/settings/notifications) se push alerts control karein. Order updates mostly dashboard/WhatsApp se aate hain.",
+    roles: "all",
+    link: "/settings/notifications",
+  },
+  {
+    keys: ["recently viewed", "history", "dekha hua"],
+    q: "Recently viewed",
+    a: "Jo products aap dekhte hain woh [Recently Viewed](/recently-viewed) par save hoti hain — quick access ke liye.",
+    roles: "customer",
+    link: "/recently-viewed",
+  },
+  {
+    keys: ["faq", "help center", "guide", "sawal jawab"],
+    q: "FAQ",
+    a: "Common questions ke liye [FAQ page](/faq) dekhein — ya TrendBot se seedha pooch lein.",
+    roles: "all",
+    link: "/faq",
+  },
+  {
+    keys: ["order page", "my orders", "orders kahan", "order history"],
+    q: "Orders page",
+    a: "Apne saare orders: [Orders](/orders). Live status: [Track Order](/orders/tracking). TrendBot signed-in users se status bhi bata sakta hai.",
+    roles: "customer",
+    link: "/orders",
+  },
+  {
+    keys: ["kitchen", "dine in", "dine-in", "table order", "restaurant table"],
+    q: "Dine-in / kitchen",
+    a: "Restaurants ke liye dine-in menu aur table orders dashboard [Kitchen](/dashboard/kitchen) aur [Tables](/dashboard/tables) se manage hote hain.",
+    roles: "merchant",
+    link: "/dashboard/kitchen",
+  },
+  {
+    keys: ["service", "portfolio", "booking", "appointment"],
+    q: "Services & booking",
+    a: "Service businesses portfolio aur bookings dashboard se manage karte hain: [Services Portfolio](/dashboard/services/portfolio).",
+    roles: "merchant",
+    link: "/dashboard/services/portfolio",
+  },
+  {
+    keys: ["minimum order", "delivery fee", "free delivery", "slab"],
+    q: "Delivery fees & minimum order",
+    a: "Har shop apna minimum order aur delivery slabs set karti hai — checkout par clearly dikhte hain. Free delivery threshold shop settings mein hota hai.",
+    roles: "all",
+  },
+  {
+    keys: ["offline", "no internet", "pwa offline"],
+    q: "Offline mode",
+    a: "PWA install karne par choti network drops par basic browsing cache se chal sakti hai. Orders ke liye internet zaroori hai.",
+    roles: "all",
+  },
 ];
 
 function tokenize(text: string): Set<string> {
@@ -135,7 +259,7 @@ function scoreEntry(message: string, entry: KnowledgeEntry): number {
   return score;
 }
 
-function faqToEntry(faq: FaqItem, roles: AssistantRole[] | "all"): KnowledgeEntry {
+function faqToEntry(faq: FaqItem, roles: AssistantRole | "all"): KnowledgeEntry {
   return {
     keys: [faq.q.toLowerCase(), ...faq.q.toLowerCase().split(/\s+/).filter((w) => w.length > 3)],
     q: faq.q,
@@ -150,6 +274,13 @@ const ALL_ENTRIES: KnowledgeEntry[] = [
   ...MERCHANT_FAQS.map((f) => faqToEntry(f, "merchant")),
 ];
 
+function entryVisibleToRole(entryRoles: AssistantRole | AssistantRole[] | "all", role: AssistantRole): boolean {
+  if (entryRoles === "all") return true;
+  const allowed = Array.isArray(entryRoles) ? entryRoles : [entryRoles];
+  if (allowed.includes(role)) return true;
+  return role === "shop" && allowed.includes("customer");
+}
+
 export function matchAppKnowledge(
   message: string,
   role: AssistantRole,
@@ -157,10 +288,10 @@ export function matchAppKnowledge(
   const lower = message.toLowerCase();
 
   const isAppQuestion =
-    /(trendsmart|trends mart|ye app|yeh app|is app|app mein|app par|how does|kaise kaam|kya hai|what is|help|madad|feature|function)/i.test(
+    /(trendsmart|trends mart|trendbot|trend bot|ye app|yeh app|is app|app mein|app par|how does|kaise kaam|kya hai|what is|help|madad|feature|function)/i.test(
       lower,
     ) ||
-    /(cart|checkout|wishlist|whatsapp|delivery|radius|merchant|qr|analytics|deals|support|pwa|chat|track)/i.test(
+    /(cart|checkout|wishlist|whatsapp|delivery|radius|merchant|qr|analytics|deals|support|pwa|chat|track|theme|location|search|stories|coupon|review|refund|legal|login|notification|faq|order)/i.test(
       lower,
     );
 
@@ -170,9 +301,7 @@ export function matchAppKnowledge(
   let bestScore = 0;
 
   for (const entry of ALL_ENTRIES) {
-    if (entry.roles !== "all" && entry.roles !== role && !entry.roles.includes(role)) {
-      if (role === "shop" && !entry.roles.includes("customer")) continue;
-    }
+    if (!entryVisibleToRole(entry.roles, role)) continue;
     const s = scoreEntry(message, entry);
     if (s > bestScore) {
       bestScore = s;
@@ -186,6 +315,6 @@ export function matchAppKnowledge(
   return {
     intent: "app_knowledge",
     confidence: Math.min(0.95, 0.5 + bestScore / 80),
-    reply: `💡 *${best.q}*\n\n${best.a}${linkLine}\n\n_Kuch aur pooch sakte hain — main TrendsMart ki poori app samajhta hoon._`,
+    reply: `💡 *${best.q}*\n\n${best.a}${linkLine}\n\n_${TREND_BOT_NAME} — TrendsMart ki poori app samajhta hoon. Aur pooch sakte hain!_`,
   };
 }

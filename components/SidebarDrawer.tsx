@@ -741,7 +741,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                         onClick={onClose}
                         className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
                       >
-                        <span aria-hidden="true" className="text-base">🤖</span> AI Shopping Assistant
+                        <span aria-hidden="true" className="text-base">🤖</span> TrendBot
                       </Link>
                     </>
                   )}

@@ -198,12 +198,6 @@ export function detectMerchantIntent(message: string): { intent: MerchantIntent;
   if (matchAny(t, [/^(hi|hello|salam|aoa|assalam|hey|help me|madad)/i, /\b(salam|aoa)\b/])) {
     return { intent: "greeting", confidence: 0.95 };
   }
-  if (matchAny(t, [/link|url|dhund|find|search|milega|milta|chahiye|dedo|de do|dikhao|recommend/i])) {
-    return { intent: "product_search", confidence: 0.92 };
-  }
-  if (matchAny(t, [/best.*(mobile|phone|laptop|iphone|samsung|burger|biryani|shirt|shoes)/i, /sasta.*(mobile|phone|laptop)/i])) {
-    return { intent: "product_search", confidence: 0.9 };
-  }
   if (matchAny(t, [/summary|overview|performance|report|status|halat|kya haal|kitna chal/i, /meri shop|my (store|shop|business)/i])) {
     return { intent: "business_summary", confidence: 0.92 };
   }
@@ -473,8 +467,6 @@ export async function buildMerchantContext(
     return d >= fourteenDaysAgo && d < sevenDaysAgo && o.status !== "Cancelled";
   }).length;
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
   const yesterdayStart = new Date(todayStart);
   yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
@@ -1433,7 +1425,7 @@ export async function runAssistant(
       return withThinking(
         {
           reply:
-            `👋 *TrendsMart AI Shopping Assistant*\n\n` +
+            `👋 *TrendBot* — TrendsMart ka AI assistant.\n\n` +
             `Product links, deals, shops — bina sign-in ke bhi.\n\n` +
             `Try karein:\n• *"best mobile ka link do"*\n• *"sasta laptop dhundo"*\n• *"konsa business karun?"*\n\n` +
             `Orders aur personal tracking ke liye [sign in](/login?redirect=/account/assistant) karein.`,
@@ -1457,7 +1449,7 @@ export async function runAssistant(
           ...res,
           reply:
             res.reply +
-            "\n\n_Tip: Product link chahiye? Likhein \"best mobile ka link do\" — ya app ke bare mein kuch bhi pooch sakte hain._",
+            "\n\n_TrendBot tip: Product link chahiye? Likhein \"best mobile ka link do\" — ya app ke bare mein kuch bhi pooch sakte hain._",
         },
         role,
       );

@@ -300,7 +300,7 @@ export default function CustomerAccountPage() {
             { href: "/orders", title: "My Orders", desc: "Past orders & details" },
             { href: "/orders/tracking", title: "Live Order Tracking", desc: "Pending → Delivered timeline" },
             { href: "/account/inquiries", title: "My Chats", desc: "In-app chat with shops" },
-            { href: "/account/assistant", title: "AI Shopping Assistant", desc: "Free — orders, deals & shop tips" },
+            { href: "/account/assistant", title: "TrendBot", desc: "Free AI — orders, deals & product links" },
             { href: "/wishlist", title: "Wishlist", desc: "Saved shops & products (separate tabs)" },
             { href: "/account/addresses", title: "Delivery Addresses", desc: "Saved checkout addresses" },
             { href: "/auth/settings", title: "Account Settings", desc: "Password & profile" },

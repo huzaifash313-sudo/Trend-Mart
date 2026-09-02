@@ -40,8 +40,8 @@ export default function CustomerAssistantPage() {
   return (
     <AiAssistantChat
       role="customer"
-      title="Shopping Assistant"
-      subtitle="Orders, deals, shops & delivery — personalized for you."
+      title="TrendBot"
+      subtitle="Personal orders, deals & tracking — signed in."
       accentClass="from-violet-600 to-indigo-600"
       backHref="/account"
       backLabel="← Account"

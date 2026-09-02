@@ -223,8 +223,9 @@ export function formatNoProductResults(
         : ["Meri shop ki summary", "Business grow strategy"],
     reply:
       `😕 *"${query}"* ke liye abhi koi product nahi mila.\n\n` +
+      `*Kya hua:* TrendsMart catalog mein is naam se available product match nahi hua.\n\n` +
       (role === "merchant"
-        ? `Apni catalog mein add karein ya naam check karein.\n\n➕ ${searchLink}`
-        : `Try karein:\n• Spelling thori change karein (jaise "mobile" ya "samsung")\n• ${searchLink}\n• [All shops](/products) browse karein`),
+        ? `✅ *Try karein:*\n• Catalog mein product add karein\n• Naam/spelling check karein\n\n➕ ${searchLink}`
+        : `✅ *Try karein:*\n• Spelling change karein (jaise "mobile", "samsung")\n• ${searchLink}\n• [All shops browse karein](/products)\n\n_TrendBot live data use karta hai — jab product add hoga, main link de dunga._`),
   };
 }

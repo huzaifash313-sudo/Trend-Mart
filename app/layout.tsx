@@ -23,6 +23,7 @@ import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
 import ReviewReminderPopup from "@/components/ReviewReminderPopup";
+import TrendBotHost from "@/components/trendbot/TrendBotHost";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
 import OnboardingWizard from "@/components/OnboardingWizard";
 import PolicyNotice from "@/components/PolicyNotice";
@@ -155,6 +156,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </ErrorBoundary>
               <ErrorBoundary name="CartBar" autoResetMs={2500}>
                 <CartBar />
+              </ErrorBoundary>
+              <ErrorBoundary name="TrendBot" autoResetMs={2500}>
+                <TrendBotHost />
               </ErrorBoundary>
               <MerchantQuickAddHost />
               <OnboardingWizard />

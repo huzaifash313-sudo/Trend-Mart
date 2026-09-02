@@ -9,6 +9,8 @@ import {
   SHOP_PROMPTS,
 } from "@/lib/ai/assistantEngine";
 import { AssistantMessage } from "@/components/ai/AssistantMessage";
+import { TrendBotAvatar } from "@/components/trendbot/TrendBotAvatar";
+import { TREND_BOT_NAME, TREND_BOT_TAGLINE, TREND_BOT_WELCOME_CUSTOMER } from "@/lib/ai/trendBotBrand";
 
 interface ChatMessage {
   id: string;
@@ -26,14 +28,6 @@ interface AiAssistantChatProps {
   backHref?: string;
   backLabel?: string;
   initialPrompts?: string[];
-}
-
-function BotIcon() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /><circle cx="12" cy="16" r="1" />
-    </svg>
-  );
 }
 
 function SendIcon() {
@@ -56,12 +50,12 @@ function defaultPrompts(role: AssistantRole): string[] {
 
 function welcomeMessage(role: AssistantRole, title: string): string {
   if (role === "merchant") {
-    return `👋 *Salam!* Main *${title}* ka AI Business Coach hoon.\n\n*Live analytics*, best products, growth strategy — sab aapke real store data se.\n\nTry: "Meri shop ki live summary" ya "Aaj kitne orders aaye?"`;
+    return `👋 *Salam!* Main *TrendBot Business Coach* hoon — *${title}* ke liye.\n\n*Live analytics*, best products, growth strategy — sab aapke real store data se.\n\nTry: "Meri shop ki live summary" ya "Aaj kitne orders aaye?"`;
   }
   if (role === "shop") {
-    return `👋 *Welcome to ${title}!*\n\nProducts, prices, links — ya "best mobile ka link do".\n\nHuman chat: *Message seller* button.`;
+    return `👋 *Welcome!* Main *${title}* ka TrendBot hoon.\n\nProducts, prices, links — ya "best mobile ka link do".\n\nHuman chat: *Message seller* button.`;
   }
-  return `👋 *Salam!* Main TrendsMart AI Assistant hoon.\n\n• Product links ("best mobile ka link do")\n• App help ("cart kaise kaam karta hai?")\n• Business ideas ("konsa business karun?")\n• Orders, deals, shops\n\nNeeche prompts tap karein — main *live data* se jawab deta hoon.`;
+  return TREND_BOT_WELCOME_CUSTOMER;
 }
 
 export default function AiAssistantChat({
@@ -69,7 +63,7 @@ export default function AiAssistantChat({
   shopId,
   title,
   subtitle,
-  accentClass = "from-emerald-600 to-teal-600",
+  accentClass = "from-emerald-600 via-teal-600 to-teal-500",
   backHref,
   backLabel = "← Back",
   initialPrompts,
@@ -139,7 +133,7 @@ export default function AiAssistantChat({
             await sleep(450 + Math.random() * 350);
           }
         } else {
-          setThinkingStep("Soch raha hoon…");
+          setThinkingStep(`${TREND_BOT_NAME} soch raha hai…`);
           await sleep(600);
         }
         setThinkingStep(null);
@@ -153,7 +147,7 @@ export default function AiAssistantChat({
           {
             id: `a_${Date.now()}`,
             role: "assistant",
-            text: data.reply ?? "Sorry, could not respond. Try again.",
+            text: data.reply ?? `😕 ${TREND_BOT_NAME} abhi jawab nahi de saka. Dubara try karein ya sawal clear likhein.`,
             timestamp: Date.now(),
           },
         ]);
@@ -189,10 +183,10 @@ export default function AiAssistantChat({
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-            Free AI · No API key
+            {TREND_BOT_NAME} · {TREND_BOT_TAGLINE}
           </p>
           <h1 className="tm-font-display text-xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {title}
+            {role === "merchant" ? "TrendBot Business Coach" : TREND_BOT_NAME}
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
         </div>
@@ -206,34 +200,35 @@ export default function AiAssistantChat({
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-        {/* Gradient bar */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-lg shadow-emerald-900/5 dark:border-emerald-900/30 dark:bg-zinc-900">
         <div className={`flex shrink-0 items-center gap-3 bg-gradient-to-r ${accentClass} px-4 py-3 text-white`}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-            <BotIcon />
-          </div>
+          <TrendBotAvatar size="sm" animated={!loading} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold">{title}</p>
-            <p className="text-[0.65rem] opacity-90">Live AI · Real marketplace data</p>
+            <p className="truncate text-sm font-bold">{role === "merchant" ? title : TREND_BOT_NAME}</p>
+            <p className="text-[0.65rem] opacity-90">{TREND_BOT_TAGLINE}</p>
           </div>
           <span className="rounded-full bg-white/20 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide">
             Free
           </span>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto bg-zinc-50 px-3 py-4 dark:bg-zinc-950 sm:px-4">
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white to-emerald-50/30 px-3 py-4 dark:from-zinc-950 dark:to-emerald-950/10 sm:px-4">
           <div className="space-y-3">
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start gap-2"}`}
               >
+                {msg.role === "assistant" ? (
+                  <div className="mt-1 shrink-0">
+                    <TrendBotAvatar size="sm" animated={false} />
+                  </div>
+                ) : null}
                 <div
-                  className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed sm:max-w-[80%] ${
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed sm:max-w-[78%] ${
                     msg.role === "user"
-                      ? "rounded-br-md bg-emerald-600 text-white"
-                      : "rounded-bl-md border border-zinc-100 bg-white text-zinc-800 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+                      ? "rounded-br-md bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/20"
+                      : "rounded-bl-md border border-emerald-100 bg-white text-zinc-800 shadow-sm dark:border-emerald-900/30 dark:bg-zinc-900 dark:text-zinc-100"
                   }`}
                 >
                   {renderFormattedText(msg.text)}
@@ -241,7 +236,8 @@ export default function AiAssistantChat({
               </div>
             ))}
             {loading ? (
-              <div className="flex justify-start">
+              <div className="flex justify-start gap-2">
+                <TrendBotAvatar size="sm" animated wiggle />
                 <div className="rounded-2xl rounded-bl-md border border-emerald-100 bg-white px-4 py-3 shadow-sm dark:border-emerald-900/40 dark:bg-zinc-900">
                   <div className="flex items-center gap-2">
                     <span className="relative flex h-2 w-2">
@@ -289,21 +285,21 @@ export default function AiAssistantChat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Apna sawal likhein… (Urdu / English)"
-              className="max-h-28 min-h-[44px] flex-1 resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              placeholder="TrendBot se pucho… (Urdu / English)"
+              className="max-h-28 min-h-[44px] flex-1 resize-none rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-900/40 dark:bg-zinc-800 dark:text-zinc-100"
             />
             <button
               type="button"
               disabled={loading || !input.trim()}
               onClick={() => void send(input)}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white transition hover:bg-emerald-700 disabled:opacity-40"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 text-white transition hover:opacity-90 disabled:opacity-40"
               aria-label="Send"
             >
               <SendIcon />
             </button>
           </div>
-          <p className="mt-2 text-center text-[0.6rem] text-zinc-400">
-            Live data · Smart search · Instant links
+          <p className="mt-2 text-center text-[0.6rem] text-emerald-600/70">
+            {TREND_BOT_NAME} · Powered by TrendsMart · 100% Free AI
           </p>
         </div>
       </div>

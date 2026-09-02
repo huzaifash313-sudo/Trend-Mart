@@ -5943,3 +5943,59 @@ html.dark .recharts-label-line {
     scroll-behavior: auto;
   }
 }
+
+/* ── TrendBot animated mascot & speech bubbles ───────────────────────────── */
+@keyframes tm-trendbot-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes tm-trendbot-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-6deg); }
+  75% { transform: rotate(6deg); }
+}
+
+@keyframes tm-trendbot-bubble-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes tm-trendbot-pulse-ring {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(1.12); opacity: 0.12; }
+}
+
+@keyframes tm-trendbot-antenna {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes tm-trendbot-blink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  92% { transform: scaleY(0.15); }
+}
+
+.tm-trendbot-float { animation: tm-trendbot-float 2.8s ease-in-out infinite; }
+.tm-trendbot-wiggle { animation: tm-trendbot-wiggle 0.55s ease-in-out; }
+.tm-trendbot-bubble { animation: tm-trendbot-bubble-in 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+.tm-trendbot-pulse-ring { animation: tm-trendbot-pulse-ring 2.4s ease-in-out infinite; }
+.tm-trendbot-antenna { animation: tm-trendbot-antenna 1.6s ease-in-out infinite; }
+.tm-trendbot-eye-l,
+.tm-trendbot-eye-r { transform-origin: center; animation: tm-trendbot-blink 4.5s ease-in-out infinite; }
+.tm-trendbot-eye-r { animation-delay: 0.3s; }
+.tm-trendbot-panel-open { animation: tm-trendbot-bubble-in 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-trendbot-float,
+  .tm-trendbot-wiggle,
+  .tm-trendbot-bubble,
+  .tm-trendbot-pulse-ring,
+  .tm-trendbot-antenna,
+  .tm-trendbot-eye-l,
+  .tm-trendbot-eye-r,
+  .tm-trendbot-panel-open {
+    animation: none !important;
+  }
+}
+
