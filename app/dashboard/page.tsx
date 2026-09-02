@@ -341,6 +341,14 @@ export default function DashboardOverviewPage() {
         icon: "📣",
       },
       {
+        id: "assistant",
+        label: "AI Coach",
+        description: "Growth strategy, best products & analytics",
+        href: "/dashboard/assistant",
+        tone: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
+        icon: "🤖",
+      },
+      {
         id: "inquiries",
         label: "Messages",
         description: "Chat with customers in real time",

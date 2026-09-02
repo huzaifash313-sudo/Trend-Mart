@@ -612,6 +612,15 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           </li>
                           <li>
                             <Link
+                              href="/dashboard/assistant"
+                              onClick={onClose}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-indigo-700 transition-all hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
+                            >
+                              <span aria-hidden="true">🤖</span> AI Business Coach
+                            </Link>
+                          </li>
+                          <li>
+                            <Link
                               href="/dashboard/orders"
                               onClick={onClose}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
@@ -719,13 +728,22 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                       )}
                     </>
                   ) : (
-                    <Link
-                      href="/account"
-                      onClick={onClose}
-                      className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
-                    >
-                      <DashboardIcon /> My Account
-                    </Link>
+                    <>
+                      <Link
+                        href="/account"
+                        onClick={onClose}
+                        className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                      >
+                        <DashboardIcon /> My Account
+                      </Link>
+                      <Link
+                        href="/account/assistant"
+                        onClick={onClose}
+                        className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
+                      >
+                        <span aria-hidden="true" className="text-base">🤖</span> AI Shopping Assistant
+                      </Link>
+                    </>
                   )}
 
                   {/* Sign Out */}
@@ -738,17 +756,26 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                   </button>
                 </>
               ) : session === false ? (
-                <a
-                  href="/login"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onClose();
-                    window.location.assign("/login");
-                  }}
-                  className="flex items-center gap-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/40"
-                >
-                  <UserIcon /> Sign In / Register
-                </a>
+                <>
+                  <Link
+                    href="/assistant"
+                    onClick={onClose}
+                    className="mb-2 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
+                  >
+                    <span aria-hidden="true" className="text-base">🤖</span> AI Shopping Assistant
+                  </Link>
+                  <a
+                    href="/login"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onClose();
+                      window.location.assign("/login");
+                    }}
+                    className="flex items-center gap-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/40"
+                  >
+                    <UserIcon /> Sign In / Register
+                  </a>
+                </>
               ) : (
                 <div className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 dark:text-zinc-500">
                   <UserIcon /> Loading…

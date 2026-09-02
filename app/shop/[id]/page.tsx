@@ -14,6 +14,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { EmptyState } from "@/components/EmptyState";
 import { ProductGridSkeleton, ShopBannerSkeleton } from "@/components/Skeletons";
 import ContactModal from "@/components/ContactModal";
+import ChatWidget from "@/components/ChatWidget";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
@@ -1057,7 +1058,7 @@ function ShopDetailInner({ id }: { id: string }) {
               </div>
             )}
             <div className="flex gap-2 flex-wrap">
-              <button type="button" onClick={() => setShowContactModal(true)} disabled={!shop.whatsapp_number} className={`inline-flex items-center gap-1.5 rounded-full ${theme.buttonClass} px-4 py-2 text-xs font-semibold transition-colors disabled:opacity-50`}><WhatsAppIcon />Chat with seller</button>
+              <button type="button" onClick={() => setShowContactModal(true)} className={`inline-flex items-center gap-1.5 rounded-full ${theme.buttonClass} px-4 py-2 text-xs font-semibold transition-colors`}>💬 Message seller</button>
             </div>
 
             {isOwner ? (
@@ -1484,6 +1485,11 @@ function ShopDetailInner({ id }: { id: string }) {
         displayPrefs.showWhatsappFloatingButton && (
           <WhatsAppFloatButton phone={shop.whatsapp_number} shopName={shop.name} />
         )}
+
+      {/* ── Free AI shop assistant (products, prices, hours) ─────────── */}
+      {shop && !isOwner && (
+        <ChatWidget shopId={shop.id} shopName={shop.name} accentHex={theme.accentHex} />
+      )}
     </div>
   );
 }

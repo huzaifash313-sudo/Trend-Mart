@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { AssistantMessage } from "@/components/ai/AssistantMessage";
+import { SHOP_PROMPTS } from "@/lib/ai/assistantEngine";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — AI Business Assistant Chat Widget                              */
@@ -88,12 +90,14 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
     {
       id: "welcome",
       role: "bot",
-      text: `👋 Hi! I'm the AI assistant for ${shopName}.\n\nAsk me about:\n• Products & prices\n• Business hours\n• Ordering & delivery\n• Location & contact info`,
+      text: `👋 *Salam!* Main *${shopName}* ka AI assistant hoon.\n\nPooch sakte hain products, prices, timings — ya seedha:\n"best mobile ka link do"\n\nLinks tap karke product khol sakte hain.`,
       timestamp: Date.now(),
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [thinkingStep, setThinkingStep] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>(SHOP_PROMPTS);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -109,8 +113,8 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
     }
   }, [open]);
 
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
+  const sendMessage = useCallback(async (textOverride?: string) => {
+    const text = (textOverride ?? input).trim();
     if (!text || loading) return;
 
     const userMessage: Message = {
@@ -120,32 +124,56 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
       timestamp: Date.now(),
     };
 
+    const history = [...messages, userMessage]
+      .filter((m) => m.id !== "welcome")
+      .slice(-8)
+      .map((m) => ({
+        role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
+        text: m.text,
+      }));
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
+    setThinkingStep(null);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/ai-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          shopId,
-          sessionId,
-        }),
+        body: JSON.stringify({ message: text, role: "shop", shopId, sessionId, history }),
       });
 
-      const data = (await response.json()) as { reply: string; error?: string };
-
-      const botMessage: Message = {
-        id: `bot_${Date.now()}`,
-        role: "bot",
-        text: data.reply ?? "Sorry, I couldn't process that. Please try again.",
-        timestamp: Date.now(),
+      const data = (await response.json()) as {
+        reply: string;
+        suggestions?: string[];
+        thinkingSteps?: string[];
       };
 
-      setMessages((prev) => [...prev, botMessage]);
+      if (data.thinkingSteps?.length) {
+        for (const step of data.thinkingSteps) {
+          setThinkingStep(step);
+          await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
+        }
+      } else {
+        setThinkingStep("Scanning catalog…");
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      setThinkingStep(null);
+
+      if (data.suggestions?.length) setSuggestions(data.suggestions);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `bot_${Date.now()}`,
+          role: "bot",
+          text: data.reply ?? "Sorry, I couldn't process that. Please try again.",
+          timestamp: Date.now(),
+        },
+      ]);
     } catch {
+      setThinkingStep(null);
       setMessages((prev) => [
         ...prev,
         {
@@ -158,7 +186,7 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
     } finally {
       setLoading(false);
     }
-  }, [input, loading, shopId, sessionId]);
+  }, [input, loading, messages, shopId, sessionId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -206,7 +234,7 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
             <BotIcon />
             <div>
               <p className="text-sm font-bold">{shopName} Assistant</p>
-              <p className="text-[0.6rem] opacity-80">AI-powered • Instant replies</p>
+              <p className="text-[0.6rem] opacity-80">Free AI · Products & orders help</p>
             </div>
           </div>
           <button
@@ -234,7 +262,7 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
                 }`}
                 style={msg.role === "user" ? { backgroundColor: accentHex } : undefined}
               >
-                {msg.text}
+                {msg.role === "bot" ? <AssistantMessage text={msg.text} /> : msg.text}
                 {msg.role === "bot" && msg.id !== "welcome" && (
                   <div className="mt-1.5 flex items-center gap-2 border-t border-zinc-100 pt-1.5 dark:border-zinc-700">
                     <span className="text-[0.6rem] text-zinc-400">Was this helpful?</span>
@@ -270,16 +298,32 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
           {loading && (
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-md bg-white px-4 py-2.5 shadow-sm dark:bg-zinc-800">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: "0ms" }} />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: "150ms" }} />
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400" style={{ animationDelay: "300ms" }} />
-                </div>
+                <p className="text-[0.65rem] font-medium text-zinc-600 dark:text-zinc-300">
+                  {thinkingStep ?? "Processing…"}
+                </p>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Quick prompts */}
+        {!loading && suggestions.length > 0 && (
+          <div className="border-t border-zinc-100 bg-white px-2 py-2 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+              {suggestions.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => void sendMessage(p)}
+                  className="shrink-0 rounded-full border border-zinc-200 px-2.5 py-1 text-[0.65rem] font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Input */}
         <div className="border-t border-zinc-200 bg-white p-2.5 dark:border-zinc-800 dark:bg-zinc-900">
@@ -296,7 +340,7 @@ export default function ChatWidget({ shopId, shopName = "Shop", accentHex = "#10
             />
             <button
               type="button"
-              onClick={sendMessage}
+              onClick={() => void sendMessage()}
               disabled={loading || !input.trim()}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               style={{ backgroundColor: accentHex }}
