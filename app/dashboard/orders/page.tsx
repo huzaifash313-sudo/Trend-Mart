@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMyShop } from "@/services/shopService";
 import { fetchOrdersByShopId } from "@/services/orderService";
+import { getOrCreateConversationForOrder } from "@/services/messagingService";
 import {
   getStatusLabel,
   getValidTransitions,
@@ -45,6 +47,7 @@ function statusTone(status: OrderStatus): string {
 
 export default function MerchantOrdersPage() {
   const { addToast } = useToast();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [shop, setShop] = useState<Shop | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -185,6 +188,19 @@ export default function MerchantOrdersPage() {
     }
     window.open(url, "_blank", "noopener,noreferrer");
   };
+
+  const openInAppChat = useCallback(
+    async (order: Order) => {
+      if (!shop) return;
+      const result = await getOrCreateConversationForOrder(shop.id, order);
+      if (result.success) {
+        router.push(`/dashboard/inquiries?c=${result.data.id}`);
+      } else {
+        addToast(result.error, "error");
+      }
+    },
+    [addToast, router, shop],
+  );
 
   const quickCancelOrder = useCallback(
     async (order: Order) => {
@@ -339,6 +355,16 @@ export default function MerchantOrdersPage() {
                       className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
                       🧾 Bill
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openInAppChat(order)}
+                      disabled={!order.customer_user_id}
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                      title={order.customer_user_id ? "Message customer in-app" : "Customer has no app account"}
+                    >
+                      <span aria-hidden="true">💬</span>
+                      Chat
                     </button>
                     <button
                       type="button"

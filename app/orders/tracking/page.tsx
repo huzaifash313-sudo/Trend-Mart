@@ -491,6 +491,7 @@ function OrderCard({
             whatsapp_message: order.whatsappMessage,
           }}
           shopWhatsapp={order.shopWhatsapp}
+          shopId={order.shopId}
           userId={userId}
           compact
           onUpdated={(patch) => onOrderPatch?.(order.id, patch)}

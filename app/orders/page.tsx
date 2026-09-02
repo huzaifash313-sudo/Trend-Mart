@@ -177,6 +177,7 @@ function OrderCard({
         <CustomerOrderActions
           order={order}
           shopWhatsapp={shop?.whatsapp_number}
+          shopId={shop?.id}
           userId={userId}
           onUpdated={(patch) => onOrderPatch?.(order.id, patch)}
         />

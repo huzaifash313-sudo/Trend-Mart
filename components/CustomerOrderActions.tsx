@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   cancelOrderAsCustomer,
   updateOrderWhatsApp,
 } from "@/services/orderService";
+import { getOrCreateConversation } from "@/services/messagingService";
 import {
   buildMerchantOrderWhatsAppUrl,
   canCustomerCancelOrder,
@@ -20,6 +22,7 @@ interface CustomerOrderActionsProps {
     "id" | "status" | "customer_user_id" | "whatsapp_sent_at" | "whatsapp_message"
   >;
   shopWhatsapp?: string | null;
+  shopId?: string;
   userId?: string | null;
   onUpdated?: (patch: Partial<Order>) => void;
   compact?: boolean;
@@ -36,10 +39,12 @@ function WhatsAppIcon() {
 export default function CustomerOrderActions({
   order,
   shopWhatsapp,
+  shopId,
   userId,
   onUpdated,
   compact = false,
 }: CustomerOrderActionsProps) {
+  const router = useRouter();
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const [busy, setBusy] = useState<"send" | "cancel" | null>(null);
@@ -101,8 +106,25 @@ export default function CustomerOrderActions({
     }
   }, [addToast, confirm, onUpdated, order.id]);
 
-  if (order.status === "Cancelled") return null;
-  if (!awaiting && !canResend && !canCancel) return null;
+  const handleOpenChat = useCallback(async () => {
+    if (!shopId || !userId) {
+      addToast("Sign in to chat with the shop.", "info");
+      return;
+    }
+    const result = await getOrCreateConversation({
+      shopId,
+      customerName: "Customer",
+      orderId: order.id,
+    });
+    if (result.success) {
+      router.push(`/account/inquiries?c=${result.data.id}`);
+    } else {
+      addToast(result.error, "error");
+    }
+  }, [addToast, order.id, router, shopId, userId]);
+
+  if (order.status === "Cancelled" && !shopId) return null;
+  if (!awaiting && !canResend && !canCancel && !shopId) return null;
 
   const btnClass = compact
     ? "rounded-full px-3 py-1.5 text-xs font-semibold"
@@ -125,6 +147,16 @@ export default function CustomerOrderActions({
         >
           <WhatsAppIcon />
           {awaiting ? "Send on WhatsApp" : "Send again on WhatsApp"}
+        </button>
+      )}
+
+      {shopId && userId && order.status !== "Cancelled" && (
+        <button
+          type="button"
+          onClick={() => void handleOpenChat()}
+          className={`inline-flex items-center gap-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900/20 ${btnClass}`}
+        >
+          💬 Chat with shop
         </button>
       )}
 

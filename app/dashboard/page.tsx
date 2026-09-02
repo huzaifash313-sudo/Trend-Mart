@@ -342,8 +342,8 @@ export default function DashboardOverviewPage() {
       },
       {
         id: "inquiries",
-        label: "Inquiries",
-        description: "Reply to customer questions",
+        label: "Messages",
+        description: "Chat with customers in real time",
         href: "/dashboard/inquiries",
         tone: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
         icon: "💬",

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { sendInquiry } from "@/services/inquiryService";
+import { getOrCreateConversation } from "@/services/messagingService";
 import { logLead } from "@/services/leadsService";
 import { formatPkPhoneDisplay, formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 import { useToast } from "@/components/Toast";
@@ -39,12 +40,13 @@ export default function ContactModal({
   productId,
   onClose,
 }: ContactModalProps) {
+  const router = useRouter();
   const { addToast } = useToast();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   const waDigits = whatsappNumber?.replace(/\D/g, "") ?? "";
 
@@ -52,6 +54,7 @@ export default function ContactModal({
     const supabase = createClient();
     void supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user;
+      setSignedIn(!!user);
       if (!user) return;
       const [{ data: profile }, { data: addr }] = await Promise.all([
         supabase
@@ -77,13 +80,17 @@ export default function ContactModal({
   }, []);
 
   const handleSendInApp = useCallback(async () => {
+    if (!signedIn) {
+      addToast("Sign in to chat with the shop in-app.", "info");
+      router.push(`/login?redirect=/shop/${shopId}`);
+      return;
+    }
     setSending(true);
-    const result = await sendInquiry({
+    const result = await getOrCreateConversation({
       shopId,
       customerName: name.trim(),
       customerPhone: phone,
-      message: message.trim(),
-      productId,
+      initialMessage: message.trim(),
     });
     setSending(false);
     if (!result.success) {
@@ -100,9 +107,10 @@ export default function ContactModal({
       source: "inquiry_form",
     });
 
-    setSent(true);
-    addToast("Message sent to the shop!", "success");
-  }, [addToast, message, name, phone, productId, shopId]);
+    addToast("Message sent!", "success");
+    onClose();
+    router.push(`/account/inquiries?c=${result.data.id}`);
+  }, [addToast, message, name, onClose, phone, productId, router, shopId, signedIn]);
 
   const handleOpenWhatsApp = useCallback(() => {
     if (!waDigits) return;
@@ -129,10 +137,10 @@ export default function ContactModal({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              Message {shopName}
+              Chat with {shopName}
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Sent in-app — the shop replies from their dashboard
+              In-app messaging — chat back and forth like Daraz or Foodpanda
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="Close">
@@ -140,31 +148,27 @@ export default function ContactModal({
           </button>
         </div>
 
-        {sent ? (
-          <div className="space-y-4 py-4 text-center">
-            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-              Your message was delivered to {shopName}.
+        {signedIn === false ? (
+          <div className="space-y-4 py-2 text-center">
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              Sign in to use in-app chat with {shopName}.
             </p>
-            <p className="text-xs text-zinc-500">
-              Track replies in{" "}
-              <Link href="/account/inquiries" className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400">
-                My Messages
-              </Link>
-              .
-            </p>
+            <Link
+              href={`/login?redirect=/shop/${shopId}`}
+              className="inline-block w-full rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Sign in to chat
+            </Link>
             {waDigits ? (
               <button
                 type="button"
                 onClick={handleOpenWhatsApp}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
               >
                 <WhatsAppIcon />
-                Also chat on WhatsApp
+                Use WhatsApp instead
               </button>
             ) : null}
-            <button type="button" onClick={onClose} className="w-full rounded-full bg-zinc-100 py-2.5 text-sm font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-              Done
-            </button>
           </div>
         ) : (
           <>
@@ -193,11 +197,11 @@ export default function ContactModal({
             />
             <button
               type="button"
-              disabled={sending || !message.trim() || !name.trim()}
+              disabled={sending || !message.trim() || !name.trim() || signedIn === null}
               onClick={() => void handleSendInApp()}
               className="w-full rounded-full bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              {sending ? "Sending…" : "Send message"}
+              {sending ? "Starting chat…" : "Send message"}
             </button>
             {waDigits ? (
               <button

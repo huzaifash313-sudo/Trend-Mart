@@ -109,6 +109,29 @@ export type AnalyticsPayload = {
   created_at: string;
 };
 
+export type ConversationPayload = {
+  id: string;
+  shop_id: string;
+  customer_user_id: string | null;
+  customer_name: string;
+  last_message_at: string;
+  last_message_preview: string;
+  merchant_unread_count: number;
+  customer_unread_count: number;
+  updated_at: string;
+};
+
+export type ChatMessagePayload = {
+  id: string;
+  conversation_id: string;
+  sender_role: "customer" | "merchant";
+  sender_user_id: string | null;
+  body: string;
+  is_deleted: boolean;
+  created_at: string;
+  read_at: string | null;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RealtimeCallback<T extends Record<string, any>> = (payload: RealtimePostgresChangesPayload<T>) => void;
 
@@ -252,6 +275,116 @@ export function subscribeToInquiries(
     .subscribe((status) => {
       if (status === "SUBSCRIBED") {
         console.log(`[Realtime] ✅ Subscribed to inquiries for shop: ${shopId}`);
+        notifyStateChange("connected", channelKey);
+      }
+    });
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
+/**
+ * Merchant dashboard — live conversation list updates (new threads, previews).
+ */
+export function subscribeToShopConversations(
+  shopId: string,
+  onChange: RealtimeCallback<ConversationPayload>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = uniqueKey(`conversations-${shopId}`);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "conversations",
+        filter: `shop_id=eq.${shopId}`,
+      },
+      (payload) => {
+        onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>);
+      },
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        console.log(`[Realtime] ✅ Subscribed to conversations for shop: ${shopId}`);
+        notifyStateChange("connected", channelKey);
+      }
+    });
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
+/** Customer portal — live conversation list updates. */
+export function subscribeToMyConversations(
+  userId: string,
+  onChange: RealtimeCallback<ConversationPayload>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = uniqueKey(`my-conversations-${userId}`);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "conversations",
+        filter: `customer_user_id=eq.${userId}`,
+      },
+      (payload) => {
+        onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>);
+      },
+    )
+    .subscribe();
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
+/**
+ * Live messages inside an open chat thread.
+ */
+export function subscribeToConversationMessages(
+  conversationId: string,
+  onInsert: RealtimeCallback<ChatMessagePayload>,
+  onUpdate?: RealtimeCallback<ChatMessagePayload>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = uniqueKey(`chat-messages-${conversationId}`);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "conversation_messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        onInsert(payload as RealtimePostgresChangesPayload<ChatMessagePayload>);
+      },
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "conversation_messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        onUpdate?.(payload as RealtimePostgresChangesPayload<ChatMessagePayload>);
+      },
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
         notifyStateChange("connected", channelKey);
       }
     });
