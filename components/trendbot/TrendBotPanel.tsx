@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { AssistantRole } from "@/lib/ai/assistantEngine";
 import { AssistantMessage } from "@/components/ai/AssistantMessage";
+import { ProductResultCards } from "@/components/ai/ProductResultCards";
 import { TrendBotAvatar } from "@/components/trendbot/TrendBotAvatar";
 import { useTrendBotChat } from "@/hooks/useTrendBotChat";
 import { TREND_BOT_NAME, TREND_BOT_TAGLINE } from "@/lib/ai/trendBotBrand";
@@ -23,6 +25,7 @@ export interface TrendBotPanelProps {
   open: boolean;
   onClose: () => void;
   subtitle?: string;
+  initialQuery?: string | null;
 }
 
 function SendIcon() {
@@ -33,10 +36,13 @@ function SendIcon() {
   );
 }
 
-function CloseIcon() {
+function MicIcon() {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
     </svg>
   );
 }
@@ -57,6 +63,26 @@ function ThumbsDownIcon() {
   );
 }
 
+type SpeechRec = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((ev: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+
+function getSpeechRecognition(): (new () => SpeechRec) | null {
+  if (typeof window === "undefined") return null;
+  const w = window as Window & {
+    SpeechRecognition?: new () => SpeechRec;
+    webkitSpeechRecognition?: new () => SpeechRec;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
 /** Full-screen TrendBot — sits between navbar and bottom nav */
 export function TrendBotPanel({
   role,
@@ -68,6 +94,7 @@ export function TrendBotPanel({
   open,
   onClose,
   subtitle,
+  initialQuery,
 }: TrendBotPanelProps) {
   const {
     messages,
@@ -79,10 +106,22 @@ export function TrendBotPanel({
     sendMessage,
     setFeedback,
     sessionLabel,
-  } = useTrendBotChat({ role, shopId, shopName, shopCategory, welcomeText, initialPrompts });
+    showOnboarding,
+    dismissOnboarding,
+  } = useTrendBotChat({
+    role,
+    shopId,
+    shopName,
+    shopCategory,
+    welcomeText,
+    initialPrompts,
+    initialQuery,
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRec | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -96,12 +135,22 @@ export function TrendBotPanel({
     if (open) setTimeout(() => inputRef.current?.focus(), 150);
   }, [open]);
 
-  const headerTitle = role === "shop" && shopName ? shopName : TREND_BOT_NAME;
-  const headerSub = subtitle ?? TREND_BOT_TAGLINE;
-
   useEffect(() => {
     if (open) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinkingStep, open]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
+
+  const headerTitle = role === "shop" && shopName ? shopName : TREND_BOT_NAME;
+  const headerSub = subtitle ?? TREND_BOT_TAGLINE;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -110,7 +159,45 @@ export function TrendBotPanel({
     }
   };
 
+  const toggleVoice = () => {
+    const Ctor = getSpeechRecognition();
+    if (!Ctor) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new Ctor();
+    rec.lang = "ur-PK";
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (ev) => {
+      const transcript = ev.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      }
+    };
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec;
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      setListening(false);
+    }
+  };
+
+  const defaultHandoff =
+    role === "shop" && shopId
+      ? { href: `/shop/${shopId}`, label: "Message seller" }
+      : role === "merchant"
+        ? { href: "/dashboard/inquiries", label: "Open inbox" }
+        : { href: "/account/inquiries", label: "Human chat" };
+
   if (!open) return null;
+
+  const voiceSupported = Boolean(getSpeechRecognition());
 
   return (
     <FullScreenChatShell className="z-[130]">
@@ -122,6 +209,26 @@ export function TrendBotPanel({
         avatar={<TrendBotAvatar size="sm" animated={!loading} />}
         badge="AI"
       />
+
+      {showOnboarding ? (
+        <div className="shrink-0 border-b border-emerald-100 bg-emerald-50/90 px-3 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/40">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold text-emerald-900 dark:text-emerald-100">TrendBot quick start</p>
+              <p className="mt-0.5 text-[0.7rem] text-emerald-800/80 dark:text-emerald-200/80">
+                Try: &quot;best mobile ka link do&quot; · &quot;mere cart mein kya hai?&quot; · &quot;order kaise karun?&quot;
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissOnboarding}
+              className="rounded-full px-2 py-1 text-[0.65rem] font-semibold text-emerald-700 hover:bg-white/70 dark:text-emerald-200"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <ChatShellBody>
         <div className="space-y-3 py-1">
@@ -145,8 +252,11 @@ export function TrendBotPanel({
                 >
                   {msg.role === "bot" ? <AssistantMessage text={msg.text} /> : msg.text}
                 </div>
+                {msg.role === "bot" && msg.products?.length ? (
+                  <ProductResultCards products={msg.products} />
+                ) : null}
                 {msg.role === "bot" && msg.id !== "welcome" ? (
-                  <div className="mt-1.5 flex items-center gap-2 px-1">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 px-1">
                     <span className="text-[0.6rem] text-zinc-400">Helpful?</span>
                     <button
                       type="button"
@@ -167,6 +277,12 @@ export function TrendBotPanel({
                     {msg.feedback === "helpful" ? (
                       <span className="text-[0.6rem] text-emerald-600">Shukriya — seekh liya!</span>
                     ) : null}
+                    <Link
+                      href={(msg.handoff ?? defaultHandoff).href}
+                      className="ml-auto rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[0.6rem] font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300"
+                    >
+                      {(msg.handoff ?? defaultHandoff).label} →
+                    </Link>
                   </div>
                 ) : null}
               </div>
@@ -212,6 +328,22 @@ export function TrendBotPanel({
 
       <ChatShellFooter>
         <div className="flex items-end gap-2">
+          {voiceSupported ? (
+            <button
+              type="button"
+              onClick={toggleVoice}
+              disabled={loading}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition ${
+                listening
+                  ? "border-rose-300 bg-rose-50 text-rose-600"
+                  : "border-emerald-100 bg-white text-emerald-700 dark:border-emerald-900/40 dark:bg-zinc-900 dark:text-emerald-300"
+              }`}
+              aria-label={listening ? "Stop voice" : "Voice input"}
+              title="Voice (Urdu / English)"
+            >
+              <MicIcon />
+            </button>
+          ) : null}
           <textarea
             ref={inputRef}
             rows={1}

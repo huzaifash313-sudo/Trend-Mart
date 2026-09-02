@@ -1,7 +1,3 @@
-/* -------------------------------------------------------------------------- */
-/*  POST /api/ai-assistant — Free AI (customer, merchant, shop)               */
-/* -------------------------------------------------------------------------- */
-
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -23,6 +19,9 @@ interface AiAssistantBody {
   sessionId?: string;
   history?: { role: "user" | "assistant"; text: string }[];
   memoryHints?: string[];
+  pathname?: string;
+  cartSummary?: { count: number; total: number; lines: string[] };
+  location?: { lat: number; lng: number; label?: string };
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -71,6 +70,26 @@ export async function POST(request: Request): Promise<NextResponse> {
   const sessionId = body.sessionId
     ? sanitizeChatString(body.sessionId, 50)
     : `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const pathname = body.pathname ? sanitizeChatString(body.pathname, 120) : undefined;
+
+  const cartSummary = body.cartSummary
+    ? {
+        count: Math.max(0, Math.min(99, Number(body.cartSummary.count) || 0)),
+        total: Math.max(0, Number(body.cartSummary.total) || 0),
+        lines: (body.cartSummary.lines ?? []).slice(0, 8).map((l) => sanitizeChatString(l, 120)),
+      }
+    : undefined;
+
+  const location =
+    body.location &&
+    Number.isFinite(body.location.lat) &&
+    Number.isFinite(body.location.lng)
+      ? {
+          lat: Number(body.location.lat),
+          lng: Number(body.location.lng),
+          label: body.location.label ? sanitizeChatString(body.location.label, 80) : undefined,
+        }
+      : undefined;
 
   if (role === "merchant" && !user) {
     return NextResponse.json(
@@ -97,13 +116,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       userId: user?.id,
       history,
       memoryHints: (body.memoryHints ?? []).slice(0, 5).map((h) => sanitizeChatString(h, 80)),
+      pathname,
+      cartSummary,
+      location,
     });
 
-    if (role === "shop" && shopId) {
-      logShopChat(supabase, shopId, sessionId, message, result.reply, result.intent, result.confidence).catch(
-        () => {},
-      );
-    } else if (role === "merchant" && shopId) {
+    if ((role === "shop" || role === "merchant") && shopId) {
       logShopChat(supabase, shopId, sessionId, message, result.reply, result.intent, result.confidence).catch(
         () => {},
       );
@@ -115,6 +133,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       confidence: result.confidence,
       suggestions: result.suggestions,
       thinkingSteps: result.thinkingSteps,
+      products: result.products ?? [],
+      handoff: result.handoff ?? null,
       sessionId,
     });
   } catch (err) {

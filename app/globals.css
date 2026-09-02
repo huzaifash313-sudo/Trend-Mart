@@ -6009,7 +6009,7 @@ html.tm-trendbot-open .tm-trendbot-bubble {
   visibility: hidden;
 }
 
-/* WhatsApp-style full-screen chat — hide site footer & cart bar only */
+/* WhatsApp-style full-screen chat — hide site chrome that would bleed through */
 html.tm-chat-fullscreen .tm-site-footer,
 html.tm-trendbot-open .tm-site-footer {
   display: none !important;
@@ -6017,6 +6017,9 @@ html.tm-trendbot-open .tm-site-footer {
 
 html.tm-chat-fullscreen .tm-main,
 html.tm-trendbot-open .tm-main {
+  /* Keep layout but fully obscure Sponsored / shops under the chat layer */
+  visibility: hidden !important;
+  pointer-events: none !important;
   padding-bottom: 0 !important;
 }
 
@@ -6025,15 +6028,50 @@ html.tm-trendbot-open .tm-cartbar-root {
   display: none !important;
 }
 
-html.tm-chat-fullscreen {
+/*
+  Chat shell bottom clearance:
+  - Mobile: clear bottom nav + protruding center (+) FAB (~5.15rem)
+  - Desktop (md+): bottom nav hidden → shell flush to viewport bottom
+*/
+html.tm-chat-fullscreen,
+html.tm-trendbot-open {
+  --tm-chat-shell-bottom: calc(5.15rem + env(safe-area-inset-bottom, 0px));
   --tm-chat-bg: #e8f5f0;
 }
 
-html.dark.tm-chat-fullscreen {
+@media (min-width: 768px) {
+  html.tm-chat-fullscreen,
+  html.tm-trendbot-open {
+    --tm-chat-shell-bottom: 0px;
+  }
+}
+
+html.dark.tm-chat-fullscreen,
+html.dark.tm-trendbot-open {
   --tm-chat-bg: #0c1412;
 }
 
-.tm-chat-shell {
+.tm-chat-shell,
+.tm-chat-backdrop {
   -webkit-overflow-scrolling: touch;
+}
+
+.tm-chat-shell {
+  isolation: isolate;
+  box-shadow: 0 -1px 0 rgba(16, 185, 129, 0.08);
+}
+
+/* Keep bottom nav tappable above the opaque chat backdrop */
+html.tm-chat-fullscreen .bottom-nav,
+html.tm-trendbot-open .bottom-nav {
+  z-index: 140 !important;
+}
+
+.tm-chat-composer {
+  background-color: #fff;
+}
+
+html.dark .tm-chat-composer {
+  background-color: #09090b;
 }
 

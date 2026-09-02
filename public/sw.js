@@ -1,4 +1,4 @@
-/* TrendsMart SW v42 — install/activate + web-push delivery.
+/* TrendsMart SW v43 — install/activate + web-push delivery.
    Does NOT intercept fetches (avoids breaking Next.js client navigations).
    Clears old caches from previous SW versions.
    Adds the `push` + `notificationclick` handlers so OS notifications from
@@ -38,13 +38,14 @@ self.addEventListener("push", (event) => {
     body: (data && data.body) || "",
     icon: (data && data.icon) || "/trendsmart-mark.png?v=10",
     badge: (data && data.badge) || "/trendsmart-mark.png?v=10",
-    tag: (data && data.tag) || undefined,
+    tag: (data && data.tag) || "trendsmart",
     data: {
       url: (data && data.url) || "/",
     },
     // Reuse the same tag so repeated updates collapse into one notification.
     renotify: true,
-    vibrate: [100, 50, 100],
+    requireInteraction: false,
+    vibrate: [120, 60, 120],
   };
 
   event.waitUntil(

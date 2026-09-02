@@ -11,7 +11,7 @@ import { signOut } from "@/services/authService";
 import {
   getPushPermissionState,
   isPushClientSupported,
-  subscribeToPushNotifications,
+  syncPushSubscriptionIfGranted,
 } from "@/lib/pushClient";
 
 function BrowserNotifyBridge() {
@@ -112,35 +112,37 @@ function AutoSubscribeWebPush() {
     let cancelled = false;
     const supabase = createClient();
 
-    const trySubscribe = async () => {
+    const trySync = async () => {
       if (cancelled) return;
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user || cancelled) return;
+      if (!session?.user || cancelled) return;
 
       const permission = await getPushPermissionState();
       if (permission === "denied" || permission === "unsupported") return;
 
-      // SECURITY/UX: only auto-subscribe when permission is ALREADY granted.
-      // Never call requestPermission() outside a user gesture — the browser
-      // silently suppresses it and the "trendsmart_push_subscribed" flag alone
-      // must not trigger a prompt.
+      // Only re-sync when permission is ALREADY granted (no prompt without gesture).
       if (permission === "granted") {
-        await subscribeToPushNotifications();
+        await syncPushSubscriptionIfGranted();
       }
     };
 
-    void trySubscribe();
+    void trySync();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) void trySubscribe();
+      if (session?.user) void trySync();
     });
+
+    const onVis = () => {
+      if (document.visibilityState === "visible") void trySync();
+    };
+    document.addEventListener("visibilitychange", onVis);
 
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 

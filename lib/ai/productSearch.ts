@@ -6,6 +6,7 @@ import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { buildSupabaseOrFilter, detectSortMode, expandSearchTerms, type SearchSortMode } from "@/lib/ai/queryExpand";
 import { getShopCategoryPrompts } from "@/lib/ai/shopCategoryPrompts";
 import { sanitizeChatNumber, sanitizeChatString } from "@/lib/ai/sanitize";
+import { haversineDistance } from "@/services/geoRadiusService";
 
 export interface ProductSearchHit {
   id: string;
@@ -19,6 +20,8 @@ export interface ProductSearchHit {
   discountPct: number;
   productPath: string;
   shopPath: string;
+  imageUrl: string | null;
+  distanceKm: number | null;
 }
 
 type ProductRow = {
@@ -28,8 +31,17 @@ type ProductRow = {
   original_price: number | null;
   short_code: string | null;
   description: string;
+  image_url: string | null;
+  images: string[] | null;
   shop_id: string;
-  shops: { id: string; name: string; location: string; is_live: boolean } | null;
+  shops: {
+    id: string;
+    name: string;
+    location: string;
+    is_live: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null;
 };
 
 function sanitizeSearchTerm(input: string): string {
@@ -58,7 +70,15 @@ function rankBoost(query: string, hit: ProductSearchHit, sortMode?: SearchSortMo
 
 export async function searchProductsForAssistant(
   supabase: SupabaseClient,
-  options: { query: string; shopId?: string; limit?: number; sortMode?: SearchSortMode; originalMessage?: string },
+  options: {
+    query: string;
+    shopId?: string;
+    limit?: number;
+    sortMode?: SearchSortMode;
+    originalMessage?: string;
+    userLat?: number;
+    userLng?: number;
+  },
 ): Promise<ProductSearchHit[]> {
   const query = sanitizeSearchTerm(options.query);
   if (!query || query.length < 2) return [];
@@ -70,7 +90,7 @@ export async function searchProductsForAssistant(
   let dbQuery = supabase
     .from("products")
     .select(
-      "id, name, price, original_price, short_code, description, shop_id, is_available, shops!inner(id, name, location, is_live)",
+      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, latitude, longitude)",
     )
     .eq("is_available", true)
     .eq("shops.is_live", true);
@@ -103,6 +123,22 @@ export async function searchProductsForAssistant(
     const name = sanitizeChatString(item.name, 100);
     const shopName = sanitizeChatString(item.shops?.name, 80) || "Shop";
     const shopId = sanitizeChatString(item.shop_id, 100);
+    const imageFromArr = Array.isArray(item.images) ? item.images.find((u) => typeof u === "string" && u.length > 0) : null;
+    const imageUrl = (item.image_url && String(item.image_url)) || imageFromArr || null;
+    let distanceKm: number | null = null;
+    if (
+      options.userLat != null &&
+      options.userLng != null &&
+      item.shops?.latitude != null &&
+      item.shops?.longitude != null
+    ) {
+      distanceKm = haversineDistance(
+        options.userLat,
+        options.userLng,
+        Number(item.shops.latitude),
+        Number(item.shops.longitude),
+      );
+    }
     const hit: ProductSearchHit = {
       id: String(item.id),
       name,
@@ -115,8 +151,12 @@ export async function searchProductsForAssistant(
       discountPct: discountPercent(price, original),
       productPath: getProductSeoPath(name, item.short_code, String(item.id)),
       shopPath: `/shop/${shopId}`,
+      imageUrl,
+      distanceKm,
     };
     hit.score += rankBoost(query, hit, sortMode);
+    if (distanceKm != null && distanceKm < 5) hit.score += 6;
+    else if (distanceKm != null && distanceKm < 10) hit.score += 3;
     return hit;
   });
 
@@ -127,6 +167,11 @@ export async function searchProductsForAssistant(
       const scoreA = a.score + a.discountPct * 1.5;
       const scoreB = b.score + b.discountPct * 1.5;
       return scoreB - scoreA || a.price - b.price;
+    }
+    // Prefer nearer shops when location known
+    if (a.distanceKm != null && b.distanceKm != null) {
+      const distDelta = a.distanceKm - b.distanceKm;
+      if (Math.abs(distDelta) > 2 && Math.abs(a.score - b.score) < 12) return distDelta;
     }
     return b.score - a.score;
   });
@@ -144,7 +189,13 @@ export function formatProductSearchReply(
   sortMode: SearchSortMode = "relevance",
   shopCategory?: string,
   shopName?: string,
-): { reply: string; intent: string; confidence: number; suggestions: string[] } {
+): {
+  reply: string;
+  intent: string;
+  confidence: number;
+  suggestions: string[];
+  products: ProductSearchHit[];
+} {
   const uniqueShops = new Set(hits.map((h) => h.shopId)).size;
   const sortLabel =
     sortMode === "cheapest"
@@ -167,7 +218,9 @@ export function formatProductSearchReply(
     ? `🏆 *Top pick:* *${top.name}* — ${rs(top.price)}${
         top.discountPct > 0 ? ` (*${top.discountPct}% OFF*)` : ""
       }\n` +
-      `📍 *${top.shopName}*${top.shopLocation ? ` · ${top.shopLocation}` : ""}\n` +
+      `📍 *${top.shopName}*${top.shopLocation ? ` · ${top.shopLocation}` : ""}${
+        top.distanceKm != null ? ` · ~${top.distanceKm < 1 ? `${Math.round(top.distanceKm * 1000)}m` : `${top.distanceKm.toFixed(1)}km`}` : ""
+      }\n` +
       `👉 [Open product now](${top.productPath}) · [Visit shop](${top.shopPath})\n`
     : "";
 
@@ -201,7 +254,8 @@ export function formatProductSearchReply(
         : role === "merchant"
           ? ["Meri shop ki live summary", "Best selling product?", "Growth strategy"]
           : getShopCategoryPrompts(shopCategory, shopName),
-    reply: `✨ *${title}*\n\n${topSection}${body}${browseLink}\n\n_Tap green links to open product or shop instantly._`,
+    reply: `✨ *${title}*\n\n${topSection}${body}${browseLink}\n\n_Neeche cards tap karke product/shop kholen._`,
+    products: hits,
   };
 }
 

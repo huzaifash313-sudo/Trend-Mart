@@ -1,9 +1,14 @@
+/* Client TrendBot chat state — context, products, feedback, voice-ready */
+
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { AssistantRole } from "@/lib/ai/assistantEngine";
+import type { ProductSearchHit } from "@/lib/ai/productSearch";
 import { TREND_BOT_NAME } from "@/lib/ai/trendBotBrand";
 import {
+  getMemoryHint,
   getSessionLabel,
   personalizePrompts,
   recordTrendBotHelpful,
@@ -11,6 +16,8 @@ import {
   recordTrendBotQuery,
   startTrendBotSession,
 } from "@/lib/ai/trendBotMemory";
+import { useCartStore } from "@/store/cartStore";
+import { useLocation } from "@/context/LocationContext";
 
 export interface TrendBotMessage {
   id: string;
@@ -19,6 +26,8 @@ export interface TrendBotMessage {
   timestamp: number;
   intent?: string;
   feedback?: "helpful" | "not_helpful";
+  products?: ProductSearchHit[];
+  handoff?: { type: string; href: string; label: string };
 }
 
 interface UseTrendBotChatOptions {
@@ -28,6 +37,8 @@ interface UseTrendBotChatOptions {
   shopCategory?: string;
   welcomeText: string;
   initialPrompts: string[];
+  /** Prefill + auto-send once (shareable /assistant?q=) */
+  initialQuery?: string | null;
 }
 
 export function useTrendBotChat({
@@ -37,7 +48,12 @@ export function useTrendBotChat({
   shopCategory,
   welcomeText,
   initialPrompts,
+  initialQuery,
 }: UseTrendBotChatOptions) {
+  const pathname = usePathname() ?? "/";
+  const cartItems = useCartStore((s) => s.items);
+  const { coordinates, location } = useLocation();
+
   const [sessionId] = useState(() => `tb_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
   const [sessionCount, setSessionCount] = useState(1);
   const [messages, setMessages] = useState<TrendBotMessage[]>(() => [
@@ -47,19 +63,63 @@ export function useTrendBotChat({
   const [loading, setLoading] = useState(false);
   const [thinkingStep, setThinkingStep] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState(initialPrompts);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const lastUserQuery = useRef("");
+  const autoSent = useRef(false);
 
   useEffect(() => {
     const mem = startTrendBotSession(shopCategory);
     setSessionCount(mem.sessions);
     setSuggestions(personalizePrompts(initialPrompts));
+    try {
+      if (!sessionStorage.getItem("tm_trendbot_onboard_v1")) {
+        setShowOnboarding(true);
+      }
+    } catch {
+      /* ignore */
+    }
   }, [initialPrompts, shopCategory]);
+
+  const dismissOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+    try {
+      sessionStorage.setItem("tm_trendbot_onboard_v1", "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const buildContextPayload = useCallback(() => {
+    const lines = cartItems.slice(0, 6).map((i) => {
+      const qty = i.quantity ?? 1;
+      return `${qty}× ${i.name} @ Rs. ${Number(i.price).toLocaleString("en-PK")}`;
+    });
+    const total = cartItems.reduce((sum, i) => sum + Number(i.price) * (i.quantity ?? 1), 0);
+    return {
+      pathname,
+      cartSummary: {
+        count: cartItems.reduce((n, i) => n + (i.quantity ?? 1), 0),
+        total,
+        lines,
+      },
+      location:
+        coordinates?.latitude != null && coordinates?.longitude != null
+          ? {
+              lat: coordinates.latitude,
+              lng: coordinates.longitude,
+              label: location?.city || location?.deliveryZone || undefined,
+            }
+          : undefined,
+      memoryHints: getMemoryHint().slice(0, 5),
+    };
+  }, [cartItems, coordinates, location, pathname]);
 
   const sendMessage = useCallback(
     async (textOverride?: string) => {
       const text = (textOverride ?? input).trim();
       if (!text || loading) return;
 
+      dismissOnboarding();
       lastUserQuery.current = text;
       recordTrendBotQuery(text);
 
@@ -84,6 +144,7 @@ export function useTrendBotChat({
       setThinkingStep(null);
 
       try {
+        const ctx = buildContextPayload();
         const res = await fetch("/api/ai-assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -95,7 +156,7 @@ export function useTrendBotChat({
             shopCategory,
             sessionId,
             history,
-            memoryHints: personalizePrompts([]).slice(0, 3),
+            ...ctx,
           }),
         });
 
@@ -105,16 +166,18 @@ export function useTrendBotChat({
           thinkingSteps?: string[];
           intent?: string;
           error?: string;
+          products?: ProductSearchHit[];
+          handoff?: TrendBotMessage["handoff"];
         };
 
         if (data.thinkingSteps?.length) {
           for (const step of data.thinkingSteps) {
             setThinkingStep(step);
-            await new Promise((r) => setTimeout(r, 350 + Math.random() * 280));
+            await new Promise((r) => setTimeout(r, 280 + Math.random() * 220));
           }
         } else {
           setThinkingStep(`${TREND_BOT_NAME} analyze kar raha hai…`);
-          await new Promise((r) => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, 400));
         }
         setThinkingStep(null);
 
@@ -127,7 +190,7 @@ export function useTrendBotChat({
           reply =
             data.error === "auth_required"
               ? "🔐 Sign in chahiye.\n\n[Sign in](/login) karein."
-              : `😕 *Jawab nahi mil saka*\n\n• Internet check karein\n• Sawal clear likhein\n• Example: *best mobile ka link do*\n\n_${TREND_BOT_NAME} har baar behtar ho raha hai — dubara try karein._`;
+              : `😕 *Jawab nahi mil saka*\n\n• Internet check karein\n• Sawal clear likhein\n• Example: *best mobile ka link do*\n\n_${TREND_BOT_NAME} seekhta rehta hai — dubara try karein._`;
         }
 
         setMessages((prev) => [
@@ -138,6 +201,8 @@ export function useTrendBotChat({
             text: reply,
             timestamp: Date.now(),
             intent: data.intent,
+            products: data.products,
+            handoff: data.handoff,
           },
         ]);
       } catch {
@@ -155,23 +220,58 @@ export function useTrendBotChat({
         setLoading(false);
       }
     },
-    [input, loading, messages, role, sessionId, shopCategory, shopId, shopName],
+    [
+      buildContextPayload,
+      dismissOnboarding,
+      input,
+      loading,
+      messages,
+      role,
+      sessionId,
+      shopCategory,
+      shopId,
+      shopName,
+    ],
   );
 
-  const setFeedback = useCallback((messageId: string, feedback: "helpful" | "not_helpful") => {
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id !== messageId) return m;
-        if (feedback === "helpful") {
-          recordTrendBotHelpful(lastUserQuery.current, m.intent);
-          setSuggestions((s) => personalizePrompts(s));
-        } else {
-          recordTrendBotNotHelpful(lastUserQuery.current);
-        }
-        return { ...m, feedback };
-      }),
-    );
-  }, []);
+  useEffect(() => {
+    if (!initialQuery || autoSent.current) return;
+    autoSent.current = true;
+    setInput(initialQuery);
+    const t = setTimeout(() => void sendMessage(initialQuery), 400);
+    return () => clearTimeout(t);
+    // intentionally once on mount for shareable links
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
+
+  const setFeedback = useCallback(
+    (messageId: string, feedback: "helpful" | "not_helpful") => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          if (feedback === "helpful") {
+            recordTrendBotHelpful(lastUserQuery.current, m.intent);
+            setSuggestions((s) => personalizePrompts(s));
+          } else {
+            recordTrendBotNotHelpful(lastUserQuery.current);
+          }
+          void fetch("/api/ai-assistant/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId,
+              feedback,
+              intent: m.intent,
+              query: lastUserQuery.current,
+              shopId,
+            }),
+          }).catch(() => undefined);
+          return { ...m, feedback };
+        }),
+      );
+    },
+    [sessionId, shopId],
+  );
 
   return {
     messages,
@@ -183,5 +283,8 @@ export function useTrendBotChat({
     sendMessage,
     setFeedback,
     sessionLabel: getSessionLabel(sessionCount),
+    showOnboarding,
+    dismissOnboarding,
+    sessionId,
   };
 }

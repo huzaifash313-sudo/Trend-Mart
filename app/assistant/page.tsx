@@ -19,7 +19,13 @@ export const metadata = {
   },
 };
 
-export default function PublicAssistantPage() {
+export default async function PublicAssistantPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const params = await searchParams;
+  const initialQuery = params.q?.trim()?.slice(0, 120) || null;
   const jsonLd = generateTrendBotJsonLd();
 
   return (
@@ -34,6 +40,7 @@ export default function PublicAssistantPage() {
         subtitle="Product links, deals & shop finder — no sign-in required."
         backHref="/"
         backLabel="← Home"
+        initialQuery={initialQuery}
       />
     </>
   );

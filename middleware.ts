@@ -587,7 +587,7 @@ function applySecurityHeaders(response: NextResponse): void {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(self)",
+    "camera=(), microphone=(self), geolocation=(self)",
   );
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("X-XSS-Protection", "1; mode=block");

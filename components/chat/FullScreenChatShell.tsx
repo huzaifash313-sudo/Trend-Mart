@@ -10,7 +10,11 @@ interface FullScreenChatShellProps {
   className?: string;
 }
 
-/** WhatsApp-style fixed chat viewport — navbar top, bottom nav visible, site footer hidden. */
+/**
+ * WhatsApp-style fixed chat viewport.
+ * Opaque backdrop covers homepage (Sponsored, etc.). Shell sits above bottom nav on mobile;
+ * on md+ it fills to the viewport bottom (no bottom-nav gap).
+ */
 export function FullScreenChatShell({ children, className = "" }: FullScreenChatShellProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -20,23 +24,32 @@ export function FullScreenChatShell({ children, className = "" }: FullScreenChat
 
   useEffect(() => {
     document.documentElement.classList.add("tm-chat-fullscreen");
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.documentElement.classList.remove("tm-chat-fullscreen");
-      document.body.style.overflow = "";
+      document.body.style.overflow = prevOverflow;
     };
   }, []);
 
   const shell = (
-    <div
-      className={`tm-chat-shell fixed inset-x-0 z-[130] flex min-h-0 flex-col bg-white dark:bg-zinc-950 ${className}`}
-      style={{
-        top: "var(--tm-navbar-sticky-offset, 62px)",
-        bottom: "calc(3.75rem + env(safe-area-inset-bottom, 0px))",
-      }}
-    >
-      {children}
-    </div>
+    <>
+      {/* Full opaque cover so Sponsored / page content never bleeds under the chat */}
+      <div
+        className="tm-chat-backdrop fixed inset-x-0 bottom-0 z-[128] bg-white dark:bg-zinc-950"
+        style={{ top: "var(--tm-navbar-sticky-offset, 62px)" }}
+        aria-hidden
+      />
+      <div
+        className={`tm-chat-shell fixed inset-x-0 z-[130] flex min-h-0 flex-col overflow-hidden bg-white dark:bg-zinc-950 ${className}`}
+        style={{
+          top: "var(--tm-navbar-sticky-offset, 62px)",
+          bottom: "var(--tm-chat-shell-bottom, 0px)",
+        }}
+      >
+        {children}
+      </div>
+    </>
   );
 
   if (!mounted) return null;

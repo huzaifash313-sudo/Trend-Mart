@@ -45,6 +45,9 @@ export interface AssistantRequest {
   userId?: string;
   history?: HistoryMessage[];
   memoryHints?: string[];
+  pathname?: string;
+  cartSummary?: { count: number; total: number; lines: string[] };
+  location?: { lat: number; lng: number; label?: string };
 }
 
 export interface AssistantResponse {
@@ -53,6 +56,8 @@ export interface AssistantResponse {
   confidence: number;
   suggestions?: string[];
   thinkingSteps?: string[];
+  products?: import("@/lib/ai/productSearch").ProductSearchHit[];
+  handoff?: { type: "shop" | "support" | "inquiries"; href: string; label: string };
 }
 
 // ─── Intent types ────────────────────────────────────────────────────────────
@@ -1120,6 +1125,7 @@ export function generateCustomerResponse(
         confidence: 0.85,
         suggestions,
         reply: `💬 *In-App Chat with Shops*\n\n1. Shop page → "Chat with seller"\n2. Sign in karein\n3. Message bhejein — shop Dashboard se reply karegi\n\nAapke chats: /account/inquiries\n\nWhatsApp bhi available hai har shop par.`,
+        handoff: { type: "inquiries", href: "/account/inquiries", label: "Open human chat" },
       };
 
     case "delivery_help":
@@ -1296,6 +1302,7 @@ async function tryProductSearch(
   shopId?: string,
   shopCategory?: string,
   shopName?: string,
+  location?: { lat: number; lng: number },
 ): Promise<AssistantResponse | null> {
   if (isShortGreeting(message)) return null;
   if (!shouldRunProductSearch(message, role)) return null;
@@ -1310,10 +1317,16 @@ async function tryProductSearch(
     limit: 5,
     sortMode,
     originalMessage: message,
+    userLat: location?.lat,
+    userLng: location?.lng,
   });
 
   if (hits.length > 0) {
-    return formatProductSearchReply(hits, query, role, sortMode, shopCategory, shopName);
+    const formatted = formatProductSearchReply(hits, query, role, sortMode, shopCategory, shopName);
+    return {
+      ...formatted,
+      products: hits,
+    };
   }
 
   if (looksLikeProductSearch(message)) {
@@ -1321,6 +1334,61 @@ async function tryProductSearch(
   }
 
   return null;
+}
+
+function looksLikeCartQuery(message: string): boolean {
+  return /\b(cart|basket|mer[ea] cart|cart mein|cart me|kitne items|cart ka status)\b/i.test(message);
+}
+
+function looksLikePageHelp(message: string): boolean {
+  return /\b(yeh page|is page|yahan kya|where am i|current page|ye page)\b/i.test(message);
+}
+
+function buildCartReply(cart?: AssistantRequest["cartSummary"]): AssistantResponse {
+  if (!cart || cart.count <= 0) {
+    return {
+      intent: "cart_help",
+      confidence: 0.92,
+      suggestions: ["Best mobile ka link do", "Best deals?", "Order kaise karun?"],
+      reply:
+        `🛒 *Aapka cart khali hai.*\n\nProducts add karke [Cart](/cart) se WhatsApp order bhej sakte ho.\n\nTip: *"best mobile ka link do"* likho — main seedha product link dunga.`,
+    };
+  }
+  const lines = cart.lines.slice(0, 6).map((l) => `• ${l}`).join("\n");
+  return {
+    intent: "cart_help",
+    confidence: 0.95,
+    suggestions: ["Order kaise karun?", "Best deals?", "Mere orders?"],
+    reply:
+      `🛒 *Aapke cart mein ${cart.count} item(s)* — total ~Rs. ${cart.total.toLocaleString("en-PK")}\n\n${lines}\n\n👉 [Open cart & checkout](/cart)`,
+  };
+}
+
+function buildPageContextReply(pathname?: string, cart?: AssistantRequest["cartSummary"]): AssistantResponse | null {
+  if (!pathname) return null;
+  const p = pathname.toLowerCase();
+  let tip = "";
+  if (p === "/" || p.startsWith("/?")) tip = "Aap *homepage* par hain — Live Shops, categories, aur TrendBot se product search.";
+  else if (p.startsWith("/shop/")) tip = "Aap *kisi shop* ke storefront par hain — products browse karein ya mujh se us shop ke items poochhein.";
+  else if (p.startsWith("/products")) tip = "Aap *products browse* kar rahe hain — filter/sort use karein ya mujh se best pick maangein.";
+  else if (p.startsWith("/cart")) tip = "Aap *cart* par hain — checkout se WhatsApp order jayega.";
+  else if (p.startsWith("/orders")) tip = "Aap *orders* section mein hain — status track kar sakte ho.";
+  else if (p.startsWith("/wishlist")) tip = "Aap *wishlist* par hain — saved items yahan milte hain.";
+  else if (p.startsWith("/deals")) tip = "Aap *deals* page par hain — discounts explore karein.";
+  else if (p.startsWith("/dashboard")) tip = "Aap *merchant dashboard* par hain — live summary ke liye poochhein.";
+  else tip = `Aap *${pathname}* par hain.`;
+
+  const cartLine =
+    cart && cart.count > 0
+      ? `\n\n🛒 Cart: ${cart.count} item(s) · [Open cart](/cart)`
+      : "";
+
+  return {
+    intent: "page_context",
+    confidence: 0.9,
+    suggestions: ["Best mobile ka link do", "Mere cart mein kya hai?", "Order kaise karun?"],
+    reply: `📍 ${tip}${cartLine}\n\nKuch aur chahiye? Product link, deals, ya help — likh do.`,
+  };
 }
 
 export async function runAssistant(
@@ -1335,18 +1403,36 @@ export async function runAssistant(
   const message = resolveMessageWithHistory(rawMessage, req.history);
   const role = req.role;
 
+  // ── Live cart / page context (client-provided) ──────────────────────────
+  if (role !== "merchant" && looksLikeCartQuery(message)) {
+    return withThinking(buildCartReply(req.cartSummary), role);
+  }
+  if (looksLikePageHelp(message)) {
+    const pageRes = buildPageContextReply(req.pathname, req.cartSummary);
+    if (pageRes) return withThinking(pageRes, role);
+  }
+
   // ── App knowledge (FAQs + features) ─────────────────────────────────────
   const appHit = matchAppKnowledge(message, role);
   if (appHit && appHit.confidence >= 0.55) {
+    const hintBoost =
+      req.memoryHints?.length &&
+      req.memoryHints.some((h) => message.toLowerCase().includes(h.toLowerCase().slice(0, 12)));
     return withThinking(
       {
         reply: appHit.reply,
         intent: appHit.intent,
-        confidence: appHit.confidence,
+        confidence: hintBoost ? Math.min(appHit.confidence + 0.05, 0.99) : appHit.confidence,
         suggestions:
           role === "merchant"
             ? ["Meri shop ki live summary", "Best selling product?", "Growth strategy"]
-            : ["Best mobile ka link do", "Konsa business karun?", "Order kaise karun?"],
+            : req.memoryHints?.length
+              ? [...req.memoryHints.slice(0, 2), "Best mobile ka link do", "Order kaise karun?"]
+              : ["Best mobile ka link do", "Konsa business karun?", "Order kaise karun?"],
+        handoff:
+          role === "shop" && req.shopId
+            ? { type: "shop", href: `/shop/${req.shopId}`, label: "Message seller" }
+            : { type: "support", href: "/contact", label: "Contact support" },
       },
       role,
     );
@@ -1374,6 +1460,7 @@ export async function runAssistant(
     req.shopId,
     req.shopCategory,
     req.shopName,
+    req.location,
   );
   if (productHit) {
     return withThinking(productHit, role, extractProductQuery(message) ?? message);

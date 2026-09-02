@@ -505,27 +505,24 @@ export default function DashboardSettingsPage() {
   const handleEnablePush = useCallback(async () => {
     setPushBusy(true);
     setPushStatus("checking");
+    const { pushFailMessage } = await import("@/lib/pushClient");
     const result = await subscribeToPushNotifications();
 
     if (result.ok) {
       setPushStatus("enabled");
-      addToast("Order alerts enabled on this device.", "success");
+      addToast("Order alerts enabled & synced on this device.", "success");
     } else {
       const nextStatus: PushStatus =
-        result.reason === "unsupported"
+        result.reason === "unsupported" ||
+        result.reason === "ios_needs_pwa" ||
+        result.reason === "insecure" ||
+        result.reason === "no_vapid"
           ? "unsupported"
           : result.reason === "denied"
             ? "denied"
             : "not-enabled";
       setPushStatus(nextStatus);
-      addToast(
-        result.reason === "unsupported"
-          ? "Push alerts are not supported on this device."
-          : result.reason === "denied"
-            ? "Notifications are blocked for this browser."
-            : "Could not enable order alerts. Please try again.",
-        "error",
-      );
+      addToast(pushFailMessage(result.reason, result.detail), "error");
     }
 
     setPushBusy(false);

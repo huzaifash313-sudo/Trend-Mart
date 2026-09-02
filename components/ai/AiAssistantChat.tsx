@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef } from "react";
+import Link from "next/link";
 import type { AssistantRole } from "@/lib/ai/assistantEngine";
 import {
   CUSTOMER_PROMPTS,
@@ -8,6 +9,7 @@ import {
   SHOP_PROMPTS,
 } from "@/lib/ai/assistantEngine";
 import { AssistantMessage } from "@/components/ai/AssistantMessage";
+import { ProductResultCards } from "@/components/ai/ProductResultCards";
 import { TrendBotAvatar } from "@/components/trendbot/TrendBotAvatar";
 import {
   ChatShellBody,
@@ -16,22 +18,19 @@ import {
   FullScreenChatShell,
 } from "@/components/chat/FullScreenChatShell";
 import { TREND_BOT_NAME, TREND_BOT_TAGLINE, TREND_BOT_WELCOME_CUSTOMER } from "@/lib/ai/trendBotBrand";
-
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  timestamp: number;
-}
+import { useTrendBotChat } from "@/hooks/useTrendBotChat";
 
 interface AiAssistantChatProps {
   role: AssistantRole;
   shopId?: string;
+  shopName?: string;
+  shopCategory?: string;
   title: string;
   subtitle: string;
   backHref?: string;
   backLabel?: string;
   initialPrompts?: string[];
+  initialQuery?: string | null;
 }
 
 function SendIcon() {
@@ -61,107 +60,44 @@ function welcomeMessage(role: AssistantRole, title: string): string {
 export default function AiAssistantChat({
   role,
   shopId,
+  shopName,
+  shopCategory,
   title,
   subtitle,
   backHref,
   backLabel = "Back",
   initialPrompts,
+  initialQuery,
 }: AiAssistantChatProps) {
-  const [sessionId] = useState(() => `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    { id: "welcome", role: "assistant", text: welcomeMessage(role, title), timestamp: Date.now() },
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [thinkingStep, setThinkingStep] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>(initialPrompts ?? defaultPrompts(role));
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const prompts = initialPrompts ?? defaultPrompts(role);
+  const {
+    messages,
+    input,
+    setInput,
+    loading,
+    thinkingStep,
+    suggestions,
+    sendMessage,
+    setFeedback,
+    showOnboarding,
+    dismissOnboarding,
+  } = useTrendBotChat({
+    role,
+    shopId,
+    shopName,
+    shopCategory,
+    welcomeText: welcomeMessage(role, title),
+    initialPrompts: prompts,
+    initialQuery,
+  });
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading, thinkingStep]);
-
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  const send = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || loading) return;
-
-      const userMsg: ChatMessage = {
-        id: `u_${Date.now()}`,
-        role: "user",
-        text: trimmed,
-        timestamp: Date.now(),
-      };
-      setMessages((prev) => [...prev, userMsg]);
-      setInput("");
-      setLoading(true);
-      setThinkingStep(null);
-
-      const history = [...messages, userMsg]
-        .filter((m) => m.id !== "welcome")
-        .slice(-10)
-        .map((m) => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), text: m.text }));
-
-      try {
-        const res = await fetch("/api/ai-assistant", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: trimmed, role, shopId, sessionId, history }),
-        });
-        const data = (await res.json()) as {
-          reply?: string;
-          suggestions?: string[];
-          thinkingSteps?: string[];
-        };
-
-        if (data.thinkingSteps?.length) {
-          for (const step of data.thinkingSteps) {
-            setThinkingStep(step);
-            await sleep(400 + Math.random() * 300);
-          }
-        } else {
-          setThinkingStep(`${TREND_BOT_NAME} soch raha hai…`);
-          await sleep(500);
-        }
-        setThinkingStep(null);
-
-        if (data.suggestions?.length) setSuggestions(data.suggestions);
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `a_${Date.now()}`,
-            role: "assistant",
-            text: data.reply ?? `😕 ${TREND_BOT_NAME} abhi jawab nahi de saka. Dubara try karein.`,
-            timestamp: Date.now(),
-          },
-        ]);
-      } catch {
-        setThinkingStep(null);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `e_${Date.now()}`,
-            role: "assistant",
-            text: "⚠️ Connection issue — internet check karke dubara try karein.",
-            timestamp: Date.now(),
-          },
-        ]);
-      } finally {
-        setLoading(false);
-        inputRef.current?.focus();
-      }
-    },
-    [loading, messages, role, sessionId, shopId],
-  );
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      void send(input);
+      void sendMessage();
     }
   };
 
@@ -178,6 +114,19 @@ export default function AiAssistantChat({
         badge="Free AI"
       />
 
+      {showOnboarding ? (
+        <div className="shrink-0 border-b border-emerald-100 bg-emerald-50/90 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/40">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[0.7rem] text-emerald-800 dark:text-emerald-200">
+              Shareable tip: <code className="rounded bg-white/70 px-1">/assistant?q=best+mobile</code>
+            </p>
+            <button type="button" onClick={dismissOnboarding} className="text-[0.65rem] font-semibold text-emerald-700">
+              Got it
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <ChatShellBody>
         <div className="flex flex-1 flex-col gap-2 py-1">
           {messages.map((msg) => (
@@ -185,19 +134,47 @@ export default function AiAssistantChat({
               key={msg.id}
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start gap-2"}`}
             >
-              {msg.role === "assistant" ? (
+              {msg.role === "bot" ? (
                 <div className="mt-1 shrink-0">
                   <TrendBotAvatar size="sm" animated={false} />
                 </div>
               ) : null}
-              <div
-                className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm sm:max-w-[80%] ${
-                  msg.role === "user"
-                    ? "rounded-br-sm bg-gradient-to-br from-emerald-600 to-teal-600 text-white"
-                    : "rounded-bl-sm border border-white/80 bg-white text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                }`}
-              >
-                {msg.role === "assistant" ? <AssistantMessage text={msg.text} /> : msg.text}
+              <div className="max-w-[88%] sm:max-w-[80%]">
+                <div
+                  className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${
+                    msg.role === "user"
+                      ? "rounded-br-sm bg-gradient-to-br from-emerald-600 to-teal-600 text-white"
+                      : "rounded-bl-sm border border-white/80 bg-white text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  }`}
+                >
+                  {msg.role === "bot" ? <AssistantMessage text={msg.text} /> : msg.text}
+                </div>
+                {msg.role === "bot" && msg.products?.length ? (
+                  <ProductResultCards products={msg.products} />
+                ) : null}
+                {msg.role === "bot" && msg.id !== "welcome" ? (
+                  <div className="mt-1 flex gap-2 px-1">
+                    <button
+                      type="button"
+                      onClick={() => setFeedback(msg.id, "helpful")}
+                      className={`text-[0.65rem] font-semibold ${msg.feedback === "helpful" ? "text-emerald-600" : "text-zinc-400"}`}
+                    >
+                      👍 Helpful
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFeedback(msg.id, "not_helpful")}
+                      className={`text-[0.65rem] font-semibold ${msg.feedback === "not_helpful" ? "text-red-500" : "text-zinc-400"}`}
+                    >
+                      👎
+                    </button>
+                    {msg.handoff ? (
+                      <Link href={msg.handoff.href} className="ml-auto text-[0.65rem] font-semibold text-emerald-700">
+                        {msg.handoff.label} →
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}
@@ -206,15 +183,9 @@ export default function AiAssistantChat({
             <div className="flex justify-start gap-2">
               <TrendBotAvatar size="sm" animated wiggle />
               <div className="rounded-2xl rounded-bl-sm border border-white/80 bg-white px-4 py-3 shadow-sm dark:bg-zinc-800">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                  </span>
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                    {thinkingStep ?? "Processing…"}
-                  </span>
-                </div>
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                  {thinkingStep ?? "Processing…"}
+                </span>
               </div>
             </div>
           ) : null}
@@ -229,8 +200,8 @@ export default function AiAssistantChat({
               <button
                 key={prompt}
                 type="button"
-                onClick={() => void send(prompt)}
-                className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                onClick={() => void sendMessage(prompt)}
+                className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800"
               >
                 {prompt}
               </button>
@@ -253,8 +224,8 @@ export default function AiAssistantChat({
           <button
             type="button"
             disabled={loading || !input.trim()}
-            onClick={() => void send(input)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-md transition hover:opacity-90 disabled:opacity-40"
+            onClick={() => void sendMessage()}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-md disabled:opacity-40"
             aria-label="Send"
           >
             <SendIcon />

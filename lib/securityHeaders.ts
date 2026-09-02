@@ -125,7 +125,7 @@ export function getBaseSecurityHeaders(): Record<string, string> {
     "X-Content-Type-Options": "nosniff",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+    "Permissions-Policy": "camera=(), microphone=(self), geolocation=(self)",
     "X-Permitted-Cross-Domain-Policies": "none",
     "X-Download-Options": "noopen",
     "X-DNS-Prefetch-Control": "on",
