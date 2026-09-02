@@ -231,6 +231,40 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
     a: "PWA install karne par choti network drops par basic browsing cache se chal sakti hai. Orders ke liye internet zaroori hai.",
     roles: "all",
   },
+  {
+    keys: ["payment", "cod", "cash on delivery", "online payment", "paisa", "pay"],
+    q: "Payment kaise hota hai?",
+    a: "Zyada tar shops *Cash on Delivery (COD)* ya WhatsApp par payment confirm karti hain. Checkout message mein payment method clear likhein — shop confirm karegi.",
+    roles: "all",
+    link: "/cart",
+  },
+  {
+    keys: ["guest", "bina login", "without login", "sign in zaroori"],
+    q: "Bina login browse?",
+    a: "Haan — shops aur products *bina sign-in* browse aur cart mein add kar sakte hain. Orders / chat / wishlist sync ke liye sign-in better hai.",
+    roles: "customer",
+    link: "/login",
+  },
+  {
+    keys: ["how to use", "kaise use", "guide", "tutorial", "shuruat", "start"],
+    q: "TrendsMart kaise use karein?",
+    a: "1) Homepage se shop/category choose karein\n2) Product cart mein add karein\n3) Checkout → WhatsApp order\n4) Status [Orders](/orders) par track karein\n\nTrendBot se product link bhi maang sakte hain.",
+    roles: "all",
+    link: "/",
+  },
+  {
+    keys: ["safe", "secure", "scam", "trust", "reliable"],
+    q: "Kya TrendsMart safe hai?",
+    a: "Merchants admin approval ke baad live hote hain. Order WhatsApp par shop se direct confirm hota hai. Issues ke liye pehle shop, phir [Support](/contact).",
+    roles: "all",
+    link: "/legal/merchant-guidelines",
+  },
+  {
+    keys: ["language", "urdu", "english", "roman urdu"],
+    q: "Kaunsi language?",
+    a: "TrendBot *Roman Urdu + English* dono samajhta hai — jaise \"best mobile ka link do\" ya \"show cheapest laptop\".",
+    roles: "all",
+  },
 ];
 
 function tokenize(text: string): Set<string> {
@@ -281,22 +315,10 @@ function entryVisibleToRole(entryRoles: AssistantRole | AssistantRole[] | "all",
   return role === "shop" && allowed.includes("customer");
 }
 
-export function matchAppKnowledge(
+function scoreBestKnowledge(
   message: string,
   role: AssistantRole,
-): { reply: string; confidence: number; intent: string } | null {
-  const lower = message.toLowerCase();
-
-  const isAppQuestion =
-    /(trendsmart|trends mart|trendbot|trend bot|ye app|yeh app|is app|app mein|app par|how does|kaise kaam|kya hai|what is|help|madad|feature|function)/i.test(
-      lower,
-    ) ||
-    /(cart|checkout|wishlist|whatsapp|delivery|radius|merchant|qr|analytics|deals|support|pwa|chat|track|theme|location|search|stories|coupon|review|refund|legal|login|notification|faq|order)/i.test(
-      lower,
-    );
-
-  if (!isAppQuestion && lower.split(/\s+/).length < 4) return null;
-
+): { entry: KnowledgeEntry; score: number } | null {
   let best: KnowledgeEntry | null = null;
   let bestScore = 0;
 
@@ -309,12 +331,49 @@ export function matchAppKnowledge(
     }
   }
 
-  if (!best || bestScore < 20) return null;
+  if (!best) return null;
+  return { entry: best, score: bestScore };
+}
 
-  const linkLine = best.link ? `\n\n👉 [Open related page](${best.link})` : "";
+function formatKnowledgeReply(entry: KnowledgeEntry, confidence: number) {
+  const linkLine = entry.link ? `\n\n👉 [Open related page](${entry.link})` : "";
   return {
     intent: "app_knowledge",
-    confidence: Math.min(0.95, 0.5 + bestScore / 80),
-    reply: `💡 *${best.q}*\n\n${best.a}${linkLine}\n\n_${TREND_BOT_NAME} — TrendsMart ki poori app samajhta hoon. Aur pooch sakte hain!_`,
+    confidence,
+    suggestions: ["Best mobile ka link do", "Order kaise karun?", "Best deals?", "Mere orders?"],
+    reply: `💡 *${entry.q}*\n\n${entry.a}${linkLine}\n\n_${TREND_BOT_NAME} — TrendsMart ki poori app samajhta hoon. Aur pooch sakte hain!_`,
   };
+}
+
+export function matchAppKnowledge(
+  message: string,
+  role: AssistantRole,
+): { reply: string; confidence: number; intent: string; suggestions?: string[] } | null {
+  const lower = message.toLowerCase();
+
+  const isAppQuestion =
+    /(trendsmart|trends mart|trendbot|trend bot|ye app|yeh app|is app|app mein|app par|how does|kaise kaam|kya hai|what is|help|madad|feature|function)/i.test(
+      lower,
+    ) ||
+    /(cart|checkout|wishlist|whatsapp|delivery|radius|merchant|qr|analytics|deals|support|pwa|chat|track|theme|location|search|stories|coupon|review|refund|legal|login|notification|faq|order|payment|cod|address|profile|password|install|offline|promo|banner|kitchen|booking)/i.test(
+      lower,
+    );
+
+  if (!isAppQuestion && lower.split(/\s+/).length < 3) return null;
+
+  const hit = scoreBestKnowledge(message, role);
+  if (!hit || hit.score < 14) return null;
+
+  return formatKnowledgeReply(hit.entry, Math.min(0.95, 0.5 + hit.score / 80));
+}
+
+/** Soft FAQ match for never-empty fallback (lower threshold). */
+export function matchAppKnowledgeSoft(
+  message: string,
+  role: AssistantRole,
+): { reply: string; confidence: number; intent: string; suggestions?: string[] } | null {
+  const hit = scoreBestKnowledge(message, role);
+  // Keep soft match useful but not random wrong FAQs
+  if (!hit || hit.score < 18) return null;
+  return formatKnowledgeReply(hit.entry, Math.min(0.88, 0.45 + hit.score / 90));
 }

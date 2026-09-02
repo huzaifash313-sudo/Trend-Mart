@@ -35,8 +35,18 @@ export function getThinkingSteps(
         "Orders aur analytics merge ho rahe hain…",
         "Report compile ho rahi hai…",
       ];
+    case "brand_owner":
+    case "brand_knowledge":
+      return ["TrendsMart brand info check…", "Clear official jawab tayyar…"];
     case "app_knowledge":
-      return ["TrendsMart help database check ho rahi hai…", "Best answer select ho raha hai…"];
+    case "policy":
+    case "how_it_works":
+      return ["TrendsMart help & policies check…", "Best clear answer select…"];
+    case "category_browse":
+      return ["Category aur live products scan…", "Best picks rank…"];
+    case "helpful_guide":
+    case "helpful_redirect":
+      return [`${TREND_BOT_NAME} app guide ready kar raha hai…`, "Useful next steps…"];
     case "order_status":
       return ["Aapke orders fetch ho rahe hain…", "Status update check ho raha hai…"];
     default:

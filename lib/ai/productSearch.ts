@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
-import { buildSupabaseOrFilter, detectSortMode, expandSearchTerms, type SearchSortMode } from "@/lib/ai/queryExpand";
+import { buildSupabaseOrFilter, detectSortMode, expandSearchTerms, applySpellFixes, type SearchSortMode } from "@/lib/ai/queryExpand";
 import { getShopCategoryPrompts } from "@/lib/ai/shopCategoryPrompts";
 import { sanitizeChatNumber, sanitizeChatString } from "@/lib/ai/sanitize";
 import { haversineDistance } from "@/services/geoRadiusService";
@@ -41,6 +41,7 @@ type ProductRow = {
     is_live: boolean;
     latitude?: number | null;
     longitude?: number | null;
+    category?: string | null;
   } | null;
 };
 
@@ -80,7 +81,7 @@ export async function searchProductsForAssistant(
     userLng?: number;
   },
 ): Promise<ProductSearchHit[]> {
-  const query = sanitizeSearchTerm(options.query);
+  const query = applySpellFixes(sanitizeSearchTerm(options.query));
   if (!query || query.length < 2) return [];
 
   const sortMode = options.sortMode ?? (options.originalMessage ? detectSortMode(options.originalMessage) : "relevance");
@@ -114,7 +115,7 @@ export async function searchProductsForAssistant(
     rows,
     query,
     (r) => [r.name, r.description, r.shops?.name, r.shops?.location],
-    { minScore: Math.max(FUZZY_MIN_SCORE - 8, 18), limit: 20 },
+    { minScore: Math.max(FUZZY_MIN_SCORE - 12, 14), limit: 20 },
   );
 
   const hits: ProductSearchHit[] = ranked.map(({ item, score }) => {
@@ -175,6 +176,133 @@ export async function searchProductsForAssistant(
     }
     return b.score - a.score;
   });
+  return hits.slice(0, limit);
+}
+
+/** Token-by-token fallback when full-phrase search returns nothing. */
+export async function searchProductsLoose(
+  supabase: SupabaseClient,
+  options: {
+    message: string;
+    shopId?: string;
+    limit?: number;
+    userLat?: number;
+    userLng?: number;
+  },
+): Promise<ProductSearchHit[]> {
+  const stop = new Set([
+    "the", "and", "for", "you", "kya", "hai", "ka", "ki", "ke", "ko", "se", "par",
+    "mein", "main", "mujhe", "bhai", "yar", "please", "batao", "dikhao", "dedo",
+    "chahiye", "link", "url", "best", "sasta", "top", "find", "search", "shop",
+  ]);
+  const tokens = options.message
+    .toLowerCase()
+    .replace(/[^\w\s\u0600-\u06FF-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !stop.has(w))
+    .slice(0, 5);
+
+  if (!tokens.length) return [];
+
+  const merged = new Map<string, ProductSearchHit>();
+  for (const token of tokens) {
+    const hits = await searchProductsForAssistant(supabase, {
+      query: token,
+      shopId: options.shopId,
+      limit: 4,
+      sortMode: "best_pick",
+      userLat: options.userLat,
+      userLng: options.userLng,
+    });
+    for (const h of hits) {
+      const prev = merged.get(h.id);
+      if (!prev || h.score > prev.score) merged.set(h.id, h);
+    }
+    if (merged.size >= (options.limit ?? 5) * 2) break;
+  }
+
+  return [...merged.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, options.limit ?? 5);
+}
+
+/** Live popular / discounted products in a category (API-free discovery). */
+export async function searchProductsByCategory(
+  supabase: SupabaseClient,
+  options: {
+    category: string;
+    limit?: number;
+    shopId?: string;
+    userLat?: number;
+    userLng?: number;
+  },
+): Promise<ProductSearchHit[]> {
+  const category = sanitizeChatString(options.category, 80);
+  if (!category) return [];
+  const limit = options.limit ?? 5;
+
+  let dbQuery = supabase
+    .from("products")
+    .select(
+      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, latitude, longitude, category)",
+    )
+    .eq("is_available", true)
+    .eq("shops.is_live", true)
+    .eq("shops.category", category)
+    .order("created_at", { ascending: false })
+    .limit(40);
+
+  if (options.shopId) {
+    dbQuery = dbQuery.eq("shop_id", sanitizeChatString(options.shopId, 100));
+  }
+
+  const { data, error } = await dbQuery;
+  if (error || !data?.length) return [];
+
+  const rows = data as unknown as ProductRow[];
+  const hits: ProductSearchHit[] = rows.map((item) => {
+    const price = sanitizeChatNumber(item.price, 0);
+    const original = item.original_price != null ? sanitizeChatNumber(item.original_price, 0) : null;
+    const name = sanitizeChatString(item.name, 100);
+    const shopName = sanitizeChatString(item.shops?.name, 80) || "Shop";
+    const shopId = sanitizeChatString(item.shop_id, 100);
+    const imageFromArr = Array.isArray(item.images)
+      ? item.images.find((u) => typeof u === "string" && u.length > 0)
+      : null;
+    const imageUrl = (item.image_url && String(item.image_url)) || imageFromArr || null;
+    let distanceKm: number | null = null;
+    if (
+      options.userLat != null &&
+      options.userLng != null &&
+      item.shops?.latitude != null &&
+      item.shops?.longitude != null
+    ) {
+      distanceKm = haversineDistance(
+        options.userLat,
+        options.userLng,
+        Number(item.shops.latitude),
+        Number(item.shops.longitude),
+      );
+    }
+    const discountPct = discountPercent(price, original);
+    return {
+      id: String(item.id),
+      name,
+      price,
+      originalPrice: original,
+      shopId,
+      shopName,
+      shopLocation: sanitizeChatString(item.shops?.location, 80),
+      score: 40 + discountPct + (distanceKm != null && distanceKm < 5 ? 8 : 0),
+      discountPct,
+      productPath: getProductSeoPath(name, item.short_code, String(item.id)),
+      shopPath: `/shop/${shopId}`,
+      imageUrl,
+      distanceKm,
+    };
+  });
+
+  hits.sort((a, b) => b.discountPct - a.discountPct || b.score - a.score || a.price - b.price);
   return hits.slice(0, limit);
 }
 

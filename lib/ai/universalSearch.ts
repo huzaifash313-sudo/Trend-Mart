@@ -15,12 +15,20 @@ export interface ShopSearchHit {
 }
 
 const SHOP_SEARCH =
-  /(shop|dukan|dukaan|store|market|vendor|seller|kahan milega|kahan hai|dhundho|find shop)/i;
+  /(shop|dukan|dukaan|store|market|vendor|seller|kahan milega|kahan hai|dhundho|find shop|near me|qareeb|nearby)/i;
 
 export function looksLikeUniversalSearch(message: string): boolean {
+  const trimmed = message.trim();
+  if (/^(hi|hello|salam|aoa|assalam|hey|ok|thanks|shukriya)[!.?\s]*$/i.test(trimmed)) {
+    return false;
+  }
   if (SHOP_SEARCH.test(message)) return true;
-  const words = message.split(/\s+/).length;
-  return words >= 3 && /(dhund|search|find|chahiye|milega|dikhao)/i.test(message);
+  const words = trimmed.split(/\s+/).length;
+  if (words >= 2 && /(dhund|search|find|chahiye|milega|dikhao|recommend|suggest|batao|available)/i.test(message)) {
+    return true;
+  }
+  // Multi-word marketplace queries (not pure greetings)
+  return words >= 2 && words <= 10;
 }
 
 export async function searchShopsForAssistant(
@@ -64,10 +72,14 @@ export async function runUniversalSearch(
   const q = sanitizeChatString(query, 80);
   if (q.length < 2) return null;
 
-  const [products, shops] = await Promise.all([
+  const [rawProducts, rawShops] = await Promise.all([
     searchProductsForAssistant(supabase, { query: q, shopId, limit: 4 }),
     shopId ? Promise.resolve([]) : searchShopsForAssistant(supabase, q, 3),
   ]);
+
+  // Only keep strong matches — avoid wrong answers
+  const products = rawProducts.filter((p) => p.score >= 36);
+  const shops = rawShops.filter((s) => s.score >= 32);
 
   if (!products.length && !shops.length) return null;
 

@@ -190,7 +190,11 @@ export function useTrendBotChat({
           reply =
             data.error === "auth_required"
               ? "🔐 Sign in chahiye.\n\n[Sign in](/login) karein."
-              : `😕 *Jawab nahi mil saka*\n\n• Internet check karein\n• Sawal clear likhein\n• Example: *best mobile ka link do*\n\n_${TREND_BOT_NAME} seekhta rehta hai — dubara try karein._`;
+              : `🤖 *${TREND_BOT_NAME}* abhi reply nahi de saka, lekin aap yeh try karein:\n\n` +
+                `• *best mobile ka link do*\n` +
+                `• *best deals*\n` +
+                `• *order kaise karun*\n\n` +
+                `👉 [Products](/products) · [Deals](/deals) · [Support](/contact)`;
         }
 
         setMessages((prev) => [

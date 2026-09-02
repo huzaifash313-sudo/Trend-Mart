@@ -10,11 +10,12 @@ import {
   looksLikeProductSearch,
   shouldRunProductSearch,
 } from "@/lib/ai/queryExtract";
-import { detectSortMode } from "@/lib/ai/queryExpand";
+import { detectSortMode, applySpellFixes } from "@/lib/ai/queryExpand";
 import {
-  formatNoProductResults,
   formatProductSearchReply,
+  searchProductsByCategory,
   searchProductsForAssistant,
+  searchProductsLoose,
 } from "@/lib/ai/productSearch";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { matchAppKnowledge } from "@/lib/ai/appKnowledge";
@@ -31,6 +32,17 @@ import { resolveMessageWithHistory, type HistoryMessage } from "@/lib/ai/session
 import { getShopCategoryPrompts } from "@/lib/ai/shopCategoryPrompts";
 import { getThinkingSteps } from "@/lib/ai/thinkingSteps";
 import { looksLikeUniversalSearch, runUniversalSearch } from "@/lib/ai/universalSearch";
+import { buildHonestFallbackReply } from "@/lib/ai/smartFallback";
+import { normalizeUserLanguage } from "@/lib/ai/languageNormalize";
+import { runLocalNlu } from "@/lib/ai/localNlu";
+import {
+  buildHelpfulGuideReply,
+  isOutOfScope,
+  MIN_KNOWLEDGE_CONFIDENCE,
+  MIN_PRODUCT_SCORE,
+} from "@/lib/ai/honestReply";
+import { matchCategoryFromMessage, buildCategoryBrowseReply } from "@/lib/ai/categoryIntel";
+import { matchBrandKnowledge } from "@/lib/ai/brandKnowledge";
 
 export type { HistoryMessage };
 
@@ -265,7 +277,7 @@ export function detectCustomerIntent(message: string): { intent: CustomerIntent;
   if (matchAny(t, [/^(hi|hello|salam|aoa|assalam|hey)/i, /\b(salam|aoa)\b/])) {
     return { intent: "greeting", confidence: 0.95 };
   }
-  if (matchAny(t, [/link|url|dhund|find|search|milega|milta|chahiye|dedo|de do|dikhao|best.*(mobile|phone|laptop|iphone)/i, /sasta.*(mobile|phone)/i])) {
+  if (matchAny(t, [/link|url|dhund|find|search|milega|milta|chahiye|dedo|de do|dikhao|best.*(mobile|phone|laptop|iphone)|available|stock mein|kitne|price of|rate of/i, /sasta.*(mobile|phone)/i])) {
     return { intent: "product_search", confidence: 0.92 };
   }
   if (matchAny(t, [/order.*status|mera order|my order|kahan hai order|track|tracking|deliver/i])) {
@@ -999,9 +1011,9 @@ export function generateMerchantResponse(
     default:
       return {
         intent: "general",
-        confidence: 0.5,
+        confidence: 0.45,
         suggestions,
-        reply: `Main *${ctx.shopName}* ke business data se help karta hoon.\n\nTry karein:\n• "Meri shop ki summary"\n• "Best product kaun sa hai?"\n• "Growth strategy batao"\n\nYa seedha Dashboard → Analytics / Orders / Messages kholen.`,
+        reply: `MAIN_NEEDS_FALLBACK`,
       };
   }
 }
@@ -1023,7 +1035,7 @@ export function generateCustomerResponse(
         intent,
         confidence: 0.95,
         suggestions,
-        reply: `👋 *Salam ${ctx.userName}!* Main TrendsMart Shopping Assistant hoon.\n\nMain aapki madad kar sakta hoon:\n• *Product search + direct links* (jaise "best mobile ka link do")\n• Orders & tracking\n• Best deals & shops\n\nNeeche tap karein ya likhein!`,
+        reply: `👋 *Salam ${ctx.userName}!* Main TrendsMart Shopping Assistant hoon.\n\n*Owner:* Huzaifa\n\nMain aapki madad kar sakta hoon:\n• *Product search + direct links*\n• Orders, deals, shops\n• Policies (Terms, Refund, Privacy)\n\nNeeche tap karein ya likhein!`,
       };
 
     case "order_status":
@@ -1163,9 +1175,9 @@ export function generateCustomerResponse(
     default:
       return {
         intent: "general",
-        confidence: 0.5,
+        confidence: 0.45,
         suggestions,
-        reply: `Main TrendsMart shopping assistant hoon.\n\nPooch sakte hain orders, deals, shops, delivery ke bare mein.\n\nTry: "Mere orders ka status" ya "Best deals kahan hain?"`,
+        reply: `MAIN_NEEDS_FALLBACK`,
       };
   }
 }
@@ -1270,9 +1282,9 @@ export function generateShopResponse(intent: ShopIntent, ctx: ShopContext): Assi
     default:
       return {
         intent: "general",
-        confidence: 0.5,
+        confidence: 0.45,
         suggestions,
-        reply: `*${ctx.name}* — ${ctx.category} in ${ctx.location}\n\nProducts, prices, timings pooch sakte hain.\n📞 WhatsApp: +${ctx.whatsapp}`,
+        reply: `MAIN_NEEDS_FALLBACK`,
       };
   }
 }
@@ -1311,7 +1323,7 @@ async function tryProductSearch(
   if (!query || query.length < 2) return null;
 
   const sortMode = detectSortMode(message);
-  const hits = await searchProductsForAssistant(supabase, {
+  let hits = await searchProductsForAssistant(supabase, {
     query,
     shopId: role === "customer" ? undefined : shopId,
     limit: 5,
@@ -1320,6 +1332,19 @@ async function tryProductSearch(
     userLat: location?.lat,
     userLng: location?.lng,
   });
+  hits = hits.filter((h) => h.score >= MIN_PRODUCT_SCORE);
+
+  if (!hits.length) {
+    hits = (
+      await searchProductsLoose(supabase, {
+        message,
+        shopId: role === "customer" ? undefined : shopId,
+        limit: 5,
+        userLat: location?.lat,
+        userLng: location?.lng,
+      })
+    ).filter((h) => h.score >= MIN_PRODUCT_SCORE);
+  }
 
   if (hits.length > 0) {
     const formatted = formatProductSearchReply(hits, query, role, sortMode, shopCategory, shopName);
@@ -1330,7 +1355,11 @@ async function tryProductSearch(
   }
 
   if (looksLikeProductSearch(message)) {
-    return formatNoProductResults(query, role, shopId);
+    return buildHelpfulGuideReply({
+      reason: "no_match",
+      query,
+      role,
+    });
   }
 
   return null;
@@ -1400,35 +1429,78 @@ export async function runAssistant(
     return { reply: "Please type a message.", intent: "empty", confidence: 0 };
   }
 
-  const message = resolveMessageWithHistory(rawMessage, req.history);
+  const historyResolved = resolveMessageWithHistory(rawMessage, req.history);
+  const nlu = runLocalNlu(historyResolved);
+  const lang = normalizeUserLanguage(historyResolved);
+  const message =
+    nlu.normalizedMessage.length >= 2 ? nlu.normalizedMessage : historyResolved;
   const role = req.role;
+  let shopCategoryHint = req.shopCategory ?? nlu.categoryHint ?? lang.likelyCategory;
 
-  // ── Live cart / page context (client-provided) ──────────────────────────
-  if (role !== "merchant" && looksLikeCartQuery(message)) {
+  const honestFallback = (preferredQuery?: string) =>
+    buildHonestFallbackReply(supabase, {
+      message: historyResolved,
+      role,
+      shopId: req.shopId,
+      shopCategory: shopCategoryHint,
+      shopName: req.shopName,
+      location: req.location,
+      preferredQuery,
+    });
+
+  if (isOutOfScope(historyResolved)) {
+    return withThinking(
+      buildHelpfulGuideReply({ reason: "out_of_scope", query: historyResolved.slice(0, 40), role }),
+      role,
+    );
+  }
+
+  // Brand / owner / policies / how-it-works — FIRST (100% local, no API)
+  if (
+    nlu.intent === "brand_owner" ||
+    nlu.intent === "policy" ||
+    nlu.intent === "how_it_works" ||
+    nlu.intent === "support"
+  ) {
+    const brandHit =
+      matchBrandKnowledge(historyResolved, role) ?? matchBrandKnowledge(message, role);
+    if (brandHit) return withThinking(brandHit, role);
+  } else {
+    const brandHit =
+      matchBrandKnowledge(historyResolved, role) ?? matchBrandKnowledge(message, role);
+    if (brandHit && brandHit.confidence >= 0.75) {
+      return withThinking(brandHit, role);
+    }
+  }
+
+  const searchQuery = nlu.searchQuery ? applySpellFixes(nlu.searchQuery) : undefined;
+  if (nlu.categoryHint) shopCategoryHint = nlu.categoryHint;
+
+  // ── Live cart / page context ────────────────────────────────────────────
+  if (role !== "merchant" && (nlu.intent === "cart_help" || looksLikeCartQuery(historyResolved))) {
     return withThinking(buildCartReply(req.cartSummary), role);
   }
-  if (looksLikePageHelp(message)) {
+  if (looksLikePageHelp(historyResolved)) {
     const pageRes = buildPageContextReply(req.pathname, req.cartSummary);
     if (pageRes) return withThinking(pageRes, role);
   }
 
   // ── App knowledge (FAQs + features) ─────────────────────────────────────
-  const appHit = matchAppKnowledge(message, role);
-  if (appHit && appHit.confidence >= 0.55) {
+  const appHit = matchAppKnowledge(historyResolved, role) ?? matchAppKnowledge(message, role);
+  if (appHit && appHit.confidence >= MIN_KNOWLEDGE_CONFIDENCE) {
     const hintBoost =
       req.memoryHints?.length &&
-      req.memoryHints.some((h) => message.toLowerCase().includes(h.toLowerCase().slice(0, 12)));
+      req.memoryHints.some((h) => historyResolved.toLowerCase().includes(h.toLowerCase().slice(0, 12)));
     return withThinking(
       {
         reply: appHit.reply,
         intent: appHit.intent,
         confidence: hintBoost ? Math.min(appHit.confidence + 0.05, 0.99) : appHit.confidence,
         suggestions:
-          role === "merchant"
+          appHit.suggestions ??
+          (role === "merchant"
             ? ["Meri shop ki live summary", "Best selling product?", "Growth strategy"]
-            : req.memoryHints?.length
-              ? [...req.memoryHints.slice(0, 2), "Best mobile ka link do", "Order kaise karun?"]
-              : ["Best mobile ka link do", "Konsa business karun?", "Order kaise karun?"],
+            : ["TrendsMart ka owner?", "Best mobile ka link do", "Order kaise karun?", "Refund policy?"]),
         handoff:
           role === "shop" && req.shopId
             ? { type: "shop", href: `/shop/${req.shopId}`, label: "Message seller" }
@@ -1438,39 +1510,74 @@ export async function runAssistant(
     );
   }
 
-  // ── Platform business advisor (customer / shop) ───────────────────────
-  if (
-    (role === "customer" || role === "shop") &&
-    (looksLikeBusinessAdvisor(message) || looksLikePlatformTrends(message))
-  ) {
-    const snapshot = await fetchPlatformSnapshot(supabase);
-    if (looksLikeBusinessAdvisor(message)) {
-      const res = generateBusinessAdvisorReply(snapshot, message);
-      return withThinking(res, role);
+  // ── Category browse + live products ─────────────────────────────────────
+  if (nlu.intent === "category_browse" || nlu.intent === "deals") {
+    const catMatch = await matchCategoryFromMessage(supabase, historyResolved);
+    if (catMatch && catMatch.score >= 40) {
+      const catProducts = await searchProductsByCategory(supabase, {
+        category: catMatch.category,
+        shopId: role === "shop" ? req.shopId : undefined,
+        limit: 5,
+        userLat: req.location?.lat,
+        userLng: req.location?.lng,
+      });
+      if (catProducts.length) {
+        return withThinking(
+          {
+            ...formatProductSearchReply(
+              catProducts,
+              catMatch.subCategory || catMatch.category,
+              role,
+              nlu.intent === "deals" ? "best_deal" : nlu.sortMode,
+              catMatch.category,
+              req.shopName,
+            ),
+            products: catProducts,
+          },
+          role,
+        );
+      }
+      const catReply = await buildCategoryBrowseReply(supabase, catMatch);
+      if (catReply) return withThinking(catReply, role);
     }
-    const res = generatePlatformTrendsReply(snapshot);
-    return withThinking(res, role);
   }
 
-  // ── Product search ──────────────────────────────────────────────────────
+  // ── Platform business advisor ───────────────────────────────────────────
+  if (
+    (role === "customer" || role === "shop") &&
+    (looksLikeBusinessAdvisor(historyResolved) || looksLikePlatformTrends(historyResolved))
+  ) {
+    const snapshot = await fetchPlatformSnapshot(supabase);
+    if (looksLikeBusinessAdvisor(historyResolved)) {
+      return withThinking(generateBusinessAdvisorReply(snapshot, historyResolved), role);
+    }
+    return withThinking(generatePlatformTrendsReply(snapshot), role);
+  }
+
+  // ── Product search (local NLU) ──────────────────────────────────────────
+  const searchMessage = searchQuery ? `${searchQuery} ${message}` : message;
   const productHit = await tryProductSearch(
     supabase,
-    message,
+    searchMessage,
     role,
     req.shopId,
-    req.shopCategory,
+    shopCategoryHint,
     req.shopName,
     req.location,
   );
   if (productHit) {
-    return withThinking(productHit, role, extractProductQuery(message) ?? message);
+    return withThinking(productHit, role, extractProductQuery(searchMessage) ?? searchMessage);
   }
 
-  // ── Universal search (shops + products) ─────────────────────────────────
-  if (looksLikeUniversalSearch(message) && role !== "merchant") {
-    const q = extractProductQuery(message) ?? message;
+  if (nlu.intent === "product_search" || nlu.intent === "shop_search") {
+    return withThinking(await honestFallback(searchQuery || message), role, message);
+  }
+
+  // ── Universal search ────────────────────────────────────────────────────
+  if (looksLikeUniversalSearch(historyResolved) && role !== "merchant") {
+    const q = searchQuery || extractProductQuery(message) || message;
     const uni = await runUniversalSearch(supabase, q, role === "shop" ? req.shopId : undefined);
-    if (uni) return withThinking(uni, role, q);
+    if (uni && uni.confidence >= 0.8) return withThinking(uni, role, q);
   }
 
   if (role === "merchant") {
@@ -1483,7 +1590,7 @@ export async function runAssistant(
       return { reply: "Could not load your shop data. Register a store first.", intent: "no_shop", confidence: 0 };
     }
 
-    if (looksLikeLiveAnalytics(message)) {
+    if (looksLikeLiveAnalytics(historyResolved)) {
       return withThinking(
         {
           reply: formatMerchantLivePulse({
@@ -1509,45 +1616,52 @@ export async function runAssistant(
       );
     }
 
-    const { intent } = detectMerchantIntent(message);
-    return withThinking(generateMerchantResponse(intent, ctx), role);
+    const { intent, confidence } = detectMerchantIntent(historyResolved);
+    const res = generateMerchantResponse(intent, ctx);
+    if (intent === "general" || res.reply === "MAIN_NEEDS_FALLBACK" || confidence < 0.7) {
+      const fallback = await honestFallback(searchQuery);
+      if (
+        fallback.intent !== "helpful_guide" &&
+        fallback.intent !== "helpful_redirect" &&
+        fallback.intent !== "honest_refuse"
+      ) {
+        return withThinking(fallback, role, message);
+      }
+      if (intent === "general" || res.reply === "MAIN_NEEDS_FALLBACK") {
+        return withThinking(
+          {
+            intent: "merchant_help",
+            confidence: 0.85,
+            suggestions: [
+              "Meri shop ki live summary",
+              "Best selling product?",
+              "Growth strategy batao",
+              "Pending orders kitne?",
+            ],
+            reply:
+              `🤖 *${ctx.shopName}* — main aapke *live store data* se guide karta hoon.\n\n` +
+              `Pooch sakte hain:\n• Live summary / revenue / views\n• Best sellers / low stock\n• Growth, discounts, ads, WhatsApp tips\n• Product naam → stock/price check\n\n` +
+              `TrendsMart Owner: *Huzaifa*\n\n` +
+              `👉 [Analytics](/dashboard/analytics) · [Orders](/dashboard/orders) · [Products](/dashboard/products)`,
+          },
+          role,
+        );
+      }
+    }
+    return withThinking(res, role);
   }
 
   if (role === "customer") {
     if (!req.userId) {
-      const uni = await runUniversalSearch(supabase, message);
-      if (uni) return withThinking(uni, role, message);
-      return withThinking(
-        {
-          reply:
-            `👋 *TrendBot* — TrendsMart ka AI assistant.\n\n` +
-            `Product links, deals, shops — bina sign-in ke bhi.\n\n` +
-            `Try karein:\n• *"best mobile ka link do"*\n• *"sasta laptop dhundo"*\n• *"konsa business karun?"*\n\n` +
-            `Orders aur personal tracking ke liye [sign in](/login?redirect=/account/assistant) karein.`,
-          intent: "guest_help",
-          confidence: 0.75,
-          suggestions: ["Best mobile ka link do", "Konsa business karun?", "Best deals kahan hain?", "Electronics shop dhundo"],
-        },
-        role,
-      );
+      return withThinking(await honestFallback(searchQuery), role, message);
     }
 
     const ctx = await buildCustomerContext(supabase, req.userId);
-    const { intent } = detectCustomerIntent(message);
+    const { intent, confidence } = detectCustomerIntent(historyResolved);
     const res = generateCustomerResponse(intent, ctx);
 
-    if (intent === "general") {
-      const uni = await runUniversalSearch(supabase, message);
-      if (uni) return withThinking(uni, role, message);
-      return withThinking(
-        {
-          ...res,
-          reply:
-            res.reply +
-            "\n\n_TrendBot tip: Product link chahiye? Likhein \"best mobile ka link do\" — ya app ke bare mein kuch bhi pooch sakte hain._",
-        },
-        role,
-      );
+    if (intent === "general" || res.reply === "MAIN_NEEDS_FALLBACK" || confidence < 0.7) {
+      return withThinking(await honestFallback(searchQuery), role, message);
     }
 
     return withThinking(res, role);
@@ -1555,18 +1669,49 @@ export async function runAssistant(
 
   // shop storefront
   if (!req.shopId) {
-    return { reply: "Shop not found.", intent: "no_shop", confidence: 0 };
+    return withThinking(await honestFallback(searchQuery), role, message);
   }
 
   const shopCtx = await buildShopContext(supabase, req.shopId);
   if (!shopCtx) {
-    return { reply: "Could not load shop information.", intent: "no_shop", confidence: 0 };
+    return withThinking(await honestFallback(searchQuery), role, message);
   }
-  const { intent } = detectShopIntent(message);
+  const { intent, confidence } = detectShopIntent(historyResolved);
   const res = generateShopResponse(intent, shopCtx);
-  if (intent === "general") {
-    const uni = await runUniversalSearch(supabase, message, req.shopId);
-    if (uni) return withThinking(uni, role, message);
+  if (
+    intent === "general" ||
+    intent === "product_search" ||
+    res.reply === "MAIN_NEEDS_FALLBACK" ||
+    confidence < 0.7
+  ) {
+    const fallback = await honestFallback(searchQuery);
+    if (fallback.intent !== "helpful_guide" && fallback.intent !== "helpful_redirect" && fallback.intent !== "honest_refuse") {
+      return withThinking(fallback, role, message);
+    }
+    if (shopCtx.products.length > 0 && intent === "product_search") {
+      // Only list real shop products when user asked about products but search failed
+      const list = shopCtx.products
+        .filter((p) => p.available)
+        .slice(0, 5)
+        .map((p) => `• *${p.name}* — Rs. ${p.price.toLocaleString("en-PK")} · [Open](${p.productPath})`)
+        .join("\n");
+      if (list) {
+        return withThinking(
+          {
+            intent: "product_inquiry",
+            confidence: 0.8,
+            suggestions: getShopCategoryPrompts(shopCtx.category, shopCtx.name),
+            reply:
+              `📦 *${shopCtx.name}* ke confirmed products:\n\n${list}\n\n` +
+              `🛒 [Browse full shop](/shop/${shopCtx.shopId})\n📞 WhatsApp: +${shopCtx.whatsapp}`,
+            handoff: { type: "shop", href: `/shop/${shopCtx.shopId}`, label: "Message seller" },
+          },
+          role,
+          message,
+        );
+      }
+    }
+    return withThinking(fallback, role, message);
   }
   return withThinking(res, role);
 }

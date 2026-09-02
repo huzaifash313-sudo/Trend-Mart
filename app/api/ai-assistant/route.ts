@@ -140,8 +140,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (err) {
     console.error("[AI Assistant]", err instanceof Error ? err.message : err);
     return NextResponse.json(
-      { reply: "Something went wrong. Please try again.", error: "internal_error", sessionId },
-      { status: 500 },
+      {
+        reply:
+          "⚠️ Thori technical issue aa gayi, lekin main madad kar sakta hoon.\n\n" +
+          "Try karein:\n• *best mobile ka link do*\n• *order kaise karun*\n• *best deals*\n\n" +
+          "👉 [Browse products](/products) · [Deals](/deals) · [Support](/contact)",
+        error: "internal_error",
+        sessionId,
+        suggestions: ["Best mobile ka link do", "Best deals?", "Order kaise karun?"],
+      },
+      { status: 200 },
     );
   }
 }
