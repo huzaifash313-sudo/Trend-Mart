@@ -610,37 +610,71 @@ code {
 
 /* ── Touch Target & Interaction Optimizations ───────────────────────────────── */
 
-/* Minimum touch target size for interactive elements (AA standard: 44x44px).
-   Skip checkboxes/radios/switches — forcing 44×44 turns toggles into circles
-   and makes tick boxes look oversized. Labels provide the hit area instead.
-   Center content vertically so pills don't look "top-aligned" inside tall hits. */
-button,
-a,
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea,
-[role="button"],
-[role="link"],
-[role="tab"],
-[role="menuitem"] {
-  min-height: 44px;
-  min-width: 44px;
-  touch-action: manipulation;
+/*
+ * @layer base so Tailwind utilities (hidden, flex, block, flex-col, etc.) can
+ * override display/alignment. Center all interactive hits so text is not stuck
+ * at the top/bottom of 44px touch targets.
+ */
+@layer base {
+  button,
+  a,
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"] {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    line-height: 1.25;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+
+  /* Header / toolbar compact buttons — avoid awkward line breaks */
+  a.rounded-lg,
+  button.rounded-lg {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Plain text links keep natural inline flow (no 44px balloon) */
+  a[class*="hover:underline"]:not([class*="rounded"]):not([class*="border"]):not(
+      [class*="bg-"]
+    ) {
+    min-height: unset;
+    min-width: unset;
+    display: inline;
+    line-height: inherit;
+  }
 }
 
-/*
- * Do NOT set display on all `button` elements here — unlayered CSS beats
- * Tailwind utilities and breaks `hidden` / `sm:flex` (e.g. navbar search).
- * Center only explicit pill / chip controls.
- */
-a.rounded-full,
-button.rounded-full,
-[role="button"].rounded-full {
+/* Badge / status pills — unlayered so it wins over inline-block utilities */
+span.rounded-full {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   vertical-align: middle;
   line-height: 1.25;
+}
+
+/* Footer link lists — natural line height, still vertically centered */
+footer ul a {
+  min-height: unset;
+  min-width: unset;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.5;
+  padding-block: 0.125rem;
 }
 
 /* Compact pills / chips — keep readable size without ballooning to 44px tall. */
