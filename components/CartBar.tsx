@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { formatRupees } from "@/lib/formatters";
-import { formatRupees } from "@/lib/formatters";
 import WhatsAppCheckoutModal from "@/components/WhatsAppCheckoutModal";
 import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import type { Shop } from "@/types";

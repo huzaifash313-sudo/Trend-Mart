@@ -323,7 +323,8 @@ html:not([data-brand-theme]) {
   /* Default TrendsMart emerald + sea — values already on :root */
 }
 
-Soft charcoal dark mode — NOT jet black.
+/*
+ * Soft charcoal dark mode — NOT jet black.
  * Warm slate surfaces + calm text + emerald accents only where needed.
  */
 html.dark {
