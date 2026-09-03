@@ -239,7 +239,7 @@ export default function ProductDetailClient({ code }: { code: string }) {
   }, [product, shop, variantsReady, comboSoldOut, cartItem, quantity, variantLabel, itemNotes, addItem, addToast, hasVariants]);
 
   const handleOrder = useCallback(() => {
-    if (!product || !shop) return;
+    if (!product || !shop || !cartItem) return;
     const currentOk = variantsReady && !comboSoldOut;
     if (mixBag.length === 0 && !currentOk) {
       if (!variantsReady) addToast("Pehle options choose karo.", "error");

@@ -93,7 +93,7 @@ export async function PUT(request: NextRequest) {
           { status: 500 },
         );
       }
-      const { error } = await admin.from("platform_settings").upsert(payload, { onConflict: "key" });
+      const { error } = await (admin as any).from("platform_settings").upsert(payload, { onConflict: "key" });
       if (error) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
