@@ -19,7 +19,8 @@ import { getShopPath } from "@/lib/shopSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import ProductOrderModal from "@/components/ProductOrderModal";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
-import { computeVariantPricing } from "@/lib/variantPricing";
+import { computeVariantPricing, customerVariantGroups } from "@/lib/variantPricing";
+import { isComboUnavailable } from "@/lib/variantMatrix";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
@@ -80,7 +81,7 @@ function stubShopFromProduct(p: MarketplaceProduct): Shop {
 
 export default function ProductDetailClient({ code }: { code: string }) {
   const router = useRouter();
-  const { addItem } = useCart();
+  const { addItem, items: cartItems, updateQuantity, removeItem } = useCart();
   const { addToast } = useToast();
 
   const [product, setProduct] = useState<MarketplaceProduct | null>(null);
@@ -158,7 +159,11 @@ export default function ProductDetailClient({ code }: { code: string }) {
     [productLocation, safeIndex, images.length],
   );
 
-  const hasVariants = Boolean(product?.variants && product.variants.length > 0);
+  const customerGroups = useMemo(
+    () => customerVariantGroups(product?.variants),
+    [product?.variants],
+  );
+  const hasVariants = customerGroups.length > 0;
   const variantLabel = useMemo(
     () => selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · "),
     [selectedVariants],
@@ -170,10 +175,13 @@ export default function ProductDetailClient({ code }: { code: string }) {
     variantLabel,
   );
   const displayPrice = variantPricing.price;
-  const variantsReady = !hasVariants || selectedVariants.length === (product?.variants?.length ?? 0);
-  const tiersActive = product
-    ? hasPriceTiers(product.price_tiers) && displayPrice === product.price
-    : false;
+  const comboSoldOut = hasVariants && isComboUnavailable(product?.variants, variantLabel);
+  const variantsReady = !hasVariants || selectedVariants.length === customerGroups.length;
+  const mixBag = useMemo(
+    () => (product ? cartItems.filter((i) => i.productId === product.id) : []),
+    [cartItems, product],
+  );
+  const tiersActive = product ? hasPriceTiers(product.price_tiers) : false;
   const tierLabels = useMemo(
     () => (tiersActive && product ? tierPreviewLabels(product.price_tiers) : []),
     [tiersActive, product],
@@ -212,27 +220,42 @@ export default function ProductDetailClient({ code }: { code: string }) {
   const handleAddToCart = useCallback(() => {
     if (!product || !shop || !cartItem) return;
     if (!variantsReady) {
-      addToast("Please choose the options first.", "error");
+      addToast("Pehle options choose karo.", "error");
+      return;
+    }
+    if (comboSoldOut) {
+      addToast("Yeh option sold out hai.", "error");
       return;
     }
     addItem(cartItem, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
-    addToast(`"${product.name}" added to cart`, "success");
+    addToast(
+      hasVariants
+        ? `"${variantLabel || product.name}" bag mein. Doosra flavour Add se mix karo.`
+        : `"${product.name}" added to cart`,
+      "success",
+    );
     setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, variantsReady, cartItem, quantity, variantLabel, itemNotes, addItem, addToast]);
+  }, [product, shop, variantsReady, comboSoldOut, cartItem, quantity, variantLabel, itemNotes, addItem, addToast, hasVariants]);
 
   const handleOrder = useCallback(() => {
     if (!product || !shop) return;
-    if (!variantsReady) {
-      addToast("Please choose the options first.", "error");
+    const currentOk = variantsReady && !comboSoldOut;
+    if (mixBag.length === 0 && !currentOk) {
+      if (!variantsReady) addToast("Pehle options choose karo.", "error");
+      else addToast("Yeh option sold out hai.", "error");
       return;
     }
     if (!shop.whatsapp_number) {
       addToast("This store has no WhatsApp number yet — please contact them directly.", "info");
       return;
     }
+    const alreadyInBag = mixBag.some((i) => (i.variant || "") === (variantLabel || ""));
+    if (currentOk && (mixBag.length === 0 || (hasVariants && !alreadyInBag))) {
+      addItem(cartItem, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
+    }
     setOrderOpen(true);
-  }, [product, shop, variantsReady, addToast]);
+  }, [product, shop, variantsReady, comboSoldOut, addToast, mixBag, addItem, cartItem, quantity, variantLabel, itemNotes, hasVariants]);
 
   if (loading) {
     return (
@@ -405,6 +428,25 @@ export default function ProductDetailClient({ code }: { code: string }) {
             </div>
           )}
 
+          {mixBag.length > 0 ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+              <p className="mb-1.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                Your mix ({mixBag.reduce((n, i) => n + i.quantity, 0)} items)
+              </p>
+              {mixBag.map((line) => (
+                <div key={line.id} className="flex items-center gap-2 py-0.5">
+                  <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
+                    {line.variant || line.name}
+                  </p>
+                  <button type="button" className="h-6 w-6 rounded-full border text-xs" onClick={() => updateQuantity(line.id, line.quantity - 1)}>−</button>
+                  <span className="w-4 text-center text-[11px] font-bold">{line.quantity}</span>
+                  <button type="button" className="h-6 w-6 rounded-full border text-xs" onClick={() => updateQuantity(line.id, line.quantity + 1)}>+</button>
+                  <button type="button" className="text-[10px] font-semibold text-red-500" onClick={() => removeItem(line.id)}>Remove</button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {hasVariants && product.variants ? (
             <VariantSelector
               variants={product.variants}
@@ -458,22 +500,26 @@ export default function ProductDetailClient({ code }: { code: string }) {
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!product.is_available || !variantsReady}
+              disabled={!product.is_available || !variantsReady || comboSoldOut}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                 added
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
                   : "border-teal-300 text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/30"
               }`}
             >
-              {added ? <><CheckIcon /> Added</> : <><CartPlusIcon /> Add to Cart</>}
+              {added ? <><CheckIcon /> Added</> : <><CartPlusIcon /> {hasVariants ? "Add this option" : "Add to Cart"}</>}
             </button>
             <button
               type="button"
               onClick={handleOrder}
-              disabled={!product.is_available || !variantsReady || !shop?.whatsapp_number}
+              disabled={
+                !product.is_available ||
+                !shop?.whatsapp_number ||
+                (mixBag.length === 0 && (!variantsReady || comboSoldOut))
+              }
               className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <WhatsAppIcon /> Order
+              <WhatsAppIcon /> {mixBag.length > 1 ? "Order mix" : "Order"}
             </button>
           </div>
 
@@ -492,14 +538,17 @@ export default function ProductDetailClient({ code }: { code: string }) {
 
       {orderOpen && shop && (
         <ProductOrderModal
-          product={
-            {
-              ...product,
-              price: displayPrice,
-              original_price: discount?.hasDiscount ? discount.originalPrice : null,
-            } as Product
-          }
           shop={shop}
+          cartLines={mixBag.length > 0 ? mixBag : undefined}
+          product={
+            mixBag.length > 0
+              ? undefined
+              : ({
+                  ...product,
+                  price: displayPrice,
+                  original_price: discount?.hasDiscount ? discount.originalPrice : null,
+                } as Product)
+          }
           variant={variantLabel || undefined}
           quantity={quantity}
           notes={itemNotes.trim() || undefined}

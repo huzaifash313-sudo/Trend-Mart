@@ -24,7 +24,9 @@ import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 import CustomSelect from "@/components/CustomSelect";
 import {
   cloneVariantGroups,
-  getVariantTemplates,
+  getComboTemplates,
+  getSimpleTemplates,
+  categoryVariantHint,
   mergeVariantGroups,
   sanitizeVariantGroups,
   type VariantTemplatePack,
@@ -167,8 +169,16 @@ export default function BulkProductCreator({
     setRows((prev) => prev.map((r) => ({ ...r, variants: [], price_tiers: [] })));
   }, []);
 
-  const categoryPacks = useMemo(
-    () => getVariantTemplates(shopCategory),
+  const simplePacks = useMemo(
+    () => getSimpleTemplates(shopCategory),
+    [shopCategory],
+  );
+  const mixPacks = useMemo(
+    () => getComboTemplates(shopCategory),
+    [shopCategory],
+  );
+  const optionsHint = useMemo(
+    () => categoryVariantHint(shopCategory),
     [shopCategory],
   );
 
@@ -368,37 +378,52 @@ export default function BulkProductCreator({
         </div>
       </div>
 
-      {/* Category option packs — one tap for every / empty rows */}
-      {shopCategory && categoryPacks.length > 0 ? (
+      {/* Category option packs — simple first, same as Add / Edit product */}
+      {shopCategory && (simplePacks.length > 0 || mixPacks.length > 0) ? (
         <div className="rounded-xl border border-teal-200/80 bg-gradient-to-r from-teal-50/90 to-emerald-50/50 p-3 dark:border-teal-900/50 dark:from-teal-950/40 dark:to-emerald-950/20">
           <p className="text-xs font-bold text-teal-900 dark:text-teal-200">
-            Quick options for {shopCategory}
+            Product options — {shopCategory}
           </p>
           <p className="mt-0.5 text-[11px] text-teal-800/80 dark:text-teal-300/80">
-            Ek tap — Size/Color/Portion waghera saari rows pe. Phir chips se jo nahi bechte woh hata do.
+            Add ke waqt hi set karo. {optionsHint}
           </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {categoryPacks.map((pack) => (
-              <div key={pack.id} className="flex flex-wrap items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => applyPackToAllRows(pack)}
-                  className="rounded-full bg-teal-700 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500"
-                  title={`${pack.hint} — apply to every row`}
-                >
-                  {pack.label} → all rows
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyPackToEmptyRows(pack)}
-                  className="rounded-full border border-teal-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:bg-zinc-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
-                  title="Only rows that still have no options"
-                >
-                  Empty only
-                </button>
+
+          {simplePacks.length > 0 ? (
+            <div className="mt-2 space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-700/80 dark:text-teal-400/80">
+                Simple (ek type) → all / empty rows
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {simplePacks.map((pack) => (
+                  <PackApplyButtons
+                    key={pack.id}
+                    pack={pack}
+                    onAll={() => applyPackToAllRows(pack)}
+                    onEmpty={() => applyPackToEmptyRows(pack)}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ) : null}
+
+          {mixPacks.length > 0 ? (
+            <div className="mt-2.5 space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-teal-700/80 dark:text-teal-400/80">
+                Mix (2 types) — optional
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {mixPacks.map((pack) => (
+                  <PackApplyButtons
+                    key={pack.id}
+                    pack={pack}
+                    onAll={() => applyPackToAllRows(pack)}
+                    onEmpty={() => applyPackToEmptyRows(pack)}
+                    muted
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -461,7 +486,7 @@ export default function BulkProductCreator({
                       <span className={`inline-block transition-transform ${expandedVariants[row.key] ? "rotate-90" : ""}`}>▸</span>
                       {row.variants.length > 0
                         ? `Options (${row.variants.reduce((acc, g) => acc + g.options.length, 0)})`
-                        : "＋ Add Options / Variants (optional)"}
+                        : "＋ Product options (optional)"}
                     </button>
                   </td>
                   <td className="px-2 py-2.5">
@@ -690,8 +715,8 @@ export default function BulkProductCreator({
               >
                 <span>
                   {row.variants.length > 0
-                    ? `Options / Variants (${row.variants.reduce((acc, g) => acc + g.options.length, 0)})`
-                    : "＋ Add Options / Variants (optional)"}
+                    ? `Options (${row.variants.reduce((acc, g) => acc + g.options.length, 0)})`
+                    : "＋ Product options (optional)"}
                 </span>
                 <span className={`transition-transform ${expandedVariants[row.key] ? "rotate-180" : ""}`}>▾</span>
               </button>
@@ -740,6 +765,43 @@ export default function BulkProductCreator({
             : `Done · Save ${filledCount || ""} Product${filledCount === 1 ? "" : "s"}`}
         </button>
       </div>
+    </div>
+  );
+}
+
+function PackApplyButtons({
+  pack,
+  onAll,
+  onEmpty,
+  muted = false,
+}: {
+  pack: VariantTemplatePack;
+  onAll: () => void;
+  onEmpty: () => void;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        onClick={onAll}
+        className={`rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm ${
+          muted
+            ? "border border-teal-300 bg-white text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:bg-zinc-900 dark:text-teal-300"
+            : "bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500"
+        }`}
+        title={`${pack.hint} — apply to every row`}
+      >
+        {pack.label} → all
+      </button>
+      <button
+        type="button"
+        onClick={onEmpty}
+        className="rounded-full border border-teal-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:bg-zinc-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
+        title="Only rows that still have no options"
+      >
+        Empty only
+      </button>
     </div>
   );
 }

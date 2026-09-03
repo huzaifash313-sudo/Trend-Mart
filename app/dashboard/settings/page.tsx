@@ -127,7 +127,7 @@ type SectionId =
 
 type PushStatus = "checking" | "unsupported" | "denied" | "enabled" | "not-enabled";
 
-const THEME_ACCENT = "#10b981";
+const THEME_ACCENT = "var(--tm-brand-500)";
 
 const SECTION_LINKS: Array<{ id: SectionId; label: string }> = [
   { id: "profile", label: "Profile" },

@@ -135,7 +135,85 @@ export function tierPreviewLabels(tiers: PriceTier[] | null | undefined): string
   });
 }
 
-/** Human hint shown under the tier list (mode-aware). */
+/** Pool pack deals across mixed flavours of the same product (same unit price). */
+export function tierPoolKey(productId: string, unitPrice: number): string {
+  return `${productId}::${Math.round((Number(unitPrice) || 0) * 100)}`;
+}
+
+export function applyPooledTierPrices<
+  T extends {
+    productId: string;
+    quantity: number;
+    price: number;
+    basePrice?: number;
+    priceTiers?: PriceTier[] | null;
+  },
+>(items: T[]): T[] {
+  const poolQty = new Map<string, { qty: number; base: number; tiers: PriceTier[] | null | undefined }>();
+  for (const item of items) {
+    if (!hasPriceTiers(item.priceTiers)) continue;
+    const base = item.basePrice ?? item.price;
+    const key = tierPoolKey(item.productId, base);
+    const prev = poolQty.get(key);
+    poolQty.set(key, {
+      qty: (prev?.qty ?? 0) + item.quantity,
+      base,
+      tiers: item.priceTiers,
+    });
+  }
+
+  const remaining = new Map<string, { money: number; units: number }>();
+  for (const [key, pool] of poolQty) {
+    remaining.set(key, {
+      money: priceForQuantity(pool.base, pool.tiers, pool.qty),
+      units: pool.qty,
+    });
+  }
+
+  const lastIndexByKey = new Map<string, number>();
+  items.forEach((item, index) => {
+    if (!hasPriceTiers(item.priceTiers)) return;
+    const base = item.basePrice ?? item.price;
+    lastIndexByKey.set(tierPoolKey(item.productId, base), index);
+  });
+
+  return items.map((item, index) => {
+    if (!hasPriceTiers(item.priceTiers)) return item;
+    const base = item.basePrice ?? item.price;
+    const key = tierPoolKey(item.productId, base);
+    const rem = remaining.get(key);
+    if (!rem || rem.units <= 0) return item;
+    const isLast = lastIndexByKey.get(key) === index;
+    const lineTotal = isLast
+      ? rem.money
+      : Math.round((rem.money / rem.units) * item.quantity);
+    rem.money -= lineTotal;
+    rem.units -= item.quantity;
+    const unit = item.quantity > 0 ? lineTotal / item.quantity : base;
+    if (unit === item.price) return item;
+    return { ...item, price: unit };
+  });
+}
+
+/** Line totals after pooling pack deals across mixed flavours of one product. */
+export function computePooledLineTotals<
+  T extends {
+    id: string;
+    productId: string;
+    quantity: number;
+    price: number;
+    basePrice?: number;
+    priceTiers?: PriceTier[] | null;
+  },
+>(items: T[]): Map<string, number> {
+  const pooled = applyPooledTierPrices(items);
+  const map = new Map<string, number>();
+  for (const item of pooled) {
+    map.set(item.id, Math.round(item.price * item.quantity));
+  }
+  return map;
+}
+
 export function tierModeHint(tiers: PriceTier[] | null | undefined): string {
   if (tierMode(tiers) === "unit") {
     return "Per-unit pricing — the price applies to every item once the quantity reaches the tier.";

@@ -61,6 +61,7 @@ import {
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
 import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
+import { sanitizeVariantGroups } from "@/lib/variantTemplates";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -368,7 +369,7 @@ export default function ProductsDashboardPage() {
       is_available: form.isAvailable,
       stock_status: form.isAvailable ? "in_stock" : "out_of_stock",
       // Availability toggle only — no numeric stock counts.
-      variants: form.variantGroups.length > 0 ? form.variantGroups : null,
+      variants: sanitizeVariantGroups(form.variantGroups),
       price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
       category_id: shopCat || null,
       sub_category_id: subId && isValidUUID(subId) ? subId : null,
@@ -907,7 +908,7 @@ export default function ProductsDashboardPage() {
                 fileIdPrefix={editingProductId ?? activeShopId ?? "new"}
               />
 
-              {/* Multi-Attribute Variant Builder — always visible */}
+              {/* Same options builder on Add + Edit — set variants before first save */}
               <div>
                 <VariantEditor
                   variants={form.variantGroups}
@@ -917,11 +918,11 @@ export default function ProductsDashboardPage() {
                 />
               </div>
 
-              {/* Availability only — no numeric stock counts */}
               {form.variantGroups.length > 0 && (
                 <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
-                  Variants save with this product. Use the <strong>In Stock / Out of Stock</strong> toggle —
-                  TrendsMart does not track numeric stock quantities.
+                  Options is product ke saath{" "}
+                  {editingProductId ? "update" : "add"} pe save hongi. Har option
+                  ka <strong>In stock / Sold out</strong> upar set karo.
                 </p>
               )}
 
@@ -1242,7 +1243,10 @@ export default function ProductsDashboardPage() {
                         </button>
                         {product.variants && product.variants.length > 0 && (
                           <span className="text-zinc-400">
-                            {product.variants.reduce((acc, g) => acc * g.options.length, 1)} variants
+                            {product.variants
+                              .filter((g) => g.name !== "__sku_matrix__")
+                              .reduce((acc, g) => acc * Math.max(g.options.length, 1), 1)}{" "}
+                            variants
                           </span>
                         )}
                       </div>

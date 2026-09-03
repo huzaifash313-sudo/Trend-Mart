@@ -83,9 +83,43 @@ export function getQuickGroupNamesForCategory(category?: string | null): string[
   return names;
 }
 
+/** Single-group shortcuts (Size only, Flavour, Portion, …) — easiest path. */
+export function getSimpleTemplates(category?: string | null): VariantTemplatePack[] {
+  return getVariantTemplates(category).filter((pack) => pack.groups.length === 1);
+}
+
 /** Multi-group shortcuts (Portion + Spice, Size + Color, …). */
 export function getComboTemplates(category?: string | null): VariantTemplatePack[] {
   return getVariantTemplates(category).filter((pack) => pack.groups.length > 1);
+}
+
+/** One-line empty-state hint for the product editor. */
+export function categoryVariantHint(category?: string | null): string {
+  const key = (category ?? "").trim();
+  const hints: Record<string, string> = {
+    "Fashion & Apparel": "Size, color, ya shoe size — simple se shuru karo.",
+    "Fast Food & Restaurants": "Portion, spice, ya flavour — sirf ek type bhi chalega.",
+    "Grocery & Kiryana": "Weight, pack, ya flavour — mix sirf zarurat pe.",
+    "Bakery & Sweets": "Cake size, flavour, ya weight — simple option pehle.",
+    "Fruits & Vegetables": "Weight ya dozen — bilkul simple.",
+    "Electronics & Gadgets": "Color, storage, ya warranty — ek type kaafi.",
+    "Health & Beauty": "Shade, scent, ya bottle size — simple se start.",
+    "Home & Living": "Color, bed size, ya set — jo chahiye woh tap karo.",
+    "Pharmacy & Medical": "Strength, pack, ya form — medicine SKU easy.",
+    "Books & Stationery": "Color, pack, ya pages — optional.",
+    "Sports & Fitness": "Size, shoe size, ya weight — sports wear easy.",
+    "Toys & Baby Care": "Age, diaper size, ya color — kids items.",
+    "Automotive Accessories": "Vehicle fit, size, ya oil volume.",
+    "Handmade & Crafts": "Size, color, ya set — handmade pieces.",
+    "Home Maintenance & Repair": "Duration ya package — service plans.",
+    "Security & Surveillance": "Camera pack ya package.",
+    "Tech & IT Services": "Package ya duration — service tiers.",
+    "Personal & Professional Services": "Package, visit, ya duration.",
+  };
+  return (
+    hints[key] ??
+    "Sirf zarurat ho to options add karo. Simple (1 type) ya mix (2 types) — dono chalenge."
+  );
 }
 
 /** Common option pools — used for quick-add chips inside the editor. */
@@ -120,6 +154,13 @@ export const OPTION_POOLS: Record<string, string[]> = {
   "Spice Level": ["Mild", "Medium", "Spicy", "Extra Spicy"],
   Flavour: [
     "Original",
+    "Onion",
+    "Apple",
+    "Aloe",
+    "Honey",
+    "Coconut",
+    "Menthol",
+    "Lemon",
     "Chocolate",
     "Vanilla",
     "Strawberry",
@@ -569,8 +610,14 @@ const BY_CATEGORY: Record<string, VariantTemplatePack[]> = {
     {
       id: "grocery-flavour",
       label: "Flavour / type",
-      hint: "Tea, biscuits, snacks",
+      hint: "Tea, biscuits, snacks, shampoo",
       groups: [FLAVOUR()],
+    },
+    {
+      id: "grocery-flavour-volume",
+      label: "Flavour + Size",
+      hint: "Shampoo / soap: 5 flavours × 2 bottles",
+      groups: [FLAVOUR(), VOLUME()],
     },
   ),
 
@@ -603,6 +650,24 @@ const BY_CATEGORY: Record<string, VariantTemplatePack[]> = {
 
   "Electronics & Gadgets": packs(
     {
+      id: "elec-color",
+      label: "Color only",
+      hint: "Cables, cases, earbuds",
+      groups: [COLOR()],
+    },
+    {
+      id: "elec-storage",
+      label: "Storage only",
+      hint: "64GB / 128GB / 256GB",
+      groups: [STORAGE()],
+    },
+    {
+      id: "elec-warranty",
+      label: "Warranty",
+      hint: "Refurbished / used gear",
+      groups: [WARRANTY()],
+    },
+    {
       id: "elec-storage-color",
       label: "Storage + Color",
       hint: "Phones & tablets",
@@ -626,21 +691,15 @@ const BY_CATEGORY: Record<string, VariantTemplatePack[]> = {
       hint: "4G / 5G / Wi-Fi",
       groups: [NETWORK(), STORAGE()],
     },
-    {
-      id: "elec-color",
-      label: "Color only",
-      hint: "Cables, cases, earbuds",
-      groups: [COLOR()],
-    },
-    {
-      id: "elec-warranty",
-      label: "Warranty",
-      hint: "Refurbished / used gear",
-      groups: [WARRANTY()],
-    },
   ),
 
   "Health & Beauty": packs(
+    {
+      id: "beauty-flavour",
+      label: "Flavour / type",
+      hint: "Shampoo, soap, face wash types",
+      groups: [FLAVOUR()],
+    },
     {
       id: "beauty-shade",
       label: "Shade",
@@ -672,6 +731,12 @@ const BY_CATEGORY: Record<string, VariantTemplatePack[]> = {
       groups: [SCENT(), BEAUTY_VOLUME()],
     },
     {
+      id: "beauty-flavour-volume",
+      label: "Flavour + Size",
+      hint: "Shampoo: flavours × bottle sizes",
+      groups: [FLAVOUR(), BEAUTY_VOLUME()],
+    },
+    {
       id: "beauty-hair",
       label: "Hair type",
       hint: "Shampoo / hair care",
@@ -686,6 +751,18 @@ const BY_CATEGORY: Record<string, VariantTemplatePack[]> = {
   ),
 
   "Home & Living": packs(
+    {
+      id: "home-size",
+      label: "Size only",
+      hint: "Curtains, cushions — same color",
+      groups: [HOME_SIZE()],
+    },
+    {
+      id: "home-bed",
+      label: "Bed size",
+      hint: "Sheets & mattress sizes",
+      groups: [BED_SIZE()],
+    },
     {
       id: "home-bed-color",
       label: "Bed size + Color",
@@ -1067,7 +1144,10 @@ export function sanitizeVariantGroups(
         .map((o) => ({ ...o, label: o.label.trim() }))
         .filter((o) => o.label.length > 0),
     }))
-    .filter((g) => g.name.length > 0 && g.options.length > 0);
+    .filter((g) => {
+      if (g.name === "__sku_matrix__") return g.options.length > 0;
+      return g.name.length > 0 && g.options.length > 0;
+    });
   return cleaned.length > 0 ? cleaned : null;
 }
 

@@ -129,7 +129,7 @@ export default function AnnouncementBanner({
   text,
   segments,
   variant = "marquee",
-  accentColor = "#10b981",
+  accentColor = "var(--tm-brand-500)",
   dismissible = false,
   className = "",
 }: AnnouncementBannerProps) {

@@ -58,7 +58,7 @@ type TimeRange = "7d" | "30d" | "90d";
 type ChartView = "revenue" | "orders" | "categories" | "peak-hours" | "top-products";
 
 const CHART_COLORS = [
-  "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
+  "var(--tm-brand-500)", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444",
   "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
 ];
 
@@ -244,8 +244,8 @@ function RevenueTrendChart({ data }: RevenueTrendChartProps) {
       <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            <stop offset="5%" stopColor="var(--tm-brand-500)" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="var(--tm-brand-500)" stopOpacity={0} />
           </linearGradient>
           <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -285,10 +285,10 @@ function RevenueTrendChart({ data }: RevenueTrendChartProps) {
           type="monotone"
           dataKey="revenue"
           name="Revenue"
-          stroke="#10b981"
+          stroke="var(--tm-brand-500)"
           fill="url(#revenueGradient)"
           strokeWidth={2}
-          dot={{ r: 3, fill: "#10b981" }}
+          dot={{ r: 3, fill: "var(--tm-brand-500)" }}
           activeDot={{ r: 5 }}
         />
         <Area
@@ -447,7 +447,7 @@ function TopProductsChart({ data }: TopProductsChartProps) {
         <Bar
           dataKey="revenue"
           name="Revenue"
-          fill="#10b981"
+          fill="var(--tm-brand-500)"
           radius={[0, 4, 4, 0]}
           maxBarSize={20}
         />

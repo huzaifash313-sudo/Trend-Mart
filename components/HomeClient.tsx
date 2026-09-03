@@ -97,9 +97,9 @@ function StoryRing({
       >
         <defs>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#34d399" />
-            <stop offset="50%" stopColor="#2dd4bf" />
-            <stop offset="100%" stopColor="#059669" />
+            <stop offset="0%" stopColor="var(--tm-brand-400)" />
+            <stop offset="50%" stopColor="var(--tm-sea-400)" />
+            <stop offset="100%" stopColor="var(--tm-brand-600)" />
           </linearGradient>
         </defs>
         <circle

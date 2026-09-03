@@ -33,6 +33,7 @@ import {
 } from "@/lib/supabase/realtime";
 import { logError } from "@/services/errorService";
 import type { Product, VariantGroup } from "@/types";
+import { isSkuMatrixGroup } from "@/lib/variantPricing";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -162,6 +163,7 @@ function flattenVariantsToCells(
   }
 
   for (const group of variants) {
+    if (isSkuMatrixGroup(group.name)) continue;
     for (const option of group.options) {
       const key = `${product.id}::${group.name}::${option.label}`;
       const existing = existingInventory.get(key);

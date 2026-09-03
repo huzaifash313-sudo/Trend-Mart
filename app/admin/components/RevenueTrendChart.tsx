@@ -76,7 +76,7 @@ export default function RevenueTrendChart({ data }: { data: RevenueTrendPoint[] 
             yAxisId="revenue"
             dataKey="revenue"
             name="Revenue"
-            fill="var(--chart-revenue, #10b981)"
+            fill="var(--chart-revenue, var(--tm-brand-500))"
             radius={[4, 4, 0, 0]}
             maxBarSize={26}
           />

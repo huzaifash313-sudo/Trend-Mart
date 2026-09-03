@@ -10,6 +10,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
+import { applyBrandTheme, readStoredBrandTheme, syncBrowserBrandChrome, normalizeBrandThemeId } from "@/lib/brandThemes";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Real‑Time Dynamic Theme, Font Scale & Grid Layout Engine       */
@@ -226,6 +227,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     applyCardStyle(prefs.cardStyle);
   }, [prefs.cardStyle]);
+
+  // Brand color theme — local first (no flash), then sync published platform theme
+  useLayoutEffect(() => {
+    applyBrandTheme(readStoredBrandTheme());
+    syncBrowserBrandChrome();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/brand-theme", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as { id?: string };
+        const id = normalizeBrandThemeId(json?.id);
+        if (cancelled) return;
+        applyBrandTheme(id);
+      } catch {
+        /* keep local / default */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Listen for system color-scheme changes (when mode === "system") ────────
   useEffect(() => {

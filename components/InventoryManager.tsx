@@ -30,6 +30,7 @@ import type {
   ProductVariant,
   InventorySnapshot,
 } from "@/types";
+import { isSkuMatrixGroup } from "@/lib/variantPricing";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ function flattenVariants(products: Product[]): InventorySnapshot[] {
       });
     } else {
       for (const group of variants) {
+        if (isSkuMatrixGroup(group.name)) continue;
         for (const option of group.options) {
           snapshots.push({
             key: `${product.id}::${option.label}`,

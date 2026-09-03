@@ -346,7 +346,7 @@ export default function OnboardingWizard() {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(120% 90% at 50% -10%, rgba(45, 212, 191, 0.35), transparent 55%), radial-gradient(90% 70% at 100% 100%, rgba(13, 148, 136, 0.5), transparent 50%), linear-gradient(165deg, #0f766e 0%, #0d9488 42%, #134e4a 100%)",
+            "radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--tm-sea-400) 35%, transparent), transparent 55%), radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--tm-sea-600) 50%, transparent), transparent 50%), linear-gradient(165deg, var(--tm-sea-700) 0%, var(--tm-sea-600) 42%, var(--tm-sea-900) 100%)",
         }}
       />
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />

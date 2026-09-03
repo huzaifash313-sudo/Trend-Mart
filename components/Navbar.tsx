@@ -45,13 +45,13 @@ function TrendBackdrop() {
       >
         <defs>
           <linearGradient id="tmTrendStroke" x1="0" y1="0" x2="400" y2="0" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#6ee7b7" />
+            <stop offset="0%" stopColor="var(--tm-brand-300)" />
             <stop offset="45%" stopColor="#ffffff" />
-            <stop offset="100%" stopColor="#5eead4" />
+            <stop offset="100%" stopColor="var(--tm-sea-300)" />
           </linearGradient>
           <linearGradient id="tmTrendUnder" x1="0" y1="0" x2="0" y2="90" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#34d399" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--tm-brand-400)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--tm-sea-500)" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -80,7 +80,7 @@ function TrendBackdrop() {
         <path
           className="tm-navbar-trend-arrow"
           d="M352 6 L392 6 L392 34 Z"
-          fill="#a7f3d0"
+          fill="var(--tm-brand-200)"
         />
       </svg>
     </div>

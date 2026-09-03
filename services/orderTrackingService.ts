@@ -67,7 +67,7 @@ const STATUS_TIMELINE: Array<{
   { status: "Pending", label: "Order Placed", color: "#f59e0b", icon: "📋" },
   { status: "Processing", label: "Processing", color: "#3b82f6", icon: "⚙️" },
   { status: "Dispatched", label: "Dispatched", color: "#8b5cf6", icon: "🚚" },
-  { status: "Delivered", label: "Delivered", color: "#10b981", icon: "✅" },
+  { status: "Delivered", label: "Delivered", color: "var(--tm-brand-500)", icon: "✅" },
   { status: "Cancelled", label: "Cancelled", color: "#ef4444", icon: "❌" },
 ];
 
@@ -138,7 +138,7 @@ export function buildStatusTimeline(
       timestamp: isActive && updatedAt ? updatedAt : isCompleted ? updatedAt ?? createdAt : "",
       completed: isCompleted,
       active: isActive,
-      color: isCompleted ? "#10b981" : isActive ? entry.color : "#d1d5db",
+      color: isCompleted ? "var(--tm-brand-500)" : isActive ? entry.color : "#d1d5db",
       icon: isCompleted ? "✅" : isActive ? entry.icon : "⏳",
     });
   }

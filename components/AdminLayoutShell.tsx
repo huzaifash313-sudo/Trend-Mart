@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 const ADMIN_NAV = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "📊", desc: "Metrics · merchants · orders" },
+  { href: "/admin/appearance", label: "Appearance", icon: "🎨", desc: "Brand colors · 1-click themes" },
   { href: "/admin/support", label: "Support Inbox", icon: "📨", desc: "Platform tickets" },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: "🛡️", desc: "Security trail" },
 ] as const;

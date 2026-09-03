@@ -22,7 +22,8 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizePkPhoneDigits, isValidUUID } from "@/lib/sanitization";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { computeVariantPricing } from "@/lib/variantPricing";
-import { hasPriceTiers, priceForQuantity } from "@/lib/priceTiers";
+import { isComboUnavailable, upsertSku } from "@/lib/variantMatrix";
+import { applyPooledTierPrices } from "@/lib/priceTiers";
 import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { sendPushToUser } from "@/lib/webPush";
@@ -151,55 +152,19 @@ function variantIsUnavailable(
   variants: VariantGroup[],
   variantLabel: string | undefined,
 ): boolean {
-  if (!variantLabel || !variants.length) return false;
-  const parts = variantLabel.split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
-  for (const part of parts) {
-    const idx = part.indexOf(":");
-    const label = idx > 0 ? part.slice(idx + 1).trim() : part;
-    for (const group of variants) {
-      for (const opt of group.options) {
-        if (opt.label === label || `${group.name}: ${opt.label}` === part) {
-          if (opt.is_available === false) return true;
-        }
-      }
-    }
-  }
-  return false;
+  return isComboUnavailable(variants, variantLabel);
 }
 
 /**
- * Mark only the referenced variant option(s) unavailable inside the product's
- * `variants` JSON — never the whole product. When a tracked variant runs out
- * during checkout we "Sold Out" just that option (Daraz-style) so the rest of
- * the sizes/flavours stay orderable. Returns a new array (or null if nothing
- * matched / nothing changed).
+ * Sold-out only the exact Flavour×Size combo — never the whole flavour or size.
  */
 function markVariantUnavailable(
   variants: VariantGroup[],
   variantLabel: string | undefined,
 ): VariantGroup[] | null {
   if (!variantLabel || !variants.length) return null;
-  const parts = variantLabel.split(/\s*·\s*/).map((p) => p.trim()).filter(Boolean);
-  if (parts.length === 0) return null;
-
-  let changed = false;
-  const next = variants.map((group) => ({
-    ...group,
-    options: group.options.map((opt) => {
-      const match = parts.some((part) => {
-        const idx = part.indexOf(":");
-        const label = idx > 0 ? part.slice(idx + 1).trim() : part;
-        return opt.label === label || `${group.name}: ${opt.label}` === part;
-      });
-      if (match && opt.is_available !== false) {
-        changed = true;
-        return { ...opt, is_available: false };
-      }
-      return opt;
-    }),
-  }));
-
-  return changed ? next : null;
+  if (isComboUnavailable(variants, variantLabel)) return null;
+  return upsertSku(variants, variantLabel, { is_available: false });
 }
 
 type CoverageMode = "radius" | "city" | "nationwide";
@@ -688,12 +653,16 @@ export async function POST(request: Request) {
 
   // 6. Subtotal from authoritative prices — pack/quantity tiers honoured so a
   //    "6 = Rs 1100" bottle never gets billed as 6 × 200 = 1200.
-  const subtotal = resolvedItems.reduce((sum, i) => {
-    if (hasPriceTiers(i.priceTiers)) {
-      return sum + priceForQuantity(i.price, i.priceTiers, i.quantity);
-    }
-    return sum + i.price * i.quantity;
-  }, 0);
+  const pooled = applyPooledTierPrices(
+    resolvedItems.map((i) => ({
+      productId: i.productId,
+      quantity: i.quantity,
+      price: i.price,
+      basePrice: i.price,
+      priceTiers: i.priceTiers,
+    })),
+  );
+  const subtotal = pooled.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   // 7. Delivery-coverage enforcement (radius / city / nationwide).
   //    Skipped entirely for self-pickup — the customer is coming to the shop.
@@ -1024,14 +993,8 @@ export async function POST(request: Request) {
   }
 
   // 14. Insert the order with the full money breakdown.
-  const orderItems: OrderItem[] = resolvedItems.map((i) => {
-    // Effective per-unit price so bill lines match the pack/quantity subtotal
-    // (e.g. "6 = Rs 1100" → line is 183.33 × 6, subtotal stays exactly 1100).
-    let unit = i.price;
-    if (hasPriceTiers(i.priceTiers)) {
-      unit = priceForQuantity(i.price, i.priceTiers, i.quantity) / i.quantity;
-      unit = Math.round(unit * 100) / 100;
-    }
+  const orderItems: OrderItem[] = resolvedItems.map((i, idx) => {
+    const unit = Math.round((pooled[idx]?.price ?? i.price) * 100) / 100;
     return {
       product_id: i.productId,
       name: i.name,

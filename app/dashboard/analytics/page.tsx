@@ -74,7 +74,7 @@ interface AnalyticsData {
 
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
-const CHART_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+const CHART_COLORS = ["var(--tm-brand-500)", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
 // ─── Custom Tooltip ─────────────────────────────────────────────────────────
 
@@ -496,7 +496,7 @@ export default function AnalyticsDashboard() {
                       />
                       <YAxis tick={{ fontSize: 11, fill: "#71717a" }} />
                       <Tooltip content={<RevenueTooltip />} />
-                      <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 5 }} />
+                      <Line type="monotone" dataKey="revenue" stroke="var(--tm-brand-500)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--tm-brand-500)" }} activeDot={{ r: 5 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
@@ -524,7 +524,7 @@ export default function AnalyticsDashboard() {
                         }
                       />
                       <Tooltip content={<BarTooltip />} />
-                      <Bar dataKey="revenue" fill="#10b981" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="revenue" fill="var(--tm-brand-500)" radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (

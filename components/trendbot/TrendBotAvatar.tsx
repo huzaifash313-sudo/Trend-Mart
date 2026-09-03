@@ -54,13 +54,13 @@ export function TrendBotAvatar({
       >
         <defs>
           <linearGradient id={`${uid}-body`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="55%" stopColor="#0d9488" />
-            <stop offset="100%" stopColor="#14b8a6" />
+            <stop offset="0%" stopColor="var(--tm-brand-500)" />
+            <stop offset="55%" stopColor="var(--tm-sea-600)" />
+            <stop offset="100%" stopColor="var(--tm-sea-500)" />
           </linearGradient>
           <linearGradient id={`${uid}-face`} x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="100%" stopColor="#ecfdf5" />
+            <stop offset="100%" stopColor="var(--tm-brand-50)" />
           </linearGradient>
         </defs>
 
@@ -70,7 +70,7 @@ export function TrendBotAvatar({
           y1="4"
           x2="32"
           y2="12"
-          stroke="#0f766e"
+          stroke="var(--tm-sea-700)"
           strokeWidth="2.4"
           strokeLinecap="round"
         />
@@ -78,7 +78,7 @@ export function TrendBotAvatar({
           cx="32"
           cy="3.5"
           r="3.2"
-          fill="#34d399"
+          fill="var(--tm-brand-400)"
           className={animated ? "tm-trendbot-antenna" : ""}
         />
 
@@ -92,7 +92,7 @@ export function TrendBotAvatar({
           cy="27"
           rx="4.4"
           ry="5.2"
-          fill="#0f766e"
+          fill="var(--tm-sea-700)"
           className={animated ? "tm-trendbot-eye-l" : ""}
         />
         <ellipse
@@ -100,45 +100,45 @@ export function TrendBotAvatar({
           cy="27"
           rx="4.4"
           ry="5.2"
-          fill="#0f766e"
+          fill="var(--tm-sea-700)"
           className={animated ? "tm-trendbot-eye-r" : ""}
         />
-        <circle cx="25" cy="25.2" r="1.5" fill="#a7f3d0" />
-        <circle cx="41" cy="25.2" r="1.5" fill="#a7f3d0" />
+        <circle cx="25" cy="25.2" r="1.5" fill="var(--tm-brand-200)" />
+        <circle cx="41" cy="25.2" r="1.5" fill="var(--tm-brand-200)" />
 
         {/* Smile — soft friendly curve */}
         <path
           d="M 24 33.5 Q 32 40 40 33.5"
           fill="none"
-          stroke="#0f766e"
+          stroke="var(--tm-sea-700)"
           strokeWidth="2"
           strokeLinecap="round"
         />
 
         {/* Left arm */}
         <g className={pose === "wave" ? "tm-trendbot-arm-wave" : pose === "walk" ? "tm-trendbot-arm-l" : ""}>
-          <rect x="4" y="48" width="10" height="16" rx="5" fill="#0d9488" />
-          <circle cx="9" cy="65" r="4.2" fill="#14b8a6" />
+          <rect x="4" y="48" width="10" height="16" rx="5" fill="var(--tm-sea-600)" />
+          <circle cx="9" cy="65" r="4.2" fill="var(--tm-sea-500)" />
         </g>
 
         {/* Right arm */}
         <g className={pose === "walk" ? "tm-trendbot-arm-r" : ""}>
-          <rect x="50" y="48" width="10" height="16" rx="5" fill="#0d9488" />
-          <circle cx="55" cy="65" r="4.2" fill="#14b8a6" />
+          <rect x="50" y="48" width="10" height="16" rx="5" fill="var(--tm-sea-600)" />
+          <circle cx="55" cy="65" r="4.2" fill="var(--tm-sea-500)" />
         </g>
 
         {/* Belly / torso */}
         <rect x="18" y="44" width="28" height="24" rx="10" fill={`url(#${uid}-body)`} />
-        <ellipse cx="32" cy="56" rx="8" ry="6" fill="#5eead4" opacity="0.35" />
+        <ellipse cx="32" cy="56" rx="8" ry="6" fill="var(--tm-sea-300)" opacity="0.35" />
 
         {/* Legs + feet */}
         <g className={pose === "walk" ? "tm-trendbot-leg-l" : ""}>
-          <rect x="20" y="66" width="9" height="14" rx="4.5" fill="#0f766e" />
-          <ellipse cx="24.5" cy="82" rx="7" ry="3.5" fill="#134e4a" />
+          <rect x="20" y="66" width="9" height="14" rx="4.5" fill="var(--tm-sea-700)" />
+          <ellipse cx="24.5" cy="82" rx="7" ry="3.5" fill="var(--tm-sea-900)" />
         </g>
         <g className={pose === "walk" ? "tm-trendbot-leg-r" : ""}>
-          <rect x="35" y="66" width="9" height="14" rx="4.5" fill="#0f766e" />
-          <ellipse cx="39.5" cy="82" rx="7" ry="3.5" fill="#134e4a" />
+          <rect x="35" y="66" width="9" height="14" rx="4.5" fill="var(--tm-sea-700)" />
+          <ellipse cx="39.5" cy="82" rx="7" ry="3.5" fill="var(--tm-sea-900)" />
         </g>
       </svg>
     </div>

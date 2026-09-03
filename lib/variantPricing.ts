@@ -14,6 +14,28 @@
 
 import type { ProductVariant, VariantGroup } from "@/types";
 
+/** Reserved variants[] group for Flavour×Size combo prices / sold-out flags. */
+export const SKU_MATRIX_GROUP = "__sku_matrix__";
+
+export function isSkuMatrixGroup(name: string | undefined): boolean {
+  return (name ?? "").trim() === SKU_MATRIX_GROUP;
+}
+
+export function customerVariantGroups(
+  groups: VariantGroup[] | null | undefined,
+): VariantGroup[] {
+  return (groups ?? []).filter((g) => !isSkuMatrixGroup(g.name) && g.options.length > 0);
+}
+
+function findSkuOption(
+  groups: VariantGroup[],
+  variantLabel?: string,
+): ProductVariant | undefined {
+  if (!variantLabel) return undefined;
+  const matrix = groups.find((g) => isSkuMatrixGroup(g.name));
+  return matrix?.options.find((o) => o.label === variantLabel);
+}
+
 export interface VariantSelectionPart {
   groupName: string;
   optionLabel: string;
@@ -40,7 +62,7 @@ export function parseVariantLabel(variantLabel?: string): VariantSelectionPart[]
 
 /** Locate the matching option for a selection part within the variant groups. */
 function findOption(groups: VariantGroup[], part: VariantSelectionPart) {
-  for (const group of groups) {
+  for (const group of customerVariantGroups(groups)) {
     if (part.groupName && group.name !== part.groupName) continue;
     const opt = group.options.find((o) => o.label === part.optionLabel);
     if (opt) return opt;
@@ -130,6 +152,15 @@ export function computeVariantOriginalPrice(
   }
 
   const effective = computeVariantPrice(basePrice, groups, variantLabel);
+  const sku = findSkuOption(groups, variantLabel);
+  if (
+    sku &&
+    typeof sku.original_price === "number" &&
+    Number.isFinite(sku.original_price) &&
+    sku.original_price > effective
+  ) {
+    return Math.round(sku.original_price * 100) / 100;
+  }
   let original: number | null = null;
   for (const part of parseVariantLabel(variantLabel)) {
     const opt = findOption(groups, part);
@@ -180,17 +211,22 @@ export function computeVariantPrice(
   variants: VariantGroup[] | null | undefined,
   variantLabel?: string,
 ): number {
-  let price = basePrice;
   const groups = variants ?? [];
-  if (variantLabel && groups.length > 0) {
+  const sku = findSkuOption(groups, variantLabel);
+  if (sku && typeof sku.price === "number" && Number.isFinite(sku.price)) {
+    const adj = typeof sku.price_adj === "number" && Number.isFinite(sku.price_adj) ? sku.price_adj : 0;
+    return Math.max(0, Math.round((sku.price + adj) * 100) / 100);
+  }
+
+  let price = basePrice;
+  const pickFrom = customerVariantGroups(groups);
+  if (variantLabel && pickFrom.length > 0) {
     for (const part of parseVariantLabel(variantLabel)) {
-      const opt = findOption(groups, part);
+      const opt = findOption(pickFrom, part);
       if (!opt) continue;
-      // Absolute (Daraz) price overrides the starting point.
       if (typeof opt.price === "number" && Number.isFinite(opt.price)) {
         price = opt.price;
       }
-      // Additive adjustment is always applied on top.
       if (typeof opt.price_adj === "number" && Number.isFinite(opt.price_adj)) {
         price += opt.price_adj;
       }
@@ -208,15 +244,28 @@ export function variantPriceRange(
   if (groups.length === 0) {
     return { min: basePrice, max: basePrice };
   }
-  let min = basePrice;
-  let max = basePrice;
-  for (const group of groups) {
-    for (const opt of group.options) {
-      const start = typeof opt.price === "number" ? opt.price : basePrice;
-      const total = start + (opt.price_adj ?? 0);
-      if (total < min) min = total;
-      if (total > max) max = total;
-    }
+  const combos = groups.filter((g) => !isSkuMatrixGroup(g.name));
+  if (combos.length === 0) {
+    return { min: basePrice, max: basePrice };
   }
+  let min = Number.POSITIVE_INFINITY;
+  let max = 0;
+  const visible = customerVariantGroups(groups);
+  const walk = (gi: number, labelParts: string[]) => {
+    if (gi >= visible.length) {
+      const label = labelParts.join(" · ");
+      const p = computeVariantPrice(basePrice, groups, label);
+      if (p < min) min = p;
+      if (p > max) max = p;
+      return;
+    }
+    const g = visible[gi]!;
+    for (const opt of g.options) {
+      if (!opt.label.trim() || opt.is_available === false) continue;
+      walk(gi + 1, [...labelParts, `${g.name}: ${opt.label}`]);
+    }
+  };
+  walk(0, []);
+  if (!Number.isFinite(min)) return { min: basePrice, max: basePrice };
   return { min: Math.max(0, min), max: Math.max(0, max) };
 }

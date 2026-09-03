@@ -15,6 +15,7 @@ import ImageUpload from "@/components/ImageUpload";
 import VariantEditor from "@/components/VariantEditor";
 import PriceTierEditor from "@/components/PriceTierEditor";
 import { normalizeTiers } from "@/lib/priceTiers";
+import { sanitizeVariantGroups } from "@/lib/variantTemplates";
 import QuickCouponPanel from "@/components/QuickCouponPanel";
 import DealManager from "@/components/DealManager";
 import { useToast } from "@/components/Toast";
@@ -108,7 +109,7 @@ export default function MerchantQuickAddModal() {
       is_available: true,
       category_id: shopCategory,
       sub_category_id: subCategoryId || null,
-      variants: variants.length > 0 ? variants : null,
+      variants: sanitizeVariantGroups(variants),
       price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
     });
     if (result.success) {

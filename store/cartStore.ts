@@ -13,7 +13,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { PriceTier, Product, Shop } from "@/types";
 import { getProductDiscount } from "@/lib/formatters";
-import { hasPriceTiers, priceForQuantity } from "@/lib/priceTiers";
+import { applyPooledTierPrices } from "@/lib/priceTiers";
 import { scopedKey, scopedKeyFor } from "@/lib/clientScope";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
@@ -79,7 +79,7 @@ function sanitizeString(input: unknown, maxLength: number = 500): string {
 }
 
 function sanitizeVariant(input: unknown): string {
-  return sanitizeString(input, 100);
+  return sanitizeString(input, 220);
 }
 
 /** Sanitize persisted price tiers to {min_qty, price, mode} numbers. */
@@ -100,12 +100,6 @@ function sanitizePriceTiers(raw: unknown): PriceTier[] | null {
     }
   }
   return out.length > 0 ? out : null;
-}
-
-/** Per-unit price for a cart line given its tiers and current quantity. */
-function tieredUnitPrice(price: number, tiers: PriceTier[] | null | undefined, qty: number): number {
-  if (!tiers || tiers.length === 0) return price;
-  return Math.round(priceForQuantity(price, tiers, qty) / Math.max(1, qty));
 }
 
 function sanitizeCartItem(raw: Record<string, unknown>): CartItem | null {
@@ -239,22 +233,24 @@ export const useCartStore = create<CartState>()(
           if (existing) {
             const mergedQty = Math.min(99, existing.quantity + safeQuantity);
             return {
-              items: state.items.map((i) =>
-                i.id === cartId
-                  ? {
-                      ...i,
-                      quantity: mergedQty,
-                      price: tieredUnitPrice(safePrice, safePriceTiers, mergedQty),
-                      basePrice: safePrice,
-                      priceTiers: safePriceTiers ?? i.priceTiers,
-                    }
-                  : i,
+              items: applyPooledTierPrices(
+                state.items.map((i) =>
+                  i.id === cartId
+                    ? {
+                        ...i,
+                        quantity: mergedQty,
+                        price: safePrice,
+                        basePrice: safePrice,
+                        priceTiers: safePriceTiers ?? i.priceTiers,
+                      }
+                    : i,
+                ),
               ),
             };
           }
 
           return {
-            items: [
+            items: applyPooledTierPrices([
               ...state.items,
               {
                 id: cartId,
@@ -263,7 +259,7 @@ export const useCartStore = create<CartState>()(
                 shopName: safeShopName || "Unknown Shop",
                 shopWhatsapp: safeShopWhatsapp || "",
                 name: safeName,
-                price: tieredUnitPrice(safePrice, safePriceTiers, safeQuantity),
+                price: safePrice,
                 basePrice: safePrice,
                 originalPrice: safeOriginalPrice,
                 imageUrl: safeImageUrl,
@@ -274,14 +270,16 @@ export const useCartStore = create<CartState>()(
                 shortCode: safeShortCode,
                 priceTiers: safePriceTiers,
               },
-            ],
+            ]),
           };
         });
       },
 
       removeItem: (cartItemId) => {
         if (!cartItemId || typeof cartItemId !== "string") return;
-        set((state) => ({ items: state.items.filter((i) => i.id !== cartItemId) }));
+        set((state) => ({
+          items: applyPooledTierPrices(state.items.filter((i) => i.id !== cartItemId)),
+        }));
       },
 
       updateQuantity: (cartItemId, quantity) => {
@@ -292,14 +290,15 @@ export const useCartStore = create<CartState>()(
           return;
         }
         set((state) => ({
-          items: state.items.map((i) =>
-            i.id === cartItemId
-              ? {
-                  ...i,
-                  quantity: safeQuantity,
-                  price: tieredUnitPrice(i.basePrice ?? i.price, i.priceTiers, safeQuantity),
-                }
-              : i,
+          items: applyPooledTierPrices(
+            state.items.map((i) =>
+              i.id === cartItemId
+                ? {
+                    ...i,
+                    quantity: safeQuantity,
+                  }
+                : i,
+            ),
           ),
         }));
       },
@@ -321,18 +320,18 @@ export const useCartStore = create<CartState>()(
         const safeOriginal =
           originalPrice != null ? sanitizePrice(originalPrice) : null;
         set((state) => ({
-          items: state.items.map((i) =>
-            i.id === cartItemId
-              ? {
-                  ...i,
-                  variant: safeVariant,
-                  price: safePrice,
-                  basePrice: safePrice,
-                  originalPrice: safeOriginal,
-                  // Variant products never carry quantity tiers.
-                  priceTiers: null,
-                }
-              : i,
+          items: applyPooledTierPrices(
+            state.items.map((i) =>
+              i.id === cartItemId
+                ? {
+                    ...i,
+                    variant: safeVariant,
+                    price: safePrice,
+                    basePrice: safePrice,
+                    originalPrice: safeOriginal,
+                  }
+                : i,
+            ),
           ),
         }));
       },
@@ -392,7 +391,7 @@ export const useCartStore = create<CartState>()(
       partialize: (state) => ({ items: state.items }),
       merge: (persisted, current) => {
         const rawItems = (persisted as { items?: unknown } | undefined)?.items;
-        return { ...current, items: sanitizeCartItems(rawItems) };
+        return { ...current, items: applyPooledTierPrices(sanitizeCartItems(rawItems)) };
       },
     },
   ),
@@ -413,11 +412,7 @@ export function useCart() {
   const totalAmount = items.reduce((sum, i) => {
     const qty = sanitizeQuantity(i.quantity);
     const price = sanitizePrice(i.price);
-    // Exact tier-aware line total (pack mode = best pack combination), so the
-    // cart always matches the checkout modal / WhatsApp message.
-    const lineTotal = hasPriceTiers(i.priceTiers)
-      ? priceForQuantity(i.basePrice ?? price, i.priceTiers, qty)
-      : price * qty;
+    const lineTotal = price * qty;
     return sum + (Number.isFinite(lineTotal) ? lineTotal : 0);
   }, 0);
 

@@ -16,6 +16,7 @@ import CustomSelect from "@/components/CustomSelect";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import VariantEditor from "@/components/VariantEditor";
 import PriceTierEditor from "@/components/PriceTierEditor";
+import { sanitizeVariantGroups } from "@/lib/variantTemplates";
 import { useToast } from "@/components/Toast";
 
 /* -------------------------------------------------------------------------- */
@@ -147,7 +148,7 @@ export default function ProductEditorModal({
         stock_status: isAvailable ? "in_stock" : "out_of_stock",
         category_id: shopCategory || null,
         sub_category_id: subId || null,
-        variants: variants.length > 0 ? variants : null,
+        variants: sanitizeVariantGroups(variants),
         price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
       };
 

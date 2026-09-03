@@ -15,6 +15,7 @@ import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilt
 import { useLocation } from "@/context/LocationContext";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/Toast";
+import { customerVariantGroups } from "@/lib/variantPricing";
 import ProductOrderModal, { type ProductOrderIntent } from "@/components/ProductOrderModal";
 import { fetchShopById } from "@/services/shopService";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
@@ -551,7 +552,7 @@ function ProductsPageInner() {
       }
       // Variant products must open the option picker first — otherwise the
       // customer would silently add the base (Size/Flavour) price to cart.
-      if (full.variants && full.variants.length > 0) {
+      if (customerVariantGroups(full.variants).length > 0) {
         setQuickView(full);
         syncUrlRef.current({ product: full.id });
         return;
@@ -701,7 +702,7 @@ function ProductsPageInner() {
     (product: Product) => {
       // Variant products must open the option picker first so the WhatsApp
       // order carries the selected Size/Flavour and its real price.
-      if (product.variants && product.variants.length > 0) {
+      if (customerVariantGroups(product.variants).length > 0) {
         const full =
           productsRef.current.find((p) => p.id === product.id) ??
           (product as MarketplaceProduct);

@@ -18,6 +18,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/sanitization";
 import { sendPushToUser } from "@/lib/webPush";
 import { computeVariantPrice } from "@/lib/variantPricing";
+import { isComboUnavailable } from "@/lib/variantMatrix";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { normalizeDinePhone } from "@/services/dineInService";
 import type { OrderItem, VariantGroup } from "@/types";
@@ -261,6 +262,12 @@ export async function POST(request: Request) {
       product.variants,
       line.variant,
     );
+    if (isComboUnavailable(product.variants ?? [], line.variant)) {
+      return NextResponse.json(
+        { success: false, error: `"${product.name}" (${line.variant ?? "option"}) is sold out.` },
+        { status: 409 },
+      );
+    }
     resolvedItems.push({
       productId: line.productId,
       name: product.name || line.name,

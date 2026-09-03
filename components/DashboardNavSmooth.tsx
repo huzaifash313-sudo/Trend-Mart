@@ -128,10 +128,11 @@ export default function DashboardNavSmooth() {
       aria-hidden
     >
       <div
-        className="h-full origin-left bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.55)] transition-[width,opacity] duration-200 ease-out dark:bg-emerald-400"
+        className="h-full origin-left bg-emerald-500 transition-[width,opacity] duration-200 ease-out dark:bg-emerald-400"
         style={{
           width: `${progress}%`,
           opacity: visible ? 1 : 0,
+          boxShadow: "0 0 8px color-mix(in srgb, var(--tm-brand-500) 55%, transparent)",
         }}
       />
     </div>

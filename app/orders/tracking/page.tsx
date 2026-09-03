@@ -392,7 +392,7 @@ function OrderCard({
           style={{
             backgroundColor:
               order.status === "Delivered"
-                ? "#10b981"
+                ? "var(--tm-brand-500)"
                 : order.status === "Cancelled"
                   ? "#ef4444"
                   : order.status === "Dispatched"

@@ -1,13 +1,13 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  VariantEditor — category-smart, chip-first options builder                 */
+/*  VariantEditor — simple-first, category-smart options builder               */
 /*                                                                             */
-/*  Flow for merchants:                                                        */
-/*   1. One-tap pack for their shop category (Size+Color, Portion, …)         */
-/*   2. Tap chips to keep / remove options                                     */
-/*   3. Optional: set different price per option (collapsed)                   */
-/*   Skip anytime — variants are never required.                               */
+/*  Flow for merchants (any category):                                         */
+/*   1. Tap a Simple pack (Size / Portion / Flavour / Color …)                */
+/*   2. Chip options on/off; set rate + sold-out per option                   */
+/*   3. Optional: Mix packs (Flavour + Size) → combination rates table        */
+/*   Skip anytime — options are never required.                                */
 /* -------------------------------------------------------------------------- */
 
 import { useMemo, useState } from "react";
@@ -16,19 +16,18 @@ import { effectiveOptionPrice } from "@/lib/variantPricing";
 import {
   EXTRA_GROUP_PRESETS,
   categoryUsuallyHasVariants,
+  categoryVariantHint,
   createGroupFromPreset,
   getComboTemplates,
   getOptionPoolForGroup,
   getQuickGroupNamesForCategory,
+  getSimpleTemplates,
   mergeVariantGroups,
   type VariantTemplatePack,
 } from "@/lib/variantTemplates";
-
-function originalFromPercent(effective: number, pct: number): number | undefined {
-  if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) return undefined;
-  const derived = Math.round(effective / (1 - pct / 100));
-  return derived > effective ? derived : undefined;
-}
+import { comboCount as countCombos, isSkuMatrixGroup } from "@/lib/variantMatrix";
+import VariantSkuMatrix from "@/components/VariantSkuMatrix";
+import { formatRupees } from "@/lib/formatters";
 
 function percentFromOriginal(effective: number, original?: number): number | undefined {
   if (original == null || !Number.isFinite(original) || original <= effective) return undefined;
@@ -75,16 +74,21 @@ export default function VariantEditor({
   const [customOption, setCustomOption] = useState<Record<number, string>>({});
   const [showPrices, setShowPrices] = useState(false);
   const [showMoreGroups, setShowMoreGroups] = useState(false);
-  const [showCombos, setShowCombos] = useState(false);
+  const [showMix, setShowMix] = useState(false);
 
-  const quickGroupNames = useMemo(
-    () => getQuickGroupNamesForCategory(shopCategory),
+  const simpleTemplates = useMemo(
+    () => getSimpleTemplates(shopCategory),
     [shopCategory],
   );
   const comboTemplates = useMemo(
     () => getComboTemplates(shopCategory),
     [shopCategory],
   );
+  const quickGroupNames = useMemo(
+    () => getQuickGroupNamesForCategory(shopCategory),
+    [shopCategory],
+  );
+  const hint = useMemo(() => categoryVariantHint(shopCategory), [shopCategory]);
 
   const usuallyNeeds = categoryUsuallyHasVariants(shopCategory);
   const hasVariants = variants.length > 0;
@@ -227,13 +231,12 @@ export default function VariantEditor({
     );
   }
 
-  const comboCount = useMemo(() => {
-    if (variants.length === 0) return 0;
-    return variants.reduce((acc, g) => {
-      const n = g.options.filter((o) => o.label.trim()).length;
-      return acc * Math.max(n, 1);
-    }, 1);
-  }, [variants]);
+  const comboCount = useMemo(() => countCombos(variants), [variants]);
+  const editableGroups = variants
+    .map((g, idx) => ({ g, idx }))
+    .filter(({ g }) => !isSkuMatrixGroup(g.name));
+  const isSimpleOnly = editableGroups.length === 1;
+  const isMix = editableGroups.length >= 2;
 
   return (
     <div
@@ -244,23 +247,32 @@ export default function VariantEditor({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            Options / Variants
+            Product options
             <span className="ml-1 font-normal text-zinc-400">(optional)</span>
           </p>
-          {shopCategory ? (
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              Suggested for{" "}
-              <span className="font-medium text-teal-700 dark:text-teal-300">
-                {shopCategory}
-              </span>
-            </p>
-          ) : null}
+          <p className="mt-0.5 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
+            {shopCategory ? (
+              <>
+                For{" "}
+                <span className="font-medium text-teal-700 dark:text-teal-300">
+                  {shopCategory}
+                </span>
+                {" — "}
+              </>
+            ) : null}
+            {hint}
+          </p>
         </div>
         {hasVariants ? (
           <div className="flex items-center gap-1.5">
-            {comboCount > 0 ? (
+            {isSimpleOnly ? (
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                Simple
+              </span>
+            ) : null}
+            {isMix && comboCount > 0 ? (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                {comboCount} combo{comboCount === 1 ? "" : "s"}
+                {comboCount} mix
               </span>
             ) : null}
             <button
@@ -274,11 +286,46 @@ export default function VariantEditor({
         ) : null}
       </div>
 
-      {/* ── Quick groups: tap one or many ───────────────────────────────── */}
-      {quickGroupNames.length > 0 ? (
+      {/* ── Simple one-tap packs (primary) ─────────────────────────────── */}
+      {simpleTemplates.length > 0 ? (
         <div className="mb-2.5 space-y-1.5">
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-            Tap karo — jitne groups chaho, utne lagao. Dobara tap = hata do.
+          <p className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Simple — ek type pick karo
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {simpleTemplates.map((pack) => {
+              const done = packFullyApplied(pack);
+              const name = pack.groups[0]?.name ?? pack.label;
+              const on = hasGroupName(name);
+              return (
+                <button
+                  key={pack.id}
+                  type="button"
+                  onClick={() => {
+                    if (on) {
+                      toggleQuickGroup(name);
+                      return;
+                    }
+                    applyPack(pack);
+                  }}
+                  title={pack.hint}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                    done || on
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "border border-teal-200 bg-white text-teal-800 hover:border-teal-400 hover:bg-teal-50 dark:border-teal-800 dark:bg-zinc-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                  }`}
+                >
+                  {done || on ? "✓ " : "+ "}
+                  {pack.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : quickGroupNames.length > 0 ? (
+        <div className="mb-2.5 space-y-1.5">
+          <p className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Simple — ek type pick karo
           </p>
           <div className="flex flex-wrap gap-1.5">
             {quickGroupNames.map((name) => {
@@ -303,16 +350,19 @@ export default function VariantEditor({
         </div>
       ) : null}
 
+      {/* ── Mix packs (optional, 2 groups) ─────────────────────────────── */}
       {comboTemplates.length > 0 ? (
         <div className="mb-2.5">
           <button
             type="button"
-            onClick={() => setShowCombos((v) => !v)}
+            onClick={() => setShowMix((v) => !v)}
             className="text-[11px] font-semibold text-teal-700 hover:underline dark:text-teal-400"
           >
-            {showCombos ? "▾ Tez combos chhupao" : "▸ Tez combos (2 groups ek saath)"}
+            {showMix
+              ? "▾ Mix options chhupao"
+              : "▸ Mix options (2 types — jaise Flavour + Size)"}
           </button>
-          {showCombos ? (
+          {showMix ? (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {comboTemplates.map((pack) => {
                 const done = packFullyApplied(pack);
@@ -347,11 +397,13 @@ export default function VariantEditor({
               onClick={() => setShowMoreGroups((v) => !v)}
               className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
             >
-              {showMoreGroups ? "Hide" : "+ Custom group"}
+              {showMoreGroups ? "Hide" : "+ Apna group"}
             </button>
             {!usuallyNeeds ? (
-              <span className="text-[11px] text-zinc-400">Skip = simple product</span>
-            ) : null}
+              <span className="text-[11px] text-zinc-400">Skip = seedha product, koi option nahi</span>
+            ) : (
+              <span className="text-[11px] text-zinc-400">Ya skip — options zaroori nahi</span>
+            )}
           </div>
           {showMoreGroups ? (
             <ExtraGroupBar
@@ -383,7 +435,7 @@ export default function VariantEditor({
             />
           ) : null}
 
-          {variants.map((group, groupIdx) => {
+          {editableGroups.map(({ g: group, idx: groupIdx }) => {
             const pool = getOptionPoolForGroup(group.name);
             const selectedKeys = new Set(
               group.options.map((o) => optionKey(o.label)).filter(Boolean),
@@ -497,163 +549,62 @@ export default function VariantEditor({
             );
           })}
 
-          <button
-            type="button"
-            onClick={() => setShowPrices((v) => !v)}
-            className="text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
-          >
-            {showPrices
-              ? "Hide per-option prices"
-              : "▸ Different price / discount per option (optional)"}
-          </button>
+          <VariantSkuMatrix
+            variants={variants}
+            onChange={onChange}
+            basePrice={basePrice}
+          />
 
-          {showPrices ? (
-            <div className="space-y-2 rounded-lg border border-dashed border-zinc-300 bg-white p-2 dark:border-zinc-600 dark:bg-zinc-900">
-              <p className="text-[10px] text-zinc-500">
-                Leave blank to use the product&apos;s main price. Fill only when this
-                option costs differently.
-              </p>
-              {variants.map((group, groupIdx) => (
-                <div key={`price-${groupIdx}`} className="space-y-1.5">
-                  <p className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-                    {group.name}
+          {/* Simple: always show rates & stock. Mix: optional advanced per-option. */}
+          {isSimpleOnly ? (
+            <SimpleRatesPanel
+              group={editableGroups[0]!.g}
+              groupIdx={editableGroups[0]!.idx}
+              basePrice={basePrice}
+              updateOption={updateOption}
+              removeOption={removeOption}
+            />
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowPrices((v) => !v)}
+                className="text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+              >
+                {showPrices
+                  ? "Hide per-option prices"
+                  : "▸ Group-level price / sold-out (optional — mix table upar hai)"}
+              </button>
+
+              {showPrices ? (
+                <div className="space-y-2 rounded-lg border border-dashed border-zinc-300 bg-white p-2 dark:border-zinc-600 dark:bg-zinc-900">
+                  <p className="text-[10px] text-zinc-500">
+                    Blank = product ka main price. Sirf tab bharo jab is option ka
+                    alag rate ho.
                   </p>
-                  {group.options.filter((o) => o.label.trim()).length === 0 ? (
-                    <p className="text-[11px] text-zinc-400">No options selected.</p>
-                  ) : null}
-                  {group.options.map((option, optIdx) => {
-                    if (!option.label.trim()) return null;
-                    const eff = effectiveOptionPrice(basePrice, option);
-                    const impliedPct =
-                      option.discount_pct ??
-                      percentFromOriginal(eff, option.original_price);
-                    const unavailable = option.is_available === false;
-                    return (
-                      <div
-                        key={optIdx}
-                        className={`flex flex-wrap items-center gap-1.5 rounded-lg px-1 py-1 ${
-                          unavailable ? "bg-zinc-100 dark:bg-zinc-800/60" : ""
-                        }`}
-                      >
-                        <span
-                          className={`w-20 truncate text-[11px] font-medium ${
-                            unavailable
-                              ? "text-zinc-400 line-through"
-                              : "text-zinc-700 dark:text-zinc-200"
-                          }`}
-                        >
-                          {option.label}
-                        </span>
-                        <input
-                          value={option.price ?? ""}
-                          onChange={(e) =>
-                            updateOption(groupIdx, optIdx, {
-                              price:
-                                e.target.value === ""
-                                  ? undefined
-                                  : Number(e.target.value),
-                            })
-                          }
-                          type="number"
-                          min={0}
-                          placeholder="Price"
-                          title="Absolute price for this option"
-                          className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800"
-                        />
-                        <input
-                          value={option.original_price ?? ""}
-                          onChange={(e) =>
-                            updateOption(groupIdx, optIdx, {
-                              original_price:
-                                e.target.value === ""
-                                  ? undefined
-                                  : Number(e.target.value),
-                              discount_pct: undefined,
-                            })
-                          }
-                          type="number"
-                          min={0}
-                          placeholder="Was"
-                          className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800"
-                        />
-                        <input
-                          value={option.discount_pct ?? ""}
-                          onChange={(e) => {
-                            const pct =
-                              e.target.value === ""
-                                ? undefined
-                                : Number(e.target.value);
-                            updateOption(groupIdx, optIdx, {
-                              discount_pct: pct,
-                              original_price:
-                                pct != null
-                                  ? originalFromPercent(eff, pct)
-                                  : undefined,
-                            });
-                          }}
-                          type="number"
-                          min={0}
-                          max={99}
-                          placeholder="% Off"
-                          className="w-14 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800"
-                        />
-                        <input
-                          value={option.price_adj ?? ""}
-                          onChange={(e) =>
-                            updateOption(groupIdx, optIdx, {
-                              price_adj:
-                                e.target.value === ""
-                                  ? undefined
-                                  : Number(e.target.value),
-                            })
-                          }
-                          type="number"
-                          placeholder="+Add"
-                          className="w-14 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800"
-                        />
-                        {impliedPct != null && impliedPct > 0 ? (
-                          <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                            -{impliedPct}%
-                          </span>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateOption(groupIdx, optIdx, {
-                              is_available: unavailable,
-                            })
-                          }
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            unavailable
-                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                          }`}
-                        >
-                          {unavailable ? "Sold out" : "In stock"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeOption(groupIdx, optIdx)}
-                          className="rounded-md p-1 text-zinc-300 hover:text-red-500"
-                          aria-label="Remove option"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    );
-                  })}
+                  {editableGroups.map(({ g: group, idx: groupIdx }) => (
+                    <SimpleRatesPanel
+                      key={`price-${groupIdx}`}
+                      group={group}
+                      groupIdx={groupIdx}
+                      basePrice={basePrice}
+                      updateOption={updateOption}
+                      removeOption={removeOption}
+                      showGroupTitle
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : null}
+              ) : null}
+            </>
+          )}
 
           {/* Live preview */}
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 dark:border-emerald-800 dark:bg-emerald-900/10">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-              Customer will see
+              Customer ko yeh dikhega
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {variants.map((g) => {
+              {editableGroups.map(({ g }) => {
                 const shown = g.options.filter((o) => o.label.trim()).slice(0, 6);
                 const total = g.options.filter((o) => o.label.trim()).length;
                 if (total === 0) {
@@ -662,7 +613,7 @@ export default function VariantEditor({
                       key={g.name}
                       className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
                     >
-                      {g.name}: pick options above
+                      {g.name}: upar se options choose karo
                     </span>
                   );
                 }
@@ -683,6 +634,122 @@ export default function VariantEditor({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SimpleRatesPanel({
+  group,
+  groupIdx,
+  basePrice,
+  updateOption,
+  removeOption,
+  showGroupTitle = false,
+}: {
+  group: VariantGroup;
+  groupIdx: number;
+  basePrice: number;
+  updateOption: (groupIdx: number, optIdx: number, patch: Partial<ProductVariant>) => void;
+  removeOption: (groupIdx: number, optIdx: number) => void;
+  showGroupTitle?: boolean;
+}) {
+  const options = group.options.filter((o) => o.label.trim());
+  return (
+    <div className="space-y-1.5 rounded-lg border border-sky-200 bg-white p-2.5 dark:border-sky-900/40 dark:bg-zinc-900">
+      <div>
+        <p className="text-[11px] font-semibold text-sky-800 dark:text-sky-300">
+          {showGroupTitle ? group.name : "Rates & stock"}
+        </p>
+        {!showGroupTitle ? (
+          <p className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
+            Har option ka alag rate ya sold-out. Blank = main product price (
+            {formatRupees(basePrice)}).
+          </p>
+        ) : null}
+      </div>
+      {options.length === 0 ? (
+        <p className="text-[11px] text-zinc-400">Pehle upar chips se options on karo.</p>
+      ) : null}
+      {group.options.map((option, optIdx) => {
+        if (!option.label.trim()) return null;
+        const eff = effectiveOptionPrice(basePrice, option);
+        const impliedPct =
+          option.discount_pct ?? percentFromOriginal(eff, option.original_price);
+        const unavailable = option.is_available === false;
+        return (
+          <div
+            key={optIdx}
+            className={`flex flex-wrap items-center gap-1.5 rounded-lg px-1 py-1 ${
+              unavailable ? "bg-zinc-100 dark:bg-zinc-800/60" : ""
+            }`}
+          >
+            <span
+              className={`w-20 truncate text-[11px] font-medium ${
+                unavailable
+                  ? "text-zinc-400 line-through"
+                  : "text-zinc-700 dark:text-zinc-200"
+              }`}
+            >
+              {option.label}
+            </span>
+            <input
+              value={option.price ?? ""}
+              onChange={(e) =>
+                updateOption(groupIdx, optIdx, {
+                  price: e.target.value === "" ? undefined : Number(e.target.value),
+                })
+              }
+              type="number"
+              min={0}
+              placeholder={String(Math.round(eff))}
+              title="Price for this option"
+              className="w-16 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800"
+            />
+            <input
+              value={option.original_price ?? ""}
+              onChange={(e) =>
+                updateOption(groupIdx, optIdx, {
+                  original_price:
+                    e.target.value === "" ? undefined : Number(e.target.value),
+                  discount_pct: undefined,
+                })
+              }
+              type="number"
+              min={0}
+              placeholder="Was"
+              className="w-14 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] outline-none dark:border-zinc-700 dark:bg-zinc-800"
+            />
+            {impliedPct != null && impliedPct > 0 ? (
+              <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                -{impliedPct}%
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() =>
+                updateOption(groupIdx, optIdx, {
+                  is_available: unavailable,
+                })
+              }
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                unavailable
+                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+              }`}
+            >
+              {unavailable ? "Sold out" : "In stock"}
+            </button>
+            <button
+              type="button"
+              onClick={() => removeOption(groupIdx, optIdx)}
+              className="rounded-md p-1 text-zinc-300 hover:text-red-500"
+              aria-label="Remove option"
+            >
+              <TrashIcon />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

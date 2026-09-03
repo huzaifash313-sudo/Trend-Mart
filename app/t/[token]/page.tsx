@@ -21,7 +21,8 @@ import {
 import DineInOrderTracker from "@/components/DineInOrderTracker";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { formatRupees } from "@/lib/formatters";
-import { computeVariantPrice } from "@/lib/variantPricing";
+import { computeVariantPrice, customerVariantGroups } from "@/lib/variantPricing";
+import { isComboUnavailable } from "@/lib/variantMatrix";
 import {
   DineInDealCard,
   DineInMenuRow,
@@ -280,7 +281,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
   }, []);
 
   const handleAdd = useCallback((product: Product) => {
-    const groups: VariantGroup[] = (product.variants as VariantGroup[] | null) ?? [];
+    const groups = customerVariantGroups(product.variants as VariantGroup[] | null);
     if (groups.length > 0) {
       setVariantSelection([]);
       setVariantQty(1);
@@ -291,7 +292,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
   }, [bump]);
 
   const handleRemove = useCallback((product: Product) => {
-    const groups: VariantGroup[] = (product.variants as VariantGroup[] | null) ?? [];
+    const groups = customerVariantGroups(product.variants as VariantGroup[] | null);
     if (groups.length > 0) {
       setCart((prev) => {
         const next = { ...prev };
@@ -322,7 +323,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
   /** Confirm the variant sheet — add the line to cart. */
   function confirmVariantAdd() {
     if (!variantProduct) return;
-    const groups: VariantGroup[] = (variantProduct.variants as VariantGroup[] | null) ?? [];
+    const groups = customerVariantGroups(variantProduct.variants as VariantGroup[] | null);
     // Require a selection in every group so the order is unambiguous.
     const missing = groups.filter((g) => !variantSelection.some((s) => s.groupName === g.name));
     if (missing.length > 0) {
@@ -330,6 +331,10 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
       return;
     }
     const label = variantLabelFor(variantSelection);
+    if (isComboUnavailable(variantProduct.variants as VariantGroup[] | null, label)) {
+      setPlaceError("This option is sold out — pick another flavour or size.");
+      return;
+    }
     const unit = unitPriceFor(variantProduct, variantSelection);
     const id = variantProduct.id;
     setCart((prev) => {
@@ -505,7 +510,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
             className="rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm"
             style={{
               backgroundColor:
-                table.shop_accent_color || "#10b981",
+                table.shop_accent_color || "var(--tm-brand-500)",
             }}
           >
             {table.table_name}

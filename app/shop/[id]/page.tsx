@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@/types";
+import { customerVariantGroups } from "@/lib/variantPricing";
 import { logShopView, logProductClick } from "@/services/analyticsService";
 import { trackCategoryInterest, trackProductView } from "@/lib/behavior";
 import { useLocation } from "@/context/LocationContext";
@@ -212,7 +213,7 @@ function ShopDetailInner({ id }: { id: string }) {
   const [showContactModal, setShowContactModal] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const { addToast } = useToast();
-  const { addItem } = useCart();
+  const { addItem, items: cartItems } = useCart();
   const { confirm } = useConfirm();
   const { openQuickAdd } = useMerchantQuickAdd();
   const { openShopReviews } = useShopReviews();
@@ -236,6 +237,7 @@ function ShopDetailInner({ id }: { id: string }) {
 
   // Direct "Order" checkout (single product, no cart step) — mirrors DealCard.
   const [orderIntent, setOrderIntent] = useState<ProductOrderIntent | null>(null);
+  const [orderProductId, setOrderProductId] = useState<string | null>(null);
 
   // ── Service-specific state ─────────────────────────────────────────────────
   const [servicePackages, setServicePackages] = useState<ServicePackageItem[]>([]);
@@ -283,7 +285,7 @@ function ShopDetailInner({ id }: { id: string }) {
    * courses/packages via the product form then saw an empty storefront.
    */
   const showProductCatalog = !isServiceCategory || products.length > 0;
-  const THEME_ACCENT = "#10b981";
+  const THEME_ACCENT = "var(--tm-brand-500)";
 
   // ── Data Loading (React Query: cached, no flicker) ────────────────────────
   useEffect(() => {
@@ -537,7 +539,7 @@ function ShopDetailInner({ id }: { id: string }) {
     if (!shop || isOwner) return;
     // Variant products must open the option picker first — otherwise the
     // customer would silently add the base (Size/Flavour) price to cart.
-    if (product.variants && product.variants.length > 0) {
+    if (customerVariantGroups(product.variants).length > 0) {
       setQuickViewProduct(product);
       return;
     }
@@ -610,7 +612,7 @@ function ShopDetailInner({ id }: { id: string }) {
     (product: Product) => {
       // Variant products must open the option picker first so the WhatsApp
       // order carries the selected Size/Flavour and its real price.
-      if (product.variants && product.variants.length > 0) {
+      if (customerVariantGroups(product.variants).length > 0) {
         setQuickViewProduct(product);
         return;
       }
@@ -1418,13 +1420,22 @@ function ShopDetailInner({ id }: { id: string }) {
           onWishlistToggle={() => handleWishlistToggle(quickViewProduct)}
           onOrder={(order) => {
             setQuickViewProduct(null);
-            handleOrder(order);
+            setOrderProductId(order.product.id);
           }}
         />
       )}
 
       {/* ── Direct Order Modal (single product → WhatsApp checkout) ────── */}
-      {orderIntent && shop && (
+      {orderProductId && shop && (
+        <ProductOrderModal
+          shop={shop}
+          cartLines={cartItems.filter((i) => i.productId === orderProductId)}
+          onClose={() => setOrderProductId(null)}
+          onOrderPlaced={() => setOrderProductId(null)}
+        />
+      )}
+
+      {orderIntent && shop && !orderProductId && (
         <ProductOrderModal
           product={orderIntent.product}
           shop={shop}

@@ -4,7 +4,8 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { computeVariantPricing } from "@/lib/variantPricing";
+import { computeVariantPricing, customerVariantGroups } from "@/lib/variantPricing";
+import { isComboUnavailable } from "@/lib/variantMatrix";
 import { getProductImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import type { Product, Shop } from "@/types";
@@ -85,7 +86,7 @@ export default function QuickViewModal({
   onWishlistToggle,
   onOrder,
 }: QuickViewModalProps) {
-  const { addItem } = useCart();
+  const { addItem, items: cartItems, updateQuantity, removeItem } = useCart();
   const { addToast } = useToast();
   const [added, setAdded] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -109,23 +110,28 @@ export default function QuickViewModal({
       }),
     [product.name, productLocation, images.length],
   );
-  const hasVariants = Boolean(product.variants && product.variants.length > 0);
+  const customerGroups = useMemo(
+    () => customerVariantGroups(product.variants),
+    [product.variants],
+  );
+  const hasVariants = customerGroups.length > 0;
   const variantLabel = useMemo(
     () => selectedVariants.map((v) => `${v.groupName}: ${v.optionLabel}`).join(" · "),
     [selectedVariants],
   );
-  // Unit price + original ("before discount") price for the selected combo so
-  // the badge/strikethrough are per-variant (never a wrong % / negative Save).
+  const comboSoldOut = hasVariants && isComboUnavailable(product.variants, variantLabel);
   const { price: displayPrice, originalPrice: variantOriginal } = computeVariantPricing(
     product.price,
     product.original_price ?? product.compare_at_price ?? null,
     product.variants,
     variantLabel,
   );
-  const variantsReady = !hasVariants || selectedVariants.length === (product.variants?.length ?? 0);
-  // Quantity tiers apply only when no variant overrides the base price —
-  // otherwise the variant's own price (absolute/add-on) wins.
-  const tiersActive = hasPriceTiers(product.price_tiers) && displayPrice === product.price;
+  const variantsReady = !hasVariants || selectedVariants.length === customerGroups.length;
+  const mixBag = useMemo(
+    () => cartItems.filter((i) => i.productId === product.id),
+    [cartItems, product.id],
+  );
+  const tiersActive = hasPriceTiers(product.price_tiers);
   const tierLabels = useMemo(
     () => (tiersActive ? tierPreviewLabels(product.price_tiers) : []),
     [tiersActive, product.price_tiers],
@@ -231,23 +237,53 @@ export default function QuickViewModal({
 
   const handleAddToCart = useCallback(() => {
     if (!variantsReady) {
-      addToast("Please choose flavour / options first.", "error");
+      addToast("Pehle flavour / size choose karo.", "error");
+      return;
+    }
+    if (comboSoldOut) {
+      addToast("Yeh option sold out hai — doosra flavour ya size lo.", "error");
       return;
     }
     addItem(cartItem, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     setAdded(true);
-    addToast(`"${product.name}" added to cart`, "success");
-    setTimeout(() => setAdded(false), 2000);
-  }, [product, shop, quantity, addItem, addToast, variantsReady, cartItem, variantLabel, itemNotes]);
+    addToast(
+      hasVariants
+        ? `"${variantLabel || product.name}" bag mein. Doosra flavour choose karke phir Add dabao.`
+        : `"${product.name}" added to cart`,
+      "success",
+    );
+    setTimeout(() => setAdded(false), 1800);
+  }, [
+    product,
+    shop,
+    quantity,
+    addItem,
+    addToast,
+    variantsReady,
+    comboSoldOut,
+    cartItem,
+    variantLabel,
+    itemNotes,
+    hasVariants,
+  ]);
 
   const handleOrder = useCallback(() => {
-    if (!variantsReady) {
-      addToast("Please choose flavour / options first.", "error");
+    const currentOk = variantsReady && !comboSoldOut;
+    if (mixBag.length === 0 && !currentOk) {
+      if (!variantsReady) {
+        addToast("Pehle flavour / size choose karo.", "error");
+        return;
+      }
+      addToast("Yeh option sold out hai.", "error");
       return;
     }
     if (!shop.whatsapp_number) {
       addToast("This store has no WhatsApp number yet — please contact them directly.", "info");
       return;
+    }
+    const alreadyInBag = mixBag.some((i) => (i.variant || "") === (variantLabel || ""));
+    if (currentOk && (mixBag.length === 0 || (hasVariants && !alreadyInBag))) {
+      addItem(cartItem, shop, quantity, variantLabel || undefined, itemNotes.trim() || undefined);
     }
     onOrder?.({
       product: cartItem,
@@ -255,7 +291,20 @@ export default function QuickViewModal({
       quantity,
       notes: itemNotes.trim() || undefined,
     });
-  }, [shop, quantity, addToast, variantsReady, cartItem, variantLabel, itemNotes, onOrder]);
+  }, [
+    shop,
+    quantity,
+    addToast,
+    variantsReady,
+    comboSoldOut,
+    cartItem,
+    variantLabel,
+    itemNotes,
+    onOrder,
+    mixBag,
+    addItem,
+    hasVariants,
+  ]);
 
   return (
     <div
@@ -403,6 +452,49 @@ export default function QuickViewModal({
             </div>
           )}
 
+          {mixBag.length > 0 ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+              <p className="mb-1.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                Your mix ({mixBag.reduce((n, i) => n + i.quantity, 0)} items)
+              </p>
+              <div className="space-y-1.5">
+                {mixBag.map((line) => (
+                  <div key={line.id} className="flex items-center gap-2">
+                    <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
+                      {line.variant || line.name}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(line.id, line.quantity - 1)}
+                        className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200 text-emerald-800 dark:border-emerald-800 dark:text-emerald-300"
+                        aria-label="Decrease"
+                      >
+                        −
+                      </button>
+                      <span className="w-5 text-center text-[11px] font-bold">{line.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(line.id, line.quantity + 1)}
+                        className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200 text-emerald-800 dark:border-emerald-800 dark:text-emerald-300"
+                        aria-label="Increase"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(line.id)}
+                      className="text-[10px] font-semibold text-red-500"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {hasVariants && product.variants ? (
             <VariantSelector
               variants={product.variants}
@@ -456,23 +548,26 @@ export default function QuickViewModal({
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!product.is_available || !variantsReady}
+              disabled={!product.is_available || !variantsReady || comboSoldOut}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                 added
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
                   : "border-teal-300 text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/30"
               }`}
             >
-              {added ? <><CheckIcon /> Added</> : <><CartPlusIcon /> Add to Cart</>}
+              {added ? <><CheckIcon /> Added</> : <><CartPlusIcon /> {hasVariants ? "Add this option" : "Add to Cart"}</>}
             </button>
             {onOrder && (
               <button
                 type="button"
                 onClick={handleOrder}
-                disabled={!product.is_available || !variantsReady}
+                disabled={
+                  !product.is_available ||
+                  (mixBag.length === 0 && (!variantsReady || comboSoldOut))
+                }
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Order
+                {mixBag.length > 1 ? "Order mix" : "Order"}
               </button>
             )}
             {onWishlistToggle && (

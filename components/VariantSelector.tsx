@@ -18,13 +18,19 @@
 /*  carries a distinct price and markdown, Daraz-style.                       */
 /* -------------------------------------------------------------------------- */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { VariantGroup, ProductVariant } from "@/types";
 import {
   computeVariantPrice,
+  customerVariantGroups,
   effectiveOptionPrice,
   effectiveOptionOriginal,
 } from "@/lib/variantPricing";
+import {
+  buildVariantLabel,
+  isComboUnavailable,
+  isOptionFullySoldOut,
+} from "@/lib/variantMatrix";
 import { formatRupees } from "@/lib/formatters";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -148,6 +154,8 @@ export default function VariantSelector({
   displayMode = "auto",
   compact = false,
 }: VariantSelectorProps) {
+  const groups = useMemo(() => customerVariantGroups(variants), [variants]);
+
   const [selectedMap, setSelectedMap] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     if (initialSelection) {
@@ -158,9 +166,33 @@ export default function VariantSelector({
     return initial;
   });
 
+  useEffect(() => {
+    setSelectedMap((prev) => {
+      const next = { ...prev };
+      for (const group of groups) {
+        const current = next[group.name];
+        const stillValid = group.options.some(
+          (o) =>
+            o.label === current &&
+            o.is_available !== false &&
+            !isOptionFullySoldOut(variants, group.name, o.label),
+        );
+        if (stillValid) continue;
+        const first = group.options.find(
+          (o) =>
+            o.is_available !== false &&
+            !isOptionFullySoldOut(variants, group.name, o.label),
+        );
+        if (first) next[group.name] = first.label;
+        else delete next[group.name];
+      }
+      return next;
+    });
+  }, [groups, variants]);
+
   /** Compute which option is selected for each group. */
   const selectedEntries = useMemo((): SelectedVariant[] => {
-    return variants.flatMap((group) => {
+    return groups.flatMap((group) => {
       const selectedLabel = selectedMap[group.name];
       if (!selectedLabel) return [];
       const option = group.options.find((o) => o.label === selectedLabel);
@@ -173,23 +205,27 @@ export default function VariantSelector({
         },
       ];
     });
-  }, [variants, selectedMap]);
+  }, [groups, selectedMap]);
 
-  /** Total price with adjustments (absolute prices + additive adjustments). */
+  const comboLabel = useMemo(
+    () => buildVariantLabel(selectedEntries),
+    [selectedEntries],
+  );
+  const comboSoldOut =
+    selectedEntries.length === groups.length &&
+    groups.length > 0 &&
+    isComboUnavailable(variants, comboLabel);
+
   const totalPrice = useMemo(() => {
-    const label = selectedEntries
-      .map((e) => `${e.groupName}: ${e.optionLabel}`)
-      .join(" · ");
-    return computeVariantPrice(basePrice, variants, label);
-  }, [basePrice, variants, selectedEntries]);
+    return computeVariantPrice(basePrice, variants, comboLabel);
+  }, [basePrice, variants, comboLabel]);
 
   const handleSelect = useCallback(
     (groupName: string, optionLabel: string) => {
       setSelectedMap((prev) => {
         const next = { ...prev, [groupName]: optionLabel };
-        // Notify parent after state update
         setTimeout(() => {
-          const entries = variants.flatMap((group) => {
+          const entries = groups.flatMap((group) => {
             const label = next[group.name];
             if (!label) return [];
             const opt = group.options.find((o) => o.label === label);
@@ -207,14 +243,23 @@ export default function VariantSelector({
         return next;
       });
     },
-    [variants, onSelectionChange],
+    [groups, onSelectionChange],
   );
 
-  if (!variants || variants.length === 0) return null;
+  const sentLabel = useRef("");
+  useEffect(() => {
+    const label = comboLabel;
+    if (label === sentLabel.current) return;
+    if (groups.length > 0 && selectedEntries.length !== groups.length) return;
+    sentLabel.current = label;
+    onSelectionChange?.(selectedEntries);
+  }, [comboLabel, groups.length, selectedEntries, onSelectionChange]);
+
+  if (!groups.length) return null;
 
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>
-      {variants.map((group) => {
+      {groups.map((group) => {
         const isColor =
           displayMode === "swatches"
             ? true
@@ -257,7 +302,21 @@ export default function VariantSelector({
               {group.options.map((option) => {
                 const isSelected = selectedMap[group.name] === option.label;
                 const colorHex = isColor ? getColorHex(option.label) : null;
-                const unavailable = option.is_available === false;
+                const optionGone =
+                  option.is_available === false ||
+                  isOptionFullySoldOut(variants, group.name, option.label);
+                const previewLabel = buildVariantLabel(
+                  groups.map((g) => ({
+                    groupName: g.name,
+                    optionLabel:
+                      g.name === group.name ? option.label : selectedMap[g.name] ?? "",
+                  })),
+                );
+                const comboGone =
+                  groups.every((g) =>
+                    g.name === group.name ? true : Boolean(selectedMap[g.name]),
+                  ) && isComboUnavailable(variants, previewLabel);
+                const unavailable = optionGone || comboGone;
                 const eff = effectiveOptionPrice(basePrice, option);
                 const orig = effectiveOptionOriginal(basePrice, baseOriginalPrice, option);
                 const pct = percentOff(eff, orig);
@@ -329,6 +388,12 @@ export default function VariantSelector({
           </div>
         );
       })}
+
+      {comboSoldOut ? (
+        <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+          This option is sold out. Pick another flavour or size.
+        </p>
+      ) : null}
 
       {/* Total price display (whenever the selected options change the price) */}
       {totalPrice !== basePrice && (

@@ -31,8 +31,8 @@ import { validateCoupon, fetchCouponsByShopId } from "@/services/couponService";
 import { saveOrderRecord } from "@/services/orderHistoryService";
 import type { OrderItem as OrderItemType, PriceTier, Shop, VariantGroup } from "@/types";
 import { formatRupees } from "@/lib/formatters";
-import { priceForQuantity, hasPriceTiers } from "@/lib/priceTiers";
-import { computeVariantPricing, parseVariantLabel } from "@/lib/variantPricing";
+import { hasPriceTiers, computePooledLineTotals } from "@/lib/priceTiers";
+import { computeVariantPricing, customerVariantGroups, parseVariantLabel } from "@/lib/variantPricing";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 import { sanitizeText } from "@/lib/validations";
@@ -101,15 +101,38 @@ export interface WhatsAppCartItem {
   shortCode?: string;
   /** Quantity price tiers — line total recomputes when the qty changes. */
   priceTiers?: PriceTier[] | null;
+  /** Pre-tier unit price. Pack deals of 6 mix flavours using this, not the discounted unit. */
+  basePrice?: number;
 }
 
-/** Line total for an item at a given quantity (tier-aware). */
-function itemLineTotal(item: { price: number; priceTiers?: PriceTier[] | null }, qty: number): number {
-  const q = Math.max(1, Math.min(99, Math.round(qty) || 1));
-  if (hasPriceTiers(item.priceTiers)) {
-    return priceForQuantity(item.price, item.priceTiers, q);
-  }
-  return item.price * q;
+function pooledTotalsFor(
+  items: WhatsAppCartItem[],
+  quantities: Record<string, number>,
+): Map<string, number> {
+  return computePooledLineTotals(
+    items.map((item) => {
+      const quantity = Math.max(1, Math.min(99, Math.round(quantities[item.id] ?? item.quantity) || 1));
+      const base = item.basePrice ?? item.price;
+      return {
+        id: item.id,
+        productId: item.productId,
+        quantity,
+        price: base,
+        basePrice: base,
+        priceTiers: item.priceTiers,
+      };
+    }),
+  );
+}
+
+function itemLineTotal(
+  item: WhatsAppCartItem,
+  quantities: Record<string, number>,
+  totals?: Map<string, number>,
+): number {
+  const qty = Math.max(1, Math.min(99, Math.round(quantities[item.id] ?? item.quantity) || 1));
+  const map = totals ?? pooledTotalsFor([item], quantities);
+  return map.get(item.id) ?? Math.round((item.basePrice ?? item.price) * qty);
 }
 
 /** Convert a "Group: Label · Group: Label" string into `SelectedVariant[]`. */
@@ -124,14 +147,13 @@ function labelToSelection(label?: string): SelectedVariant[] {
 
 /** Whether a variant label selects every group of a product's variant set. */
 function isVariantComplete(variants: VariantGroup[], label?: string): boolean {
-  if (!variants || variants.length === 0) return true;
+  const groups = customerVariantGroups(variants);
+  if (groups.length === 0) return true;
   if (!label) return false;
   const selectedGroups = parseVariantLabel(label)
-    .filter((p) => p.groupName)
-    .map((p) => p.groupName);
-  // Legacy labels without "Group: " prefixes can't be verified per-group.
-  if (selectedGroups.length === 0) return true;
-  return variants.every((g) => selectedGroups.includes(g.name));
+    .map((p) => p.groupName)
+    .filter(Boolean);
+  return groups.every((g) => selectedGroups.includes(g.name));
 }
 
 /** Variant metadata for a cart product (authoritative base price + options). */
@@ -305,14 +327,15 @@ function buildWhatsAppMessage(
     `──────────────────────────`,
   ];
 
+  const waTotals = pooledTotalsFor(items, quantities);
   for (const item of items) {
     const rawQty = quantities[item.id] ?? item.quantity;
     const qty = Math.max(1, Math.min(99, Math.round(sanitizePayloadNumber(rawQty, 1))));
-    const safePrice = sanitizePayloadNumber(item.price);
+    const itemTotal = itemLineTotal(item, quantities, waTotals);
+    const safePrice = sanitizePayloadNumber(Math.round(itemTotal / Math.max(1, qty)));
     const safeItemName = sanitizePayloadString(item.name, 100);
     const safeVariant = item.variant ? sanitizePayloadString(item.variant, 50) : "";
     const safeItemNotes = item.notes ? sanitizePayloadString(item.notes, 200) : "";
-    const itemTotal = itemLineTotal({ price: safePrice, priceTiers: item.priceTiers }, qty);
     const safeOriginalPrice = item.originalPrice ? sanitizePayloadNumber(item.originalPrice) : 0;
 
     const variantLabel = safeVariant ? ` (${safeVariant})` : "";
@@ -509,7 +532,9 @@ export default function WhatsAppCheckoutModal({
   const resolvedItems = useMemo(() => {
     return items.map((item) => {
       const data = variantData[item.productId];
-      if (!data || data.variants.length === 0) return item;
+      if (!data || customerVariantGroups(data.variants).length === 0) {
+        return { ...item, basePrice: item.basePrice ?? item.price };
+      }
       const sel = variantSelections[item.id];
       if (!sel) return item;
       const { price, originalPrice } = computeVariantPricing(
@@ -522,6 +547,7 @@ export default function WhatsAppCheckoutModal({
         ...item,
         variant: sel,
         price,
+        basePrice: price,
         originalPrice: originalPrice ?? undefined,
       };
     });
@@ -531,18 +557,23 @@ export default function WhatsAppCheckoutModal({
     () =>
       items.filter((item) => {
         const data = variantData[item.productId];
-        if (!data || data.variants.length === 0) return false;
+        if (!data || customerVariantGroups(data.variants).length === 0) return false;
         return !isVariantComplete(data.variants, variantSelections[item.id]);
       }),
     [items, variantData, variantSelections],
   );
 
+  const pooledTotals = useMemo(
+    () => pooledTotalsFor(resolvedItems, quantities),
+    [resolvedItems, quantities],
+  );
+
   const subtotal = useMemo(() => {
-    return resolvedItems.reduce((sum, item) => {
-      const qty = quantities[item.id] ?? item.quantity;
-      return sum + itemLineTotal(item, qty);
-    }, 0);
-  }, [resolvedItems, quantities]);
+    return resolvedItems.reduce(
+      (sum, item) => sum + itemLineTotal(item, quantities, pooledTotals),
+      0,
+    );
+  }, [resolvedItems, quantities, pooledTotals]);
 
   const discountAmount = useMemo(() => {
     return couponResult?.valid ? couponResult.discountAmount : 0;
@@ -1083,7 +1114,7 @@ export default function WhatsAppCheckoutModal({
       // 1. Persist order to Supabase (effective unit price + qty — tier-aware)
       const orderItems: OrderItemType[] = resolvedItems.map(item => {
         const oQty = Math.max(1, Math.round(quantities[item.id] ?? item.quantity));
-        const oTotal = itemLineTotal(item, oQty);
+        const oTotal = itemLineTotal(item, quantities, pooledTotals);
         return {
           product_id: item.productId,
           name: item.name,
@@ -1277,6 +1308,7 @@ export default function WhatsAppCheckoutModal({
     couponCode,
     couponResult,
     quantities,
+    pooledTotals,
     belowMinimumOrder,
     minOrderAmount,
     shopClosed,
@@ -1510,12 +1542,12 @@ export default function WhatsAppCheckoutModal({
             <div className="max-h-64 space-y-2 overflow-y-auto px-6 py-4">
               {resolvedItems.map(item => {
                 const qty = quantities[item.id] ?? item.quantity;
-                const itemTotal = itemLineTotal(item, qty);
+                const itemTotal = itemLineTotal(item, quantities, pooledTotals);
                 const tierUnit = hasPriceTiers(item.priceTiers)
                   ? Math.round(itemTotal / Math.max(1, qty))
                   : item.price;
                 const data = item.viewKind === undefined ? variantData[item.productId] : undefined;
-                const hasVariants = !!data && data.variants.length > 0;
+                const hasVariants = !!data && customerVariantGroups(data.variants).length > 0;
                 const needsSelection = hasVariants && !isVariantComplete(data!.variants, item.variant);
                 const variantOpen = variantOpenId === item.id;
                 return (
@@ -2016,7 +2048,7 @@ export default function WhatsAppCheckoutModal({
                       {item.name} {item.variant ? `(${item.variant})` : ""} × {quantities[item.id] ?? item.quantity}
                     </span>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                      {formatRupees(itemLineTotal(item, quantities[item.id] ?? item.quantity))}
+                      {formatRupees(itemLineTotal(item, quantities, pooledTotals))}
                     </span>
                   </div>
                 ))}
