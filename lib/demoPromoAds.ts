@@ -195,9 +195,12 @@ export const DEMO_PROMO_ADS: PromotionalAd[] = [
 ];
 
 export function demoAdsEnabled(): boolean {
-  // Demo ads show whenever the DB has no live ads for a placement.
-  // Opt out in production with NEXT_PUBLIC_DEMO_ADS=false once real ads are live.
-  return process.env.NEXT_PUBLIC_DEMO_ADS !== "false";
+  // OFF by default — fake Tandoori/Pizza banners must not appear after a fresh DB.
+  // Enable only for local demos: NEXT_PUBLIC_DEMO_ADS=true
+  return (
+    process.env.NEXT_PUBLIC_DEMO_ADS === "true" ||
+    process.env.NEXT_PUBLIC_DEMO_ADS === "1"
+  );
 }
 
 export function getDemoAdsForPlacement(

@@ -4656,11 +4656,14 @@ html.dark .tm-offer-ticker--delivery {
   animation: tm-offer-label-marquee 7s linear infinite;
 }
 @keyframes tm-offer-label-marquee {
-  0% {
+  /* Hold start so "Sun-Sat" never reads as "n-Sat" mid-clip. */
+  0%,
+  20% {
     transform: translateX(0);
   }
+  80%,
   100% {
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% + 4.5rem));
   }
 }
 @media (prefers-reduced-motion: reduce) {
