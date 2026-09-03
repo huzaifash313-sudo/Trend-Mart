@@ -10,7 +10,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import { applyBrandTheme, readStoredBrandTheme, syncBrowserBrandChrome, normalizeBrandThemeId } from "@/lib/brandThemes";
+import { applyBrandTheme, normalizeBrandThemeId, readStoredBrandTheme, syncBrowserBrandChrome } from "@/lib/brandThemes";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Real‑Time Dynamic Theme, Font Scale & Grid Layout Engine       */
@@ -228,24 +228,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyCardStyle(prefs.cardStyle);
   }, [prefs.cardStyle]);
 
-  // Brand color theme — local first (no flash), then sync published platform theme
+  // Brand color theme (admin presets) — keep CSS + browser chrome in sync
   useLayoutEffect(() => {
     applyBrandTheme(readStoredBrandTheme());
     syncBrowserBrandChrome();
   }, []);
 
+  // Pull the published platform brand theme so a Super-Admin "publish" reaches
+  // every visitor (not just the admin's device). Local preview still wins until
+  // the fetch resolves; the published id is the source of truth for guests.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/brand-theme", { cache: "no-store" });
-        if (!res.ok || cancelled) return;
-        const json = (await res.json()) as { id?: string };
-        const id = normalizeBrandThemeId(json?.id);
-        if (cancelled) return;
-        applyBrandTheme(id);
+        const json = (await res.json()) as { id?: unknown };
+        if (!cancelled) {
+          applyBrandTheme(normalizeBrandThemeId(json?.id));
+        }
       } catch {
-        /* keep local / default */
+        /* keep local fallback */
       }
     })();
     return () => {

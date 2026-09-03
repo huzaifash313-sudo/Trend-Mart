@@ -108,7 +108,7 @@ export function applyBrandTheme(theme: BrandThemeId): void {
   }
 }
 
-/** Admin “Reset to default” — back to TrendsMart green. */
+/** Admin "Reset to default" — back to TrendsMart green. */
 export function resetBrandTheme(): void {
   applyBrandTheme(DEFAULT_BRAND_THEME);
 }
