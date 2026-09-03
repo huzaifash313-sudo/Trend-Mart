@@ -70,11 +70,18 @@ function rankBoost(query: string, hit: ProductSearchHit, sortMode?: SearchSortMo
   if (name.startsWith(q)) boost += 8;
   if (hit.discountPct >= 5) boost += Math.min(hit.discountPct / 2, 12);
   if (sortMode === "best_pick" && hit.discountPct >= 3) boost += hit.discountPct;
-  // Denormalized product rating — no extra query; lifts trusted items.
+  // Denormalized product rating — lifts trusted / reviewed items for recommendations.
   const rating = Number(hit.avgRating) || 0;
   const reviews = Number(hit.reviewCount) || 0;
-  if (rating >= 4 && reviews > 0) boost += Math.min(rating * 1.5 + Math.log10(reviews + 1) * 2, 10);
-  else if (rating > 0 && reviews > 0) boost += Math.min(rating, 5);
+  if (sortMode === "best_pick") {
+    if (rating >= 4.2 && reviews >= 2) boost += Math.min(rating * 2.2 + Math.log10(reviews + 1) * 4, 16);
+    else if (rating >= 3.5 && reviews > 0) boost += Math.min(rating * 1.4 + reviews, 10);
+  } else if (rating >= 4 && reviews > 0) {
+    boost += Math.min(rating * 1.5 + Math.log10(reviews + 1) * 2, 10);
+  } else if (rating > 0 && reviews > 0) {
+    boost += Math.min(rating, 5);
+  }
+  if (hit.distanceKm != null && hit.distanceKm <= 5) boost += Math.max(0, 6 - hit.distanceKm);
   return boost;
 }
 
@@ -371,13 +378,33 @@ export function formatProductSearchReply(
         : `"${query}" — ${hits.length} product(s) across ${uniqueShops} shop(s)${sortLabel}`;
 
   const top = hits[0];
+  const whyBits: string[] = [];
+  if (top) {
+    if (top.discountPct >= 5) whyBits.push(`${top.discountPct}% OFF`);
+    if ((top.avgRating ?? 0) >= 4 && (top.reviewCount ?? 0) > 0) {
+      whyBits.push(`★ ${Number(top.avgRating).toFixed(1)} (${top.reviewCount} reviews)`);
+    }
+    if (top.distanceKm != null && top.distanceKm <= 8) {
+      whyBits.push(
+        top.distanceKm < 1
+          ? `~${Math.round(top.distanceKm * 1000)}m away`
+          : `~${top.distanceKm.toFixed(1)}km away`,
+      );
+    }
+    if (sortMode === "best_pick" && whyBits.length === 0) whyBits.push("best match for your search");
+  }
+  const whyLine =
+    whyBits.length > 0 ? `\n💡 *Kyun recommend:* ${whyBits.join(" · ")}\n` : "\n";
+
   const topSection = top
     ? `🔎 *Closest match:* *${top.name}* — ${rs(top.price)}${
         top.discountPct > 0 ? ` (*${top.discountPct}% OFF*)` : ""
       }\n` +
       `📍 *${top.shopName}*${top.shopLocation ? ` · ${top.shopLocation}` : ""}${
-        top.distanceKm != null ? ` · ~${top.distanceKm < 1 ? `${Math.round(top.distanceKm * 1000)}m` : `${top.distanceKm.toFixed(1)}km`}` : ""
-      }\n` +
+        top.distanceKm != null
+          ? ` · ~${top.distanceKm < 1 ? `${Math.round(top.distanceKm * 1000)}m` : `${top.distanceKm.toFixed(1)}km`}`
+          : ""
+      }${whyLine}` +
       `👉 [Open product](${top.productPath}) · [Visit shop](${top.shopPath})\n`
     : "";
 
@@ -386,8 +413,12 @@ export function formatProductSearchReply(
       h.discountPct > 0
         ? ` · *${h.discountPct}% OFF* (${rs(h.originalPrice!)} → ${rs(h.price)})`
         : ` · ${rs(h.price)}`;
+    const ratingBit =
+      (h.avgRating ?? 0) > 0 && (h.reviewCount ?? 0) > 0
+        ? ` · ★ ${Number(h.avgRating).toFixed(1)}`
+        : "";
     return (
-      `${i + 2}. *${h.name}*${discount}\n` +
+      `${i + 2}. *${h.name}*${discount}${ratingBit}\n` +
       `   🏪 *${h.shopName}*${h.shopLocation ? ` · ${h.shopLocation}` : ""}\n` +
       `   🔗 [Product link](${h.productPath}) · [Shop](${h.shopPath})`
     );
@@ -401,17 +432,26 @@ export function formatProductSearchReply(
         : "";
 
   const body = rest.length ? `\n*More options:*\n\n${rest.join("\n\n")}` : "";
+  const coach =
+    role === "customer" && top
+      ? `\n\n✅ *Mera tip:* pehle top pick check karo — rating/discount/distance mix se choose kiya. Agar sasta chahiye to *"sasta ${query}"* likho.`
+      : "";
 
   return {
     intent: "product_search",
     confidence: Math.min(0.94, 0.55 + (hits[0]?.score ?? 0) / 200),
     suggestions:
       role === "customer"
-        ? ["Sasta mobile dhundo", "Electronics shop dhundo", "Best deals?", "Order kaise karun?"]
+        ? [
+            `Sasta ${query.slice(0, 24)} dhundo`,
+            "Best deals?",
+            "Qareeb ki shops",
+            "Order kaise karun?",
+          ]
         : role === "merchant"
           ? ["Meri shop ki live summary", "Best selling product?", "Growth strategy"]
           : getShopCategoryPrompts(shopCategory, shopName),
-    reply: `✨ *${title}*\n\n${topSection}${body}${browseLink}\n\n_Neeche cards tap karke product/shop kholen._`,
+    reply: `✨ *${title}*\n\n${topSection}${body}${browseLink}${coach}\n\n_Neeche cards tap karke product/shop kholen._`,
     products: hits,
   };
 }

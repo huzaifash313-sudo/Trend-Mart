@@ -14,7 +14,8 @@ import {
   syncPushSubscriptionIfGranted,
 } from "@/lib/pushClient";
 import ChatIncomingBanner from "@/components/ChatIncomingBanner";
-import { getActiveConversationId } from "@/lib/activeChat";
+import { isViewingConversation } from "@/lib/activeChat";
+import { isChatNotification } from "@/lib/chatNotifications";
 
 function BrowserNotifyBridge() {
   const { notifications, isMuted } = useNotifications();
@@ -44,6 +45,9 @@ function BrowserNotifyBridge() {
     if (!latest || latest.read) return;
     if (seenIds.current.has(latest.id)) return;
     seenIds.current.add(latest.id);
+
+    // Chat never uses OS Notification API from the tab — web push + banner only.
+    if (isChatNotification(latest)) return;
 
     // Respect user prefs — promotions / non-essential stay quiet.
     try {
@@ -192,13 +196,34 @@ function NotificationChrome() {
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
     const onMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; conversationId?: string } | undefined;
-      if (!data || data.type !== "tm-active-chat-query") return;
-      const viewing =
-        Boolean(data.conversationId) &&
-        getActiveConversationId() === data.conversationId &&
-        document.visibilityState === "visible";
-      event.ports?.[0]?.postMessage({ viewing });
+      const data = event.data as
+        | { type?: string; conversationId?: string; title?: string; body?: string; url?: string }
+        | undefined;
+      if (!data?.type) return;
+
+      if (data.type === "tm-active-chat-query") {
+        const viewing =
+          Boolean(data.conversationId) &&
+          isViewingConversation(data.conversationId) &&
+          document.visibilityState === "visible";
+        event.ports?.[0]?.postMessage({ viewing });
+        return;
+      }
+
+      // App open on another page: show WhatsApp-style banner instead of OS toast.
+      if (data.type === "tm-chat-alert" && data.conversationId) {
+        if (isViewingConversation(data.conversationId)) return;
+        window.dispatchEvent(
+          new CustomEvent("trendsmart:chat-alert", {
+            detail: {
+              conversationId: data.conversationId,
+              title: data.title || "New message",
+              body: data.body || "",
+              linkUrl: data.url || `/account/inquiries?c=${data.conversationId}`,
+            },
+          }),
+        );
+      }
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);

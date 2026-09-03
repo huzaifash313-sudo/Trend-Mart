@@ -3,10 +3,8 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Merchant Promotional Ad Requests                              */
 /*                                                                             */
-/*  Lets a merchant request a sponsored banner on home / deals / products /   */
-/*  store (or all pages). Pick a pricing plan, creative, and link target      */
-/*  (store, product, deal, or custom URL). Requests start as "pending" and    */
-/*  only go live after Super-Admin approval.                                  */
+/*  pick a plan + spend tokens for instant auto-approve, or leave pending for  */
+/*  Super-Admin review.                                                       */
 /* -------------------------------------------------------------------------- */
 
 import { useState, useEffect, useCallback, useMemo, type FormEvent } from "react";
@@ -28,8 +26,13 @@ import {
   fetchActiveAdPlans,
   resolveAdPlacements,
 } from "@/services/adsService";
+import {
+  fetchTokenBalance,
+  publishAdWithTokens,
+} from "@/services/billingService";
 import type { PromotionalAd, PromotionalAdFormData, AdPlan, AdPlacementChoice } from "@/types";
 import { AD_PLACEMENT_LABELS, AD_PLACEMENT_OPTIONS } from "@/types";
+import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
 
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
@@ -86,6 +89,8 @@ export default function MerchantAdsPage() {
   const [plans, setPlans] = useState<AdPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [placementChoice, setPlacementChoice] = useState<AdPlacementChoice>("homepage_top");
+  const [tokenBalance, setTokenBalance] = useState(0);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
 
   // ── Load pricing plans ───────────────────────────────────────────────
   useEffect(() => {
@@ -128,8 +133,9 @@ export default function MerchantAdsPage() {
   // ── Load ad requests ─────────────────────────────────────────────────────
   const loadAds = useCallback(async (id: string) => {
     setAdsLoading(true);
-    const result = await fetchShopAds(id);
+    const [result, bal] = await Promise.all([fetchShopAds(id), fetchTokenBalance(id)]);
     if (result.success) setAds(result.data);
+    if (bal.success) setTokenBalance(bal.data);
     setAdsLoading(false);
   }, []);
 
@@ -208,9 +214,13 @@ export default function MerchantAdsPage() {
 
     if (!failed) {
       addToast(
-        placements.length > 1
-          ? `Ad requests submitted for ${placements.length} pages!`
-          : "Ad request submitted for review!",
+        !isPaidFeaturesEnabled()
+          ? placements.length > 1
+            ? `Ads live on ${placements.length} pages!`
+            : "Ad is live!"
+          : placements.length > 1
+            ? `Ad requests submitted for ${placements.length} pages!`
+            : "Ad request submitted for review!",
         "success",
       );
       await loadAds(shopId);
@@ -240,6 +250,33 @@ export default function MerchantAdsPage() {
     }
     setDeletingId(null);
   }, [addToast, confirm]);
+
+  const handlePublishWithTokens = useCallback(
+    async (ad: PromotionalAd) => {
+      const cost = Math.max(0, Number(ad.price_paid) || 0);
+      if (cost <= 0) {
+        addToast("This ad has no plan price. Edit it and pick a pricing plan first.", "error");
+        return;
+      }
+      if (
+        !(await confirm(
+          `Spend ${cost} tokens to publish "${ad.title}" now? (Balance: ${tokenBalance})`,
+        ))
+      ) {
+        return;
+      }
+      setPublishingId(ad.id);
+      const result = await publishAdWithTokens(ad.id);
+      setPublishingId(null);
+      if (result.success) {
+        addToast(`Live! ${result.data.tokens_spent} tokens spent.`, "success");
+        if (shopId) await loadAds(shopId);
+      } else {
+        addToast(result.error, "error");
+      }
+    },
+    [addToast, confirm, loadAds, shopId, tokenBalance],
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -300,10 +337,15 @@ export default function MerchantAdsPage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <p className="text-xs text-emerald-900 dark:text-emerald-200">
+            Soft launch: ads are <strong>free</strong> — submit and they go live instantly
+            (admin can still pause anything).
+          </p>
+        </div>
+
         <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-          Choose where the ad appears (Home, Deals, Products, Store, or All pages), pick a
-          pricing plan, link it to your store / a product / a deal, then submit. TrendsMart
-          admin reviews before it goes live — usually within 24 hours.
+          Pick a placement, upload creative, link your store / product / deal, then submit.
         </div>
 
         {/* ── Pricing plans ──────────────────────────────────────────────── */}
@@ -581,7 +623,21 @@ export default function MerchantAdsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {isPaidFeaturesEnabled() &&
+                        ad.status === "pending" &&
+                        Number(ad.price_paid) > 0 && (
+                        <button
+                          type="button"
+                          disabled={publishingId === ad.id}
+                          onClick={() => void handlePublishWithTokens(ad)}
+                          className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {publishingId === ad.id
+                            ? "Publishing…"
+                            : `Publish with ${Number(ad.price_paid)} tokens`}
+                        </button>
+                      )}
                       <button type="button" onClick={() => handleEdit(ad)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">
                         Edit
                       </button>

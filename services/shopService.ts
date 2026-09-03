@@ -782,6 +782,14 @@ export async function createShop(
       }
     }
 
+    // 1st month free — start trial subscription (best-effort; never blocks shop create).
+    try {
+      const { initializeSubscription } = await import("@/services/subscriptionService");
+      void initializeSubscription(saved.id, "free_trial");
+    } catch (subErr) {
+      logError(subErr, { module: "shopService.createShop.trial", meta: { shopId: saved.id } });
+    }
+
     return { success: true, data: saved };
   } catch (err) {
     logError(err, { module: "shopService.createShop", meta: { form } });

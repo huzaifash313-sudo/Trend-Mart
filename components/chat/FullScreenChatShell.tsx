@@ -130,9 +130,8 @@ export function ChatShellHeader({
 export function ChatShellBody({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#ece5dd] bg-[url('/chat-bg-light.svg')] bg-repeat dark:bg-zinc-900 ${className}`}
+      className={`min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#ece5dd] bg-[url('/chat-bg-light.svg')] bg-repeat dark:bg-zinc-900 dark:bg-none ${className}`}
       style={{
-        backgroundImage: undefined,
         backgroundColor: "var(--tm-chat-bg, #f0f2f5)",
       }}
     >

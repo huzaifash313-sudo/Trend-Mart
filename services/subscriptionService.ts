@@ -6,6 +6,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
+import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,7 +193,7 @@ export interface SubscriptionWithShop extends MerchantSubscription {
 
 /**
  * Initialize a merchant subscription when a new shop is created.
- * Starts a free trial for 14 days.
+ * Starts a free trial for 30 days (1st month free).
  */
 export async function initializeSubscription(
   shopId: string,
@@ -263,6 +264,11 @@ export async function fetchSubscription(
 export async function checkMerchantAccess(
   shopId: string,
 ): Promise<AccessCheckResult> {
+  // Soft launch: never block merchants for unpaid fees / trial end.
+  if (!isPaidFeaturesEnabled()) {
+    return { allowed: true, reason: "Soft launch — paid gates disabled." };
+  }
+
   const supabase = createClient();
   try {
     const subResult = await fetchSubscription(shopId);

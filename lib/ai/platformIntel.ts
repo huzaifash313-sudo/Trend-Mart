@@ -111,12 +111,21 @@ export function generateBusinessAdvisorReply(
 
   const tips = [
     top[0]
-      ? `• *${top[0].category}* mein sab se zyada activity hai — agar aapke area mein gap hai, yahan start karein.`
+      ? `• *${top[0].category}* mein sab se zyada activity hai — agar aapke area mein gap / kam shops hain, yahan start karein.`
       : "• Pehle ek clear niche choose karein (food, grocery, fashion, electronics).",
-    "• WhatsApp number + clear photos = trust build hota hai.",
-    "• 10–15 hero products se start karein, baad mein bulk add karein.",
-    "• Free delivery threshold set karein taake average order barhe.",
+    top[1]
+      ? `• Runner-up niche: *${top[1].category}* — competition thori kam ho sakti hai, margin check karein.`
+      : "• Doosri category backup rakhein taake demand shift pe ready rahein.",
+    "• WhatsApp number + clear photos + 3–5 reviews = trust build hota hai.",
+    "• 10–15 hero products se start karein; pehle 5 pe discount badge lagayein.",
+    "• Free delivery threshold (jaise Rs 1500+) set karein taake average order barhe.",
+    "• Local QR print + WhatsApp status + nearby groups = pehle 20 orders ka shortcut.",
   ];
+
+  const gapHint =
+    top.length >= 3
+      ? `\n🎯 *Opportunity read:* Top demand *${top[0]!.category}* hai, lekin *${top[2]!.category}* mein ${top[2]!.shops} shops hain — agar aapke neighbourhood mein yeh weak hai, early-mover ban sakte ho.\n`
+      : "\n";
 
   return {
     intent: "business_advisor",
@@ -129,9 +138,10 @@ export function generateBusinessAdvisorReply(
     ],
     reply:
       `🧠 *Business Advisor* _(live data · ${new Date(snapshot.fetchedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})_\n\n` +
-      `${intro}\n\n${list}\n\n` +
-      `📊 Platform: *${snapshot.liveShops}* live shops · *${snapshot.totalProducts}+* listed products · *${snapshot.activeDeals}* active deals\n\n` +
-      `*Meri recommendation:*\n${tips.join("\n")}\n\n` +
+      `${intro}\n\n${list}\n` +
+      gapHint +
+      `\n📊 Platform: *${snapshot.liveShops}* live shops · *${snapshot.totalProducts}+* listed products · *${snapshot.activeDeals}* active deals\n\n` +
+      `*Meri best recommendation (priority order):*\n${tips.join("\n")}\n\n` +
       `Ready ho to [Register your store](/account/become-merchant) — setup ~15 minutes.\n\n` +
       `_Yeh analysis abhi ke marketplace trends par based hai, guess nahi._`,
   };

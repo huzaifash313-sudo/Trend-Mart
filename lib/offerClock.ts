@@ -7,6 +7,7 @@
 /*  rotation and countdown timers (hundreds of live intervals on the homepage). */
 /*  This module provides ONE global 1-second clock shared by every card via    */
 /*  useSyncExternalStore, so there is exactly a single interval app-wide.       */
+/*  Pauses while the tab is hidden so backgrounded phones don't burn CPU.      */
 /* -------------------------------------------------------------------------- */
 
 import { useSyncExternalStore } from "react";
@@ -14,24 +15,50 @@ import { useSyncExternalStore } from "react";
 let now = Date.now();
 const subscribers = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | null = null;
+let visibilityBound = false;
+
+function tick() {
+  now = Date.now();
+  for (const sub of subscribers) sub();
+}
+
+function stopTimer() {
+  if (timer == null) return;
+  clearInterval(timer);
+  timer = null;
+}
 
 function ensureTicking() {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    stopTimer();
+    return;
+  }
   if (timer != null) return;
-  timer = setInterval(() => {
-    now = Date.now();
-    for (const sub of subscribers) sub();
-  }, 1000);
+  timer = setInterval(tick, 1000);
+}
+
+function bindVisibility() {
+  if (visibilityBound || typeof document === "undefined") return;
+  visibilityBound = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      stopTimer();
+      return;
+    }
+    if (subscribers.size > 0) {
+      tick();
+      ensureTicking();
+    }
+  });
 }
 
 function subscribe(callback: () => void): () => void {
+  bindVisibility();
   subscribers.add(callback);
   ensureTicking();
   return () => {
     subscribers.delete(callback);
-    if (subscribers.size === 0 && timer != null) {
-      clearInterval(timer);
-      timer = null;
-    }
+    if (subscribers.size === 0) stopTimer();
   };
 }
 

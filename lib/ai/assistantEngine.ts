@@ -804,43 +804,53 @@ function growthTips(ctx: MerchantContext): string[] {
   const tips: string[] = [];
 
   if (ctx.totalViews < 20) {
-    tips.push("• Share your shop QR code locally & on WhatsApp status");
-    tips.push("• Add a clear shop banner and logo in Store Settings");
+    tips.push("• *Visibility:* Shop QR print karke counter + WhatsApp status pe lagayein");
+    tips.push("• *Brand:* Clear banner + logo Store Settings mein upload karein");
   }
   if (ctx.clickThroughRate < 5 && ctx.totalViews > 30) {
-    tips.push("• Improve product photos — views are high but clicks are low");
-    tips.push("• Add discount badges on top products");
+    tips.push("• *Photos:* Views high, clicks low — product photos bright + close-up rakhein");
+    tips.push("• *Badges:* Top 3 products pe strikethrough discount lagayein");
   }
   if (ctx.pendingOrders > 0) {
-    tips.push(`• Respond to ${ctx.pendingOrders} pending order(s) quickly — speed builds trust`);
+    tips.push(`• *Speed:* ${ctx.pendingOrders} pending order(s) jaldi update karein — fast reply = repeat buyers`);
   }
   if (ctx.unreadMessages > 0) {
-    tips.push(`• Reply to ${ctx.unreadMessages} unread customer message(s) in Messages`);
+    tips.push(`• *Chat:* ${ctx.unreadMessages} unread message(s) ka reply aaj hi dein`);
   }
   if (ctx.outOfStock > 0) {
-    tips.push(`• ${ctx.outOfStock} product(s) marked unavailable — restock or hide them`);
+    tips.push(`• *Stock:* ${ctx.outOfStock} unavailable item(s) restock ya hide karein`);
   }
   if (ctx.lowStockItems.length > 0) {
-    tips.push(`• Restock ${ctx.lowStockItems.length} low-inventory item(s) before you miss sales`);
+    tips.push(`• *Reorder:* ${ctx.lowStockItems.length} low-stock item(s) pehle restock karein`);
   }
   if (ctx.products.filter((p) => p.original_price && p.original_price > p.price).length === 0) {
-    tips.push("• Add strikethrough discounts on 2–3 hero products to attract buyers");
+    tips.push("• *Offers:* 2–3 hero products pe markdown pricing + % OFF badge");
   }
   if (ctx.leadsUnconverted > 3) {
-    tips.push(`• Follow up on ${ctx.leadsUnconverted} unconverted leads via WhatsApp`);
+    tips.push(`• *Follow-up:* ${ctx.leadsUnconverted} open leads ko WhatsApp pe soft reminder`);
   }
   if (ctx.reviewCount < 3) {
-    tips.push("• Ask happy customers to leave a review on your shop page");
+    tips.push("• *Social proof:* Happy customers se 3 reviews mangwao — ranking improve hoti hai");
+  }
+  if (ctx.avgRating > 0 && ctx.avgRating < 4 && ctx.reviewCount >= 3) {
+    tips.push("• *Quality:* Rating 4 se neeche — packaging/timing improve karein, phir reviews invite karein");
   }
   if (ctx.ordersLast7Days <= ctx.ordersPrev7Days && ctx.totalOrders > 5) {
-    tips.push("• Run a weekend deal or free-delivery promo to boost weekly orders");
+    tips.push("• *Promo:* Weekend deal ya free-delivery threshold se weekly orders boost");
+  }
+  if (ctx.freeDeliveryThreshold <= 0 && (ctx.deliveryFeeFlat > 0 || ctx.deliveryFeePerKm > 0)) {
+    tips.push("• *AOV:* Free-delivery threshold set karein (e.g. Rs 1500+) taake cart size barhe");
+  }
+  if (ctx.activeProducts < 8) {
+    tips.push("• *Catalog:* Kam se kam 10–15 products rakhein — empty shelves trust tootati hain");
   }
   if (tips.length === 0) {
-    tips.push("• Keep posting fresh products weekly");
-    tips.push("• Try Sponsored Ads in Dashboard → Ads for more visibility");
-    tips.push("• Enable free delivery threshold to increase average order value");
+    tips.push("• Weekly 2–3 fresh products add karte raho");
+    tips.push("• Best-sellers ko homepage / stories mein highlight karein");
+    tips.push("• Local groups + QR se footfall laate raho");
   }
 
+  // Cap to top 6 most actionable
   return tips.slice(0, 6);
 }
 
@@ -1394,19 +1404,20 @@ function withThinking(
   };
 }
 
-/** Merge local rules with Groq NLU — never let LLM invent a catalog query alone. */
+/** Merge local rules with Groq NLU — prefer LLM when it is confident. */
 function mergeLocalAndLlmNlu(
   local: ReturnType<typeof runLocalNlu>,
   llm: Awaited<ReturnType<typeof understandWithFreeLlm>>,
 ): ReturnType<typeof runLocalNlu> {
-  if (!llm || llm.confidence < 0.55) return local;
+  if (!llm || llm.confidence < 0.45) return local;
 
   const next = { ...local };
-  if (llm.categoryHint && (!local.categoryHint || llm.confidence >= local.confidence)) {
+  if (llm.categoryHint && (!local.categoryHint || llm.confidence >= local.confidence - 0.1)) {
     next.categoryHint = llm.categoryHint;
   }
   if (llm.searchQuery && llm.searchQuery.length >= 2) {
-    if (!local.searchQuery || llm.confidence >= local.confidence - 0.05) {
+    // Prefer LLM keywords — local often mis-extracts Roman Urdu / typos
+    if (!local.searchQuery || llm.confidence >= 0.5 || llm.confidence >= local.confidence - 0.15) {
       next.searchQuery = llm.searchQuery;
     }
   }
@@ -1426,7 +1437,10 @@ function mergeLocalAndLlmNlu(
   const mapped = map[llm.intent];
   if (
     mapped &&
-    (llm.confidence >= local.confidence || local.intent === "unclear" || local.confidence < 0.7)
+    (llm.confidence >= local.confidence ||
+      local.intent === "unclear" ||
+      local.confidence < 0.75 ||
+      llm.confidence >= 0.7)
   ) {
     next.intent = mapped;
     next.confidence = Math.max(local.confidence, Math.min(0.96, llm.confidence));
@@ -1435,8 +1449,9 @@ function mergeLocalAndLlmNlu(
 }
 
 /**
- * Optional Groq polish — FACTS = draft only. Never polish product cards (links stay exact).
+ * Groq polish — FACTS = draft only. Never polish product cards (links stay exact).
  * Never polish refuses (stay exact). Reject polish that invents new http(s) links.
+ * Weak/unclear drafts still get polished so replies stay on-topic.
  */
 async function finalizeAssistantReply(
   res: AssistantResponse,
@@ -1449,8 +1464,13 @@ async function finalizeAssistantReply(
   if (gated.products?.length) return gated;
   if (gated.intent === "honest_refuse" || gated.intent === "empty") return gated;
   if (gated.intent === "delivery_help") return gated;
-  if (gated.confidence < 0.55) return gated;
   if (["auth", "no_shop"].includes(gated.intent)) return gated;
+
+  const weak =
+    gated.confidence < 0.62 ||
+    gated.intent === "unclear" ||
+    gated.intent === "fallback" ||
+    gated.intent === "honest_fallback";
 
   try {
     const polished = await composeGroundedReplyWithLlm({
@@ -1458,7 +1478,9 @@ async function finalizeAssistantReply(
       role,
       facts:
         `Intent=${gated.intent}; confidence=${gated.confidence}\n` +
-        (gated.suggestions?.length ? `Allowed suggestions: ${gated.suggestions.join(" | ")}\n` : "") +
+        (gated.suggestions?.length
+          ? `Allowed chip suggestions (only keep if on-topic): ${gated.suggestions.join(" | ")}\n`
+          : "") +
         `Confirmed draft (do not invent beyond this):\n${gated.reply}`,
       draftReply: gated.reply,
     });
@@ -1470,7 +1492,11 @@ async function finalizeAssistantReply(
       const inventedExternal = polishLinks.some((u) => !draftLinks.has(u) && !gated.reply.includes(u));
       if (inventedExternal) return gated;
       return ensureAssistantReply(
-        { ...gated, reply: polished.slice(0, 2500) },
+        {
+          ...gated,
+          reply: polished.slice(0, 2500),
+          confidence: weak ? Math.max(gated.confidence, 0.72) : gated.confidence,
+        },
         role,
         userMessage,
       ) as AssistantResponse;
@@ -1627,7 +1653,7 @@ async function runAssistantCore(
     try {
       llmNlu = await Promise.race([
         understandWithFreeLlm(historyResolved, role),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 12_000)),
       ]);
     } catch {
       llmNlu = null;

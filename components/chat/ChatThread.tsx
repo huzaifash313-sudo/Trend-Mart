@@ -75,7 +75,16 @@ export default function ChatThread({
 
   useEffect(() => {
     setActiveConversationId(conversationId);
+    const keepActive = () => {
+      if (document.visibilityState === "visible") {
+        setActiveConversationId(conversationId);
+      }
+    };
+    document.addEventListener("visibilitychange", keepActive);
+    window.addEventListener("focus", keepActive);
     return () => {
+      document.removeEventListener("visibilitychange", keepActive);
+      window.removeEventListener("focus", keepActive);
       if (getActiveConversationId() === conversationId) {
         setActiveConversationId(null);
       }
@@ -83,8 +92,10 @@ export default function ChatThread({
   }, [conversationId]);
 
   const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+    // Smooth scroll is fine for short threads; long histories jank on mobile.
+    const behavior: ScrollBehavior = messages.length > 36 ? "auto" : "smooth";
+    bottomRef.current?.scrollIntoView({ behavior });
+  }, [messages.length]);
 
   const loadMessages = useCallback(async () => {
     const result = await fetchMessages(conversationId);

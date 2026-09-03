@@ -46,8 +46,8 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
       "🛒 Browse karte raho — madad chahiye to tap!",
     ],
     voiceLines: [
-      "Welcome home! Ask me for shops or product links.",
-      "Hi! I can find nearby deals for you.",
+      "Hey! Welcome. Ask me for nearby shops or product links.",
+      "Hi friend! I can find cute deals for you.",
     ],
     prompts: [
       "Best deals kahan hain?",
@@ -65,8 +65,8 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
       "🏷️ Deal samajh nahi aa rahi? Tap karke pooch lo!",
     ],
     voiceLines: [
-      "Wow, deals! Ask me which offer is best.",
-      "Nice discounts here. Need a tip?",
+      "Woo deals! Tell me what you want and I will pick the best.",
+      "Nice discounts! Need my top tip?",
     ],
     prompts: [
       "Aaj ke best deals?",
@@ -84,8 +84,8 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
       "✨ Filters confuse? Main clear guide karta hoon!",
     ],
     voiceLines: [
-      "Looking for a product? Tell me the name.",
-      "I can find the best match in the catalog.",
+      "Looking for something? Say the name and I will find it.",
+      "I can recommend the best match from live catalog.",
     ],
     prompts: [
       "Best mobile ka link do",
@@ -156,8 +156,8 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
       "🚀 Growth / fees / products — merchant coach ready!",
     ],
     voiceLines: [
-      "Business mode on. Ask for growth tips.",
-      "I can help with your store settings.",
+      "Business coach ready. Ask me for growth tips from your live data.",
+      "I can recommend the best next move for your store.",
     ],
     prompts: [
       "Meri shop ki live summary",

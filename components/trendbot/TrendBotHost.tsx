@@ -22,11 +22,11 @@ import {
 import { TrendBotLauncher } from "@/components/trendbot/TrendBotLauncher";
 import { TrendBotPanel } from "@/components/trendbot/TrendBotPanel";
 
-const SCROLL_TEASE_MIN_PX = 520;
-const TEASE_COOLDOWN_MS = 75_000;
-const TEASE_VISIBLE_MS = 5_500;
-const STROLL_EVERY_MS = 160_000;
-const ROUTE_TIP_DELAY_MS = 2_800;
+const SCROLL_TEASE_MIN_PX = 480;
+const TEASE_COOLDOWN_MS = 65_000;
+const TEASE_VISIBLE_MS = 5_800;
+const STROLL_EVERY_MS = 120_000;
+const ROUTE_TIP_DELAY_MS = 2_200;
 
 export default function TrendBotHost() {
   const pathname = usePathname() ?? "/";
@@ -59,13 +59,12 @@ export default function TrendBotHost() {
   }, []);
 
   const showTeaser = useCallback(
-    (text: string, withJump = false) => {
+    (text: string, mood: "wave" | "jump" | "happy" = "wave") => {
       if (open) return;
       setTeaser(text);
       setWiggle(true);
-      if (withJump) flashPose("jump", 750);
-      else flashPose("wave", 700);
-      setTimeout(() => setWiggle(false), 600);
+      flashPose(mood, mood === "jump" ? 850 : 780);
+      setTimeout(() => setWiggle(false), 700);
       if (teaseTimer.current) clearTimeout(teaseTimer.current);
       teaseTimer.current = setTimeout(() => setTeaser(null), TEASE_VISIBLE_MS);
     },
@@ -78,9 +77,14 @@ export default function TrendBotHost() {
     const tip = pack.teasers[0];
     const voice = pack.voiceLines[0];
     const t = setTimeout(() => {
-      if (tip) showTeaser(tip, pageCtx === "deals");
+      if (tip) {
+        showTeaser(
+          tip,
+          pageCtx === "deals" ? "jump" : pageCtx === "home" ? "happy" : "wave",
+        );
+      }
       if (voice) {
-        speakTrendBotLine(voice, { routeKey: `route:${pageCtx}` });
+        speakTrendBotLine(voice, { routeKey: `route:${pageCtx}`, cute: true });
       }
     }, ROUTE_TIP_DELAY_MS);
     return () => clearTimeout(t);
@@ -131,12 +135,11 @@ export default function TrendBotHost() {
       window.setTimeout(() => {
         if (cancelled) return;
         setStrolling(false);
-        setPose("idle");
-        flashPose("jump", 700);
-      }, 5600);
+        flashPose("happy", 800);
+      }, 4900);
     };
 
-    const first = window.setTimeout(runStroll, 45_000);
+    const first = window.setTimeout(runStroll, 28_000);
     const interval = window.setInterval(runStroll, STROLL_EVERY_MS);
     return () => {
       cancelled = true;
@@ -192,6 +195,7 @@ export default function TrendBotHost() {
               onClick={() => {
                 setTeaser(null);
                 setOpen(true);
+                flashPose("happy", 780);
               }}
               className="w-full text-left"
               aria-label="Open TrendBot chat"
@@ -211,6 +215,11 @@ export default function TrendBotHost() {
           onOpen={() => {
             setTeaser(null);
             setOpen(true);
+            flashPose("happy", 780);
+            speakTrendBotLine("Hi! Ask me anything — products, deals, or orders.", {
+              routeKey: "open:panel",
+              cute: true,
+            });
           }}
         />
       ) : null}

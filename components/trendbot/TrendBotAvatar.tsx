@@ -1,6 +1,6 @@
 "use client";
 
-export type TrendBotPose = "idle" | "wave" | "jump" | "walk";
+export type TrendBotPose = "idle" | "wave" | "jump" | "walk" | "happy";
 
 interface TrendBotAvatarProps {
   size?: "sm" | "md" | "lg";
@@ -30,6 +30,7 @@ export function TrendBotAvatar({
   const anim = [
     animated && pose === "idle" ? "tm-trendbot-float" : "",
     pose === "jump" ? "tm-trendbot-jump" : "",
+    pose === "happy" ? "tm-trendbot-happy" : "",
     pose === "walk" ? "tm-trendbot-walk-bob" : "",
     pose === "wave" || wiggle ? "tm-trendbot-wiggle" : "",
     className,
@@ -43,16 +44,11 @@ export function TrendBotAvatar({
       style={{ width: w, height: h }}
       aria-hidden="true"
     >
-      <span
-        className={`pointer-events-none absolute bottom-0 left-1/2 h-3 w-10 -translate-x-1/2 rounded-full bg-emerald-500/25 blur-[2px] ${
-          animated ? "tm-trendbot-pulse-ring" : ""
-        }`}
-      />
       <svg
         viewBox="0 0 64 88"
         width={w}
         height={h}
-        className="relative drop-shadow-md"
+        className="relative"
         role="img"
         aria-label="TrendBot"
       >
@@ -110,12 +106,12 @@ export function TrendBotAvatar({
         <circle cx="25" cy="25.2" r="1.5" fill="#a7f3d0" />
         <circle cx="41" cy="25.2" r="1.5" fill="#a7f3d0" />
 
-        {/* Smile */}
+        {/* Smile — soft friendly curve */}
         <path
-          d="M 24 34 Q 32 39.5 40 34"
+          d="M 24 33.5 Q 32 40 40 33.5"
           fill="none"
           stroke="#0f766e"
-          strokeWidth="1.9"
+          strokeWidth="2"
           strokeLinecap="round"
         />
 

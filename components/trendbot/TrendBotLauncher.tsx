@@ -37,16 +37,15 @@ export function TrendBotLauncher({
     <button
       type="button"
       onClick={onOpen}
-      className={`tm-trendbot-fab fixed ${sideClass} z-[118] flex h-[4.25rem] w-[3.35rem] items-end justify-center rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-teal-600 pb-1 shadow-xl shadow-emerald-600/25 transition hover:scale-105 active:scale-95 ${
+      className={`tm-trendbot-fab fixed ${sideClass} z-[118] flex h-[4.35rem] w-[3.4rem] items-end justify-center bg-transparent p-0 shadow-none transition hover:scale-105 active:scale-95 ${
         strolling ? "tm-trendbot-fab--stroll" : ""
       }`}
       style={{ bottom: FAB_BOTTOM[bottomOffset] }}
       aria-label={`Open ${TREND_BOT_NAME}${shopName ? ` for ${shopName}` : ""}`}
       title={shopName ? `${TREND_BOT_NAME} — ${shopName}` : TREND_BOT_NAME}
     >
-      <span className="absolute inset-0 rounded-2xl bg-emerald-400/20 tm-trendbot-pulse-ring" />
       <TrendBotAvatar size="sm" animated pose={pose} wiggle={wiggle} />
-      <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[0.5rem] font-black text-emerald-600 shadow">
+      <span className="absolute -right-0.5 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[0.5rem] font-black text-emerald-700 ring-1 ring-emerald-200/80 shadow-sm">
         AI
       </span>
     </button>

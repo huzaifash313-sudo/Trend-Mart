@@ -740,7 +740,9 @@ export function isCustomerWithinCoverage(
     };
   }
 
-  // radius
+  // radius — merchant must set a positive service_radius_km to appear in
+  // hyper-local feeds. Unset radius used to mean "everywhere" and flooded
+  // customers with out-of-area stories/deals.
   const radiusKm = shop.service_radius_km ?? 0;
   if (radiusKm > 0) {
     if (distanceKm == null) {
@@ -749,15 +751,15 @@ export function isCustomerWithinCoverage(
     }
     return { within: distanceKm <= radiusKm, distanceKm, coverageMode: "radius" };
   }
-  return { within: true, distanceKm, coverageMode: "radius" };
+  return { within: false, distanceKm, coverageMode: "radius" };
 }
 
 /**
  * Filter active stories to shops whose delivery coverage actually includes the
  * customer. Keeps the story tray hyper-local: a customer only sees stories from
  * shops that deliver to them (radius / city / nationwide coverage) instead of
- * every shop's story flooding the homepage. Shops without any geo config are
- * treated as "deliver anywhere" and stay visible.
+ * every shop's story flooding the homepage. Radius shops must set
+ * `service_radius_km` — unset radius no longer means "deliver everywhere".
  */
 export function filterStoriesByCoverage(
   stories: Story[],

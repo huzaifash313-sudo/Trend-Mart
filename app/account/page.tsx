@@ -203,8 +203,8 @@ export default function CustomerAccountPage() {
         <section className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Verification</h2>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Email verification is required for checkout. Phone number is a required contact
-            field — SMS OTP verification is disabled for now (coming later).
+            Email verification is required for checkout. Add your phone so merchants can
+            reach you — it is saved on your profile and used at WhatsApp checkout.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span
@@ -215,9 +215,6 @@ export default function CustomerAccountPage() {
               }`}
             >
               {emailVerified ? "Email verified" : "Email not verified"}
-            </span>
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-              Phone OTP: coming later
             </span>
           </div>
           {!emailVerified && (

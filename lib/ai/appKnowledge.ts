@@ -14,6 +14,20 @@ interface KnowledgeEntry {
 
 const APP_KNOWLEDGE: KnowledgeEntry[] = [
   {
+    keys: ["gujranwala", "lahore", "city", "kis city", "mera shehar", "area"],
+    q: "Kaunsi city?",
+    a: "TrendsMart *kisi bhi city* mein account bana sakte hain. Filhaal soft launch pe local shops focus hai — apni location on karein, phir sirf un shops dikhengi jo aapke radius / delivery area mein deliver karti hain.",
+    roles: "all",
+    link: "/settings/location",
+  },
+  {
+    keys: ["delivery", "delivery charges", "fee", "kitni delivery", "free delivery"],
+    q: "Delivery system",
+    a: "Har shop apna system set karti hai: *service radius*, minimum order, free-delivery threshold, flat / per-km fee. Checkout par aapki pin se check hota hai ke shop deliver karti hai ya nahi — bahar hone par order block ho sakta hai.",
+    roles: "all",
+    link: "/products",
+  },
+  {
     keys: ["trendsmart", "trends mart", "trend mart", "ye app", "yeh app", "what is", "kya hai", "platform"],
     q: "TrendsMart kya hai?",
     a: "TrendsMart ek *hyper-local marketplace* hai jahan aap qareeb ki dukanain browse karte hain, cart banate hain, aur WhatsApp se order place karte hain. Har shop apna radius, delivery rules, aur products khud set karti hai.",
@@ -173,7 +187,7 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
   {
     keys: ["otp", "verify email", "sign up", "register", "login", "account ban"],
     q: "Account & auth",
-    a: "Sign up → email verify → profile complete. Login: [Login](/login). Phone OTP abhi optional hai; email verification zaroori hai orders ke liye.",
+    a: "Sign up → email verify → profile complete. Login: [Login](/login). Order ke liye email verification zaroori hai; phone contact profile pe save hota hai.",
     roles: "all",
     link: "/login",
   },

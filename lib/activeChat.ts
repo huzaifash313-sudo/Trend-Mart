@@ -30,5 +30,14 @@ export function setActiveConversationId(id: string | null): void {
 
 export function isViewingConversation(conversationId: string | null | undefined): boolean {
   if (!conversationId) return false;
-  return getActiveConversationId() === conversationId;
+  if (getActiveConversationId() === conversationId) return true;
+  // Fallback: open inquiries thread URL even if active id briefly unset on remount.
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("c") === conversationId) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
 }

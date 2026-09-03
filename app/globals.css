@@ -1667,6 +1667,33 @@ html.dark .trend-card:hover {
   }
 }
 
+/* Mobile perf: kill infinite navbar animations + expensive backdrop blur.
+   Mid/low Android phones hang when blur + letter-chase run during scroll. */
+@media (max-width: 767px) {
+  .tm-navbar-wrap {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .tm-navbar-trend-line,
+  .tm-navbar-trend-arrow,
+  .tm-navbar-wordmark-letter,
+  .tm-navbar-bg-shift,
+  .tm-navbar-soft-glow {
+    animation: none !important;
+  }
+  .tm-navbar-trend-line {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Off-screen cards skip paint work while scrolling long grids. */
+.tm-product-card,
+.shop-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
 /* Brand CTA — green + sea green (primary ecommerce actions) */
 .tm-cta {
   position: relative;
@@ -5945,110 +5972,133 @@ html.dark .recharts-label-line {
   }
 }
 
-/* ── TrendBot animated mascot & speech bubbles ───────────────────────────── */
+/* ── TrendBot animated mascot & speech bubbles (cute / soft) ─────────────── */
 @keyframes tm-trendbot-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-4px) rotate(-1.5deg); }
+  50% { transform: translateY(-7px) rotate(0deg); }
+  75% { transform: translateY(-3px) rotate(1.5deg); }
 }
 
 @keyframes tm-trendbot-wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-6deg); }
-  75% { transform: rotate(6deg); }
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-10deg) scale(1.04); }
+  40% { transform: rotate(9deg) scale(1.02); }
+  60% { transform: rotate(-7deg) scale(1.05); }
+  80% { transform: rotate(5deg) scale(1.02); }
 }
 
 @keyframes tm-trendbot-bubble-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  from { opacity: 0; transform: translateY(12px) scale(0.9); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes tm-trendbot-pulse-ring {
-  0%, 100% { transform: scale(1); opacity: 0.35; }
-  50% { transform: scale(1.12); opacity: 0.12; }
+  0%, 100% { transform: scale(1); opacity: 0.28; }
+  50% { transform: scale(1.14); opacity: 0.08; }
 }
 
 @keyframes tm-trendbot-antenna {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  40% { transform: translateY(-2px); opacity: 0.85; }
+  70% { transform: translateY(1px); opacity: 0.7; }
 }
 
 @keyframes tm-trendbot-blink {
-  0%, 88%, 100% { transform: scaleY(1); }
-  92% { transform: scaleY(0.15); }
+  0%, 86%, 100% { transform: scaleY(1); }
+  90% { transform: scaleY(0.12); }
+  94% { transform: scaleY(1); }
 }
 
 @keyframes tm-trendbot-jump {
-  0%, 100% { transform: translateY(0) scale(1, 1); }
-  35% { transform: translateY(-14px) scale(0.96, 1.04); }
-  55% { transform: translateY(-2px) scale(1.04, 0.94); }
-  70% { transform: translateY(-6px) scale(0.98, 1.02); }
+  0% { transform: translateY(0) scale(1, 1); }
+  18% { transform: translateY(2px) scale(1.08, 0.9); }
+  42% { transform: translateY(-18px) scale(0.94, 1.08); }
+  58% { transform: translateY(-4px) scale(1.06, 0.92); }
+  72% { transform: translateY(-10px) scale(0.97, 1.04); }
+  88% { transform: translateY(1px) scale(1.04, 0.96); }
+  100% { transform: translateY(0) scale(1, 1); }
 }
 
 @keyframes tm-trendbot-walk-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
 }
 
 @keyframes tm-trendbot-leg-swing-l {
-  0%, 100% { transform: rotate(12deg); }
-  50% { transform: rotate(-12deg); }
+  0%, 100% { transform: rotate(14deg); }
+  50% { transform: rotate(-14deg); }
 }
 
 @keyframes tm-trendbot-leg-swing-r {
-  0%, 100% { transform: rotate(-12deg); }
-  50% { transform: rotate(12deg); }
+  0%, 100% { transform: rotate(-14deg); }
+  50% { transform: rotate(14deg); }
 }
 
 @keyframes tm-trendbot-arm-swing-l {
-  0%, 100% { transform: rotate(-10deg); }
-  50% { transform: rotate(10deg); }
+  0%, 100% { transform: rotate(-14deg); }
+  50% { transform: rotate(12deg); }
 }
 
 @keyframes tm-trendbot-arm-swing-r {
-  0%, 100% { transform: rotate(10deg); }
-  50% { transform: rotate(-10deg); }
+  0%, 100% { transform: rotate(12deg); }
+  50% { transform: rotate(-14deg); }
 }
 
 @keyframes tm-trendbot-arm-wave {
   0%, 100% { transform: rotate(0deg); }
-  30% { transform: rotate(-35deg); }
-  60% { transform: rotate(-10deg); }
+  15% { transform: rotate(-42deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(-48deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(-30deg); }
 }
 
 @keyframes tm-trendbot-stroll {
-  0% { transform: translateX(0); }
-  40% { transform: translateX(calc(-1 * min(42vw, 180px))); }
-  55% { transform: translateX(calc(-1 * min(42vw, 180px))) scaleX(-1); }
-  95% { transform: translateX(0) scaleX(-1); }
+  0% { transform: translateX(0) scaleX(1); }
+  8% { transform: translateX(-8px) scaleX(1); }
+  42% { transform: translateX(calc(-1 * min(48vw, 200px))) scaleX(1); }
+  48% { transform: translateX(calc(-1 * min(48vw, 200px))) scaleX(-1); }
+  90% { transform: translateX(0) scaleX(-1); }
+  96% { transform: translateX(4px) scaleX(1); }
   100% { transform: translateX(0) scaleX(1); }
 }
 
-.tm-trendbot-float { animation: tm-trendbot-float 2.8s ease-in-out infinite; }
-.tm-trendbot-wiggle { animation: tm-trendbot-wiggle 0.55s ease-in-out; }
-.tm-trendbot-jump { animation: tm-trendbot-jump 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
-.tm-trendbot-walk-bob { animation: tm-trendbot-walk-bob 0.45s ease-in-out infinite; }
-.tm-trendbot-bubble { animation: tm-trendbot-bubble-in 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
-.tm-trendbot-pulse-ring { animation: tm-trendbot-pulse-ring 2.4s ease-in-out infinite; }
-.tm-trendbot-antenna { animation: tm-trendbot-antenna 1.6s ease-in-out infinite; }
-.tm-trendbot-eye-l,
-.tm-trendbot-eye-r { transform-origin: center; animation: tm-trendbot-blink 4.5s ease-in-out infinite; }
-.tm-trendbot-eye-r { animation-delay: 0.3s; }
-.tm-trendbot-panel-open { animation: tm-trendbot-bubble-in 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes tm-trendbot-happy {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-8px) scale(1.06) rotate(-3deg); }
+  55% { transform: translateY(-2px) scale(1.02) rotate(3deg); }
+  75% { transform: translateY(-6px) scale(1.04); }
+}
 
-.tm-trendbot-leg-l { transform-origin: 24px 66px; animation: tm-trendbot-leg-swing-l 0.45s ease-in-out infinite; }
-.tm-trendbot-leg-r { transform-origin: 40px 66px; animation: tm-trendbot-leg-swing-r 0.45s ease-in-out infinite; }
-.tm-trendbot-arm-l { transform-origin: 9px 48px; animation: tm-trendbot-arm-swing-l 0.45s ease-in-out infinite; }
-.tm-trendbot-arm-r { transform-origin: 55px 48px; animation: tm-trendbot-arm-swing-r 0.45s ease-in-out infinite; }
-.tm-trendbot-arm-wave { transform-origin: 9px 48px; animation: tm-trendbot-arm-wave 0.7s ease-in-out; }
+.tm-trendbot-float { animation: tm-trendbot-float 3.2s ease-in-out infinite; }
+.tm-trendbot-wiggle { animation: tm-trendbot-wiggle 0.7s ease-in-out; }
+.tm-trendbot-jump { animation: tm-trendbot-jump 0.85s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.tm-trendbot-happy { animation: tm-trendbot-happy 0.75s cubic-bezier(0.34, 1.3, 0.64, 1); }
+.tm-trendbot-walk-bob { animation: tm-trendbot-walk-bob 0.4s ease-in-out infinite; }
+.tm-trendbot-bubble { animation: tm-trendbot-bubble-in 0.45s cubic-bezier(0.22, 1.2, 0.36, 1); }
+.tm-trendbot-pulse-ring { animation: tm-trendbot-pulse-ring 2.4s ease-in-out infinite; }
+.tm-trendbot-antenna { animation: tm-trendbot-antenna 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.tm-trendbot-eye-l,
+.tm-trendbot-eye-r { transform-origin: center; animation: tm-trendbot-blink 5s ease-in-out infinite; }
+.tm-trendbot-eye-r { animation-delay: 0.35s; }
+.tm-trendbot-panel-open { animation: tm-trendbot-bubble-in 0.4s cubic-bezier(0.22, 1.2, 0.36, 1); }
+
+.tm-trendbot-leg-l { transform-origin: 24px 66px; animation: tm-trendbot-leg-swing-l 0.4s ease-in-out infinite; }
+.tm-trendbot-leg-r { transform-origin: 40px 66px; animation: tm-trendbot-leg-swing-r 0.4s ease-in-out infinite; }
+.tm-trendbot-arm-l { transform-origin: 9px 48px; animation: tm-trendbot-arm-swing-l 0.4s ease-in-out infinite; }
+.tm-trendbot-arm-r { transform-origin: 55px 48px; animation: tm-trendbot-arm-swing-r 0.4s ease-in-out infinite; }
+.tm-trendbot-arm-wave { transform-origin: 9px 48px; animation: tm-trendbot-arm-wave 0.9s ease-in-out; }
 
 .tm-trendbot-fab--stroll {
-  animation: tm-trendbot-stroll 5.5s cubic-bezier(0.4, 0, 0.2, 1) 1;
+  animation: tm-trendbot-stroll 4.8s cubic-bezier(0.45, 0.05, 0.25, 1) 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .tm-trendbot-float,
   .tm-trendbot-wiggle,
   .tm-trendbot-jump,
+  .tm-trendbot-happy,
   .tm-trendbot-walk-bob,
   .tm-trendbot-bubble,
   .tm-trendbot-pulse-ring,

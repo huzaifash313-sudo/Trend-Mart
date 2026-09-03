@@ -12,6 +12,7 @@ import { logError } from "@/services/errorService";
 import { sanitizeText } from "@/lib/validations";
 import type { PromoAdPlacement, PromoAdStatus, PromotionalAd, PromotionalAdFormData, AdPlan, AdPlacementChoice } from "@/types";
 import { demoAdsEnabled, getDemoAdsForPlacement } from "@/lib/demoPromoAds";
+import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -206,7 +207,28 @@ export async function createAdRequest(
       .single();
 
     if (error) throw error;
-    return { success: true, data: data as PromotionalAd };
+    const created = data as PromotionalAd;
+
+    // Soft launch / free plan: instant go-live without tokens or admin wait.
+    if (!isPaidFeaturesEnabled() || Number(created.price_paid ?? 0) <= 0) {
+      try {
+        const { data: live, error: pubErr } = await (
+          supabase as unknown as {
+            rpc: (
+              fn: string,
+              args: Record<string, unknown>,
+            ) => Promise<{ data: unknown; error: { message: string } | null }>;
+          }
+        ).rpc("publish_ad_with_tokens", { p_ad_id: created.id });
+        if (!pubErr && live) {
+          return { success: true, data: live as PromotionalAd };
+        }
+      } catch {
+        /* stays pending for admin review */
+      }
+    }
+
+    return { success: true, data: created };
   } catch (err) {
     logError(err, { module: "adsService.createAdRequest", meta: { shopId } });
     return { success: false, error: toError(err) };

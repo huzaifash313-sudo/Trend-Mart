@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue, Suspense } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -100,6 +100,8 @@ function ProductsPageInner() {
   const productParam = searchParams.get("product");
 
   const [query, setQuery] = useState(qParam);
+  /** Keep input snappy; defer heavy fuzzy/geo ranking until idle. */
+  const deferredQuery = useDeferredValue(query);
   const [activeCategory, setActiveCategory] = useState<ShopCategory>(
     SHOP_CATEGORIES.includes(categoryParam) ? categoryParam : "All",
   );
@@ -330,7 +332,7 @@ function ProductsPageInner() {
 
   /** Deals matching the current search (when-tag / title / shop). */
   const searchMatchedDeals = useMemo(() => {
-    const q = query.trim();
+    const q = deferredQuery.trim();
     if (!q) return activeDeals;
     const ranked = fuzzyFilterAndRank(
       activeDeals.filter((d) => d.is_active),
@@ -339,7 +341,7 @@ function ProductsPageInner() {
       { minScore: FUZZY_MIN_SCORE },
     );
     return ranked.length ? ranked.map((r) => r.item) : [];
-  }, [activeDeals, query]);
+  }, [activeDeals, deferredQuery]);
 
   // Build a deduplicated list of pseudo-shops from the product join so the
   // same proximity / merchant-coverage engine used on the homepage applies here.
@@ -367,46 +369,49 @@ function ProductsPageInner() {
   const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
   useEffect(() => {
     let cancelled = false;
-    async function compute() {
-      const scope = geoFilter.scope;
-      const coords = geoFilter.coordinates ?? globalCoords ?? null;
+    const timer = window.setTimeout(() => {
+      async function compute() {
+        const scope = geoFilter.scope;
+        const coords = geoFilter.coordinates ?? globalCoords ?? null;
 
-      // All Pakistan never narrows by location — show every shop's products.
-      if (scope === "pakistan") {
-        setGeoVisibleShopIds(null);
-        return;
-      }
-      // No pin + city browse → no location restriction on products.
-      if (scope === "city" && !coords) {
-        setGeoVisibleShopIds(null);
-        return;
-      }
-      if (scope === "radius" && !coords) {
-        setGeoVisibleShopIds(null);
-        return;
-      }
-
-      try {
-        const result = await filterShopsByProximity(productShops, {
-          coordinates: coords,
-          maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
-          enforceServiceRadius: true,
-          sortByProximity: false,
-          scope,
-          deliveryZone: globalLocation?.deliveryZone ?? undefined,
-          customerCity: globalLocation?.city ?? undefined,
-          customerArea: getCustomerArea(globalLocation),
-        });
-        if (!cancelled) {
-          setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
+        // All Pakistan never narrows by location — show every shop's products.
+        if (scope === "pakistan") {
+          setGeoVisibleShopIds(null);
+          return;
         }
-      } catch {
-        if (!cancelled) setGeoVisibleShopIds(null);
+        // No pin + city browse → no location restriction on products.
+        if (scope === "city" && !coords) {
+          setGeoVisibleShopIds(null);
+          return;
+        }
+        if (scope === "radius" && !coords) {
+          setGeoVisibleShopIds(null);
+          return;
+        }
+
+        try {
+          const result = await filterShopsByProximity(productShops, {
+            coordinates: coords,
+            maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
+            enforceServiceRadius: true,
+            sortByProximity: false,
+            scope,
+            deliveryZone: globalLocation?.deliveryZone ?? undefined,
+            customerCity: globalLocation?.city ?? undefined,
+            customerArea: getCustomerArea(globalLocation),
+          });
+          if (!cancelled) {
+            setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
+          }
+        } catch {
+          if (!cancelled) setGeoVisibleShopIds(null);
+        }
       }
-    }
-    compute();
+      void compute();
+    }, 120);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [productShops, geoFilter, globalCoords, globalLocation]);
 
@@ -438,7 +443,7 @@ function ProductsPageInner() {
     }
 
     // Search: boost products from shops whose deals match ("Monday deal", "14 August", …)
-    const q = query.trim();
+    const q = deferredQuery.trim();
     if (q && searchMatchedDeals.length > 0) {
       const boostIds = new Set(searchMatchedDeals.map((d) => d.shop_id));
       const boosted = list.filter((p) => boostIds.has(p.shop_id));
@@ -452,7 +457,7 @@ function ProductsPageInner() {
     geoVisibleShopIds,
     sort,
     globalCoords,
-    query,
+    deferredQuery,
     searchMatchedDeals,
   ]);
 

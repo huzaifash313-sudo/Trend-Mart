@@ -1,11 +1,21 @@
-/* TrendsMart SW v46 — push + image cache + offline navigation fallback.
+/* TrendsMart SW v48 — push + image cache + offline navigation fallback.
    Document navigations are network-first; on total network failure we serve
-   /offline. Images use stale-while-revalidate. Chat pushes are suppressed when
-   a focused client is already viewing that conversation. */
+   /offline. Only same-origin / Cloudinary / Next image proxy are SWR-cached
+   (SW fetch uses connect-src; caching flickr/unsplash/wikimedia causes CSP noise).
+   Chat pushes: suppress when viewing that convo; in-app banner when app visible;
+   OS notification only when fully backgrounded. */
 
-const IMAGE_CACHE = "tm-images-v46";
-const SHELL_CACHE = "tm-shell-v46";
+const IMAGE_CACHE = "tm-images-v48";
+const SHELL_CACHE = "tm-shell-v48";
 const KEEP = new Set([IMAGE_CACHE, SHELL_CACHE]);
+
+function isSwCacheableImage(url, req) {
+  const host = url.hostname;
+  if (host.includes("res.cloudinary.com") || host.includes("cloudinary.com")) return true;
+  if (url.pathname.startsWith("/_next/image")) return true;
+  if (url.origin === self.location.origin && req.destination === "image") return true;
+  return false;
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -66,13 +76,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const isImage =
-    req.destination === "image" ||
-    url.hostname.includes("cloudinary.com") ||
-    url.hostname.includes("res.cloudinary.com") ||
-    url.pathname.startsWith("/_next/image");
-
-  if (!isImage) return;
+  // Do not intercept third-party demo CDNs — browser loads them via img-src.
+  if (!isSwCacheableImage(url, req)) return;
 
   event.respondWith(
     (async () => {
@@ -134,8 +139,8 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     (async () => {
-      // Chat: if any TrendsMart tab is visible, in-app banner handles it.
-      // Only show an OS notification when the app is fully in the background.
+      // Chat: suppress OS toast when viewing that thread; otherwise if the app
+      // is open, tell a visible client to show the in-app banner.
       if (conversationId) {
         try {
           const clients = await self.clients.matchAll({
@@ -143,29 +148,49 @@ self.addEventListener("push", (event) => {
             includeUncontrolled: true,
           });
           let anyVisible = false;
+          let viewing = false;
           for (const client of clients) {
-            if (client.visibilityState === "visible") {
-              anyVisible = true;
-              const viewing = await new Promise((resolve) => {
-                try {
-                  const channel = new MessageChannel();
-                  const timer = setTimeout(() => resolve(false), 400);
-                  channel.port1.onmessage = (ev) => {
-                    clearTimeout(timer);
-                    resolve(Boolean(ev.data && ev.data.viewing));
-                  };
-                  client.postMessage(
-                    { type: "tm-active-chat-query", conversationId },
-                    [channel.port2],
-                  );
-                } catch {
-                  resolve(false);
-                }
-              });
-              if (viewing) return;
+            if (client.visibilityState !== "visible") continue;
+            anyVisible = true;
+            const isViewing = await new Promise((resolve) => {
+              try {
+                const channel = new MessageChannel();
+                const timer = setTimeout(() => resolve(false), 400);
+                channel.port1.onmessage = (ev) => {
+                  clearTimeout(timer);
+                  resolve(Boolean(ev.data && ev.data.viewing));
+                };
+                client.postMessage(
+                  { type: "tm-active-chat-query", conversationId },
+                  [channel.port2],
+                );
+              } catch {
+                resolve(false);
+              }
+            });
+            if (isViewing) {
+              viewing = true;
+              break;
             }
           }
-          if (anyVisible) return;
+          if (viewing) return;
+          if (anyVisible) {
+            for (const client of clients) {
+              if (client.visibilityState !== "visible") continue;
+              try {
+                client.postMessage({
+                  type: "tm-chat-alert",
+                  conversationId,
+                  title,
+                  body: options.body,
+                  url: options.data && options.data.url,
+                });
+              } catch {
+                /* ignore */
+              }
+            }
+            return;
+          }
         } catch {
           /* fall through and show */
         }

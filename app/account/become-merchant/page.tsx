@@ -168,7 +168,7 @@ export default function BecomeMerchantPage() {
       }
 
       addToast(
-        "Store created! It is pending admin approval — you can set up products now.",
+        "Store created! Pending admin approval — you can set up products now.",
         "success",
       );
       window.location.href = "/dashboard";
@@ -216,7 +216,7 @@ export default function BecomeMerchantPage() {
           <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-zinc-600 dark:text-zinc-400">
             <li>Fill in your store details (required fields marked *).</li>
             <li>Accept merchant guidelines.</li>
-            <li>We create your store and open the merchant dashboard instantly.</li>
+            <li>We create your store and open the merchant dashboard (admin approval for public listing).</li>
           </ol>
         </section>
 

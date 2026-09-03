@@ -20,6 +20,7 @@ import {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
   createContext,
   useContext,
   type ReactNode,
@@ -35,14 +36,10 @@ import {
   type AppNotification,
 } from "@/services/notificationService";
 import { isViewingConversation } from "@/lib/activeChat";
+import { isBellNotification, isChatNotification } from "@/lib/chatNotifications";
 
 const HISTORY_KEY_PREFIX = "trendsmart_notif_history_v2";
 const PREFS_KEY = "trendsmart_notifications";
-
-/** Chat messages use unread badges + top banner — never the navbar bell. */
-function isBellType(type: string): boolean {
-  return type !== "message";
-}
 
 /**
  * Notification history is cached per ACCOUNT, never per device. On a shared
@@ -61,7 +58,7 @@ function loadHistory(userId: string): Notification[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Notification[];
     return Array.isArray(parsed)
-      ? parsed.filter((n) => n && isBellType(n.type)).slice(0, 50)
+      ? parsed.filter((n) => n && isBellNotification(n)).slice(0, 50)
       : [];
   } catch {
     return [];
@@ -75,6 +72,17 @@ function saveHistory(userId: string, items: Notification[]) {
   } catch {
     /* ignore */
   }
+}
+
+/** Coalesce rapid bell updates so localStorage doesn't block the main thread. */
+let historySaveTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleSaveHistory(userId: string, items: Notification[]) {
+  if (typeof window === "undefined" || !userId) return;
+  if (historySaveTimer) clearTimeout(historySaveTimer);
+  historySaveTimer = setTimeout(() => {
+    historySaveTimer = null;
+    saveHistory(userId, items);
+  }, 450);
 }
 
 /** Sound/toast preference — bell always lists DB notifications regardless. */
@@ -236,7 +244,7 @@ export function NotificationListenerProvider({
     isMutedRef.current = isMuted;
   }, [isMuted]);
 
-  const unreadCount = notifications.filter((n) => !n.read && isBellType(n.type)).length;
+  const unreadCount = notifications.filter((n) => !n.read && isBellNotification(n)).length;
   const openPanel = useCallback(() => setIsPanelOpen(true), []);
   const closePanel = useCallback(() => setIsPanelOpen(false), []);
   const togglePanel = useCallback(() => setIsPanelOpen((v) => !v), []);
@@ -251,7 +259,7 @@ export function NotificationListenerProvider({
     if (!historyReady) return;
     const uid = currentUserIdRef.current;
     if (!uid) return;
-    saveHistory(uid, notifications);
+    scheduleSaveHistory(uid, notifications);
   }, [notifications, historyReady]);
 
   // ── Mute Toggle ────────────────────────────────────────────────────────────
@@ -298,8 +306,8 @@ export function NotificationListenerProvider({
     const notif = mapRow(row);
     if (!notif.id || !notif.title) return;
 
-    // Actively viewing this chat → mark read, no banner / no bell.
-    if (notif.type === "message") {
+    // Chat rows (incl. legacy system/"Reply from shop") never enter the bell.
+    if (isChatNotification(notif)) {
       const convId = notif.entityId || "";
       if (isViewingConversation(convId)) {
         void markNotificationRead(notif.id);
@@ -331,10 +339,7 @@ export function NotificationListenerProvider({
 
     setNotifications((prev) => {
       if (prev.some((n) => n.id === notif.id)) return prev;
-      const next = [notif, ...prev].slice(0, 50);
-      const uid = currentUserIdRef.current;
-      if (uid) saveHistory(uid, next);
-      return next;
+      return [notif, ...prev].slice(0, 50);
     });
 
     if (prefsAllow(notif.type)) {
@@ -378,16 +383,16 @@ export function NotificationListenerProvider({
           setNotifications((prev) => {
             const byId = new Map(prev.map((n) => [n.id, n]));
             for (const row of result.data) {
-              if (!isBellType(row.type)) {
+              if (!isBellNotification(row)) {
                 // Drain legacy chat rows from the bell so they never reappear.
                 if (!row.read) void markNotificationRead(row.id);
                 continue;
               }
               byId.set(row.id, mapRow(row));
             }
-            // Drop any cached message rows from older clients.
+            // Drop any cached chat rows from older clients.
             for (const [id, n] of byId) {
-              if (!isBellType(n.type)) byId.delete(id);
+              if (!isBellNotification(n)) byId.delete(id);
             }
             const merged = [...byId.values()]
               .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
@@ -462,23 +467,39 @@ export function NotificationListenerProvider({
     };
   }, []);
 
+  const contextValue = useMemo(
+    () => ({
+      notifications,
+      unreadCount,
+      markAsRead,
+      markAllAsRead,
+      clearNotifications,
+      isMuted,
+      toggleMute,
+      isPanelOpen,
+      openPanel,
+      closePanel,
+      togglePanel,
+      registerUser,
+    }),
+    [
+      notifications,
+      unreadCount,
+      markAsRead,
+      markAllAsRead,
+      clearNotifications,
+      isMuted,
+      toggleMute,
+      isPanelOpen,
+      openPanel,
+      closePanel,
+      togglePanel,
+      registerUser,
+    ],
+  );
+
   return (
-    <NotificationContext.Provider
-      value={{
-        notifications,
-        unreadCount,
-        markAsRead,
-        markAllAsRead,
-        clearNotifications,
-        isMuted,
-        toggleMute,
-        isPanelOpen,
-        openPanel,
-        closePanel,
-        togglePanel,
-        registerUser,
-      }}
-    >
+    <NotificationContext.Provider value={contextValue}>
       {children}
     </NotificationContext.Provider>
   );
@@ -613,7 +634,7 @@ export function NotificationPanel({
 
   if (!isOpen) return null;
 
-  const bellNotifications = notifications.filter((n) => isBellType(n.type));
+  const bellNotifications = notifications.filter((n) => isBellNotification(n));
 
   return (
     <div className="fixed inset-0 z-[200] flex justify-end">

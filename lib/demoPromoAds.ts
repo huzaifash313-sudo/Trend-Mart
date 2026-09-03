@@ -60,7 +60,7 @@ export const DEMO_PROMO_ADS: PromotionalAd[] = [
   baseAd({
     id: "f0000001-0000-4000-8000-000000000001",
     title: "TrendsMart — Your Neighborhood Marketplace",
-    subtitle: "Discover 600+ products from local Gujranwala shops",
+    subtitle: "Local shops near you — browse, cart, order on WhatsApp",
     image_url: IMG.platform,
     link_url: "/products",
     badge_label: "Featured",

@@ -20,7 +20,7 @@ const CATEGORY_OPTIONS: { value: SupportTicketCategory; label: string }[] = [
   { value: "order", label: "Order Issue" },
   { value: "merchant", label: "Merchant / Store Support" },
   { value: "technical", label: "Technical Problem" },
-  { value: "billing", label: "Billing / Subscription" },
+  { value: "billing", label: "Account / payments" },
   { value: "other", label: "Other" },
 ];
 

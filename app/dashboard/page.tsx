@@ -29,6 +29,7 @@ import { getProductImages, getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import { useToast } from "@/components/Toast";
 import CustomSelect from "@/components/CustomSelect";
+import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -333,6 +334,14 @@ export default function DashboardOverviewPage() {
         icon: "💰",
       },
       {
+        id: "billing",
+        label: "Billing",
+        description: "Free trial, monthly plan & ad tokens",
+        href: "/dashboard/billing",
+        tone: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
+        icon: "🎫",
+      },
+      {
         id: "ads",
         label: "Ads",
         description: "Sponsored banners & promos",
@@ -389,7 +398,9 @@ export default function DashboardOverviewPage() {
       );
     }
 
-    return base;
+    return isPaidFeaturesEnabled()
+      ? base
+      : base.filter((a) => a.id !== "billing");
   }, [activeShop, pendingOrders.length]);
 
   const isBootstrapping =

@@ -1,10 +1,31 @@
-/* Soft TrendBot voice — rare, muteable, never spammy */
+/* Soft cute TrendBot voice — muteable, never spammy */
 
 const MUTE_KEY = "tm_trendbot_voice_mute_v1";
 const LAST_VOICE_KEY = "tm_trendbot_voice_last_v1";
 const ROUTE_VOICE_KEY = "tm_trendbot_voice_routes_v1";
 
-const MIN_GAP_MS = 90_000;
+const MIN_GAP_MS = 55_000;
+
+let voicesReady = false;
+
+function ensureVoicesLoaded(): void {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  if (voicesReady || window.speechSynthesis.getVoices().length > 0) {
+    voicesReady = true;
+    return;
+  }
+  window.speechSynthesis.addEventListener(
+    "voiceschanged",
+    () => {
+      voicesReady = true;
+    },
+    { once: true },
+  );
+}
+
+if (typeof window !== "undefined") {
+  ensureVoicesLoaded();
+}
 
 export function isTrendBotVoiceMuted(): boolean {
   try {
@@ -46,16 +67,30 @@ function shouldSkipHeavy(): boolean {
   return false;
 }
 
+/** Prefer soft / friendly English voices (works well for Roman Urdu tips too). */
 function pickVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+  ensureVoicesLoaded();
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-  const prefer =
-    voices.find((v) => /en(-|_)?(GB|US|IN|AU)/i.test(v.lang) && /female|woman|zira|samantha|google/i.test(v.name)) ||
-    voices.find((v) => /^en/i.test(v.lang)) ||
-    voices.find((v) => /ur/i.test(v.lang)) ||
-    voices[0];
-  return prefer ?? null;
+
+  const score = (v: SpeechSynthesisVoice): number => {
+    let s = 0;
+    const name = v.name.toLowerCase();
+    const lang = v.lang.toLowerCase();
+    if (/en(-|_)?(gb|us|in|au|ie)/i.test(lang)) s += 8;
+    else if (/^en/i.test(lang)) s += 5;
+    else if (/ur|hi/i.test(lang)) s += 4;
+    if (/female|woman|zira|samantha|karen|moira|google uk english female|neural|natural/i.test(name)) {
+      s += 10;
+    }
+    if (/microsoft.*(aria|jenny|sara|neerja)|google.*female/i.test(name)) s += 6;
+    if (/male|david|mark|ravi/i.test(name)) s -= 4;
+    if (v.localService) s += 1;
+    return s;
+  };
+
+  return [...voices].sort((a, b) => score(b) - score(a))[0] ?? null;
 }
 
 function routeAlreadySpoken(routeKey: string): boolean {
@@ -94,7 +129,7 @@ function lastVoiceAt(): number {
  */
 export function speakTrendBotLine(
   text: string,
-  options?: { routeKey?: string; force?: boolean },
+  options?: { routeKey?: string; force?: boolean; cute?: boolean },
 ): boolean {
   if (typeof window === "undefined") return false;
   if (!("speechSynthesis" in window)) return false;
@@ -110,18 +145,26 @@ export function speakTrendBotLine(
 
   try {
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text.slice(0, 140));
-    utter.rate = 1.02;
-    utter.pitch = 1.12;
-    utter.volume = 0.85;
+    const utter = new SpeechSynthesisUtterance(text.slice(0, 160).trim());
+    // Soft, slightly playful voice
+    utter.rate = options?.cute === false ? 1 : 1.05;
+    utter.pitch = options?.cute === false ? 1 : 1.22;
+    utter.volume = 0.88;
     const voice = pickVoice();
     if (voice) {
       utter.voice = voice;
-      utter.lang = voice.lang || "en-US";
+      utter.lang = voice.lang || "en-IN";
     } else {
-      utter.lang = "en-US";
+      utter.lang = "en-IN";
     }
-    window.speechSynthesis.speak(utter);
+    // Chrome sometimes needs a tiny delay after cancel
+    window.setTimeout(() => {
+      try {
+        window.speechSynthesis.speak(utter);
+      } catch {
+        /* ignore */
+      }
+    }, 40);
     if (options?.routeKey) markRouteSpoken(options.routeKey);
     else {
       try {
@@ -134,6 +177,36 @@ export function speakTrendBotLine(
   } catch {
     return false;
   }
+}
+
+/** Strip markdown and speak a short spoken summary of a bot reply. */
+export function speakTrendBotReply(
+  markdown: string,
+  options?: { productName?: string; productCount?: number },
+): boolean {
+  if (isTrendBotVoiceMuted()) return false;
+
+  if (options?.productName) {
+    const n = options.productCount ?? 1;
+    const line =
+      n > 1
+        ? `I found ${n} options. Top pick is ${options.productName}.`
+        : `Best match is ${options.productName}.`;
+    return speakTrendBotLine(line, { force: true, cute: true });
+  }
+
+  const plain = markdown
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_#`~>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (plain.length < 12) return false;
+
+  // First sentence-ish, keep short for TTS
+  const cut = plain.match(/^.{12,120}?[.!?…](?:\s|$)/)?.[0] || plain.slice(0, 110);
+  return speakTrendBotLine(cut.trim(), { force: true, cute: true });
 }
 
 export function cancelTrendBotVoice(): void {

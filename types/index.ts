@@ -1094,6 +1094,9 @@ export interface PromotionalAd {
   price_paid?: number | null;
   /** When the merchant submitted the paid placement request. */
   paid_at?: string | null;
+  /** Tokens deducted on auto-publish (1 token ≈ Rs 1). */
+  tokens_spent?: number | null;
+  auto_approved_via_tokens?: boolean;
   created_at: string;
   updated_at?: string;
   /** Populated client-side for merchant/admin management views. */

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import type { AssistantRole } from "@/lib/ai/assistantEngine";
 import type { ProductSearchHit } from "@/lib/ai/productSearch";
 import { TREND_BOT_NAME } from "@/lib/ai/trendBotBrand";
+import { speakTrendBotReply } from "@/lib/ai/trendBotVoice";
 import {
   getMemoryHint,
   getSessionLabel,
@@ -215,14 +216,24 @@ export function useTrendBotChat({
           for (const step of data.thinkingSteps.slice(0, 3)) {
             if (controller.signal.aborted) break;
             setThinkingStep(step);
-            await new Promise((r) => setTimeout(r, 90 + Math.random() * 110));
+            await new Promise((r) => setTimeout(r, 45 + Math.random() * 55));
           }
         } else if (!controller.signal.aborted) {
           setThinkingStep(`${TREND_BOT_NAME} soch raha hai…`);
-          await new Promise((r) => setTimeout(r, 120));
+          await new Promise((r) => setTimeout(r, 60));
         }
         setThinkingStep(null);
         commitReply(reply);
+        // Soft spoken summary (respects mute); skip if user is typing next message soon
+        try {
+          const top = data.products?.[0];
+          speakTrendBotReply(reply, {
+            productName: top?.name,
+            productCount: data.products?.length,
+          });
+        } catch {
+          /* voice optional */
+        }
       } catch (err) {
         const superseded = abortRef.current !== null && abortRef.current !== controller;
         if (superseded) return;

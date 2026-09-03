@@ -579,49 +579,53 @@ function HomeClient({
   /* Geo filter — Near me (range) / This city / All Pakistan */
   useEffect(() => {
     let cancelled = false;
-    async function applyGeoFilter() {
-      const scope = geoFilter.scope;
-      const coords = geoFilter.coordinates ?? globalCoords ?? null;
+    const timer = window.setTimeout(() => {
+      async function applyGeoFilter() {
+        const scope = geoFilter.scope;
+        const coords = geoFilter.coordinates ?? globalCoords ?? null;
 
-      // All Pakistan always shows every category-filtered shop — pin or no pin.
-      if (scope === "pakistan") {
-        setProximityActive(false);
-        setGeoFilteredShops([]);
-        return;
-      }
-
-      // Radius mode needs a pin; otherwise fall back to unfiltered list
-      if (scope === "radius" && !coords) {
-        setProximityActive(false);
-        setGeoFilteredShops([]);
-        return;
-      }
-
-      try {
-        const result = await filterShopsByProximity(filteredShops, {
-          coordinates: coords,
-          maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
-          enforceServiceRadius: true,
-          sortByProximity: true,
-          scope,
-          deliveryZone: globalLocation?.deliveryZone ?? undefined,
-          customerCity: globalLocation?.city ?? undefined,
-          customerArea: getCustomerArea(globalLocation),
-        });
-        if (!cancelled) {
-          setGeoFilteredShops(result.shops);
-          setProximityActive(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setGeoFilteredShops([]);
+        // All Pakistan always shows every category-filtered shop — pin or no pin.
+        if (scope === "pakistan") {
           setProximityActive(false);
+          setGeoFilteredShops([]);
+          return;
+        }
+
+        // Radius mode needs a pin; otherwise fall back to unfiltered list
+        if (scope === "radius" && !coords) {
+          setProximityActive(false);
+          setGeoFilteredShops([]);
+          return;
+        }
+
+        try {
+          const result = await filterShopsByProximity(filteredShops, {
+            coordinates: coords,
+            maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
+            enforceServiceRadius: true,
+            sortByProximity: true,
+            scope,
+            deliveryZone: globalLocation?.deliveryZone ?? undefined,
+            customerCity: globalLocation?.city ?? undefined,
+            customerArea: getCustomerArea(globalLocation),
+          });
+          if (!cancelled) {
+            setGeoFilteredShops(result.shops);
+            setProximityActive(true);
+          }
+        } catch {
+          if (!cancelled) {
+            setGeoFilteredShops([]);
+            setProximityActive(false);
+          }
         }
       }
-    }
-    applyGeoFilter();
+      void applyGeoFilter();
+    }, 120);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [filteredShops, geoFilter, globalCoords, globalLocation]);
 
