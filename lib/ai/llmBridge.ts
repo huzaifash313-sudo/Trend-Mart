@@ -71,7 +71,7 @@ export const TRENDSMART_APP_BIBLE = `
 TrendsMart = Pakistan hyper-local multi-vendor marketplace (owner/founder: Huzaifa).
 Customers browse shops/products, cart, checkout → WhatsApp order to merchant.
 Identity at checkout = email OTP (SMS OTP not used currently).
-New merchant shops need admin approval before public (verification_status=pending).
+New merchant shops are auto-approved after email verification (admin queue currently off).
 Delivery fee rules (single source of truth):
   1) pickup → Rs 0
   2) cart subtotal (before coupon) >= free_delivery_threshold → Rs 0

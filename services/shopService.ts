@@ -32,36 +32,40 @@ function isMissingColumnError(err: unknown): boolean {
   return /column .* does not exist|PGRST204|schema cache|Could not find/i.test(msg);
 }
 
-/** Fields that may be missing if the merchant hasn't run the full SQL setup yet. */
+/**
+ * Columns that older Supabase projects may not have yet.
+ * Order matters for the persist fallback: drop least-critical first so a
+ * single missing column never wipes location / bio / hours / fees.
+ */
 const SHOP_EXTENDED_KEYS = [
-  "latitude",
-  "longitude",
-  "service_radius_km",
-  "delivery_zones",
-  "address_display",
-  "min_order_amount",
-  "free_delivery_threshold",
-  "delivery_fee_flat",
-  "delivery_fee_per_km",
-  "service_area",
+  "sensitive_info_updated_at",
+  "slug",
+  "accent_color",
+  "announcement_expires_at",
+  "announcement",
+  "emergency_available",
   "hourly_rate",
   "call_out_charge",
-  "emergency_available",
   "shop_type",
-  "announcement",
-  "announcement_expires_at",
-  "accent_color",
-  "store_bio",
+  "service_area",
+  "tiktok_handle",
   "instagram_handle",
   "facebook_url",
-  "tiktok_handle",
   "secondary_phone",
+  "accepts_pickup",
+  "accepts_delivery",
+  "delivery_fee_per_km",
+  "delivery_fee_flat",
+  "free_delivery_threshold",
+  "min_order_amount",
+  "delivery_zones",
+  "address_display",
+  "service_radius_km",
+  "latitude",
+  "longitude",
+  "store_bio",
   "business_hours",
   "operating_status",
-  "slug",
-  "sensitive_info_updated_at",
-  "accepts_delivery",
-  "accepts_pickup",
 ] as const;
 
 /** Persist offer end time; empty / invalid → null (no countdown). */
@@ -73,14 +77,96 @@ function sanitizeAnnouncementExpires(raw: string | null | undefined): string | n
   return new Date(t).toISOString();
 }
 
-function stripExtendedShopFields(
-  payload: Record<string, unknown>,
-): Record<string, unknown> {
-  const out = { ...payload };
-  for (const key of SHOP_EXTENDED_KEYS) {
-    delete out[key];
+/** Pull the missing column name from PostgREST / Postgres errors. */
+function missingColumnFromError(err: unknown): string | null {
+  const msg = toErrorMessage(err);
+  const patterns = [
+    /Could not find the '([^']+)' column/i,
+    /column "([^"]+)" of relation/i,
+    /column "([^"]+)" does not exist/i,
+  ];
+  for (const re of patterns) {
+    const match = msg.match(re);
+    if (match?.[1]) return match[1];
   }
-  return out;
+  return null;
+}
+
+/**
+ * Insert or update a shop row. If the live schema is missing a column, omit
+ * only that column and retry — never drop every extra field at once.
+ * `slug` is written in a second pass so a missing slug column cannot fail
+ * name / location / fees / pin.
+ */
+async function persistShopRow(
+  action: "insert" | "update",
+  payload: Record<string, unknown>,
+  shopId?: string,
+): Promise<{ data: Shop; error: null } | { data: null; error: unknown }> {
+  const supabase = createClient();
+  const body: Record<string, unknown> = { ...payload };
+  const slug =
+    typeof body.slug === "string" && body.slug.trim() ? String(body.slug).trim() : null;
+  delete body.slug;
+  delete body.id;
+  delete body.created_at;
+  delete body.updated_at;
+  delete body.avg_rating;
+  delete body.review_count;
+  delete body.subscription_tier;
+  delete body.stories_quota;
+  delete body.pro_expires_at;
+  if (action === "update") {
+    delete body.owner_id;
+    delete body.verification_status;
+  }
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const result =
+      action === "insert"
+        ? await supabase.from("shops").insert(body).select().single()
+        : await supabase.from("shops").update(body).eq("id", shopId!).select().single();
+
+    if (!result.error && result.data) {
+      const saved = result.data as Shop;
+      if (!slug || !saved.id) return { data: saved, error: null };
+      const slugged = await supabase
+        .from("shops")
+        .update({ slug })
+        .eq("id", saved.id)
+        .select()
+        .single();
+      if (!slugged.error && slugged.data) return { data: slugged.data as Shop, error: null };
+      if (slugged.error && !isMissingColumnError(slugged.error)) {
+        logError(slugged.error, {
+          module: "shopService.persistShopRow.slug",
+          meta: { shopId: saved.id },
+        });
+      }
+      return { data: saved, error: null };
+    }
+
+    lastError = result.error;
+    if (!result.error || !isMissingColumnError(result.error)) {
+      return { data: null, error: result.error };
+    }
+
+    const missing = missingColumnFromError(result.error);
+    if (missing && Object.prototype.hasOwnProperty.call(body, missing)) {
+      delete body[missing];
+      continue;
+    }
+
+    const extra = SHOP_EXTENDED_KEYS.find((key) => key in body);
+    if (extra) {
+      delete body[extra];
+      continue;
+    }
+    break;
+  }
+
+  return { data: null, error: lastError };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────── */
@@ -688,9 +774,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
 
 /**
  * Create a new shop for the currently-authenticated user.
- * New stores go live immediately (no Super-Admin approval queue).
- * Merchant onboarding is intentionally direct — email verification is not
- * required here. Verification is instead enforced at checkout/order time.
+ * Email-verified merchants go live immediately (admin approval queue is off).
  */
 export async function createShop(
   form: ShopFormData,
@@ -703,6 +787,13 @@ export async function createShop(
     } = await supabase.auth.getUser();
 
     if (!user) return { success: false, error: "Not authenticated." };
+    if (!user.email_confirmed_at) {
+      return {
+        success: false,
+        error:
+          "Verify your email first. After verification your store goes live automatically.",
+      };
+    }
 
     // Strict one-store-per-account rule. The DB also enforces this with a
     // unique index (see one_shop_per_owner migration) — this guard returns a
@@ -722,75 +813,31 @@ export async function createShop(
     }
 
     const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
-    // New stores stay off the public marketplace until Super-Admin approves.
-    // Merchants can still open the dashboard and list products while pending.
-    const insertPayload: Record<string, unknown> = {
+    const persisted = await persistShopRow("insert", {
       ...sanitized,
       owner_id: user.id,
-      verification_status: "pending",
-      // Honour form intent for go-live, but public visibility still requires approval.
+      verification_status: "approved",
       is_live: sanitizeDbBoolean(form.is_live) ?? true,
-    };
+    });
 
-    let { data, error } = await supabase
-      .from("shops")
-      .insert(insertPayload)
-      .select()
-      .single();
-
-    if (error && isMissingColumnError(error)) {
-      // Older schemas may lack geo/delivery/verification columns — retry core fields.
-      const core: Record<string, unknown> = {
-        ...stripExtendedShopFields(sanitized),
-        owner_id: user.id,
-        is_live: false,
-        verification_status: "pending",
-      };
-      ({ data, error } = await supabase
-        .from("shops")
-        .insert(core)
-        .select()
-        .single());
-      if (error && isMissingColumnError(error)) {
-        delete core.verification_status;
-        // Without a verification column, keep offline until admin tooling exists.
-        core.is_live = false;
-        ({ data, error } = await supabase
-          .from("shops")
-          .insert(core)
-          .select()
-          .single());
-      }
-    }
-
-    if (error) throw error;
-
-    let saved = data as Shop;
-    const slug = generateShopSlug(saved.name, saved.id);
-    try {
-      const { data: slugged, error: slugError } = await supabase
-        .from("shops")
-        .update({ slug })
-        .eq("id", saved.id)
-        .select()
-        .single();
-      if (slugError && !isMissingColumnError(slugError)) throw slugError;
-      if (slugged) saved = slugged as Shop;
-    } catch (slugErr) {
-      if (!isMissingColumnError(slugErr)) {
-        logError(slugErr, { module: "shopService.createShop.slug", meta: { shopId: saved.id } });
-      }
-    }
+    if (persisted.error || !persisted.data) throw persisted.error;
+    const saved = persisted.data;
+    const withIdSlug = await persistShopRow(
+      "update",
+      { slug: generateShopSlug(saved.name, saved.id) },
+      saved.id,
+    );
+    const finalShop = withIdSlug.data ?? saved;
 
     // 1st month free — start trial subscription (best-effort; never blocks shop create).
     try {
       const { initializeSubscription } = await import("@/services/subscriptionService");
-      void initializeSubscription(saved.id, "free_trial");
+      void initializeSubscription(finalShop.id, "free_trial");
     } catch (subErr) {
-      logError(subErr, { module: "shopService.createShop.trial", meta: { shopId: saved.id } });
+      logError(subErr, { module: "shopService.createShop.trial", meta: { shopId: finalShop.id } });
     }
 
-    return { success: true, data: saved };
+    return { success: true, data: finalShop };
   } catch (err) {
     logError(err, { module: "shopService.createShop", meta: { form } });
     return { success: false, error: toError(err) };
@@ -804,41 +851,19 @@ export async function updateShop(
   shopId: string,
   form: ShopFormData,
 ): Promise<ServiceResult<Shop>> {
-  const supabase = createClient();
-
   try {
     const sanitized = sanitizeShopForm(form) as Record<string, unknown>;
     sanitized.slug = generateShopSlug(String(sanitized.name ?? form.name), shopId);
-    // Merchants must never self-approve / self-reject via the update path.
-    delete sanitized.verification_status;
-    delete sanitized.owner_id;
-
-    let { data, error } = await supabase
-      .from("shops")
-      .update(sanitized)
-      .eq("id", shopId)
-      .select()
-      .single();
-
-    // If the DB is missing geo/delivery columns, retry with core shop fields
-    // so merchants can still save name/phone/logo/etc.
-    if (error && isMissingColumnError(error)) {
-      ({ data, error } = await supabase
-        .from("shops")
-        .update(stripExtendedShopFields(sanitized))
-        .eq("id", shopId)
-        .select()
-        .single());
-    }
-
-    if (error) throw error;
-    if (!data) {
+    const persisted = await persistShopRow("update", sanitized, shopId);
+    if (persisted.error || !persisted.data) {
       return {
         success: false,
-        error: "Update did not persist. Confirm you own this shop and try again.",
+        error: persisted.error
+          ? toError(persisted.error)
+          : "Update did not persist. Confirm you own this shop and try again.",
       };
     }
-    return { success: true, data: data as Shop };
+    return { success: true, data: persisted.data };
   } catch (err) {
     logError(err, { module: "shopService.updateShop", meta: { shopId, form } });
     return { success: false, error: toError(err) };
@@ -917,31 +942,16 @@ export async function updateShopProfile(
       }
     }
 
-    let { data, error } = await supabase
-      .from("shops")
-      .update(sanitized)
-      .eq("id", shopId)
-      .select()
-      .single();
-
-    // If the DB is missing extended columns, retry with core shop fields.
-    if (error && isMissingColumnError(error)) {
-      ({ data, error } = await supabase
-        .from("shops")
-        .update(stripExtendedShopFields(sanitized))
-        .eq("id", shopId)
-        .select()
-        .single());
-    }
-
-    if (error) throw error;
-    if (!data) {
+    const persisted = await persistShopRow("update", sanitized, shopId);
+    if (persisted.error || !persisted.data) {
       return {
         success: false,
-        error: "Update did not persist. Confirm you own this shop and try again.",
+        error: persisted.error
+          ? toError(persisted.error)
+          : "Update did not persist. Confirm you own this shop and try again.",
       };
     }
-    return { success: true, data: data as Shop };
+    return { success: true, data: persisted.data };
   } catch (err) {
     logError(err, { module: "shopService.updateShopProfile", meta: { shopId, sensitiveChanged } });
     return { success: false, error: toError(err) };

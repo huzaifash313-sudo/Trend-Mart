@@ -9,10 +9,18 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { updateShop } from "@/services/shopService";
 import { useToast } from "@/components/Toast";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import ShopQrCode from "@/components/ShopQrCode";
+import ImageUpload from "@/components/ImageUpload";
+import { queryKeys } from "@/lib/queries";
+import {
+  formatPkPhoneDisplay,
+  formatPkPhoneInput,
+  PK_PHONE_PLACEHOLDER,
+} from "@/lib/phoneFormat";
 import {
   getPushPermissionState,
   isPushClientSupported,
@@ -108,6 +116,7 @@ function ChevronRightIcon() {
 /* -------------------------------------------------------------------------- */
 
 type SectionId =
+  | "profile"
   | "live"
   | "social"
   | "fees"
@@ -121,6 +130,7 @@ type PushStatus = "checking" | "unsupported" | "denied" | "enabled" | "not-enabl
 const THEME_ACCENT = "#10b981";
 
 const SECTION_LINKS: Array<{ id: SectionId; label: string }> = [
+  { id: "profile", label: "Profile" },
   { id: "live", label: "Live" },
   { id: "social", label: "Social" },
   { id: "fees", label: "Fees" },
@@ -171,14 +181,14 @@ function shopToForm(source: Shop): ShopFormData {
     name: source.name,
     category: source.category,
     location: source.location,
-    whatsapp_number: source.whatsapp_number,
+    whatsapp_number: formatPkPhoneDisplay(source.whatsapp_number ?? ""),
     logo_url: source.logo_url ?? "",
     banner_url: source.banner_url ?? "",
     is_live: source.is_live,
     instagram_handle: source.instagram_handle ?? "",
     facebook_url: source.facebook_url ?? "",
     tiktok_handle: source.tiktok_handle ?? "",
-    secondary_phone: source.secondary_phone ?? "",
+    secondary_phone: formatPkPhoneDisplay(source.secondary_phone ?? ""),
     business_hours: source.business_hours ?? "",
     operating_status: source.operating_status?.trim() || "Open",
     accent_color: THEME_ACCENT,
@@ -347,6 +357,7 @@ function PushStatusBadge({ status }: { status: PushStatus }) {
 export default function DashboardSettingsPage() {
   // React Query keeps the previous shop cached (keepPreviousData) so the page
   // renders instantly on repeat visits — no blank flash while data reloads.
+  const queryClient = useQueryClient();
   const myShopQuery = useMyShop();
   const shop = myShopQuery.data ?? null;
   const loading = myShopQuery.isLoading && !shop;
@@ -491,10 +502,9 @@ export default function DashboardSettingsPage() {
       const result = await updateShop(shop.id, shopFormFields);
       if (result.success) {
         setForm(shopToForm(result.data));
-        // Invalidate the cached shop so the storefront reflects changes instantly.
-        myShopQuery.refetch();
-        addToast("Store settings saved successfully.", "success");
-        // Invalidate the storefront cache so homepage/cards reflect changes.
+        queryClient.setQueryData(queryKeys.myShop, result.data);
+        await queryClient.invalidateQueries({ queryKey: ["shop-detail"] });
+        addToast("Store settings saved. Your storefront is now in sync.", "success");
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("trendsmart:shops-updated"));
         }
@@ -506,7 +516,7 @@ export default function DashboardSettingsPage() {
     } finally {
       setSaving(false);
     }
-  }, [shop, form, addToast, myShopQuery]);
+  }, [shop, form, addToast, queryClient]);
 
   const handleEnablePush = useCallback(async () => {
     setPushBusy(true);
@@ -600,6 +610,121 @@ export default function DashboardSettingsPage() {
       </div>
 
       <main className="mx-auto max-w-4xl space-y-7 px-3 py-5 sm:px-4 sm:py-6">
+        <SectionShell
+          id="profile"
+          icon={<StoreIcon />}
+          title="Store profile"
+          helper="Name, photos, hours and bio — this is what customers see on your dukaan page."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ImageUpload
+              label="Store logo"
+              currentUrl={form.logo_url}
+              onUploaded={(url) => setForm((current) => ({ ...current, logo_url: url }))}
+              folder="shops"
+              fileId={`${shop.id}-logo`}
+              fallbackType="shop"
+            />
+            <ImageUpload
+              label="Store banner"
+              currentUrl={form.banner_url}
+              onUploaded={(url) => setForm((current) => ({ ...current, banner_url: url }))}
+              folder="shops"
+              fileId={`${shop.id}-banner`}
+              fallbackType="shop"
+              aspect="video"
+            />
+          </div>
+
+          <div>
+            <FieldLabel>Store name</FieldLabel>
+            <TextInput
+              type="text"
+              value={form.name}
+              maxLength={100}
+              onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))}
+              placeholder="Your dukaan name"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <FieldLabel>WhatsApp number</FieldLabel>
+              <TextInput
+                type="tel"
+                inputMode="numeric"
+                value={form.whatsapp_number}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    whatsapp_number: formatPkPhoneInput(e.target.value),
+                  }))
+                }
+                placeholder={PK_PHONE_PLACEHOLDER}
+              />
+              <p className="mt-1.5 text-[0.7rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
+                Orders and the storefront WhatsApp button use this number.
+              </p>
+            </div>
+            <div>
+              <FieldLabel optional>Other number</FieldLabel>
+              <TextInput
+                type="tel"
+                inputMode="numeric"
+                value={form.secondary_phone}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    secondary_phone: formatPkPhoneInput(e.target.value),
+                  }))
+                }
+                placeholder={PK_PHONE_PLACEHOLDER}
+              />
+            </div>
+          </div>
+
+          <div>
+            <FieldLabel optional>Business hours</FieldLabel>
+            <TextInput
+              type="text"
+              value={form.business_hours}
+              maxLength={150}
+              onChange={(e) => setForm((current) => ({ ...current, business_hours: e.target.value }))}
+              placeholder="Mon–Sat 9 AM – 10 PM"
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900/70">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Store open</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
+                {!(form.operating_status ?? "Open").toLowerCase().includes("closed")
+                  ? "Customers can place orders now."
+                  : "Store is marked closed on your storefront."}
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={!(form.operating_status ?? "Open").toLowerCase().includes("closed")}
+              onChange={(open) =>
+                setForm((current) => ({ ...current, operating_status: open ? "Open" : "Closed" }))
+              }
+              label="Store open or closed"
+            />
+          </div>
+
+          <div>
+            <FieldLabel optional>About this store</FieldLabel>
+            <textarea
+              value={form.store_bio}
+              maxLength={500}
+              rows={3}
+              onChange={(e) => setForm((current) => ({ ...current, store_bio: e.target.value }))}
+              placeholder="What do you sell?"
+              className={`${inputClasses()} resize-none`}
+            />
+          </div>
+        </SectionShell>
+
         <SectionShell
           id="live"
           icon={<StoreIcon />}

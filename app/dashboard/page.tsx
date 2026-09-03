@@ -191,27 +191,35 @@ export default function DashboardOverviewPage() {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    setShopsLoaded(false);
-    (async () => {
+    const loadShops = async () => {
       const result = await fetchMyShops();
       if (cancelled) return;
       if (result.success) {
         setShops(result.data);
-        if (result.data.length > 0 && !activeShopId) {
+        setActiveShopId((current) => {
+          if (result.data.length === 0) return null;
           const saved =
             typeof window !== "undefined"
               ? localStorage.getItem(scopedKey("trendsmart_active_shop"))
               : null;
           const match = saved ? result.data.find((s) => s.id === saved) : null;
-          setActiveShopId(match?.id ?? result.data[0].id);
-        }
+          if (current && result.data.some((s) => s.id === current)) return current;
+          return match?.id ?? result.data[0].id;
+        });
       } else {
         addToast(result.error ?? "Could not load your shops.", "error");
       }
       setShopsLoaded(true);
-    })();
+    };
+    setShopsLoaded(false);
+    void loadShops();
+    const onShopsUpdated = () => {
+      void loadShops();
+    };
+    window.addEventListener("trendsmart:shops-updated", onShopsUpdated);
     return () => {
       cancelled = true;
+      window.removeEventListener("trendsmart:shops-updated", onShopsUpdated);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);

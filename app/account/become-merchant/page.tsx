@@ -136,7 +136,6 @@ export default function BecomeMerchantPage() {
     setSubmitting(true);
     try {
       // Create store first — DB trigger promotes to merchant. Avoid orphan merchant role on failure.
-      // Store stays pending admin approval (createShop forces verification_status=pending).
       const shopResult = await createShop({
         ...form,
         name: form.name.trim(),
@@ -162,13 +161,12 @@ export default function BecomeMerchantPage() {
         console.warn("[become-merchant] claimSignupRole:", roleResult.error);
       }
 
-      // Invalidate storefront cache (shop still hidden until admin approves).
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("trendsmart:shops-updated"));
       }
 
       addToast(
-        "Store created! Pending admin approval — you can set up products now.",
+        "Store created! It's live — you can add products now.",
         "success",
       );
       window.location.href = "/dashboard";
@@ -216,7 +214,7 @@ export default function BecomeMerchantPage() {
           <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-zinc-600 dark:text-zinc-400">
             <li>Fill in your store details (required fields marked *).</li>
             <li>Accept merchant guidelines.</li>
-            <li>We create your store and open the merchant dashboard (admin approval for public listing).</li>
+            <li>We create your store and open the merchant dashboard. After email verification it is live for customers.</li>
           </ol>
         </section>
 

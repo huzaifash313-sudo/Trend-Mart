@@ -269,7 +269,7 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
   {
     keys: ["safe", "secure", "scam", "trust", "reliable"],
     q: "Kya TrendsMart safe hai?",
-    a: "Nayi merchant shops *admin approval* ke baad hi public hoti hain. Order WhatsApp par shop se direct confirm hota hai. Issues: pehle shop, phir [Support](/support).",
+    a: "Email verify ke baad merchant shop public ho sakti hai. Order WhatsApp par shop se direct confirm hota hai. Issues: pehle shop, phir [Support](/support).",
     roles: "all",
     link: "/legal/merchant-guidelines",
   },
