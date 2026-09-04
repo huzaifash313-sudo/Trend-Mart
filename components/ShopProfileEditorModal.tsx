@@ -92,6 +92,7 @@ function shopToFormData(source: Shop): ShopFormData {
       source.delivery_fee_per_km != null && source.delivery_fee_per_km > 0
         ? String(source.delivery_fee_per_km)
         : "",
+    free_delivery_areas: source.free_delivery_areas ?? [],
     accepts_delivery: source.accepts_delivery ?? true,
     accepts_pickup: source.accepts_pickup ?? true,
   };

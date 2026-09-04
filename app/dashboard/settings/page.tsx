@@ -172,6 +172,7 @@ const INITIAL_FORM: ShopFormData = {
   free_delivery_threshold: "",
   delivery_fee_flat: "",
   delivery_fee_per_km: "",
+  free_delivery_areas: [],
   accepts_delivery: true,
   accepts_pickup: true,
 };
@@ -221,6 +222,7 @@ function shopToForm(source: Shop): ShopFormData {
       source.delivery_fee_per_km != null && source.delivery_fee_per_km > 0
         ? String(source.delivery_fee_per_km)
         : "",
+    free_delivery_areas: source.free_delivery_areas ?? [],
     accepts_delivery: source.accepts_delivery ?? true,
     accepts_pickup: source.accepts_pickup ?? true,
   };
@@ -495,6 +497,7 @@ export default function DashboardSettingsPage() {
         free_delivery_threshold: form.free_delivery_threshold,
         delivery_fee_flat: form.delivery_fee_flat,
         delivery_fee_per_km: form.delivery_fee_per_km,
+        free_delivery_areas: form.free_delivery_areas,
         accepts_delivery: form.accepts_delivery,
         accepts_pickup: form.accepts_pickup,
       };
@@ -842,6 +845,28 @@ export default function DashboardSettingsPage() {
               onChange={(value) => setForm((current) => ({ ...current, delivery_fee_per_km: value }))}
               placeholder="Per km fee"
             />
+          </div>
+
+          {/* Free-delivery localities — FREE for those mohallas/colonies */}
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
+            <FieldLabel>Free delivery areas (optional)</FieldLabel>
+            <TextInput
+              type="text"
+              value={form.free_delivery_areas.join(", ")}
+              onChange={(e) =>
+                setForm((current) => ({
+                  ...current,
+                  free_delivery_areas: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                }))
+              }
+              placeholder="e.g. Peoples Colony, Satellite Town"
+            />
+            <p className="mt-1.5 text-[0.7rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
+              Customers whose address is in one of these areas always get free delivery — regardless of distance or order total. Separate names with commas.
+            </p>
           </div>
 
           {/* Live auto-calc preview of what customers will be charged */}

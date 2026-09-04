@@ -31,6 +31,10 @@ export interface DeliveryFeeInput {
   subtotal?: number;
   /** True when the order is self-pickup / takeaway → fee is always 0. */
   isPickup?: boolean;
+  /** Merchant-declared localities where delivery is ALWAYS free. */
+  freeAreas?: string[] | null;
+  /** Customer's selected area / mohalla / colony (e.g. "Peoples Colony"). */
+  customerArea?: string | null;
 }
 
 export interface DeliveryFeeBreakdown {
@@ -40,7 +44,7 @@ export interface DeliveryFeeBreakdown {
    */
   fee: number;
   /** Why fee is free, if applicable. */
-  freeReason: "pickup" | "threshold" | null;
+  freeReason: "pickup" | "threshold" | "area" | null;
   /** Flat portion included in fee (0 when free / incomplete / unconfigured). */
   flatPart: number;
   /** Distance portion included in fee (0 when free / no GPS). */
@@ -60,6 +64,38 @@ function n(v: unknown): number {
   return Number.isFinite(x) ? x : 0;
 }
 
+/**
+ * Normalize an area/colony name so "Peoples Colony" matches "People's Colony"
+ * and "peoples  coloney". Mirrors lib/cityAreas.normalizeAreaName without
+ * importing (keeps this module dependency-free for tests).
+ */
+function normalizeAreaToken(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * True when the customer's selected area matches one of the shop's
+ * free-delivery areas. Normalized + containment-aware so a shop can mark a
+ * broad locality and still cover sub-areas (e.g. "Satellite" covers
+ * "Satellite Town").
+ */
+export function areaQualifiesForFreeDelivery(
+  customerArea: string | null | undefined,
+  freeAreas: string[] | null | undefined,
+): boolean {
+  const target = normalizeAreaToken(customerArea ?? "");
+  if (!target || !Array.isArray(freeAreas) || freeAreas.length === 0) return false;
+  return freeAreas.some((area) => {
+    const token = normalizeAreaToken(String(area ?? ""));
+    if (!token) return false;
+    return token === target || target.includes(token) || token.includes(target);
+  });
+}
+
 /** Full breakdown — prefer this when UI needs to explain the fee. */
 export function computeDeliveryFeeBreakdown(
   input: DeliveryFeeInput,
@@ -73,6 +109,8 @@ export function computeDeliveryFeeBreakdown(
     input.distanceKm != null && Number.isFinite(input.distanceKm)
       ? Math.max(0, Number(input.distanceKm))
       : null;
+  const freeArea =
+    !isPickup && areaQualifiesForFreeDelivery(input.customerArea, input.freeAreas);
 
   if (isPickup) {
     return {
@@ -84,6 +122,20 @@ export function computeDeliveryFeeBreakdown(
       unconfigured: false,
       isFinal: true,
       formulaLabel: "Self-pickup — no delivery fee",
+    };
+  }
+
+  if (freeArea) {
+    const label = (input.customerArea ?? "").trim() || "your area";
+    return {
+      fee: 0,
+      freeReason: "area",
+      flatPart: 0,
+      distancePart: 0,
+      incompleteDistance: false,
+      unconfigured: false,
+      isFinal: true,
+      formulaLabel: `FREE delivery to ${label}`,
     };
   }
 

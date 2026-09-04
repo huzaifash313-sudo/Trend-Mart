@@ -42,11 +42,13 @@ function contentSignature(pathname: string, search: string): string {
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
-export default function ScrollToTop() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams?.toString() ?? "";
-
+/**
+ * Core scroll logic. Kept in its OWN component so the parent (which calls the
+ * suspending `useSearchParams`) has NO hooks after the suspension point — this
+ * avoids React 19's "Rendered more hooks" (#310) hook-chain corruption that
+ * fires when Suspense unwinds a component with later hooks (see react#33580).
+ */
+function ScrollToTopCore({ pathname, search }: { pathname: string; search: string }) {
   // Set on browser back/forward so we can restore instead of jumping to top.
   const wasPop = useRef(false);
   const prevContentSig = useRef<string | null>(null);
@@ -123,4 +125,17 @@ export default function ScrollToTop() {
   }, [pathname, search]);
 
   return null;
+}
+
+/**
+ * Suspending hooks (`useSearchParams`) live here with nothing after them, so
+ * the Suspense boundary can safely unwrap this component without corrupting
+ * the hook chain. All side-effect hooks move to <ScrollToTopCore>.
+ */
+export default function ScrollToTop() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams?.toString() ?? "";
+
+  return <ScrollToTopCore pathname={pathname} search={search} />;
 }

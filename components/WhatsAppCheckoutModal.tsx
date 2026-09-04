@@ -609,6 +609,8 @@ export default function WhatsAppCheckoutModal({
       perKm: shop.delivery_fee_per_km,
       distanceKm,
       freeThreshold: shop.free_delivery_threshold,
+      freeAreas: shop.free_delivery_areas,
+      customerArea: location?.deliveryZone,
       subtotal,
       isPickup: false,
     });
@@ -617,6 +619,8 @@ export default function WhatsAppCheckoutModal({
     shop.delivery_fee_per_km,
     distanceKm,
     shop.free_delivery_threshold,
+    shop.free_delivery_areas,
+    location?.deliveryZone,
     subtotal,
     isPickup,
   ]);
@@ -1178,6 +1182,7 @@ export default function WhatsAppCheckoutModal({
           customerLat: pinLat,
           customerLng: pinLng,
           customerCity: location?.city ?? undefined,
+          customerArea: location?.deliveryZone ?? undefined,
           idempotencyKey,
         }),
         15_000,
@@ -1702,7 +1707,7 @@ export default function WhatsAppCheckoutModal({
                   <span className="text-emerald-700 dark:text-emerald-300">Delivery Fee</span>
                   <span
                     className={`font-semibold ${
-                      deliveryBreakdown.freeReason === "threshold"
+                      deliveryBreakdown.freeReason === "threshold" || deliveryBreakdown.freeReason === "area"
                         ? "text-emerald-600 dark:text-emerald-400"
                         : deliveryFeeNotReady || deliveryBreakdown.freeReason === "pickup"
                           ? "text-amber-600 dark:text-amber-400"
@@ -1711,11 +1716,13 @@ export default function WhatsAppCheckoutModal({
                   >
                     {deliveryBreakdown.freeReason === "threshold"
                       ? "FREE"
-                      : deliveryBreakdown.freeReason === "pickup"
-                        ? "N/A (pickup)"
-                        : deliveryFeeNotReady
-                          ? "—"
-                          : formatRupees(deliveryFee)}
+                      : deliveryBreakdown.freeReason === "area"
+                        ? "FREE"
+                        : deliveryBreakdown.freeReason === "pickup"
+                          ? "N/A (pickup)"
+                          : deliveryFeeNotReady
+                            ? "—"
+                            : formatRupees(deliveryFee)}
                   </span>
                 </div>
                 {!isPickup && deliveryBreakdown.formulaLabel ? (
@@ -2071,11 +2078,13 @@ export default function WhatsAppCheckoutModal({
                   <span className="font-semibold">
                     {deliveryBreakdown.freeReason === "threshold"
                       ? "FREE"
-                      : deliveryBreakdown.freeReason === "pickup"
-                        ? "N/A (pickup)"
-                        : deliveryFeeNotReady
-                          ? "—"
-                          : formatRupees(deliveryFee)}
+                      : deliveryBreakdown.freeReason === "area"
+                        ? "FREE"
+                        : deliveryBreakdown.freeReason === "pickup"
+                          ? "N/A (pickup)"
+                          : deliveryFeeNotReady
+                            ? "—"
+                            : formatRupees(deliveryFee)}
                   </span>
                 </div>
                 <div className="flex justify-between text-base font-bold border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">

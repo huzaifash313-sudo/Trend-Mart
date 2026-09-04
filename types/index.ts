@@ -64,6 +64,8 @@ export interface Shop {
   delivery_fee_flat?: number | null;
   /** Additional delivery fee (PKR) charged per km of customer distance, on top of the flat fee. */
   delivery_fee_per_km?: number | null;
+  /** Specific localities (mohallas/colonies) where delivery is always FREE. */
+  free_delivery_areas?: string[] | null;
   /**
    * Review status. New stores are auto-approved on create (no admin queue).
    * Admins may still set `rejected` or flip `is_live` for abuse cases.
@@ -161,6 +163,8 @@ export interface ShopFormData {
   delivery_fee_flat: string;
   /** Additional delivery fee (PKR, form input string) charged per km of distance. */
   delivery_fee_per_km: string;
+  /** Localities (mohallas/colonies) where delivery is always free. */
+  free_delivery_areas: string[];
   /** Accept delivery orders at checkout (false hides Delivery). Default true. */
   accepts_delivery: boolean;
   /** Accept self-pickup orders at checkout (false hides Pickup). Default true. */

@@ -54,18 +54,19 @@ const SHOP_EXTENDED_KEYS = [
   "secondary_phone",
   "accepts_pickup",
   "accepts_delivery",
-  "delivery_fee_per_km",
-  "delivery_fee_flat",
-  "free_delivery_threshold",
-  "min_order_amount",
-  "delivery_zones",
-  "address_display",
-  "service_radius_km",
-  "latitude",
-  "longitude",
-  "store_bio",
-  "business_hours",
-  "operating_status",
+    "delivery_fee_per_km",
+    "delivery_fee_flat",
+    "free_delivery_threshold",
+    "free_delivery_areas",
+    "min_order_amount",
+    "delivery_zones",
+    "address_display",
+    "service_radius_km",
+    "latitude",
+    "longitude",
+    "store_bio",
+    "business_hours",
+    "operating_status",
 ] as const;
 
 /** Persist offer end time; empty / invalid → null (no countdown). */
@@ -219,6 +220,7 @@ export async function fetchShops(opts?: {
     "free_delivery_threshold",
     "delivery_fee_flat",
     "delivery_fee_per_km",
+    "free_delivery_areas",
     "min_order_amount",
     "avg_rating",
     "review_count",
@@ -667,6 +669,31 @@ function sanitizeDeliveryZones(input: unknown): string[] {
 }
 
 /**
+ * Sanitize the free-delivery-areas list: string array (or comma-separated
+ * string) of locality names. Dedupes + caps length so the column stays tidy.
+ */
+function sanitizeFreeDeliveryAreas(input: unknown): string[] {
+  if (input == null) return [];
+  const raw: string[] = Array.isArray(input)
+    ? input.filter((v): v is string => typeof v === "string")
+    : typeof input === "string"
+      ? input.split(",")
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    const name = String(item).trim().slice(0, 60);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/**
  * Sanitize an Instagram handle. Returns empty string for invalid handles.
  */
 function sanitizeDbInstagram(input: unknown): string {
@@ -767,6 +794,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     free_delivery_threshold: sanitizeDbNumeric(form.free_delivery_threshold, 0, 999_999),
     delivery_fee_flat: sanitizeDbNumeric(form.delivery_fee_flat, 0, 99_999) ?? 0,
     delivery_fee_per_km: sanitizeDbNumeric(form.delivery_fee_per_km, 0, 9_999) ?? 0,
+    free_delivery_areas: sanitizeFreeDeliveryAreas(form.free_delivery_areas),
     accepts_delivery: sanitizeDbBoolean(form.accepts_delivery ?? true),
     accepts_pickup: sanitizeDbBoolean(form.accepts_pickup ?? true),
   };
