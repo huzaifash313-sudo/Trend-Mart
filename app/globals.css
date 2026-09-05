@@ -373,6 +373,34 @@ html[data-brand-theme="royal-maroon"] {
   --tm-sea-950: #250609;
   --tm-splash-bg: var(--tm-brand-700);
 }
+html[data-brand-theme="plum-magenta"] {
+  /* Plum Magenta — exact palette:
+     Primary #8B0046 · Dark/hero #4A0024 · Gradient #3B001D→#7A003D
+     Surface #FDF0F5 · Borders/subtle #F5D6E3 */
+  --tm-brand-50: #fdf0f5;  /* surface / light backgrounds */
+  --tm-brand-100: #fae0ec;
+  --tm-brand-200: #f5d6e3; /* borders / subtles */
+  --tm-brand-300: #e6a8c8;
+  --tm-brand-400: #c04e8a;
+  --tm-brand-500: #8b0046; /* primary brand */
+  --tm-brand-600: #720038;
+  --tm-brand-700: #4a0024; /* primary dark (headers & hero bg) */
+  --tm-brand-800: #3b001d; /* gradient deep end */
+  --tm-brand-900: #2e0017;
+  --tm-brand-950: #1c000e;
+  --tm-sea-50: #fdf0f5;
+  --tm-sea-100: #f7ddea;
+  --tm-sea-200: #efc1d9;
+  --tm-sea-300: #df96be;
+  --tm-sea-400: #c75e97;
+  --tm-sea-500: #7a003d;  /* gradient lighter end */
+  --tm-sea-600: #600030;
+  --tm-sea-700: #4a0024;
+  --tm-sea-800: #3b001d;
+  --tm-sea-900: #2a0014;
+  --tm-sea-950: #19000b;
+  --tm-splash-bg: var(--tm-brand-700);
+}
 html[data-brand-theme="maroon-gold"] {
   /* Mehroon + gold — same deep maroon, royal amber support */
   --tm-brand-50: #fdf3f4;
