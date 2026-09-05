@@ -875,6 +875,7 @@ async function placeOrderOnServer(params: {
   customerLat?: number | null;
   customerLng?: number | null;
   customerCity?: string | null;
+  customerArea?: string | null;
   idempotencyKey?: string | null;
 }): Promise<ServiceResult<Order>> {
   try {
@@ -916,6 +917,7 @@ export async function createOrder(params: {
   customerLat?: number | null;
   customerLng?: number | null;
   customerCity?: string | null;
+  customerArea?: string | null;
   idempotencyKey?: string | null;
 }): Promise<ServiceResult<Order>> {
   return placeOrderOnServer({
@@ -928,6 +930,7 @@ export async function createOrder(params: {
     customerLat: params.customerLat,
     customerLng: params.customerLng,
     customerCity: params.customerCity,
+    customerArea: params.customerArea,
     idempotencyKey: params.idempotencyKey,
     items: params.items.map((item) => ({
       productId: item.product_id ?? "",

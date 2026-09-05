@@ -55,6 +55,8 @@ interface OrderRequestBody {
   customerLat?: number | null;
   customerLng?: number | null;
   customerCity?: string | null;
+  /** Customer's selected area / mohalla / colony (used for area-based free delivery). */
+  customerArea?: string | null;
   /** Client-generated idempotency token to prevent duplicate orders. */
   idempotencyKey?: string | null;
 }
@@ -74,6 +76,7 @@ interface ShopRow {
   longitude: number | null;
   service_radius_km: number | null;
   delivery_zones: string[] | null;
+  free_delivery_areas: string[] | null;
   location: string | null;
   business_hours: string | null;
   operating_status: string | null;
@@ -278,7 +281,7 @@ export async function POST(request: Request) {
   const { data: shopRaw, error: shopErr } = await admin
     .from("shops")
     .select(
-      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, location, business_hours, operating_status, accepts_delivery, accepts_pickup",
+      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, free_delivery_areas, location, business_hours, operating_status, accepts_delivery, accepts_pickup",
     )
     .eq("id", shopId)
     .maybeSingle();
@@ -669,6 +672,10 @@ export async function POST(request: Request) {
   const radiusKm = toNumber(shopRow.service_radius_km, 0);
   const coverage = parseCoverage(shopRow.delivery_zones);
   const customerCity = typeof body.customerCity === "string" ? body.customerCity.trim() : "";
+  // Selected mohalla/colony — only used to grant area-based FREE delivery; it is
+  // never trusted to relax radius/city coverage (that still needs the live pin).
+  const customerArea =
+    typeof body.customerArea === "string" ? body.customerArea.trim().slice(0, 80) : "";
   const custLat = typeof body.customerLat === "number" ? body.customerLat : null;
   const custLng = typeof body.customerLng === "number" ? body.customerLng : null;
   const hasCustomerCoords =
@@ -720,14 +727,20 @@ export async function POST(request: Request) {
           "Could not verify city coverage — shop location or your pin is missing.";
       }
     } else if (coverage.mode === "radius") {
-      if (!hasShopCoords) {
+      const radiusEnforced = radiusKm > 0;
+      if (radiusEnforced && !hasShopCoords) {
         coverageError =
           "This shop has not set its map pin yet — delivery cannot be confirmed.";
-      } else if (radiusKm > 0 && distanceKm == null) {
+      } else if (radiusEnforced && distanceKm == null) {
         coverageError = "Could not calculate distance for delivery coverage.";
-      } else if (radiusKm > 0 && distanceKm != null && distanceKm > radiusKm) {
+      } else if (radiusEnforced && distanceKm != null && distanceKm > radiusKm) {
         coverageError = `You are about ${distanceKm.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`;
+      } else if (!radiusEnforced && perKmFee > 0 && !hasShopCoords) {
+        // radius 0 = "deliver anywhere", but per-km billing still needs a pin.
+        coverageError =
+          "This shop charges per-km delivery but has no map pin — fee cannot be calculated.";
       }
+      // radius 0 with flat fee only → no coverage gate (merchant delivers anywhere).
     } else if (perKmFee > 0 && !hasShopCoords) {
       coverageError =
         "This shop charges per-km delivery but has no map pin — fee cannot be calculated.";
@@ -809,6 +822,8 @@ export async function POST(request: Request) {
     freeThreshold: toNumber(shopRow.free_delivery_threshold, 0),
     subtotal,
     isPickup: orderType === "pickup",
+    freeAreas: shopRow.free_delivery_areas ?? null,
+    customerArea: customerArea || null,
   });
 
   if (orderType === "delivery" && feeBreakdown.incompleteDistance) {

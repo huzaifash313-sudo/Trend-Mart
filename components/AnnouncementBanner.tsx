@@ -84,9 +84,9 @@ function SegmentChip({ text }: { text: string }) {
   const kind = segmentKind(text);
   const styles =
     kind === "coupon"
-      ? "bg-amber-400 text-amber-950 shadow-amber-500/30"
+      ? "bg-amber-400 text-amber-950 shadow-amber-500/30 dark:bg-amber-300 dark:shadow-amber-500/20"
       : kind === "delivery"
-        ? "bg-white text-emerald-800 shadow-white/20 dark:bg-emerald-50"
+        ? "bg-white text-emerald-800 shadow-white/20 dark:bg-emerald-900/50 dark:text-emerald-200 dark:shadow-black/30 dark:ring-1 dark:ring-emerald-400/30"
         : kind === "discount"
           ? "bg-rose-500 text-white shadow-rose-500/30"
           : "bg-emerald-950/25 text-white ring-1 ring-white/25";

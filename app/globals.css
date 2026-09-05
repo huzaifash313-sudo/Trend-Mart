@@ -1888,6 +1888,19 @@ html.dark .trend-card:hover {
   }
 }
 
+/* Navbar theme toggle — icon mirrors `html.dark` (set before first paint by the
+   boot script + ThemeProvider), so the markup never depends on client state and
+   there is zero risk of a hydration mismatch. */
+.tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
+  display: none;
+}
+html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-moon {
+  display: none;
+}
+html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
+  display: inline-block;
+}
+
 .tm-navbar-search-btn {
   display: inline-flex;
   height: 40px;

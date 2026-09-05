@@ -600,6 +600,18 @@ export default function WhatsAppCheckoutModal({
     shop.free_delivery_threshold > 0 &&
     subtotal >= shop.free_delivery_threshold;
 
+  // Area-based free delivery: match the merchant's free-delivery localities
+  // against BOTH the curated delivery zone AND the typed delivery address, so
+  // "FREE in Peoples Colony" works even when the customer just typed their
+  // address (no manual area picker needed). Address text only *grants* a free
+  // fee — it never relaxes radius/city coverage (server still needs the pin).
+  const customerAreaText = useMemo(() => {
+    return [location?.deliveryZone, shipping.shippingAddress]
+      .map((s) => (s ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
+  }, [location?.deliveryZone, shipping.shippingAddress]);
+
   const deliveryBreakdown = useMemo(() => {
     if (isPickup) {
       return computeDeliveryFeeBreakdown({ isPickup: true });
@@ -610,7 +622,7 @@ export default function WhatsAppCheckoutModal({
       distanceKm,
       freeThreshold: shop.free_delivery_threshold,
       freeAreas: shop.free_delivery_areas,
-      customerArea: location?.deliveryZone,
+      customerArea: customerAreaText,
       subtotal,
       isPickup: false,
     });
@@ -620,7 +632,7 @@ export default function WhatsAppCheckoutModal({
     distanceKm,
     shop.free_delivery_threshold,
     shop.free_delivery_areas,
-    location?.deliveryZone,
+    customerAreaText,
     subtotal,
     isPickup,
   ]);
@@ -1182,7 +1194,7 @@ export default function WhatsAppCheckoutModal({
           customerLat: pinLat,
           customerLng: pinLng,
           customerCity: location?.city ?? undefined,
-          customerArea: location?.deliveryZone ?? undefined,
+          customerArea: customerAreaText || location?.deliveryZone || undefined,
           idempotencyKey,
         }),
         15_000,
@@ -1312,6 +1324,7 @@ export default function WhatsAppCheckoutModal({
     grandTotal,
     couponCode,
     couponResult,
+    customerAreaText,
     quantities,
     pooledTotals,
     belowMinimumOrder,

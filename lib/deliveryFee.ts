@@ -83,17 +83,29 @@ function normalizeAreaToken(name: string): string {
  * broad locality and still cover sub-areas (e.g. "Satellite" covers
  * "Satellite Town").
  */
+export function findFreeDeliveryAreaMatch(
+  customerArea: string | null | undefined,
+  freeAreas: string[] | null | undefined,
+): string | null {
+  const target = normalizeAreaToken(customerArea ?? "");
+  if (!target || !Array.isArray(freeAreas) || freeAreas.length === 0) return null;
+  for (const area of freeAreas) {
+    const original = String(area ?? "").trim();
+    const token = normalizeAreaToken(original);
+    if (!token) continue;
+    if (token === target || target.includes(token) || token.includes(target)) {
+      return original;
+    }
+  }
+  return null;
+}
+
+/** True when the customer's selected area/address lands in a free-delivery area. */
 export function areaQualifiesForFreeDelivery(
   customerArea: string | null | undefined,
   freeAreas: string[] | null | undefined,
 ): boolean {
-  const target = normalizeAreaToken(customerArea ?? "");
-  if (!target || !Array.isArray(freeAreas) || freeAreas.length === 0) return false;
-  return freeAreas.some((area) => {
-    const token = normalizeAreaToken(String(area ?? ""));
-    if (!token) return false;
-    return token === target || target.includes(token) || token.includes(target);
-  });
+  return findFreeDeliveryAreaMatch(customerArea, freeAreas) != null;
 }
 
 /** Full breakdown — prefer this when UI needs to explain the fee. */
@@ -109,8 +121,7 @@ export function computeDeliveryFeeBreakdown(
     input.distanceKm != null && Number.isFinite(input.distanceKm)
       ? Math.max(0, Number(input.distanceKm))
       : null;
-  const freeArea =
-    !isPickup && areaQualifiesForFreeDelivery(input.customerArea, input.freeAreas);
+  const freeAreaMatch = !isPickup ? findFreeDeliveryAreaMatch(input.customerArea, input.freeAreas) : null;
 
   if (isPickup) {
     return {
@@ -125,8 +136,9 @@ export function computeDeliveryFeeBreakdown(
     };
   }
 
-  if (freeArea) {
-    const label = (input.customerArea ?? "").trim() || "your area";
+  if (freeAreaMatch) {
+    // Show the merchant-declared locality, not the customer's full typed address.
+    const label = freeAreaMatch || (input.customerArea ?? "").trim() || "your area";
     return {
       fee: 0,
       freeReason: "area",

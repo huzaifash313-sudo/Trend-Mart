@@ -292,6 +292,24 @@ export default function BottomNav() {
   }, []);
 
   const isMerchant = role === "merchant" || role === "admin" || !!merchantShop;
+
+  // All hooks must run unconditionally, BEFORE any early return — otherwise
+  // navigating between normal pages and /admin, /t/… or /offline (which skip
+  // this bar) changes the hook count on the same mounted instance and crashes.
+  const runQuickAdd = useCallback(
+    (tab: QuickAddTab) => {
+      setShowQuickActions(false);
+      if (merchantShop) {
+        openQuickAdd({
+          shopId: merchantShop.id,
+          shopCategory: merchantShop.category,
+          tab,
+        });
+      }
+    },
+    [merchantShop, openQuickAdd],
+  );
+
   // The admin console has its own layout — never render storefront chrome there.
   // The QR dine-in scan page (/t/...) and table tracker are standalone flows —
   // the global storefront nav would just cover the order bar / confuse the diner.
@@ -339,20 +357,6 @@ export default function BottomNav() {
     pathname.startsWith("/admin") ||
     pathname === "/login" ||
     pathname === "/signup";
-
-  const runQuickAdd = useCallback(
-    (tab: QuickAddTab) => {
-      setShowQuickActions(false);
-      if (merchantShop) {
-        openQuickAdd({
-          shopId: merchantShop.id,
-          shopCategory: merchantShop.category,
-          tab,
-        });
-      }
-    },
-    [merchantShop, openQuickAdd],
-  );
 
   const handleCenterAdd = () => {
     if (merchantShop) {
