@@ -292,6 +292,111 @@ html[data-brand-theme="maroon-pink"] {
   --tm-sea-950: #500724;
   --tm-splash-bg: var(--tm-brand-700);
 }
+html[data-brand-theme="maroon"] {
+  /* Pure maroon — rich wine/burgundy depth, warm rosewood support.
+     Brand & sea stay in the same warm family so nothing reads pink. */
+  --tm-brand-50: #fdf3f4;
+  --tm-brand-100: #fae3e6;
+  --tm-brand-200: #f2c3c9;
+  --tm-brand-300: #e698a3;
+  --tm-brand-400: #d2606f;
+  --tm-brand-500: #b23c4d;
+  --tm-brand-600: #94273a;
+  --tm-brand-700: #7a1f30;
+  --tm-brand-800: #5e1523;
+  --tm-brand-900: #450d18;
+  --tm-brand-950: #260409;
+  --tm-sea-50: #fbf5f4;
+  --tm-sea-100: #f7e6e3;
+  --tm-sea-200: #efcbc6;
+  --tm-sea-300: #e2a39c;
+  --tm-sea-400: #cc756c;
+  --tm-sea-500: #b0564d;
+  --tm-sea-600: #91403a;
+  --tm-sea-700: #75312e;
+  --tm-sea-800: #5a2423;
+  --tm-sea-900: #421616;
+  --tm-sea-950: #240707;
+  --tm-splash-bg: var(--tm-brand-700);
+}
+html[data-brand-theme="maroon-gold"] {
+  /* Mehroon + gold — same deep maroon, royal amber support */
+  --tm-brand-50: #fdf3f4;
+  --tm-brand-100: #fae3e6;
+  --tm-brand-200: #f2c3c9;
+  --tm-brand-300: #e698a3;
+  --tm-brand-400: #d2606f;
+  --tm-brand-500: #b23c4d;
+  --tm-brand-600: #94273a;
+  --tm-brand-700: #7a1f30;
+  --tm-brand-800: #5e1523;
+  --tm-brand-900: #450d18;
+  --tm-brand-950: #260409;
+  --tm-sea-50: #fffbeb;
+  --tm-sea-100: #fef3c7;
+  --tm-sea-200: #fde68a;
+  --tm-sea-300: #fcd34d;
+  --tm-sea-400: #fbbf24;
+  --tm-sea-500: #f59e0b;
+  --tm-sea-600: #d97706;
+  --tm-sea-700: #b45309;
+  --tm-sea-800: #92400e;
+  --tm-sea-900: #78350f;
+  --tm-sea-950: #451a03;
+  --tm-splash-bg: var(--tm-brand-700);
+}
+html[data-brand-theme="maroon-teal"] {
+  /* Mehroon + teal — deep maroon with a cool jewel accent */
+  --tm-brand-50: #fdf3f4;
+  --tm-brand-100: #fae3e6;
+  --tm-brand-200: #f2c3c9;
+  --tm-brand-300: #e698a3;
+  --tm-brand-400: #d2606f;
+  --tm-brand-500: #b23c4d;
+  --tm-brand-600: #94273a;
+  --tm-brand-700: #7a1f30;
+  --tm-brand-800: #5e1523;
+  --tm-brand-900: #450d18;
+  --tm-brand-950: #260409;
+  --tm-sea-50: #f0fdfa;
+  --tm-sea-100: #ccfbf1;
+  --tm-sea-200: #99f6e4;
+  --tm-sea-300: #5eead4;
+  --tm-sea-400: #2dd4bf;
+  --tm-sea-500: #14b8a6;
+  --tm-sea-600: #0d9488;
+  --tm-sea-700: #0f766e;
+  --tm-sea-800: #115e59;
+  --tm-sea-900: #134e4a;
+  --tm-sea-950: #042f2e;
+  --tm-splash-bg: var(--tm-brand-700);
+}
+html[data-brand-theme="maroon-plum"] {
+  /* Mehroon + plum — deep maroon warmed by a muted plum bloom */
+  --tm-brand-50: #fdf3f4;
+  --tm-brand-100: #fae3e6;
+  --tm-brand-200: #f2c3c9;
+  --tm-brand-300: #e698a3;
+  --tm-brand-400: #d2606f;
+  --tm-brand-500: #b23c4d;
+  --tm-brand-600: #94273a;
+  --tm-brand-700: #7a1f30;
+  --tm-brand-800: #5e1523;
+  --tm-brand-900: #450d18;
+  --tm-brand-950: #260409;
+  --tm-sea-50: #faf5f7;
+  --tm-sea-100: #f3e5eb;
+  --tm-sea-200: #e8cbd8;
+  --tm-sea-300: #d9a3ba;
+  --tm-sea-400: #c5729b;
+  --tm-sea-500: #a84c7d;
+  --tm-sea-600: #8a3565;
+  --tm-sea-700: #6e2650;
+  --tm-sea-800: #531a3c;
+  --tm-sea-900: #3a0f29;
+  --tm-sea-950: #200516;
+  --tm-splash-bg: var(--tm-brand-700);
+}
 html[data-brand-theme="purple-blue"] {
   /* Indigo purple ↔ royal blue mix */
   --tm-brand-50: #eef2ff;

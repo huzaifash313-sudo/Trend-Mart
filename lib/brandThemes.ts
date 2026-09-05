@@ -7,7 +7,11 @@ export const BRAND_THEME_IDS = [
   "purple-pink",
   "red",
   "maroon-pink",
+  "maroon",
+  "maroon-gold",
+  "maroon-teal",
   "purple-blue",
+  "maroon-plum",
 ] as const;
 
 export type BrandThemeId = (typeof BRAND_THEME_IDS)[number];
@@ -24,7 +28,11 @@ export const BRAND_THEME_META: Record<
   "purple-pink": { label: "Purple + Pink", swatch: "#a855f7", swatchAlt: "#ec4899" },
   red: { label: "Soft Red", swatch: "#e11d48", swatchAlt: "#be123c" },
   "maroon-pink": { label: "Maroon + Pink", swatch: "#9f1239", swatchAlt: "#ec4899" },
+  maroon: { label: "Pure Maroon", swatch: "#871f29", swatchAlt: "#a0524f" },
+  "maroon-gold": { label: "Maroon + Gold", swatch: "#871f29", swatchAlt: "#d97706" },
+  "maroon-teal": { label: "Maroon + Teal", swatch: "#871f29", swatchAlt: "#0d9488" },
   "purple-blue": { label: "Purple + Blue", swatch: "#6366f1", swatchAlt: "#3b82f6" },
+  "maroon-plum": { label: "Maroon + Plum", swatch: "#871f29", swatchAlt: "#7d3766" },
 };
 
 const STORAGE_KEY = "trendsmart_brand_theme_v1";
