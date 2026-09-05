@@ -45,7 +45,7 @@ export function TrendBotLauncher({
       title={shopName ? `${TREND_BOT_NAME} — ${shopName}` : TREND_BOT_NAME}
     >
       <TrendBotAvatar size="sm" animated pose={pose} wiggle={wiggle} />
-      <span className="absolute -right-0.5 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[0.5rem] font-black text-emerald-700 ring-1 ring-emerald-200/80 shadow-sm">
+      <span className="absolute -right-0.5 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[0.5rem] font-black text-emerald-700 ring-1 ring-emerald-200/80 shadow-sm dark:bg-[var(--tm-elevated)] dark:text-emerald-200 dark:ring-emerald-400/40">
         AI
       </span>
     </button>
