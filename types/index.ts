@@ -60,6 +60,8 @@ export interface Shop {
   min_order_amount?: number | null;
   /** Subtotal (PKR) at/above which delivery becomes free, overriding delivery fees. Null = never free automatically. */
   free_delivery_threshold?: number | null;
+  /** Deliver FREE to customers within this many km of the shop pin (0/null = off). */
+  free_delivery_radius_km?: number | null;
   /** Flat delivery fee (PKR) charged within the service radius, before any per-km surcharge. */
   delivery_fee_flat?: number | null;
   /** Additional delivery fee (PKR) charged per km of customer distance, on top of the flat fee. */
@@ -159,6 +161,8 @@ export interface ShopFormData {
   min_order_amount: string;
   /** Subtotal (PKR, form input string) at/above which delivery becomes free. */
   free_delivery_threshold: string;
+  /** Deliver FREE to customers within this many km (form input string; 0/empty = off). */
+  free_delivery_radius_km: string;
   /** Flat delivery fee (PKR, form input string) within the service radius. */
   delivery_fee_flat: string;
   /** Additional delivery fee (PKR, form input string) charged per km of distance. */
@@ -430,6 +434,8 @@ export interface Product {
   review_count?: number | null;
   /** Parent shop free-delivery threshold (for product image offer tags). */
   shop_free_delivery_threshold?: number | null;
+  /** Parent shop free-delivery radius in km (for product image offer tags). */
+  shop_free_delivery_radius_km?: number | null;
   /** Parent shop flat delivery fee. */
   shop_delivery_fee_flat?: number | null;
   /** Parent shop per-km delivery fee. */

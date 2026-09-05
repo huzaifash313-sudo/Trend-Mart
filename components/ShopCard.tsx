@@ -29,6 +29,7 @@ export interface ShopCardData {
   announcement?: string | null;
   announcement_expires_at?: string | null;
   free_delivery_threshold?: number | null;
+  free_delivery_radius_km?: number | null;
   avg_rating?: number | null;
   review_count?: number | null;
   /** Pre-built slides; if omitted, built from deals / free delivery / coupons */
@@ -122,6 +123,7 @@ function ShopCard({
     buildShopOfferSlides({
       shopId: shop.id,
       freeDeliveryThreshold: shop.free_delivery_threshold,
+      freeDeliveryRadiusKm: shop.free_delivery_radius_km,
       coupons: shop.coupons,
       deals: shop.deals,
     });

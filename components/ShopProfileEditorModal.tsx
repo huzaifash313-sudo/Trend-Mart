@@ -84,6 +84,10 @@ function shopToFormData(source: Shop): ShopFormData {
       source.free_delivery_threshold != null
         ? String(source.free_delivery_threshold)
         : "",
+    free_delivery_radius_km:
+      source.free_delivery_radius_km != null && source.free_delivery_radius_km > 0
+        ? String(source.free_delivery_radius_km)
+        : "",
     delivery_fee_flat:
       source.delivery_fee_flat != null && source.delivery_fee_flat > 0
         ? String(source.delivery_fee_flat)

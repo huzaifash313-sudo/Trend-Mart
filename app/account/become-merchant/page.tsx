@@ -50,6 +50,7 @@ function emptyShopForm(): ShopFormData {
     address_display: "",
     min_order_amount: "",
     free_delivery_threshold: "",
+    free_delivery_radius_km: "",
     delivery_fee_flat: "",
     delivery_fee_per_km: "",
     free_delivery_areas: [],

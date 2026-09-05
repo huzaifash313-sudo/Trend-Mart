@@ -489,6 +489,7 @@ function DealsInner() {
       return buildShopTickerTags({
         coupons: shopCoupons[shopId] ?? [],
         freeDeliveryThreshold: meta?.free_delivery_threshold,
+        freeDeliveryRadiusKm: meta?.free_delivery_radius_km,
         deliveryFeeFlat: meta?.delivery_fee_flat,
         deliveryFeePerKm: meta?.delivery_fee_per_km,
       });

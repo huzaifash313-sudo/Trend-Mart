@@ -57,6 +57,7 @@ const SHOP_EXTENDED_KEYS = [
     "delivery_fee_per_km",
     "delivery_fee_flat",
     "free_delivery_threshold",
+    "free_delivery_radius_km",
     "free_delivery_areas",
     "min_order_amount",
     "delivery_zones",
@@ -218,6 +219,7 @@ export async function fetchShops(opts?: {
     "delivery_zones",
     "address_display",
     "free_delivery_threshold",
+    "free_delivery_radius_km",
     "delivery_fee_flat",
     "delivery_fee_per_km",
     "free_delivery_areas",
@@ -658,6 +660,17 @@ function sanitizeDbRadiusKm(input: unknown): number {
   return Math.round(Math.max(1, Math.min(500, n)));
 }
 
+/**
+ * Sanitize the merchant's free-delivery radius (km). Empty / 0 / invalid →
+ * null (feature off). Decimals allowed (e.g. 1.5 km), capped at 200 km.
+ */
+function sanitizeDbFreeRadiusKm(input: unknown): number | null {
+  if (input == null || input === "") return null;
+  const n = typeof input === "number" ? input : Number(input);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(n, 200);
+}
+
 /** Sanitize coverage / delivery zone markers (max 10 entries). */
 function sanitizeDeliveryZones(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
@@ -745,6 +758,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
   | "longitude"
   | "min_order_amount"
   | "free_delivery_threshold"
+  | "free_delivery_radius_km"
   | "delivery_fee_flat"
   | "delivery_fee_per_km"
   | "announcement_expires_at"
@@ -755,6 +769,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
   longitude: number | null;
   min_order_amount: number;
   free_delivery_threshold: number | null;
+  free_delivery_radius_km: number | null;
   delivery_fee_flat: number;
   delivery_fee_per_km: number;
   announcement_expires_at: string | null;
@@ -792,6 +807,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     address_display: sanitizeDbString(form.address_display, 400),
     min_order_amount: sanitizeDbNumeric(form.min_order_amount, 0, 999_999) ?? 0,
     free_delivery_threshold: sanitizeDbNumeric(form.free_delivery_threshold, 0, 999_999),
+    free_delivery_radius_km: sanitizeDbFreeRadiusKm(form.free_delivery_radius_km),
     delivery_fee_flat: sanitizeDbNumeric(form.delivery_fee_flat, 0, 99_999) ?? 0,
     delivery_fee_per_km: sanitizeDbNumeric(form.delivery_fee_per_km, 0, 9_999) ?? 0,
     free_delivery_areas: sanitizeFreeDeliveryAreas(form.free_delivery_areas),

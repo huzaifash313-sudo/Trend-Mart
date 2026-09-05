@@ -621,6 +621,7 @@ export default function WhatsAppCheckoutModal({
       perKm: shop.delivery_fee_per_km,
       distanceKm,
       freeThreshold: shop.free_delivery_threshold,
+      freeRadiusKm: shop.free_delivery_radius_km,
       freeAreas: shop.free_delivery_areas,
       customerArea: customerAreaText,
       subtotal,
@@ -631,6 +632,7 @@ export default function WhatsAppCheckoutModal({
     shop.delivery_fee_per_km,
     distanceKm,
     shop.free_delivery_threshold,
+    shop.free_delivery_radius_km,
     shop.free_delivery_areas,
     customerAreaText,
     subtotal,
@@ -1720,22 +1722,24 @@ export default function WhatsAppCheckoutModal({
                   <span className="text-emerald-700 dark:text-emerald-300">Delivery Fee</span>
                   <span
                     className={`font-semibold ${
-                      deliveryBreakdown.freeReason === "threshold" || deliveryBreakdown.freeReason === "area"
+                      deliveryBreakdown.freeReason === "threshold" ||
+                      deliveryBreakdown.freeReason === "area" ||
+                      deliveryBreakdown.freeReason === "radius"
                         ? "text-emerald-600 dark:text-emerald-400"
                         : deliveryFeeNotReady || deliveryBreakdown.freeReason === "pickup"
                           ? "text-amber-600 dark:text-amber-400"
                           : "text-emerald-700 dark:text-emerald-300"
                     }`}
                   >
-                    {deliveryBreakdown.freeReason === "threshold"
+                    {deliveryBreakdown.freeReason === "threshold" ||
+                    deliveryBreakdown.freeReason === "area" ||
+                    deliveryBreakdown.freeReason === "radius"
                       ? "FREE"
-                      : deliveryBreakdown.freeReason === "area"
-                        ? "FREE"
-                        : deliveryBreakdown.freeReason === "pickup"
-                          ? "N/A (pickup)"
-                          : deliveryFeeNotReady
-                            ? "—"
-                            : formatRupees(deliveryFee)}
+                      : deliveryBreakdown.freeReason === "pickup"
+                        ? "N/A (pickup)"
+                        : deliveryFeeNotReady
+                          ? "—"
+                          : formatRupees(deliveryFee)}
                   </span>
                 </div>
                 {!isPickup && deliveryBreakdown.formulaLabel ? (
@@ -1749,8 +1753,13 @@ export default function WhatsAppCheckoutModal({
                 </div>
               </div>
 
-              {/* Free delivery nudge — delivery only */}
-              {!isPickup && !qualifiesForFreeDelivery && shop.free_delivery_threshold != null && shop.free_delivery_threshold > 0 && (
+              {/* Free delivery nudge — delivery only, and only when NOT already free
+                  (e.g. customer is inside the free-delivery radius / free area). */}
+              {!isPickup &&
+                !qualifiesForFreeDelivery &&
+                deliveryBreakdown.freeReason == null &&
+                shop.free_delivery_threshold != null &&
+                shop.free_delivery_threshold > 0 && (
                 <div className="mb-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs dark:bg-emerald-900/20">
                   <InfoIcon />
                   <span className="text-emerald-700 dark:text-emerald-400">
@@ -2089,15 +2098,15 @@ export default function WhatsAppCheckoutModal({
                 <div className="flex justify-between text-sm border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
                   <span className="text-emerald-700 dark:text-emerald-300">Delivery Fee</span>
                   <span className="font-semibold">
-                    {deliveryBreakdown.freeReason === "threshold"
+                    {deliveryBreakdown.freeReason === "threshold" ||
+                    deliveryBreakdown.freeReason === "area" ||
+                    deliveryBreakdown.freeReason === "radius"
                       ? "FREE"
-                      : deliveryBreakdown.freeReason === "area"
-                        ? "FREE"
-                        : deliveryBreakdown.freeReason === "pickup"
-                          ? "N/A (pickup)"
-                          : deliveryFeeNotReady
-                            ? "—"
-                            : formatRupees(deliveryFee)}
+                      : deliveryBreakdown.freeReason === "pickup"
+                        ? "N/A (pickup)"
+                        : deliveryFeeNotReady
+                          ? "—"
+                          : formatRupees(deliveryFee)}
                   </span>
                 </div>
                 <div className="flex justify-between text-base font-bold border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">

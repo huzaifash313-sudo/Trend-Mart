@@ -7,6 +7,7 @@ type ServiceResult<T> =
 
 export interface ShopDeliveryMeta {
   free_delivery_threshold: number | null;
+  free_delivery_radius_km: number | null;
   delivery_fee_flat: number | null;
   delivery_fee_per_km: number | null;
 }
@@ -22,7 +23,9 @@ export async function fetchShopDeliveryMetaForIds(
   try {
     const { data, error } = await supabase
       .from("shops")
-      .select("id, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km")
+      .select(
+        "id, free_delivery_threshold, free_delivery_radius_km, delivery_fee_flat, delivery_fee_per_km",
+      )
       .in("id", unique);
 
     if (error) throw error;
@@ -35,6 +38,10 @@ export async function fetchShopDeliveryMetaForIds(
           row.free_delivery_threshold == null
             ? null
             : Number(row.free_delivery_threshold) || null,
+        free_delivery_radius_km:
+          row.free_delivery_radius_km == null
+            ? null
+            : Number(row.free_delivery_radius_km) || null,
         delivery_fee_flat:
           row.delivery_fee_flat == null ? null : Number(row.delivery_fee_flat) || null,
         delivery_fee_per_km:

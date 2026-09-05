@@ -288,6 +288,7 @@ type ShopJoin = {
   avg_rating?: number | null;
   review_count?: number | null;
   free_delivery_threshold?: number | null;
+  free_delivery_radius_km?: number | null;
   announcement?: string | null;
   announcement_expires_at?: string | null;
   delivery_fee_flat?: number | null;
@@ -357,6 +358,10 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
       typeof shop.free_delivery_threshold === "number"
         ? shop.free_delivery_threshold
         : Number(shop.free_delivery_threshold) || null,
+    shop_free_delivery_radius_km:
+      typeof shop.free_delivery_radius_km === "number"
+        ? shop.free_delivery_radius_km
+        : Number(shop.free_delivery_radius_km) || null,
     shop_delivery_fee_flat:
       typeof shop.delivery_fee_flat === "number"
         ? shop.delivery_fee_flat
@@ -389,6 +394,7 @@ const MARKETPLACE_SELECT = `
     service_radius_km, delivery_zones,
     avg_rating, review_count,
     free_delivery_threshold, announcement, announcement_expires_at,
+    free_delivery_radius_km,
     delivery_fee_flat, delivery_fee_per_km
   )
 `;

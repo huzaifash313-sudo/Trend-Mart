@@ -316,6 +316,7 @@ function ProductsPageInner() {
         .map((d) => formatDealDisplayLabel(d));
       map.set(shopId, {
         freeDeliveryThreshold: p.shop_free_delivery_threshold,
+        freeDeliveryRadiusKm: p.shop_free_delivery_radius_km,
         deliveryFeeFlat: p.shop_delivery_fee_flat,
         deliveryFeePerKm: p.shop_delivery_fee_per_km,
         dealLabels,
@@ -616,6 +617,7 @@ function ProductsPageInner() {
         service_radius_km: full.shop_service_radius_km ?? null,
         delivery_zones: full.shop_delivery_zones ?? null,
         free_delivery_threshold: full.shop_free_delivery_threshold ?? null,
+        free_delivery_radius_km: full.shop_free_delivery_radius_km ?? null,
         delivery_fee_flat: full.shop_delivery_fee_flat ?? null,
         delivery_fee_per_km: full.shop_delivery_fee_per_km ?? null,
       };

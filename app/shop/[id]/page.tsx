@@ -329,6 +329,7 @@ function ShopDetailInner({ id }: { id: string }) {
     return buildShopOfferSlides({
       shopId: shop.id,
       freeDeliveryThreshold: shop.free_delivery_threshold,
+      freeDeliveryRadiusKm: shop.free_delivery_radius_km,
       coupons,
       deals,
     }).map((s) => {
@@ -342,6 +343,7 @@ function ShopDetailInner({ id }: { id: string }) {
     const slides = buildShopOfferSlides({
       shopId: shop.id,
       freeDeliveryThreshold: shop.free_delivery_threshold,
+      freeDeliveryRadiusKm: shop.free_delivery_radius_km,
       coupons,
       deals,
     });
@@ -361,6 +363,7 @@ function ShopDetailInner({ id }: { id: string }) {
     return buildShopTickerTags({
       coupons,
       freeDeliveryThreshold: shop.free_delivery_threshold,
+      freeDeliveryRadiusKm: shop.free_delivery_radius_km,
       deliveryFeeFlat: shop.delivery_fee_flat,
       deliveryFeePerKm: shop.delivery_fee_per_km,
     });
@@ -1055,6 +1058,11 @@ function ShopDetailInner({ id }: { id: string }) {
                 {(shop.free_delivery_threshold ?? 0) > 0 && (
                   <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[0.65rem] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                     Free delivery over Rs. {shop.free_delivery_threshold!.toLocaleString("en-PK")}
+                  </span>
+                )}
+                {(shop.free_delivery_radius_km ?? 0) > 0 && (
+                  <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[0.65rem] font-semibold text-white">
+                    FREE within {shop.free_delivery_radius_km} km
                   </span>
                 )}
               </div>

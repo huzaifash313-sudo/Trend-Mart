@@ -170,6 +170,7 @@ const INITIAL_FORM: ShopFormData = {
   address_display: "",
   min_order_amount: "",
   free_delivery_threshold: "",
+  free_delivery_radius_km: "",
   delivery_fee_flat: "",
   delivery_fee_per_km: "",
   free_delivery_areas: [],
@@ -213,6 +214,10 @@ function shopToForm(source: Shop): ShopFormData {
     free_delivery_threshold:
       source.free_delivery_threshold != null
         ? String(source.free_delivery_threshold)
+        : "",
+    free_delivery_radius_km:
+      source.free_delivery_radius_km != null && source.free_delivery_radius_km > 0
+        ? String(source.free_delivery_radius_km)
         : "",
     delivery_fee_flat:
       source.delivery_fee_flat != null && source.delivery_fee_flat > 0
@@ -368,6 +373,8 @@ export default function DashboardSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
   const [pushBusy, setPushBusy] = useState(false);
+  // Whether the "Custom…" km input is expanded in the free-delivery picker.
+  const [customRadiusOpen, setCustomRadiusOpen] = useState(false);
   const { addToast } = useToast();
 
   // Live delivery-charge preview — uses the same helper as checkout so merchants
@@ -376,6 +383,7 @@ export default function DashboardSettingsPage() {
     const flat = Number(form.delivery_fee_flat) || 0;
     const perKm = Number(form.delivery_fee_per_km) || 0;
     const freeThreshold = Number(form.free_delivery_threshold) || 0;
+    const freeRadius = Number(form.free_delivery_radius_km) || 0;
     const minOrder = Number(form.min_order_amount) || 0;
     const radius = form.service_radius_km ?? 10;
 
@@ -391,6 +399,7 @@ export default function DashboardSettingsPage() {
         perKm,
         distanceKm: km,
         freeThreshold,
+        freeRadiusKm: freeRadius,
         subtotal: previewSubtotal,
         isPickup: false,
       });
@@ -401,21 +410,38 @@ export default function DashboardSettingsPage() {
             ? "—"
             : `Rs. ${b.fee.toLocaleString()}`,
         hint:
-          freeThreshold > 0
-            ? `below Rs. ${freeThreshold.toLocaleString()} offer`
-            : b.unconfigured
-              ? "set flat or per-km"
-              : b.fee > 0
-                ? "delivery charge"
-                : "exact fee",
+          b.freeReason === "radius"
+            ? `free within ${freeRadius} km`
+            : freeThreshold > 0
+              ? `below Rs. ${freeThreshold.toLocaleString()} offer`
+              : b.unconfigured
+                ? "set flat or per-km"
+                : b.fee > 0
+                  ? "delivery charge"
+                  : "exact fee",
       };
     };
 
     const samples = [2, 5, radius === 2 || radius === 5 ? radius + 1 : radius]
       .filter((km, i, arr) => arr.indexOf(km) === i)
       .slice(0, 3);
-    return { flat, perKm, freeThreshold, minOrder, radius, samples, feeAt, previewSubtotal };
-  }, [form.delivery_fee_flat, form.delivery_fee_per_km, form.free_delivery_threshold, form.min_order_amount, form.service_radius_km]);
+    return {
+      flat,
+      perKm,
+      freeThreshold,
+      freeRadius,
+      minOrder,
+      radius,
+      samples,
+      feeAt,
+      previewSubtotal,
+    };
+  }, [form.delivery_fee_flat, form.delivery_fee_per_km, form.free_delivery_threshold, form.free_delivery_radius_km, form.min_order_amount, form.service_radius_km]);
+
+  // Free-delivery radius picker state (Off / 1–4 km presets / Custom km).
+  const freeRadiusRaw = form.free_delivery_radius_km;
+  const showCustomRadiusInput =
+    customRadiusOpen || (!!freeRadiusRaw && ![1, 2, 3, 4].includes(Number(freeRadiusRaw)));
 
   // Seed the editable form from the shop once it's available (on first load or
   // when switching shops). We intentionally key on the id so an in-progress
@@ -495,6 +521,7 @@ export default function DashboardSettingsPage() {
         address_display: form.address_display,
         min_order_amount: form.min_order_amount,
         free_delivery_threshold: form.free_delivery_threshold,
+        free_delivery_radius_km: form.free_delivery_radius_km,
         delivery_fee_flat: form.delivery_fee_flat,
         delivery_fee_per_km: form.delivery_fee_per_km,
         free_delivery_areas: form.free_delivery_areas,
@@ -847,6 +874,79 @@ export default function DashboardSettingsPage() {
             />
           </div>
 
+          {/* Free-delivery radius — FREE for customers within X km of your pin */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+            <FieldLabel>Free delivery within (km)</FieldLabel>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomRadiusOpen(false);
+                  setForm((current) => ({ ...current, free_delivery_radius_km: "" }));
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  !freeRadiusRaw && !customRadiusOpen
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                }`}
+              >
+                Off
+              </button>
+              {[1, 2, 3, 4].map((km) => {
+                const active = freeRadiusRaw === String(km);
+                return (
+                  <button
+                    key={km}
+                    type="button"
+                    onClick={() => {
+                      setCustomRadiusOpen(false);
+                      setForm((current) => ({ ...current, free_delivery_radius_km: String(km) }));
+                    }}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      active
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                    }`}
+                  >
+                    {km} km
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setCustomRadiusOpen(true)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  showCustomRadiusInput
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                }`}
+              >
+                Custom…
+              </button>
+            </div>
+            {showCustomRadiusInput ? (
+              <div className="mt-2 flex items-center gap-2">
+                <TextInput
+                  type="number"
+                  min={0.1}
+                  step={0.5}
+                  value={freeRadiusRaw}
+                  onChange={(e) =>
+                    setForm((current) => ({ ...current, free_delivery_radius_km: e.target.value }))
+                  }
+                  placeholder="e.g. 1.5 or 6"
+                  className="max-w-[10rem] !rounded-xl !py-2"
+                />
+                <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300">km</span>
+              </div>
+            ) : null}
+            <p className="mt-1.5 text-[0.7rem] leading-relaxed text-emerald-800/80 dark:text-emerald-300/80">
+              Customers within this distance of your store pin get <strong>FREE delivery</strong> —
+              chahiye 1, 2, 3, 4 ya koi bhi custom radius. Radius ke bahar normal fee
+              (flat/per-km), free-area aur free-above-threshold wale rules apply hote hain.
+            </p>
+          </div>
+
           {/* Free-delivery localities — FREE for those mohallas/colonies */}
           <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
             <FieldLabel>Free delivery areas (optional)</FieldLabel>
@@ -890,6 +990,15 @@ export default function DashboardSettingsPage() {
                   </span>
                 );
               })}
+              {feePreview.freeRadius > 0 && (
+                <span className="inline-flex flex-col rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[0.7rem] font-semibold text-white shadow-sm">
+                  <span>Radius</span>
+                  <span className="font-bold">FREE</span>
+                  <span className="text-[0.6rem] font-normal text-emerald-100">
+                    within {feePreview.freeRadius} km
+                  </span>
+                </span>
+              )}
               {feePreview.freeThreshold > 0 && (
                 <span className="inline-flex flex-col rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[0.7rem] font-semibold text-white shadow-sm">
                   <span>Offer</span>
@@ -902,12 +1011,15 @@ export default function DashboardSettingsPage() {
             </div>
             <p className="mt-2 text-[0.65rem] leading-relaxed text-emerald-700/90 dark:text-emerald-300/80">
               {feePreview.perKm > 0
-                ? `Auto-calculated: flat Rs. ${feePreview.flat.toLocaleString()} + Rs. ${feePreview.perKm} × customer distance${feePreview.freeThreshold > 0 ? ` — FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
+                ? `Auto-calculated: flat Rs. ${feePreview.flat.toLocaleString()} + Rs. ${feePreview.perKm} × customer distance${feePreview.freeRadius > 0 ? ` — FREE within ${feePreview.freeRadius} km` : ""}${feePreview.freeThreshold > 0 ? ` — FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
                 : feePreview.flat > 0
-                  ? `Flat delivery charge of Rs. ${feePreview.flat.toLocaleString()}${feePreview.freeThreshold > 0 ? `, FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
-                  : "No delivery fee set — checkout will block delivery until you set flat and/or per-km (or a free threshold customers can reach)."}
+                  ? `Flat delivery charge of Rs. ${feePreview.flat.toLocaleString()}${feePreview.freeRadius > 0 ? `, FREE within ${feePreview.freeRadius} km` : ""}${feePreview.freeThreshold > 0 ? `, FREE above Rs. ${feePreview.freeThreshold.toLocaleString()}` : ""}.`
+                  : "No delivery fee set — checkout will block delivery until you set flat and/or per-km (or a free threshold / radius customers can reach)."}
               {feePreview.freeThreshold > 0
                 ? ` Distance samples assume a Rs. ${feePreview.previewSubtotal.toLocaleString()} cart (below the free-delivery offer).`
+                : ""}
+              {feePreview.freeRadius > 0
+                ? " Distance samples within the radius show FREE."
                 : ""}
               {feePreview.minOrder > 0
                 ? ` Minimum order: Rs. ${feePreview.minOrder.toLocaleString()}.`

@@ -6,6 +6,7 @@ import type { Coupon } from "@/services/couponService";
 
 export function buildDeliveryTickerLabel(input: {
   freeDeliveryThreshold?: number | null;
+  freeDeliveryRadiusKm?: number | null;
   deliveryFeeFlat?: number | null;
   deliveryFeePerKm?: number | null;
 }): string | null {
@@ -46,6 +47,7 @@ export interface ShopTickerInput {
     "code" | "discount_percent" | "discount_amount" | "expiry_date" | "is_active"
   >>;
   freeDeliveryThreshold?: number | null;
+  freeDeliveryRadiusKm?: number | null;
   deliveryFeeFlat?: number | null;
   deliveryFeePerKm?: number | null;
 }
@@ -70,6 +72,7 @@ export function buildShopTickerTags(input: ShopTickerInput): string[] {
 
   const delivery = buildDeliveryTickerLabel({
     freeDeliveryThreshold: input.freeDeliveryThreshold,
+    freeDeliveryRadiusKm: input.freeDeliveryRadiusKm,
     deliveryFeeFlat: input.deliveryFeeFlat,
     deliveryFeePerKm: input.deliveryFeePerKm,
   });

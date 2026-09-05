@@ -74,6 +74,7 @@ function stubShopFromProduct(p: MarketplaceProduct): Shop {
     avg_rating: p.shop_avg_rating ?? null,
     review_count: p.shop_review_count ?? null,
     free_delivery_threshold: p.shop_free_delivery_threshold ?? null,
+    free_delivery_radius_km: p.shop_free_delivery_radius_km ?? null,
     delivery_fee_flat: p.shop_delivery_fee_flat ?? null,
     delivery_fee_per_km: p.shop_delivery_fee_per_km ?? null,
   } as Shop;

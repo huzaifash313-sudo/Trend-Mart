@@ -3,13 +3,15 @@
 /*                                                                             */
 /*  Priority (never mix free + paid in one bill):                               */
 /*    1. Pickup / takeaway → Rs 0                                              */
-/*    2. Free-delivery threshold: subtotal >= threshold → Rs 0                 */
+/*    2. Named free-delivery area match → Rs 0                                 */
+/*    3. Free-delivery radius: within `freeRadiusKm` of shop pin → Rs 0        */
+/*    4. Free-delivery threshold: subtotal >= threshold → Rs 0                 */
 /*       (threshold uses cart subtotal BEFORE coupon — merchant protection)    */
-/*    3. Paid delivery (only if not free):                                     */
+/*    5. Paid delivery (only if not free):                                     */
 /*         fee = flat + (per_km × distance_km)                                 */
 /*       - flat alone → flat (GPS optional)                                    */
 /*       - per_km alone / with flat → GPS REQUIRED; else incomplete (no fee)   */
-/*    4. flat=0 AND perKm=0 (and not free via threshold) → unconfigured        */
+/*    6. flat=0 AND perKm=0 (and not free above) → unconfigured                */
 /*       NOT "FREE" — checkout / API must not invent free delivery             */
 /*                                                                             */
 /*  service_radius_km / delivery_zones = coverage eligibility ONLY.            */
@@ -27,6 +29,8 @@ export interface DeliveryFeeInput {
   distanceKm?: number | null;
   /** Free-delivery threshold (Rs). 0 / null disables the rule. */
   freeThreshold?: number | null;
+  /** Free-delivery radius (km): customers within this distance pay Rs 0. 0/null = off. */
+  freeRadiusKm?: number | null;
   /** Order subtotal BEFORE coupon (Rs). Used for free-delivery threshold. */
   subtotal?: number;
   /** True when the order is self-pickup / takeaway → fee is always 0. */
@@ -44,7 +48,7 @@ export interface DeliveryFeeBreakdown {
    */
   fee: number;
   /** Why fee is free, if applicable. */
-  freeReason: "pickup" | "threshold" | "area" | null;
+  freeReason: "pickup" | "threshold" | "area" | "radius" | null;
   /** Flat portion included in fee (0 when free / incomplete / unconfigured). */
   flatPart: number;
   /** Distance portion included in fee (0 when free / no GPS). */
@@ -151,6 +155,27 @@ export function computeDeliveryFeeBreakdown(
     };
   }
 
+  // Free-delivery radius — "FREE within X km of the shop". Needs a live
+  // distance; a customer with no GPS pin simply falls through to the paid
+  // rules below (never guesses the radius as free).
+  const freeRadiusKm = Math.max(0, n(input.freeRadiusKm));
+  if (freeRadiusKm > 0 && distanceKm != null && distanceKm <= freeRadiusKm) {
+    const kmLabel =
+      distanceKm < 1
+        ? `${Math.round(distanceKm * 1000)} m`
+        : `${distanceKm.toFixed(1)} km`;
+    return {
+      fee: 0,
+      freeReason: "radius",
+      flatPart: 0,
+      distancePart: 0,
+      incompleteDistance: false,
+      unconfigured: false,
+      isFinal: true,
+      formulaLabel: `FREE delivery within ${freeRadiusKm} km — you're ${kmLabel} away`,
+    };
+  }
+
   if (threshold > 0 && subtotal >= threshold) {
     return {
       fee: 0,
@@ -247,14 +272,19 @@ export function computeDeliveryFee(input: DeliveryFeeInput): number {
  */
 export function describeDeliveryPricing(input: {
   freeDeliveryThreshold?: number | null;
+  freeDeliveryRadiusKm?: number | null;
   deliveryFeeFlat?: number | null;
   deliveryFeePerKm?: number | null;
 }): string | null {
   const free = n(input.freeDeliveryThreshold);
+  const radius = n(input.freeDeliveryRadiusKm);
   const flat = n(input.deliveryFeeFlat);
   const perKm = n(input.deliveryFeePerKm);
 
   const parts: string[] = [];
+  if (radius > 0) {
+    parts.push(`Free within ${radius} km`);
+  }
   if (free > 0) {
     parts.push(`Free over Rs. ${Math.round(free).toLocaleString()}`);
   }
@@ -266,7 +296,7 @@ export function describeDeliveryPricing(input: {
     parts.push(`Delivery Rs. ${Math.round(flat).toLocaleString()}`);
   } else if (perKm > 0) {
     parts.push(`Delivery Rs. ${Math.round(perKm).toLocaleString()}/km`);
-  } else if (free <= 0) {
+  } else if (free <= 0 && radius <= 0) {
     return null;
   }
 

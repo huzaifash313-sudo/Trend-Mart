@@ -65,6 +65,7 @@ function TrashIcon() {
 /** Shop-level ticker lines (coupon / deal / delivery) — not product % OFF. */
 export interface ProductOfferContext {
   freeDeliveryThreshold?: number | null;
+  freeDeliveryRadiusKm?: number | null;
   deliveryFeeFlat?: number | null;
   deliveryFeePerKm?: number | null;
   /** Prebuilt coupon lines e.g. "Code SAVE10 · 10% OFF" */
@@ -89,6 +90,8 @@ function buildProductOfferTags(
     ],
     freeDeliveryThreshold:
       offerContext?.freeDeliveryThreshold ?? product.shop_free_delivery_threshold,
+    freeDeliveryRadiusKm:
+      offerContext?.freeDeliveryRadiusKm ?? product.shop_free_delivery_radius_km,
     deliveryFeeFlat: offerContext?.deliveryFeeFlat ?? product.shop_delivery_fee_flat,
     deliveryFeePerKm: offerContext?.deliveryFeePerKm ?? product.shop_delivery_fee_per_km,
   });

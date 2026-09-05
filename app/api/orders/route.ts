@@ -77,6 +77,7 @@ interface ShopRow {
   service_radius_km: number | null;
   delivery_zones: string[] | null;
   free_delivery_areas: string[] | null;
+  free_delivery_radius_km: number | null;
   location: string | null;
   business_hours: string | null;
   operating_status: string | null;
@@ -281,7 +282,7 @@ export async function POST(request: Request) {
   const { data: shopRaw, error: shopErr } = await admin
     .from("shops")
     .select(
-      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, free_delivery_areas, location, business_hours, operating_status, accepts_delivery, accepts_pickup",
+      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, free_delivery_radius_km, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, free_delivery_areas, location, business_hours, operating_status, accepts_delivery, accepts_pickup",
     )
     .eq("id", shopId)
     .maybeSingle();
@@ -820,6 +821,7 @@ export async function POST(request: Request) {
     perKm: perKmFee,
     distanceKm,
     freeThreshold: toNumber(shopRow.free_delivery_threshold, 0),
+    freeRadiusKm: toNumber(shopRow.free_delivery_radius_km, 0),
     subtotal,
     isPickup: orderType === "pickup",
     freeAreas: shopRow.free_delivery_areas ?? null,

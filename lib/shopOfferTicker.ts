@@ -56,6 +56,8 @@ export interface BuildShopOfferSlidesInput {
   announcement?: string | null;
   announcementExpiresAt?: string | null;
   freeDeliveryThreshold?: number | null;
+  /** Deliver FREE within this many km of the shop pin (0/null = off). */
+  freeDeliveryRadiusKm?: number | null;
   coupons?: Array<{
     id: string;
     code: string;
@@ -91,6 +93,16 @@ export function buildShopOfferSlides(input: BuildShopOfferSlidesInput, now = Dat
       id: `${input.shopId}-fd`,
       kind: "free_delivery",
       label: `Free delivery above Rs. ${Math.round(threshold).toLocaleString()}`,
+      expiresAt: null,
+    });
+  }
+
+  const radiusKm = input.freeDeliveryRadiusKm;
+  if (radiusKm != null && radiusKm > 0) {
+    slides.push({
+      id: `${input.shopId}-fdr`,
+      kind: "free_delivery",
+      label: `FREE delivery within ${radiusKm} km`,
       expiresAt: null,
     });
   }
