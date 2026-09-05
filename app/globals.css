@@ -319,6 +319,60 @@ html[data-brand-theme="maroon"] {
   --tm-sea-950: #240707;
   --tm-splash-bg: var(--tm-brand-700);
 }
+html[data-brand-theme="bright-maroon"] {
+  /* Bright maroon — vivid crimson-pop, warm and energetic.
+     Brand pops bright red-maroon; sea is a deeper wine for depth. */
+  --tm-brand-50: #fff0f4;
+  --tm-brand-100: #ffe0e7;
+  --tm-brand-200: #ffc0cf;
+  --tm-brand-300: #ff96ac;
+  --tm-brand-400: #f75a7e;
+  --tm-brand-500: #e02b52;
+  --tm-brand-600: #c1133c;
+  --tm-brand-700: #a0102f;
+  --tm-brand-800: #84102b;
+  --tm-brand-900: #6a0f25;
+  --tm-brand-950: #3c0310;
+  --tm-sea-50: #fef2f3;
+  --tm-sea-100: #fde3e6;
+  --tm-sea-200: #fbc7cd;
+  --tm-sea-300: #f79aa6;
+  --tm-sea-400: #ef687a;
+  --tm-sea-500: #d94358;
+  --tm-sea-600: #b22c41;
+  --tm-sea-700: #8d2034;
+  --tm-sea-800: #6b1a2b;
+  --tm-sea-900: #531420;
+  --tm-sea-950: #2f080f;
+  --tm-splash-bg: var(--tm-brand-700);
+}
+html[data-brand-theme="royal-maroon"] {
+  /* Royal maroon — deep classic wine maroon, rich & regal.
+     Brand stays in a deep crimson-maroon family; no pink. */
+  --tm-brand-50: #fdf2f4;
+  --tm-brand-100: #fbe4e8;
+  --tm-brand-200: #f6c9d1;
+  --tm-brand-300: #efa1af;
+  --tm-brand-400: #e36e83;
+  --tm-brand-500: #c93e5a;
+  --tm-brand-600: #a52b45;
+  --tm-brand-700: #861f36;
+  --tm-brand-800: #681529;
+  --tm-brand-900: #4e0e1f;
+  --tm-brand-950: #2b050f;
+  --tm-sea-50: #fbf3f4;
+  --tm-sea-100: #f7e3e6;
+  --tm-sea-200: #efc7cd;
+  --tm-sea-300: #e29da7;
+  --tm-sea-400: #cf6c7a;
+  --tm-sea-500: #b64a59;
+  --tm-sea-600: #96333f;
+  --tm-sea-700: #772630;
+  --tm-sea-800: #591c24;
+  --tm-sea-900: #43151b;
+  --tm-sea-950: #250609;
+  --tm-splash-bg: var(--tm-brand-700);
+}
 html[data-brand-theme="maroon-gold"] {
   /* Mehroon + gold — same deep maroon, royal amber support */
   --tm-brand-50: #fdf3f4;

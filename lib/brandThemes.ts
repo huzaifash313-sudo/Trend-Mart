@@ -8,10 +8,12 @@ export const BRAND_THEME_IDS = [
   "red",
   "maroon-pink",
   "maroon",
+  "bright-maroon",
+  "royal-maroon",
   "maroon-gold",
   "maroon-teal",
-  "purple-blue",
   "maroon-plum",
+  "purple-blue",
 ] as const;
 
 export type BrandThemeId = (typeof BRAND_THEME_IDS)[number];
@@ -28,7 +30,9 @@ export const BRAND_THEME_META: Record<
   "purple-pink": { label: "Purple + Pink", swatch: "#a855f7", swatchAlt: "#ec4899" },
   red: { label: "Soft Red", swatch: "#e11d48", swatchAlt: "#be123c" },
   "maroon-pink": { label: "Maroon + Pink", swatch: "#9f1239", swatchAlt: "#ec4899" },
-  maroon: { label: "Pure Maroon", swatch: "#871f29", swatchAlt: "#a0524f" },
+  maroon: { label: "Pure Maroon", swatch: "#b23c4d", swatchAlt: "#7a1f30" },
+  "bright-maroon": { label: "Bright Maroon", swatch: "#e02b52", swatchAlt: "#a0102f" },
+  "royal-maroon": { label: "Royal Maroon", swatch: "#c93e5a", swatchAlt: "#861f36" },
   "maroon-gold": { label: "Maroon + Gold", swatch: "#871f29", swatchAlt: "#d97706" },
   "maroon-teal": { label: "Maroon + Teal", swatch: "#871f29", swatchAlt: "#0d9488" },
   "purple-blue": { label: "Purple + Blue", swatch: "#6366f1", swatchAlt: "#3b82f6" },
