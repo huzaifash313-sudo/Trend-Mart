@@ -6,8 +6,8 @@ import {
   useCallback,
 } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { resolveClientAdminStatus } from "@/services/adminRoleCheck";
 import CustomSelect from "@/components/CustomSelect";
 import {
   fetchAuditLogs,
@@ -144,7 +144,6 @@ function AuditLogRow({ log }: { log: AdminAuditLog }) {
 
 export default function AuditLogsPage() {
   const router = useRouter();
-  const supabase = createClient();
   const { addToast } = useToast();
 
   const [authLoading, setAuthLoading] = useState(true);
@@ -174,32 +173,23 @@ export default function AuditLogsPage() {
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      const { data: userData } = await supabase.auth.getUser();
+      const status = await resolveClientAdminStatus();
       if (!cancelled) {
-        if (!userData.user) {
+        if (status === "anon") {
           router.replace("/auth");
           return;
         }
-        // Verify admin role
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userData.user.id)
-          .single();
-
-        if (!cancelled) {
-          if (roleData?.role !== "admin") {
-            router.replace("/dashboard");
-            return;
-          }
-          setIsAdmin(true);
-          setAuthLoading(false);
+        if (status !== "admin") {
+          router.replace("/dashboard");
+          return;
         }
+        setIsAdmin(true);
+        setAuthLoading(false);
       }
     }
     init();
     return () => { cancelled = true; };
-  }, [supabase, router]);
+  }, [router]);
 
   // ── Load event types ──────────────────────────────────────────────────────
   useEffect(() => {

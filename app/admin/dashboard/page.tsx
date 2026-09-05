@@ -57,6 +57,7 @@ import {
   createPlatformAd,
 } from "@/services/adsService";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { resolveClientAdminStatus } from "@/services/adminRoleCheck";
 import CustomSelect from "@/components/CustomSelect";
 import RevenueTrendChart, {
   type RevenueTrendPoint,
@@ -141,19 +142,13 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     let cancelled = false;
     async function checkAccess() {
-      const { data: userData } = await supabase.auth.getUser();
+      const status = await resolveClientAdminStatus();
       if (cancelled) return;
-      if (!userData.user) {
+      if (status === "anon") {
         router.replace("/auth");
         return;
       }
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userData.user.id)
-        .single();
-      if (cancelled) return;
-      if (roleData?.role !== "admin") {
+      if (status !== "admin") {
         router.replace("/dashboard");
         return;
       }
@@ -164,7 +159,7 @@ export default function AdminDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase, router]);
+  }, [router]);
 
   const [state, setState] = useState<AdminDashboardState>({
     metrics: null,

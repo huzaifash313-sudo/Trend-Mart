@@ -11,9 +11,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchSupportTickets, updateSupportTicket } from "@/services/supportService";
 import { subscribeToSupportTickets } from "@/lib/supabase/realtime";
-import { createClient } from "@/lib/supabase/client";
 import type { SupportTicket, SupportTicketStatus } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+import { resolveClientAdminStatus } from "@/services/adminRoleCheck";
 
 const STATUS_OPTIONS: { value: SupportTicketStatus; label: string; color: string }[] = [
   { value: "open", label: "Open", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
@@ -33,7 +33,6 @@ function timeAgo(dateStr: string): string {
 
 export default function AdminSupportPage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [authLoading, setAuthLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -48,19 +47,13 @@ export default function AdminSupportPage() {
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      const { data: userData } = await supabase.auth.getUser();
+      const status = await resolveClientAdminStatus();
       if (cancelled) return;
-      if (!userData.user) {
+      if (status === "anon") {
         router.replace("/auth");
         return;
       }
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userData.user.id)
-        .single();
-      if (cancelled) return;
-      if (roleData?.role !== "admin") {
+      if (status !== "admin") {
         router.replace("/dashboard");
         return;
       }
@@ -71,7 +64,7 @@ export default function AdminSupportPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase, router]);
+  }, [router]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -113,7 +106,7 @@ export default function AdminSupportPage() {
       cancelled = true;
       unsub();
     };
-  }, [isAdmin, supabase]);
+  }, [isAdmin]);
 
   const filtered = useMemo(
     () => (filterStatus === "all" ? tickets : tickets.filter((t) => t.status === filterStatus)),
