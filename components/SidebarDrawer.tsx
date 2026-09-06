@@ -484,15 +484,19 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
             >
               {resolved === "dark" ? <SunIcon /> : <MoonIcon />}
             </button>
-            <button
-              ref={closeButtonRef}
-              type="button"
-              onClick={onClose}
-              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-              aria-label={isPersistent ? "Collapse menu" : "Close menu"}
-            >
-              <CloseIcon />
-            </button>
+            {/* Only the mobile drawer gets a close (X). The desktop sidebar is
+                intentionally pinned open — no collapse control at all. */}
+            {!isPersistent ? (
+              <button
+                ref={closeButtonRef}
+                type="button"
+                onClick={onClose}
+                className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                aria-label="Close menu"
+              >
+                <CloseIcon />
+              </button>
+            ) : null}
           </div>
         </div>
 

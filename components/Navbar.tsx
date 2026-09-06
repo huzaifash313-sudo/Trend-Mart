@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -114,6 +114,8 @@ export default function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [portalReady, setPortalReady] = useState(false);
+  // Global search typed straight into the brand bar (desktop+).
+  const [navQuery, setNavQuery] = useState("");
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
@@ -126,46 +128,39 @@ export default function Navbar() {
     setPortalReady(true);
   }, []);
 
-  // Restore the user's last desktop sidebar preference (auto-open by default).
-  useLayoutEffect(() => {
-    try {
-      if (localStorage.getItem("trendsmart_sidebar_open_v1") === "0") {
-        setSidebarOpen(false);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
   // Drive the page offset so the whole storefront shifts for the pinned sidebar.
+  // The desktop sidebar is intentionally ALWAYS open — there is no collapse
+  // control, so we never restore a "closed" preference.
   useLayoutEffect(() => {
     if (isStandalone) return;
     const root = document.documentElement;
-    root.classList.toggle("tm-sidebar-open", sidebarOpen);
-    root.classList.toggle("tm-sidebar-collapsed", !sidebarOpen);
+    root.classList.add("tm-sidebar-open");
+    root.classList.remove("tm-sidebar-collapsed");
     return () => {
       root.classList.remove("tm-sidebar-open");
       root.classList.remove("tm-sidebar-collapsed");
     };
-  }, [isStandalone, sidebarOpen]);
+  }, [isStandalone]);
 
   const navigateToSearch = useCallback(() => router.push("/products"), [router]);
 
-  const toggleSidebar = useCallback(() => {
-    setSidebarOpen((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("trendsmart_sidebar_open_v1", next ? "1" : "0");
-      } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
+  const submitNavSearch = useCallback(
+    (e: FormEvent) => {
+      e.preventDefault();
+      const q = navQuery.trim();
+      router.push(q ? `/products?q=${encodeURIComponent(q)}` : "/products");
+    },
+    [navQuery, router],
+  );
 
   const handleHamburger = useCallback(() => {
     if (isDesktop) {
-      toggleSidebar();
-    } else {
-      setDrawerOpen(true);
+      // Desktop sidebar is pinned & non-collapsible — hamburger is hidden lg+,
+      // but keep a safe no-op so shared handlers stay consistent.
+      return;
     }
-  }, [isDesktop, toggleSidebar]);
+    setDrawerOpen(true);
+  }, [isDesktop]);
 
   if (isStandalone) {
     return null;
@@ -178,11 +173,13 @@ export default function Navbar() {
         <TrendBackdrop />
 
         <div className="tm-navbar-inner">
+          {/* Hamburger — mobile only. On desktop the sidebar is pinned open,
+              so the toggle has been removed entirely. */}
           <button
             type="button"
             onClick={handleHamburger}
-            className="tm-navbar-icon-btn"
-            aria-label="Toggle navigation menu"
+            className="tm-navbar-icon-btn lg:hidden"
+            aria-label="Open navigation menu"
           >
             <HamburgerIcon />
           </button>
@@ -202,16 +199,45 @@ export default function Navbar() {
             </span>
           </Link>
 
+          {/* Overall search — one bar for shops, products, deals (md+).
+              Submits to the marketplace where all of it is searchable. */}
+          <div className="tm-navbar-search-slot">
+            <form role="search" className="tm-navbar-search" onSubmit={submitNavSearch}>
+              <SearchIcon />
+              <input
+                type="search"
+                value={navQuery}
+                onChange={(e) => setNavQuery(e.target.value)}
+                placeholder="Search shops, products, deals…"
+                aria-label="Search TrendsMart"
+                enterKeyHint="search"
+                className="tm-navbar-search-input"
+              />
+              {navQuery ? (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => setNavQuery("")}
+                  className="tm-navbar-search-clear"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              ) : null}
+            </form>
+          </div>
+
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <NavbarNotificationButton />
+            {/* Mobile search entry — opens the same overall search */}
             <button
               type="button"
               onClick={navigateToSearch}
-              className="tm-navbar-search-btn w-10 sm:w-auto"
+              className="tm-navbar-icon-btn md:hidden"
               aria-label="Search products and shops"
             >
               <SearchIcon />
-              <span className="hidden text-sm font-medium text-white sm:inline">Search</span>
             </button>
           </div>
         </div>
@@ -228,7 +254,7 @@ export default function Navbar() {
               <SidebarDrawer
                 variant="persistent"
                 isOpen={sidebarOpen}
-                onClose={toggleSidebar}
+                onClose={() => setSidebarOpen(true)}
               />
             </>,
             document.body,

@@ -174,7 +174,7 @@ interface ProductGridProps {
   getOfferContext?: (product: Product) => ProductOfferContext | null;
 }
 
-const ProductCard = memo(function ProductCard({
+export const ProductCard = memo(function ProductCard({
   product,
   compact,
   isFavorite,

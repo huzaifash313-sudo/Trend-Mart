@@ -34,7 +34,6 @@ import {
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
-import FadeScrollX from "@/components/FadeScrollX";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
@@ -44,6 +43,8 @@ import { useConnection } from "@/lib/connection";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { getTopAffinityCategories } from "@/lib/behavior";
 import VirtualizedGrid from "@/components/VirtualizedGrid";
+import HomeCategories from "@/components/HomeCategories";
+import { DealsRail, ProductsRail, SponsoredRail } from "@/components/HomeFeedRails";
 import { PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
@@ -568,6 +569,13 @@ function HomeClient({
     }));
   }, [shops]);
 
+  /** Map form of the counts (plus the "All" total) for the category tiles. */
+  const categoryCountsMap = useMemo(() => {
+    const map = new Map<string, number>(categoryCounts.map((c) => [c.key, c.count]));
+    map.set("All", shops.length);
+    return map;
+  }, [categoryCounts, shops.length]);
+
   // Personalisation: reorder the category pills so the categories a customer
   // actually browses / wishes / searches appear first (after "All"). Read from
   // localStorage AFTER mount (client-only) to avoid a hydration mismatch — the
@@ -743,6 +751,50 @@ function HomeClient({
   /* Reset filter-local windowing is no longer needed — server pages accumulate. */
   const visibleShops = displayShops;
 
+  /* Feed rhythm: chunks of ~24 live shops (one infinite-scroll page) with a
+     compact deals/products/sponsored rail inserted after every chunk so the
+     page keeps surprising the shopper as they scroll (marketplace flow). */
+  const shopChunks = useMemo(() => {
+    const chunks: ShopWithDistance[][] = [];
+    for (let i = 0; i < visibleShops.length; i += PAGE_SIZE) {
+      chunks.push(visibleShops.slice(i, i + PAGE_SIZE) as ShopWithDistance[]);
+    }
+    return chunks;
+  }, [visibleShops]);
+
+  const feedRails = useMemo<ReactNode[]>(() => {
+    const first: ReactNode = (
+      <DealsRail key="rail-0" deals={activeDeals} />
+    );
+    const second: ReactNode = <ProductsRail key="rail-1" myShopId={myShopId} />;
+    const third: ReactNode = <SponsoredRail key="rail-2" />;
+    // Deals → products → sponsored → deals → … (rails repeat as pages load)
+    return [first, second, third];
+  }, [activeDeals, myShopId]);
+
+  /* Auto-load the next page of shops when the sentinel scrolls into view —
+     infinite marketplace scroll instead of clicking "Show more". */
+  const feedSentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = feedSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0]?.isIntersecting &&
+          hasMoreShops &&
+          !loadingMoreShops &&
+          !offline
+        ) {
+          void shopsQuery.fetchNextPage();
+        }
+      },
+      { rootMargin: "900px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreShops, loadingMoreShops, offline, shopsQuery]);
+
   // Coupons only for shops currently on screen — first paint set, grows with pages.
   const couponShopIds = useMemo(
     () => visibleShops.slice(0, 48).map((s) => s.id).filter(Boolean),
@@ -897,32 +949,6 @@ function HomeClient({
         </div>
       </section>
 
-      {/* ── Categories (Daraz-style tabs, polished) ───────────────── */}
-      <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
-        <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
-          {orderedCategories.map((category) => {
-            const isActive = activeCategory === category;
-            const catCount = categoryCounts.find((c) => c.key === category)?.count;
-            return (
-              <button
-                key={category}
-                type="button"
-                onClick={() => handleCategoryChange(category)}
-                className={`tm-cat-tab${isActive ? " is-active" : ""}`}
-                aria-label={`${category}${catCount !== undefined ? ` — ${catCount} shop${catCount !== 1 ? "s" : ""}` : ""}`}
-                aria-pressed={isActive}
-              >
-                <span className="tm-cat-tab-label">{category}</span>
-                {catCount !== undefined ? (
-                  <span className="tm-cat-tab-count">{catCount}</span>
-                ) : null}
-                <span className="tm-cat-tab-line" aria-hidden="true" />
-              </button>
-            );
-          })}
-        </FadeScrollX>
-      </section>
-
       {storyViewerOpen && (
         <StoriesViewer
           stories={storyViewerList}
@@ -952,6 +978,16 @@ function HomeClient({
         <BrandMediaShowcase />
         <PromoAdsCarousel placement="homepage_top" />
       </div>
+
+      {/* ── Colourful category tiles (icons + gradients, under the video) ── */}
+      {!loading && displayShops.length > 0 && (
+        <HomeCategories
+          categories={orderedCategories}
+          counts={categoryCountsMap}
+          activeCategory={activeCategory}
+          onSelect={handleCategoryChange}
+        />
+      )}
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops">
@@ -1107,46 +1143,71 @@ function HomeClient({
           </div>
         )}
 
-        {/* Shop cards — 2 mobile / 3 tablet / 4 laptop / 5 wide desktop */}
+        {/* Shop feed — 2 mobile / 3 tablet / 4 laptop / 5 wide desktop.
+            Shops arrive in chunks; after every chunk a compact rail (deals /
+            products / sponsored) is woven in so the page keeps a marketplace
+            rhythm instead of one endless grid. */}
         {!loading && !hardFail && displayShops.length > 0 && (
           <>
-            <VirtualizedGrid
-              items={visibleShops}
-              getKey={(shop) => shop.id}
-              estimateRowHeight={260}
-              gapClassName="gap-2 sm:gap-4"
-              columnBreakpoints={{ base: 2, md: 3, lg: 4, xl: 5 }}
-              renderItem={(shop, index) => {
-                const withDistance = shop as ShopWithDistance;
-                return (
-                  <ShopCardRow
-                    shop={withDistance}
-                    priority={index < 2}
-                    favorited={favorites.has(shop.id)}
-                    showDistance={showProximityBadges}
-                    bannerBroken={brokenImgs.has(`banner:${shop.id}`)}
-                    logoBroken={brokenImgs.has(`logo:${shop.id}`)}
-                    coupons={shopCoupons[shop.id]}
-                    shopDeals={dealsByShopId.get(shop.id) ?? EMPTY_DEALS}
-                    setBrokenImgs={setBrokenImgs}
-                    setFavorites={setFavorites}
+            {shopChunks.map((chunk, ci) => {
+              const rail = feedRails[ci % feedRails.length];
+              return (
+                <div key={`shop-chunk-${ci}`} className={ci > 0 ? "mt-2 sm:mt-4" : ""}>
+                  <VirtualizedGrid
+                    items={chunk}
+                    getKey={(shop) => shop.id}
+                    estimateRowHeight={260}
+                    gapClassName="gap-2 sm:gap-4"
+                    columnBreakpoints={{ base: 2, md: 3, lg: 4, xl: 5 }}
+                    renderItem={(shop, index) => {
+                      const withDistance = shop as ShopWithDistance;
+                      return (
+                        <ShopCardRow
+                          shop={withDistance}
+                          priority={ci === 0 && index < 2}
+                          favorited={favorites.has(shop.id)}
+                          showDistance={showProximityBadges}
+                          bannerBroken={brokenImgs.has(`banner:${shop.id}`)}
+                          logoBroken={brokenImgs.has(`logo:${shop.id}`)}
+                          coupons={shopCoupons[shop.id]}
+                          shopDeals={dealsByShopId.get(shop.id) ?? EMPTY_DEALS}
+                          setBrokenImgs={setBrokenImgs}
+                          setFavorites={setFavorites}
+                        />
+                      );
+                    }}
                   />
-                );
-              }}
-            />
+                  {/* Compact rail — one after every shop chunk, cycling
+                      deals → products → sponsored. Even on a short feed (a
+                      single chunk) the rails still show, so the page never
+                      ends as a bare grid. */}
+                  {rail}
+                </div>
+              );
+            })}
 
-            {(hasMoreShops || loadingMoreShops) && (
-              <div className="mt-5 flex justify-center">
+            {/* Infinite-scroll sentinel — pulls the next 24 shops automatically.
+                The button below doubles as a manual fallback. */}
+            <div
+              ref={feedSentinelRef}
+              className="mt-6 flex min-h-[3rem] items-center justify-center"
+            >
+              {loadingMoreShops ? (
+                <span className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                  Loading more shops…
+                </span>
+              ) : hasMoreShops ? (
                 <button
                   type="button"
                   onClick={() => void shopsQuery.fetchNextPage()}
                   className="tm-btn-secondary rounded-full px-6 py-2 text-xs font-semibold disabled:opacity-60"
                   disabled={offline || loadingMoreShops || !hasMoreShops}
                 >
-                  {loadingMoreShops ? "Loading more…" : "Show more shops"}
+                  Show more shops
                 </button>
-              </div>
-            )}
+              ) : null}
+            </div>
           </>
         )}
       </section>
