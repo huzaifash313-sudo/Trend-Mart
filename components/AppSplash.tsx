@@ -12,9 +12,13 @@ import { fetchActiveDeals } from "@/services/dealService";
 export const SPLASH_KEY = "tm_splash_seen_v6";
 
 /**
- * First-impression intro. Shows only on a FRESH open of the homepage (new
- * browser session), never on an in-session refresh — that's the whole point of
- * the session-scoped `SPLASH_KEY`.
+ * First-impression intro.
+ * - Installed PWA (standalone, "added to home screen"): plays on EVERY cold
+ *   launch of the app — the branded open is part of the app feel, like
+ *   WhatsApp. (Opening the icon while the app is already running resumes
+ *   instantly with no intro, exactly like a native app.)
+ * - Regular browser tabs: once per session on the homepage. In-session
+ *   refreshes / client-side navigations never replay it.
  *
  * Beat (deliberately slow + smooth so it never feels rushed):
  *   1) Logo pops in centered on the green/seagreen stage
@@ -67,16 +71,36 @@ type StageTiming = typeof STAGE_MS;
 
 function shouldShowSplash(pathname: string): boolean {
   if (pathname !== "/") return false;
+  // Only play when the BOOT script armed it (i.e. this is a genuine document
+  // load on the homepage). A client-side navigation (e.g. /products → home)
+  // must NOT trigger the intro, otherwise the homepage flashes under the splash.
+  if (typeof document === "undefined") return false;
+  if (!document.documentElement.classList.contains("tm-splash-lock")) return false;
+  // Standalone PWA (added to home screen): the intro is part of the app-open
+  // feel (WhatsApp-style) — replay it on every cold launch, even when the OS
+  // kept the session alive. Regular browser tabs keep the once-per-session rule.
+  if (isStandaloneApp()) return true;
   try {
     if (sessionStorage.getItem(SPLASH_KEY) === "1") return false;
   } catch {
     /* ignore */
   }
-  // Only play the intro when the BOOT script armed it (i.e. this is a genuine
-  // fresh homepage load). A client-side navigation (e.g. /products → home) must
-  // NOT trigger the intro, otherwise the homepage flashes under the splash.
-  if (typeof document === "undefined") return false;
-  return document.documentElement.classList.contains("tm-splash-lock");
+  return true;
+}
+
+function isStandaloneApp(): boolean {
+  try {
+    const mm = window.matchMedia;
+    if (mm) {
+      if (mm("(display-mode: standalone)").matches) return true;
+      if (mm("(display-mode: fullscreen)").matches) return true;
+    }
+    const nav = navigator as Navigator & { standalone?: boolean };
+    if (nav.standalone === true) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
 }
 
 function markSplashSeen() {
@@ -148,14 +172,6 @@ function stageTiming(): StageTiming {
     ) {
       return SLOW_NET_MS;
     }
-  } catch {
-    /* ignore */
-  }
-  // Fully offline launch (PWA open without network): the home underneath is
-  // already served from the service-worker cache, so keep the brand beat tiny
-  // and land fast — no waiting on prefetches that can never succeed.
-  try {
-    if (!navigator.onLine) return SLOW_NET_MS;
   } catch {
     /* ignore */
   }

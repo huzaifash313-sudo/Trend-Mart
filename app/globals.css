@@ -548,12 +548,12 @@ body {
    fill keeps the fade while letting overlays escape to the root context. */
 @media (prefers-reduced-motion: no-preference) {
   html:not(.tm-splash-lock):not(.tm-splash-handoff) .tm-route-fade {
-    animation: tm-route-fade-in 160ms ease-out;
+    animation: tm-route-fade-in 300ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 @keyframes tm-route-fade-in {
   from {
-    opacity: 0;
+    opacity: 0.45;
   }
   to {
     opacity: 1;
@@ -5589,6 +5589,31 @@ html.tm-boot-splash .tm-boot-splash {
   display: flex;
 }
 
+/* Brand tile shown on the boot cover BEFORE React hydrates — the splash logo
+   never has to "wait to appear" on a cold launch (was an empty teal pause on
+   slow Android). Matches the React `.tm-splash-logo` resting style 1:1 so the
+   handoff is seamless; reduced-motion users see a static logo, no pop. */
+.tm-boot-logo {
+  display: inline-flex;
+  height: 5.5rem;
+  width: 5.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.25rem;
+  background: #ffffff;
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.4);
+  padding: 0.55rem;
+}
+
+.tm-boot-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* Brief cover on refresh / non-splash opens — hides header jump before CSS settles */
 html.tm-first-paint .tm-boot-splash {
   display: flex;
@@ -5749,12 +5774,15 @@ html.tm-first-paint .tm-boot-splash {
   max-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  font-size: clamp(1.85rem, 7vw, 2.35rem);
+  /* Slightly under-2.5rem keeps the whole word inside the reveal box on every
+     viewport: 15rem comfortably fits "TrendsMart" at the font cap, while a
+     too-small box would clip letters on wide (laptop) screens. */
+  font-size: clamp(1.8rem, 6.5vw, 2.3rem);
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   line-height: 1.05;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-  transition: max-width 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: max-width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Letter-by-letter reveal: each letter pops up with a slight stagger */
@@ -5772,7 +5800,9 @@ html.tm-first-paint .tm-boot-splash {
 .tm-splash--details .tm-splash-title,
 .tm-splash--hold .tm-splash-title,
 .tm-splash--exit .tm-splash-title {
-  max-width: 12rem;
+  /* 15rem > widest rendered wordmark, so the reveal box never clips letters
+     (was 12rem — on large screens the tail of "TrendsMart" got cut). */
+  max-width: min(80vw, 15rem);
 }
 
 .tm-splash--brand .tm-splash-title-letter,

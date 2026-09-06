@@ -1,4 +1,4 @@
-/* TrendsMart SW v53 — offline-first app shell.
+/* TrendsMart SW v54 — offline-first app shell.
    Goals:
    - Repeat PWA opens feel native: successful visits to PUBLIC pages are
      cached, so the next launch (even fully offline) opens the real home page
@@ -15,9 +15,9 @@
      show a subtle "You're offline" pill instead of looking broken.
    Push / notifications logic unchanged from v52. */
 
-const PAGE_CACHE = "tm-pages-v53"; /* rendered HTML of visited public pages */
-const SHELL_CACHE = "tm-shell-v53"; /* /_next/static, fonts, icons, /offline */
-const IMAGE_CACHE = "tm-images-v53"; /* Cloudinary / Next image proxy */
+const PAGE_CACHE = "tm-pages-v54"; /* rendered HTML of visited public pages */
+const SHELL_CACHE = "tm-shell-v54"; /* /_next/static, fonts, icons, /offline */
+const IMAGE_CACHE = "tm-images-v54"; /* Cloudinary / Next image proxy */
 const KEEP = new Set([PAGE_CACHE, SHELL_CACHE, IMAGE_CACHE]);
 
 /** Keep these bounded — evict oldest entries past the cap on every write. */
@@ -205,12 +205,12 @@ self.addEventListener("fetch", (event) => {
 
         if (cached) {
           // Network-first, but never leave the user staring at a blank page:
-          // if the network hasn't answered within ~3s (or fails outright),
+          // if the network hasn't answered within ~2.2s (or fails outright),
           // show the cached copy immediately and keep refreshing in the bg.
           const winner = await Promise.race([
             netPromise,
             new Promise((resolve) =>
-              setTimeout(() => resolve({ timeout: true }), 3000),
+              setTimeout(() => resolve({ timeout: true }), 2200),
             ),
           ]);
           if (winner.timeout) {
