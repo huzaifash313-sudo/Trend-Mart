@@ -431,7 +431,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=12"
+              src="/trendsmart-mark.png?v=13"
               alt=""
               width={32}
               height={32}

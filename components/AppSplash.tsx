@@ -382,7 +382,7 @@ export default function AppSplash() {
           <span className="tm-splash-logo" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=12"
+              src="/trendsmart-mark.png?v=13"
               alt=""
               width={88}
               height={88}

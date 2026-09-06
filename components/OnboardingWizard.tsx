@@ -358,7 +358,7 @@ export default function OnboardingWizard() {
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=12"
+              src="/trendsmart-mark.png?v=13"
               alt=""
               width={36}
               height={36}
