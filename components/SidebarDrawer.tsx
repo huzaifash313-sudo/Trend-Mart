@@ -431,7 +431,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=11"
+              src="/trendsmart-mark.png?v=12"
               alt=""
               width={32}
               height={32}
@@ -497,7 +497,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               <Link
                 href="/wishlist"
                 onClick={onClose}
-                className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-rose-50 hover:text-rose-600 dark:text-zinc-300 dark:hover:bg-rose-900/20 dark:hover:text-rose-400"
+                className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
               >
                 <HeartIcon /> Wishlist
               </Link>
@@ -614,7 +614,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                             <Link
                               href="/dashboard/assistant"
                               onClick={onClose}
-                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-indigo-700 transition-all hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
                             >
                               <span aria-hidden="true">🤖</span> AI Business Coach
                             </Link>
@@ -739,7 +739,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                       <Link
                         href="/account/assistant"
                         onClick={onClose}
-                        className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
+                        className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
                       >
                         <span aria-hidden="true" className="text-base">🤖</span> TrendBot
                       </Link>
@@ -760,7 +760,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                   <Link
                     href="/assistant"
                     onClick={onClose}
-                    className="mb-2 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
+                    className="mb-2 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
                   >
                     <span aria-hidden="true" className="text-base">🤖</span> AI Shopping Assistant
                   </Link>

@@ -99,7 +99,7 @@ export function emailShell(title: string, bodyHtml: string): string {
         <td align="center">
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;">
             <tr>
-              <td style="background-color:#7a1f30;padding:24px 32px;">
+              <td style="background-color:#4a0024;padding:24px 32px;">
                 <span style="color:#ffffff;font-size:20px;font-weight:700;">TrendsMart</span>
               </td>
             </tr>

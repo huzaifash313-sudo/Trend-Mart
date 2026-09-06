@@ -161,11 +161,41 @@ function stageTiming(): StageTiming {
   return STAGE_MS;
 }
 
-/* Short, human value intro — no page mockups, just "what TrendsMart is". */
+/* Short, human value intro — no page mockups, just "what TrendsMart is".
+   Monochrome glyphs (white on plum) keep the intro 100% brand-consistent —
+   no stray colourful emoji on the boot stage. */
+function BagGlyph() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
+function ChatGlyph() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+    </svg>
+  );
+}
+function TruckGlyph() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+      <path d="M15 18H9" />
+      <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+      <circle cx="17" cy="18" r="2" />
+      <circle cx="7" cy="18" r="2" />
+    </svg>
+  );
+}
+
 const FEATURES = [
-  { icon: "🛍️", title: "Local shops nearby", subtitle: "Discover trusted stores in your area" },
-  { icon: "💬", title: "Order on WhatsApp", subtitle: "Direct chat with the shop — no confusion" },
-  { icon: "🚚", title: "Fast delivery", subtitle: "Your neighbourhood, delivered to your door" },
+  { glyph: <BagGlyph />, title: "Local shops nearby", subtitle: "Discover trusted stores in your area" },
+  { glyph: <ChatGlyph />, title: "Order on WhatsApp", subtitle: "Direct chat with the shop — no confusion" },
+  { glyph: <TruckGlyph />, title: "Fast delivery", subtitle: "Your neighbourhood, delivered to your door" },
 ] as const;
 
 export default function AppSplash() {
@@ -352,7 +382,7 @@ export default function AppSplash() {
           <span className="tm-splash-logo" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=11"
+              src="/trendsmart-mark.png?v=12"
               alt=""
               width={88}
               height={88}
@@ -383,7 +413,7 @@ export default function AppSplash() {
             {FEATURES.map((f) => (
               <li key={f.title} className="tm-splash-feature">
                 <span className="tm-splash-feature-icon" aria-hidden="true">
-                  {f.icon}
+                  {f.glyph}
                 </span>
                 <span className="tm-splash-feature-text">
                   <strong>{f.title}</strong>

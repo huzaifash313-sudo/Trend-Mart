@@ -576,8 +576,8 @@ export default function QuickViewModal({
                 onClick={onWishlistToggle}
                 className={`inline-flex items-center justify-center rounded-xl border-2 px-3.5 py-2.5 text-sm font-semibold transition-all active:scale-95 ${
                   isWishlisted
-                    ? "border-red-300 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
-                    : "border-zinc-200 text-zinc-500 hover:border-red-200 hover:text-red-500 dark:border-zinc-700 dark:text-zinc-400"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/25 dark:text-emerald-300"
+                    : "border-zinc-200 text-zinc-500 hover:border-emerald-300 hover:text-emerald-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-emerald-700 dark:hover:text-emerald-300"
                 }`}
                 aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
               >

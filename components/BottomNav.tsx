@@ -146,14 +146,16 @@ const MERCHANT_QUICK_ACTIONS: {
     label: "Add Deal",
     hint: "Offer a discount / deal",
     icon: <TagIcon />,
-    iconClass: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+    iconClass:
+      "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
   },
   {
     tab: "coupon",
     label: "Add Coupon",
     hint: "Create a promo code",
     icon: <TicketIcon />,
-    iconClass: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+    iconClass:
+      "bg-gradient-to-br from-emerald-600 to-teal-700 text-white",
   },
 ];
 

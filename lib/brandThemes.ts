@@ -19,14 +19,17 @@ export const BRAND_THEME_IDS = [
 
 export type BrandThemeId = (typeof BRAND_THEME_IDS)[number];
 
-/** Platform default brand — the decided "Maroon + Plum" combo. */
-export const DEFAULT_BRAND_THEME: BrandThemeId = "maroon-plum";
+/** Platform default brand — the decided deep "Plum Magenta" combo
+ *  (primary #8B0046 · hero/dark #4A0024). Published for every visitor and
+ *  the reset target, so boot cover, splash, icons and OS chrome all agree. */
+export const DEFAULT_BRAND_THEME: BrandThemeId = "plum-magenta";
 
 export const BRAND_THEME_META: Record<
   BrandThemeId,
   { label: string; swatch: string; swatchAlt: string }
 > = {
-  "maroon-plum": { label: "Maroon + Plum (Default)", swatch: "#b23c4d", swatchAlt: "#6e2650" },
+  "plum-magenta": { label: "Deep Plum (Default)", swatch: "#8b0046", swatchAlt: "#4a0024" },
+  "maroon-plum": { label: "Maroon + Plum", swatch: "#b23c4d", swatchAlt: "#6e2650" },
   green: { label: "Green", swatch: "#10b981", swatchAlt: "#0f766e" },
   blue: { label: "Royal Blue", swatch: "#3b82f6", swatchAlt: "#0284c7" },
   "dark-purple": { label: "Dark Purple", swatch: "#7c3aed", swatchAlt: "#5b21b6" },
@@ -36,7 +39,6 @@ export const BRAND_THEME_META: Record<
   maroon: { label: "Pure Maroon", swatch: "#b23c4d", swatchAlt: "#7a1f30" },
   "bright-maroon": { label: "Bright Maroon", swatch: "#e02b52", swatchAlt: "#a0102f" },
   "royal-maroon": { label: "Royal Maroon", swatch: "#c93e5a", swatchAlt: "#861f36" },
-  "plum-magenta": { label: "Plum Magenta", swatch: "#8b0046", swatchAlt: "#4a0024" },
   "maroon-gold": { label: "Maroon + Gold", swatch: "#871f29", swatchAlt: "#d97706" },
   "maroon-teal": { label: "Maroon + Teal", swatch: "#871f29", swatchAlt: "#0d9488" },
   "purple-blue": { label: "Purple + Blue", swatch: "#6366f1", swatchAlt: "#3b82f6" },
@@ -75,7 +77,7 @@ export function getBrandColor(
     | "--tm-sea-700"
     | "--tm-accent"
     | "--tm-splash-bg" = "--tm-brand-500",
-  fallback = "#b23c4d",
+  fallback = "#8b0046",
 ): string {
   if (typeof window === "undefined") {
     return BRAND_THEME_META[DEFAULT_BRAND_THEME].swatch || fallback;
@@ -96,7 +98,7 @@ export function getBrandColor(
 /** Keep browser chrome (theme-color / splash plate) in sync with active brand. */
 export function syncBrowserBrandChrome(): void {
   if (typeof document === "undefined") return;
-  const splash = getBrandColor("--tm-splash-bg", "#7a1f30");
+  const splash = getBrandColor("--tm-splash-bg", "#4a0024");
   const metas = document.querySelectorAll('meta[name="theme-color"]');
   metas.forEach((el) => el.setAttribute("content", splash));
   const root = document.documentElement;

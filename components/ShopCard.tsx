@@ -192,8 +192,8 @@ function ShopCard({
               }}
               className={`icon-only -mr-0.5 -mt-0.5 shrink-0 rounded-full p-0.5 transition-transform duration-200 hover:scale-110 active:scale-95 ${
                 favorited
-                  ? "text-rose-500"
-                  : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                  ? "text-emerald-600 dark:text-emerald-300"
+                  : "text-zinc-400 hover:text-emerald-600 dark:text-zinc-500 dark:hover:text-emerald-300"
               }`}
               aria-label={favorited ? "Remove from wishlist" : "Add to wishlist"}
             >

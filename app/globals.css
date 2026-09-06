@@ -15,33 +15,33 @@
   --tm-muted: #71717a;
   /*
    * Brand palette (single source for whole-app theme switching).
-   * Default = the decided "Maroon + Plum" look (deep maroon brand + muted
-   * plum bloom). Admin presets later only override these scales — Tailwind
-   * emerald-* / teal-* utilities remapped via @theme below, so the UI
-   * updates app-wide. "green" remains available as an alternate preset.
+   * Default = the decided deep "Plum Magenta" look (primary #8B0046, hero/dark
+   * #4A0024, gradient #3B001D → #7A003D). Admin presets later only override
+   * these scales — Tailwind emerald-* / teal-* utilities are remapped via
+   * @theme below, so the UI updates app-wide across light and dark.
    */
-  --tm-brand-50: #fdf3f4;
-  --tm-brand-100: #fae3e6;
-  --tm-brand-200: #f2c3c9;
-  --tm-brand-300: #e698a3;
-  --tm-brand-400: #d2606f;
-  --tm-brand-500: #b23c4d;
-  --tm-brand-600: #94273a;
-  --tm-brand-700: #7a1f30;
-  --tm-brand-800: #5e1523;
-  --tm-brand-900: #450d18;
-  --tm-brand-950: #260409;
-  --tm-sea-50: #faf5f7;
-  --tm-sea-100: #f3e5eb;
-  --tm-sea-200: #e8cbd8;
-  --tm-sea-300: #d9a3ba;
-  --tm-sea-400: #c5729b;
-  --tm-sea-500: #a84c7d;
-  --tm-sea-600: #8a3565;
-  --tm-sea-700: #6e2650;
-  --tm-sea-800: #531a3c;
-  --tm-sea-900: #3a0f29;
-  --tm-sea-950: #200516;
+  --tm-brand-50: #fdf0f5;
+  --tm-brand-100: #fae0ec;
+  --tm-brand-200: #f5d6e3;
+  --tm-brand-300: #e6a8c8;
+  --tm-brand-400: #c04e8a;
+  --tm-brand-500: #8b0046;
+  --tm-brand-600: #720038;
+  --tm-brand-700: #4a0024;
+  --tm-brand-800: #3b001d;
+  --tm-brand-900: #2e0017;
+  --tm-brand-950: #1c000e;
+  --tm-sea-50: #fdf0f5;
+  --tm-sea-100: #f7ddea;
+  --tm-sea-200: #efc1d9;
+  --tm-sea-300: #df96be;
+  --tm-sea-400: #c75e97;
+  --tm-sea-500: #7a003d;
+  --tm-sea-600: #600030;
+  --tm-sea-700: #4a0024;
+  --tm-sea-800: #3b001d;
+  --tm-sea-900: #2a0014;
+  --tm-sea-950: #19000b;
 
   --tm-accent: var(--tm-brand-500);
   --tm-accent-soft: var(--tm-brand-600);
@@ -161,7 +161,7 @@
 /*
  * Brand theme presets — html[data-brand-theme="…"]
  * Soft, ecommerce-safe combos (not neon / not over). Surfaces stay zinc.
- * maroon-plum = :root default (the decided platform brand; reset target for
+ * plum-magenta = :root default (the decided platform brand; reset target for
  * admin). Every other preset only overrides brand + sea scales.
  */
 html[data-brand-theme="blue"] {
@@ -635,6 +635,16 @@ html.dark .text-zinc-600:not([class*="dark:text-"]),
 html.dark .text-zinc-500:not([class*="dark:text-"]),
 html.dark .text-zinc-400:not([class*="dark:text-"]) {
   color: var(--tm-muted);
+}
+
+/* Brand accent text on dark charcoal surfaces: lift the 400 step to the light
+   plum 300 step — #c04e8a only reaches ~3.7:1 on the dark surface, while
+   #e6a8c8 clears AA easily. Keeps every small icon/label readable in dark. */
+html.dark .text-emerald-400 {
+  color: var(--tm-brand-300);
+}
+html.dark .text-teal-400 {
+  color: var(--tm-sea-300);
 }
 
 /*
@@ -2632,13 +2642,18 @@ html.dark .tm-home-deal-shop-fallback {
 }
 .tm-home-deal-icon.is-on,
 .tm-home-deal-icon:hover {
-  color: #e11d48;
-  border-color: rgba(225, 29, 72, 0.2);
+  color: var(--tm-brand-600);
+  border-color: color-mix(in srgb, var(--tm-brand-600) 22%, transparent);
 }
 html.dark .tm-home-deal-icon {
   background: color-mix(in srgb, var(--tm-text-strong) 6%, transparent);
   border-color: color-mix(in srgb, var(--tm-text-strong) 10%, transparent);
   color: var(--tm-text-faint);
+}
+html.dark .tm-home-deal-icon.is-on,
+html.dark .tm-home-deal-icon:hover {
+  color: var(--tm-brand-300);
+  border-color: color-mix(in srgb, var(--tm-brand-300) 24%, transparent);
 }
 
 .tm-home-deal-add {
