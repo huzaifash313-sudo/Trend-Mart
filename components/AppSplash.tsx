@@ -151,6 +151,14 @@ function stageTiming(): StageTiming {
   } catch {
     /* ignore */
   }
+  // Fully offline launch (PWA open without network): the home underneath is
+  // already served from the service-worker cache, so keep the brand beat tiny
+  // and land fast — no waiting on prefetches that can never succeed.
+  try {
+    if (!navigator.onLine) return SLOW_NET_MS;
+  } catch {
+    /* ignore */
+  }
   // SSR already seeded React Query — don't make the user wait on a long intro.
   try {
     // Soft signal: if shops are already cached, use the fast path.
@@ -239,35 +247,45 @@ export default function AppSplash() {
 
     const ms = stageTiming();
 
-    // Warm the homepage cache while the customer watches the intro.
-    const prefetch = Promise.allSettled([
-      queryClient.prefetchInfiniteQuery({
-        queryKey: [...queryKeys.shopsInfinite, PUBLIC_SHOP_PAGE_SIZE],
-        queryFn: ({ pageParam }) =>
-          unwrap(
-            fetchShops({
-              publicOnly: true,
-              limit: PUBLIC_SHOP_PAGE_SIZE,
-              offset: pageParam as number,
-            }),
-          ),
-        initialPageParam: 0,
-        staleTime: 2 * 60_000,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.stories,
-        queryFn: () => unwrap(fetchActiveStories()),
-        staleTime: 2 * 60_000,
-      }),
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.deals(48),
-        queryFn: () => unwrap(fetchActiveDeals(48)),
-        staleTime: 2 * 60_000,
-      }),
-    ]).then(() => {
+    // Offline launch: skip the data-wait entirely — a cached home is already
+    // under the splash and there is nothing to prefetch without a network.
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    if (offline) {
       dataReadyRef.current = true;
-      if (!unmountedRef.current && !exitingRef.current) setDataReady(true);
-    });
+      setDataReady(true);
+    }
+
+    // Warm the homepage cache while the customer watches the intro.
+    const prefetch = offline
+      ? Promise.resolve()
+      : Promise.allSettled([
+          queryClient.prefetchInfiniteQuery({
+            queryKey: [...queryKeys.shopsInfinite, PUBLIC_SHOP_PAGE_SIZE],
+            queryFn: ({ pageParam }) =>
+              unwrap(
+                fetchShops({
+                  publicOnly: true,
+                  limit: PUBLIC_SHOP_PAGE_SIZE,
+                  offset: pageParam as number,
+                }),
+              ),
+            initialPageParam: 0,
+            staleTime: 2 * 60_000,
+          }),
+          queryClient.prefetchQuery({
+            queryKey: queryKeys.stories,
+            queryFn: () => unwrap(fetchActiveStories()),
+            staleTime: 2 * 60_000,
+          }),
+          queryClient.prefetchQuery({
+            queryKey: queryKeys.deals(48),
+            queryFn: () => unwrap(fetchActiveDeals(48)),
+            staleTime: 2 * 60_000,
+          }),
+        ]).then(() => {
+          dataReadyRef.current = true;
+          if (!unmountedRef.current && !exitingRef.current) setDataReady(true);
+        });
 
     trackTimeout(() => {
       requestAnimationFrame(() => {

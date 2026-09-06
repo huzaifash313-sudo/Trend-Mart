@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import Footer from "@/components/Footer";
 import PwaRegister from "@/components/PwaRegister";
+import ConnectionStatus from "@/components/ConnectionStatus";
 import AppSplash from "@/components/AppSplash";
 import ChunkReloadGuard from "@/components/ChunkReloadGuard";
 import NavigationRecovery from "@/components/NavigationRecovery";
@@ -104,10 +105,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <meta name="theme-color" content="#0f766e" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Trends Mart" />
         <meta
           name="apple-mobile-web-app-status-bar-style"
           content="black-translucent"
         />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="format-detection" content="telephone=no" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=16" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=16" />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: SPLASH_BOOTSTRAP }} />
         {SITE_JSON_LD.map((block, i) => (
@@ -161,6 +167,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </ErrorBoundary>
               <MerchantQuickAddHost />
               <PolicyNotice />
+              <ConnectionStatus />
               <PwaRegister />
               <TurnstileScript />
               </AppNotifications>

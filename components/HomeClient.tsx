@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   memo,
   type Dispatch,
   type SetStateAction,
@@ -39,6 +40,7 @@ import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
 import { useQueryClient } from "@tanstack/react-query";
 import { useShopsInfinite, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
+import { useConnection } from "@/lib/connection";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { getTopAffinityCategories } from "@/lib/behavior";
 import VirtualizedGrid from "@/components/VirtualizedGrid";
@@ -401,6 +403,53 @@ function HomeClient({
   const hasMoreShops = Boolean(shopsQuery.hasNextPage);
   const loadingMoreShops = shopsQuery.isFetchingNextPage;
 
+  /* Connection awareness — offline users keep browsing the cached page while a
+     pill + notices explain why content can't refresh. */
+  const connection = useConnection();
+  const offline = connection === "offline";
+
+  /* When the network comes back (browser event OR the SW stops serving from
+     cache), quietly refresh the home datasets in the background. */
+  const prevConnectionRef = useRef(connection);
+  useEffect(() => {
+    const prev = prevConnectionRef.current;
+    prevConnectionRef.current = connection;
+    if (prev === "offline" && connection === "online") {
+      queryClient.invalidateQueries({ queryKey: ["shops"] });
+      queryClient.invalidateQueries({ queryKey: ["stories"] });
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+    }
+  }, [connection, queryClient]);
+
+  const savedContent = shops.length > 0;
+  // A refetch failed, but we still have saved/SSR content worth showing.
+  const softFail = Boolean(error) && savedContent && !loading;
+  // Nothing to show at all and the fetch failed — real error / offline empty.
+  const hardFail = Boolean(error) && !savedContent && !loading;
+
+  /* Blurred reveal loader: only when this visit has no content yet (SSR seeds
+     missing and the client is fetching). Once anything settles — data or a
+     hard error — the veil fades out to reveal the page underneath. When the
+     server shipped seeds this whole path is skipped (no artificial delay). */
+  const [veilGone, setVeilGone] = useState(() => initialShops.length > 0);
+  const [veilExiting, setVeilExiting] = useState(false);
+  useEffect(() => {
+    if (veilGone) return;
+    if (shopsQuery.isLoading) return;
+    setVeilExiting(true);
+    const t = window.setTimeout(() => setVeilGone(true), 700);
+    return () => window.clearTimeout(t);
+  }, [veilGone, shopsQuery.isLoading]);
+  // Safety net: never trap the user behind the veil on a hung request.
+  useEffect(() => {
+    if (veilGone) return;
+    const hard = window.setTimeout(() => {
+      setVeilExiting(true);
+      window.setTimeout(() => setVeilGone(true), 700);
+    }, 9000);
+    return () => window.clearTimeout(hard);
+  }, [veilGone]);
+
   const dealsQuery = useDeals(48);
   const activeDeals = useMemo(() => {
     const all = dealsQuery.data ?? EMPTY_DEALS;
@@ -703,6 +752,7 @@ function HomeClient({
   const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
 
   return (
+    <>
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-3 md:pb-6">
       {/* Stories tray — top of homepage, always reserved */}
       <section aria-label="Merchant stories" className="tm-stories-tray">
@@ -967,11 +1017,47 @@ function HomeClient({
           </div>
         )}
 
-        {/* Error state */}
-        {!loading && error && (
+        {/* Hard error — nothing to show at all */}
+        {hardFail && (
           <div className="py-12 text-center">
-            <p className="mb-1 text-sm text-red-600 dark:text-red-400">{error}</p>
-            <button type="button" onClick={() => void shopsQuery.refetch()} className="text-xs font-medium text-emerald-600 underline underline-offset-2 dark:text-emerald-400">Retry</button>
+            {offline ? (
+              <>
+                <p className="text-4xl" aria-hidden="true">📡</p>
+                <p className="mt-3 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                  You&apos;re offline
+                </p>
+                <p className="mx-auto mt-1.5 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+                  Nothing is saved for this page yet. Connect to the internet and
+                  try again — shops you visit will then open instantly, even offline.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mb-1 text-sm text-red-600 dark:text-red-400">{error}</p>
+              </>
+            )}
+            <button type="button" onClick={() => void shopsQuery.refetch()} className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-5 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Soft failure — refresh failed but saved content is still on screen */}
+        {softFail && (
+          <div className="tm-home-refresh-note" role="status">
+            <span className="tm-home-refresh-dot" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">
+              {offline
+                ? "You're offline — showing saved shops from your last visit."
+                : "Couldn't refresh — showing saved shops."}
+            </span>
+            <button
+              type="button"
+              onClick={() => void shopsQuery.refetch()}
+              className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-600/10 dark:text-emerald-400"
+            >
+              Retry
+            </button>
           </div>
         )}
 
@@ -1022,7 +1108,7 @@ function HomeClient({
         )}
 
         {/* Shop cards — 2 mobile / 3 tablet / 4 laptop / 5 wide desktop */}
-        {!loading && !error && displayShops.length > 0 && (
+        {!loading && !hardFail && displayShops.length > 0 && (
           <>
             <VirtualizedGrid
               items={visibleShops}
@@ -1053,9 +1139,9 @@ function HomeClient({
               <div className="mt-5 flex justify-center">
                 <button
                   type="button"
-                  disabled={loadingMoreShops || !hasMoreShops}
                   onClick={() => void shopsQuery.fetchNextPage()}
                   className="tm-btn-secondary rounded-full px-6 py-2 text-xs font-semibold disabled:opacity-60"
+                  disabled={offline || loadingMoreShops || !hasMoreShops}
                 >
                   {loadingMoreShops ? "Loading more…" : "Show more shops"}
                 </button>
@@ -1064,7 +1150,34 @@ function HomeClient({
           </>
         )}
       </section>
+
+      {/* Blurred reveal loader — first paint without content warms up behind a
+          soft blur, then fades away so nothing "pops" into place. */}
+      {!veilGone && (
+        <div
+          className={`tm-reveal-veil${veilExiting ? " is-exit" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="tm-reveal-veil-card">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/trendsmart-mark.png?v=16"
+              alt=""
+              width={44}
+              height={44}
+              decoding="async"
+              className="tm-reveal-veil-logo"
+            />
+            <span className="tm-reveal-veil-spinner" aria-hidden="true" />
+            <span className="tm-reveal-veil-text">
+              Warming up your local shops…
+            </span>
+          </div>
+        </div>
+      )}
     </div>
+    </>
   );
 }
 

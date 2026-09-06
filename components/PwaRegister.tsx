@@ -13,9 +13,17 @@ declare global {
   }
 }
 
+/** Bump together with public/sw.js so the one-time reload guard stays unique. */
+const SW_RELOAD_KEY = "tm_sw_reload_v53";
+
 /**
  * Install prompt capture + safe SW update.
- * Keeps current image/shell caches; only deletes obsolete Cache Storage keys.
+ * - Registers /sw.js and asks a freshly installed version to activate
+ *   (skipWaiting), then performs ONE reload per session so the page runs on
+ *   the new cache generation (avoids serving HTML that references chunks the
+ *   new version deleted). Guarded against reload loops.
+ * - Keeps current image/shell/page caches; only deletes obsolete Cache Storage
+ *   keys.
  */
 export default function PwaRegister() {
   useEffect(() => {
@@ -38,7 +46,8 @@ export default function PwaRegister() {
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
 
-    const KEEP_PREFIXES = ["tm-images-", "tm-shell-"];
+    const KEEP_PREFIXES = ["tm-images-", "tm-shell-", "tm-pages-"];
+    let onControllerChange: (() => void) | null = null;
 
     const setup = async () => {
       try {
@@ -50,9 +59,35 @@ export default function PwaRegister() {
               .map((k) => caches.delete(k)),
           );
         }
-        await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
-        const reg = await navigator.serviceWorker.getRegistration();
-        await reg?.update();
+        const reg = await navigator.serviceWorker.register("/sw.js", {
+          updateViaCache: "none",
+        });
+
+        const activateWaiting = () => {
+          const waiting = reg.waiting;
+          if (waiting) {
+            waiting.postMessage({ type: "tm-skip-waiting" });
+          }
+        };
+        reg.addEventListener("updatefound", activateWaiting);
+        if (reg.waiting) activateWaiting();
+
+        // New SW took control → reload once so this tab uses the new caches.
+        onControllerChange = () => {
+          try {
+            if (sessionStorage.getItem(SW_RELOAD_KEY)) return;
+            sessionStorage.setItem(SW_RELOAD_KEY, "1");
+          } catch {
+            /* ignore */
+          }
+          window.location.reload();
+        };
+        navigator.serviceWorker.addEventListener(
+          "controllerchange",
+          onControllerChange,
+        );
+
+        await reg.update().catch(() => {});
       } catch {
         /* never block the app */
       }
@@ -67,6 +102,12 @@ export default function PwaRegister() {
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
+      if (onControllerChange) {
+        navigator.serviceWorker.removeEventListener(
+          "controllerchange",
+          onControllerChange,
+        );
+      }
     };
   }, []);
 

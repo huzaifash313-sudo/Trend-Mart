@@ -6516,3 +6516,255 @@ html.dark .tm-chat-composer {
   background-color: #09090b;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Connection pill (offline indicator)                                        */
+/* -------------------------------------------------------------------------- */
+.tm-conn {
+  position: fixed;
+  top: calc(var(--tm-navbar-sticky-offset, 62px) + 0.5rem);
+  left: 50%;
+  z-index: 90;
+  transform: translateX(-50%) translateY(-0.75rem);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0.5s;
+}
+
+.tm-conn.is-offline {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tm-conn-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: min(92vw, 22rem);
+  border-radius: 999px;
+  padding: 0.42rem 0.9rem 0.42rem 0.72rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fafafa;
+  background-color: rgba(24, 24, 27, 0.92);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.tm-conn-dot {
+  position: relative;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #fbbf24;
+}
+
+.tm-conn-dot::after {
+  content: "";
+  position: absolute;
+  inset: -0.3rem;
+  border-radius: 999px;
+  border: 1.5px solid rgba(251, 191, 36, 0.55);
+  animation: tm-conn-ping 1.8s ease-out infinite;
+}
+
+.tm-conn-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-conn-action {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #065f46;
+  background: #fff;
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.tm-conn-action:hover {
+  background: #f0fdf4;
+}
+
+.tm-conn-action:active {
+  transform: scale(0.96);
+}
+
+@keyframes tm-conn-ping {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Blurred reveal loader (home first-paint without content)                   */
+/* -------------------------------------------------------------------------- */
+.tm-reveal-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  pointer-events: none;
+  background-color: rgba(252, 253, 253, 0.45);
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  transition: opacity 0.6s ease;
+}
+
+html.dark .tm-reveal-veil {
+  background-color: rgba(13, 15, 20, 0.5);
+}
+
+.tm-reveal-veil.is-exit {
+  opacity: 0;
+}
+
+.tm-reveal-veil-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: min(90vw, 20rem);
+  border-radius: 999px;
+  padding: 0.5rem 1.1rem 0.5rem 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #27272a;
+  background-color: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 16px 40px rgba(15, 118, 110, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  animation: tm-reveal-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html.dark .tm-reveal-veil-card {
+  color: #e8eaef;
+  background-color: rgba(24, 24, 27, 0.94);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.tm-reveal-veil-logo {
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 0.8rem;
+}
+
+.tm-reveal-veil-spinner {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 2px solid rgba(13, 148, 136, 0.25);
+  border-top-color: #0d9488;
+  animation: tm-reveal-spin 0.75s linear infinite;
+}
+
+.tm-reveal-veil-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes tm-reveal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes tm-reveal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Homepage soft refresh notice (saved content, offline / stale)              */
+/* -------------------------------------------------------------------------- */
+.tm-home-refresh-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+  padding: 0.5rem 0.7rem 0.5rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #52525b;
+}
+
+html.dark .tm-home-refresh-note {
+  color: #d4d4d8;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.tm-home-refresh-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #f59e0b;
+}
+
+/* Reduced motion: fade instantly, skip decorative spins/blurs */
+@media (prefers-reduced-motion: reduce) {
+  .tm-conn,
+  .tm-conn.is-offline {
+    transition: opacity 0.2s linear;
+  }
+
+  .tm-conn-dot::after {
+    animation: none;
+  }
+
+  .tm-reveal-veil,
+  .tm-reveal-veil-card {
+    transition: none;
+    animation: none;
+  }
+
+  .tm-reveal-veil {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .tm-reveal-veil-spinner {
+    animation: none;
+  }
+}
+
