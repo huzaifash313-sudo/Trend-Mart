@@ -70,7 +70,7 @@ export default function Footer() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/trendsmart-mark.png?v=13"
+            src="/trendsmart-mark.png?v=14"
             alt=""
             width={24}
             height={24}
@@ -119,7 +119,7 @@ export default function Footer() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/trendsmart-mark.png?v=13"
+                src="/trendsmart-mark.png?v=14"
                 alt=""
                 width={28}
                 height={28}

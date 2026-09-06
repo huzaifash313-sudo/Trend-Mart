@@ -69,9 +69,9 @@ export const metadata: Metadata = generateRootMetadata();
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#4a0024" },
-    { media: "(prefers-color-scheme: dark)", color: "#4a0024" },
-    { color: "#4a0024" },
+    { media: "(prefers-color-scheme: light)", color: "#711733" },
+    { media: "(prefers-color-scheme: dark)", color: "#711733" },
+    { color: "#711733" },
   ],
   colorScheme: "light dark",
   width: "device-width",
@@ -102,7 +102,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`light ${geistSans.variable} ${geistMono.variable} ${plusJakarta.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>
-        <meta name="theme-color" content="#4a0024" />
+        <meta name="theme-color" content="#711733" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
           name="apple-mobile-web-app-status-bar-style"

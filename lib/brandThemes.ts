@@ -19,16 +19,17 @@ export const BRAND_THEME_IDS = [
 
 export type BrandThemeId = (typeof BRAND_THEME_IDS)[number];
 
-/** Platform default brand — the decided deep "Plum Magenta" combo
- *  (primary #8B0046 · hero/dark #4A0024). Published for every visitor and
- *  the reset target, so boot cover, splash, icons and OS chrome all agree. */
+/** Platform default brand — "Rich Wine Maroon" (id kept as plum-magenta so the
+ *  published platform value + stored prefs keep working). Primary #B72B51,
+ *  hero/dark #711733 — deep, saturated maroon that reads attractive in both
+ *  modes and drives boot cover, splash, icons and OS chrome consistently. */
 export const DEFAULT_BRAND_THEME: BrandThemeId = "plum-magenta";
 
 export const BRAND_THEME_META: Record<
   BrandThemeId,
   { label: string; swatch: string; swatchAlt: string }
 > = {
-  "plum-magenta": { label: "Deep Plum (Default)", swatch: "#8b0046", swatchAlt: "#4a0024" },
+  "plum-magenta": { label: "Rich Wine Maroon (Default)", swatch: "#b72b51", swatchAlt: "#711733" },
   "maroon-plum": { label: "Maroon + Plum", swatch: "#b23c4d", swatchAlt: "#6e2650" },
   green: { label: "Green", swatch: "#10b981", swatchAlt: "#0f766e" },
   blue: { label: "Royal Blue", swatch: "#3b82f6", swatchAlt: "#0284c7" },
@@ -77,7 +78,7 @@ export function getBrandColor(
     | "--tm-sea-700"
     | "--tm-accent"
     | "--tm-splash-bg" = "--tm-brand-500",
-  fallback = "#8b0046",
+  fallback = "#b72b51",
 ): string {
   if (typeof window === "undefined") {
     return BRAND_THEME_META[DEFAULT_BRAND_THEME].swatch || fallback;
@@ -98,7 +99,7 @@ export function getBrandColor(
 /** Keep browser chrome (theme-color / splash plate) in sync with active brand. */
 export function syncBrowserBrandChrome(): void {
   if (typeof document === "undefined") return;
-  const splash = getBrandColor("--tm-splash-bg", "#4a0024");
+  const splash = getBrandColor("--tm-splash-bg", "#711733");
   const metas = document.querySelectorAll('meta[name="theme-color"]');
   metas.forEach((el) => el.setAttribute("content", splash));
   const root = document.documentElement;
