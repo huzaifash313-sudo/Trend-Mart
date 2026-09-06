@@ -171,54 +171,75 @@ function MyStoryRingButton({
         }
       }}
     />
-  ) : (
+  ) : hasLiveStories ? (
     <div className="tm-avatar-fallback h-full w-full text-base font-bold">
-      {hasLiveStories ? initial : <span className="tm-story-empty-plus" aria-hidden>+</span>}
+      {initial}
     </div>
-  );
+  ) : null;
 
   return (
     <div className="tm-story-item tm-story-item--mine">
       <div className="tm-story-item-frame">
-        <button
-          type="button"
-          onClick={() => (hasLiveStories ? onView() : onAdd())}
-          className="tm-story-item-hit"
-          aria-label={
-            hasLiveStories
-              ? `Preview your live stor${stories.length === 1 ? "y" : "ies"}${totalViews > 0 ? `, ${totalViews} views` : ""}`
-              : "Add your store story"
-          }
-        >
-          {hasLiveStories ? (
-            <StoryRing total={stories.length} seen={0} gradId="tmStoryGradMine">
-              {avatar}
-            </StoryRing>
-          ) : (
-            <div className="tm-story-ring tm-story-ring--add">
-              <div className="tm-story-ring-avatar">{avatar}</div>
-            </div>
-          )}
-        </button>
+        {hasLiveStories ? (
+          <>
+            {/* Tap the ring → watch your live stories */}
+            <button
+              type="button"
+              onClick={onView}
+              className="tm-story-item-hit"
+              aria-label={`Preview your live stor${stories.length === 1 ? "y" : "ies"}${totalViews > 0 ? `, ${totalViews} views` : ""}`}
+              title="View your stories"
+            >
+              <StoryRing total={stories.length} seen={0} gradId="tmStoryGradMine">
+                {avatar}
+              </StoryRing>
+            </button>
 
-        {stories.length > 1 ? (
-          <span className="tm-story-count tm-story-count--mine" aria-hidden>
-            {stories.length}
-          </span>
-        ) : null}
+            {stories.length > 1 ? (
+              <span className="tm-story-count tm-story-count--mine" aria-hidden>
+                {stories.length}
+              </span>
+            ) : null}
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAdd();
-          }}
-          className="tm-story-add-btn icon-only"
-          aria-label="Add story"
-          title="Add story"
-        >
-          +
-        </button>
+            {/* Tiny corner + → add one more story */}
+            <button
+              type="button"
+              onClick={onAdd}
+              className="tm-story-add-btn icon-only"
+              aria-label="Add another story"
+              title="Add another story"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          </>
+        ) : (
+          /* Empty → one clean "add first story" ring — single tap, no clutter */
+          <button
+            type="button"
+            onClick={onAdd}
+            className="tm-story-item-hit"
+            aria-label="Add your store story"
+            title="Add your store story"
+          >
+            <span className="tm-story-ring tm-story-ring--add">
+              <span className="tm-story-ring-avatar">
+                <svg
+                  className="tm-story-add-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </span>
+            </span>
+          </button>
+        )}
       </div>
       <span className="tm-story-ring-label tm-story-ring-label--mine">
         {hasLiveStories ? "Your story" : "Add story"}
@@ -802,24 +823,26 @@ function HomeClient({
               );
             })
           ) : !myShop ? (
-            <>
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="tm-story-item tm-story-slot-empty"
-                  aria-hidden={i > 0}
+            /* Viewer-only empty state — customers/guests never get an "add
+               story" affordance, just a quiet "nothing to watch yet" hint. */
+            <div className="tm-story-item tm-story-slot-empty" role="status">
+              <div className="tm-story-ring tm-story-ring--empty">
+                <svg
+                  className="tm-story-empty-eye"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
                 >
-                  <div className="tm-story-ring tm-story-ring--empty">
-                    {i === 0 ? (
-                      <span className="tm-story-empty-plus" aria-hidden>+</span>
-                    ) : null}
-                  </div>
-                  <span className="tm-story-ring-label">
-                    {i === 0 ? "Add story" : "\u00a0"}
-                  </span>
-                </div>
-              ))}
-            </>
+                  <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </div>
+              <span className="tm-story-ring-label">No stories yet</span>
+            </div>
           ) : null}
         </div>
       </section>

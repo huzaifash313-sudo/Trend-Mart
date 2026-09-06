@@ -17,7 +17,8 @@ import {
 } from "@/lib/loginLockout";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { findAuthUserByEmail } from "@/lib/authOtpServer";
+import { findAuthUserByEmail, issueAndSendOtp } from "@/lib/authOtpServer";
+import { resendCooldownRemainingMs } from "@/lib/otp";
 
 export const runtime = "nodejs";
 
@@ -217,6 +218,22 @@ export async function POST(request: NextRequest) {
               { user: retry.data.user, session: retry.data.session },
               pendingCookies,
             );
+          }
+        }
+
+        // Unconfirmed account with the correct password — email a fresh code so
+        // the in-app verify modal always has a real code behind it. Codes are
+        // only sent once the account is confirmed to exist (never for unknown
+        // emails), and the per-email resend cooldown is respected.
+        if (existing && !existing.email_confirmed_at) {
+          const { data: pending } = await admin
+            .from("email_verification_otps")
+            .select("last_sent_at")
+            .eq("email", email)
+            .maybeSingle();
+          const lastSent = (pending as { last_sent_at?: string } | null)?.last_sent_at ?? "";
+          if (resendCooldownRemainingMs(lastSent) <= 0) {
+            await issueAndSendOtp(admin, email, existing.id);
           }
         }
       }

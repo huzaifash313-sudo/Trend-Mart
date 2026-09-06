@@ -6,6 +6,10 @@
 /*  auth user as UNCONFIRMED via the admin API (which sends NO email), then     */
 /*  email a custom branded 6-digit code via Resend. The account is not usable   */
 /*  until the code is verified at /api/auth/verify-otp.                         */
+/*                                                                             */
+/*  OTP pre-check: codes are emailed ONLY for brand-new emails. If the email    */
+/*  already has an account (confirmed or an unverified leftover), signup never   */
+/*  sends an OTP — it returns a 409 directing the user to log in instead.       */
 /* -------------------------------------------------------------------------- */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -103,8 +107,11 @@ export async function POST(request: NextRequest) {
       return json(500, { success: false, error: "Could not create your account. Please try again." });
     }
 
-    // Email already has an account — allow re-verification only when it's still
-    // unconfirmed; a confirmed account should log in instead.
+    // Email already has an account → never email a signup OTP to it. A confirmed
+    // account should log in. An unconfirmed account (a leftover signup) is not
+    // re-verified from here either: we refresh its password/metadata so the user
+    // can sign in with the credentials they just typed, and the sign-in flow is
+    // what emails the verification code (codes only go to existing accounts).
     const existing = await findAuthUserByEmail(admin, email);
     if (!existing) {
       return json(409, {
@@ -119,16 +126,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Refresh the pending account's password + metadata, then re-issue a code.
-    const updated = await admin.auth.admin.updateUserById(existing.id, {
+    const refreshed = await admin.auth.admin.updateUserById(existing.id, {
       password,
       user_metadata: userMetadata,
     });
-    if (updated.error) {
-      console.error("[auth/signup] updateUserById failed:", updated.error.message);
+    if (refreshed.error) {
+      console.error("[auth/signup] updateUserById failed:", refreshed.error.message);
       return json(500, { success: false, error: "Could not start sign-up. Please try again." });
     }
-    userId = existing.id;
+    return json(409, {
+      success: false,
+      error:
+        "An account with this email already exists but isn't verified yet. Please log in — we'll email a fresh verification code there.",
+    });
   } else {
     userId = created.data.user?.id ?? null;
   }
