@@ -15,32 +15,33 @@
   --tm-muted: #71717a;
   /*
    * Brand palette (single source for whole-app theme switching).
-   * Default = current emerald + teal look (zero visual change).
-   * Admin presets later only override these scales — Tailwind emerald-* /
-   * teal-* utilities remapped via @theme below, so UI updates app-wide.
+   * Default = the decided "Maroon + Plum" look (deep maroon brand + muted
+   * plum bloom). Admin presets later only override these scales — Tailwind
+   * emerald-* / teal-* utilities remapped via @theme below, so the UI
+   * updates app-wide. "green" remains available as an alternate preset.
    */
-  --tm-brand-50: #ecfdf5;
-  --tm-brand-100: #d1fae5;
-  --tm-brand-200: #a7f3d0;
-  --tm-brand-300: #6ee7b7;
-  --tm-brand-400: #34d399;
-  --tm-brand-500: #10b981;
-  --tm-brand-600: #059669;
-  --tm-brand-700: #047857;
-  --tm-brand-800: #065f46;
-  --tm-brand-900: #064e3b;
-  --tm-brand-950: #022c22;
-  --tm-sea-50: #f0fdfa;
-  --tm-sea-100: #ccfbf1;
-  --tm-sea-200: #99f6e4;
-  --tm-sea-300: #5eead4;
-  --tm-sea-400: #2dd4bf;
-  --tm-sea-500: #14b8a6;
-  --tm-sea-600: #0d9488;
-  --tm-sea-700: #0f766e;
-  --tm-sea-800: #115e59;
-  --tm-sea-900: #134e4a;
-  --tm-sea-950: #042f2e;
+  --tm-brand-50: #fdf3f4;
+  --tm-brand-100: #fae3e6;
+  --tm-brand-200: #f2c3c9;
+  --tm-brand-300: #e698a3;
+  --tm-brand-400: #d2606f;
+  --tm-brand-500: #b23c4d;
+  --tm-brand-600: #94273a;
+  --tm-brand-700: #7a1f30;
+  --tm-brand-800: #5e1523;
+  --tm-brand-900: #450d18;
+  --tm-brand-950: #260409;
+  --tm-sea-50: #faf5f7;
+  --tm-sea-100: #f3e5eb;
+  --tm-sea-200: #e8cbd8;
+  --tm-sea-300: #d9a3ba;
+  --tm-sea-400: #c5729b;
+  --tm-sea-500: #a84c7d;
+  --tm-sea-600: #8a3565;
+  --tm-sea-700: #6e2650;
+  --tm-sea-800: #531a3c;
+  --tm-sea-900: #3a0f29;
+  --tm-sea-950: #200516;
 
   --tm-accent: var(--tm-brand-500);
   --tm-accent-soft: var(--tm-brand-600);
@@ -50,7 +51,7 @@
   --tm-danger-soft: #f43f5e;
   --tm-amber: #f59e0b; /* deal / highlight badges */
   /* Exact PWA / splash brand plate — never flash stark white behind boot */
-  --tm-splash-bg: var(--tm-sea-700);
+  --tm-splash-bg: var(--tm-brand-700);
   --tm-brand-gradient: linear-gradient(
     135deg,
     var(--tm-brand-500) 0%,
@@ -160,7 +161,8 @@
 /*
  * Brand theme presets — html[data-brand-theme="…"]
  * Soft, ecommerce-safe combos (not neon / not over). Surfaces stay zinc.
- * green = :root default (reset target for admin).
+ * maroon-plum = :root default (the decided platform brand; reset target for
+ * admin). Every other preset only overrides brand + sea scales.
  */
 html[data-brand-theme="blue"] {
   /* Royal blue — calm primary + sky soft accents */
@@ -505,9 +507,33 @@ html[data-brand-theme="purple-blue"] {
   --tm-sea-950: #172554;
   --tm-splash-bg: var(--tm-brand-700);
 }
-html[data-brand-theme="green"],
-html:not([data-brand-theme]) {
-  /* Default TrendsMart emerald + sea — values already on :root */
+html[data-brand-theme="green"] {
+  /* Alternate "Green" preset — original emerald + sea look.
+     Platform default is Maroon + Plum (on :root); this block only kicks in
+     when an admin publishes / a user previews the green preset. */
+  --tm-brand-50: #ecfdf5;
+  --tm-brand-100: #d1fae5;
+  --tm-brand-200: #a7f3d0;
+  --tm-brand-300: #6ee7b7;
+  --tm-brand-400: #34d399;
+  --tm-brand-500: #10b981;
+  --tm-brand-600: #059669;
+  --tm-brand-700: #047857;
+  --tm-brand-800: #065f46;
+  --tm-brand-900: #064e3b;
+  --tm-brand-950: #022c22;
+  --tm-sea-50: #f0fdfa;
+  --tm-sea-100: #ccfbf1;
+  --tm-sea-200: #99f6e4;
+  --tm-sea-300: #5eead4;
+  --tm-sea-400: #2dd4bf;
+  --tm-sea-500: #14b8a6;
+  --tm-sea-600: #0d9488;
+  --tm-sea-700: #0f766e;
+  --tm-sea-800: #115e59;
+  --tm-sea-900: #134e4a;
+  --tm-sea-950: #042f2e;
+  --tm-splash-bg: var(--tm-brand-700);
 }
 
 /*
@@ -1360,7 +1386,7 @@ html.dark .tm-dashboard-save-bar {
 .tm-promo-strip {
   background:
     linear-gradient(105deg, var(--tm-brand-700) 0%, var(--tm-brand-600) 38%, var(--tm-sea-600) 72%, var(--tm-sea-700) 100%);
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12), 0 6px 18px rgba(5, 150, 105, 0.22);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12), 0 6px 18px color-mix(in srgb, var(--tm-brand-600) 25%, transparent);
 }
 html.dark .tm-promo-strip {
   background:
@@ -3946,7 +3972,7 @@ html.dark .tm-geo-detect {
 .tm-geo-radius-btn.is-active {
   background: var(--tm-brand-600);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.28);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--tm-brand-600) 30%, transparent);
 }
 .tm-geo-radius-btn:not(.is-active):hover {
   background: color-mix(in srgb, var(--tm-text-strong) 10%, transparent);
@@ -4019,7 +4045,7 @@ html.dark .tm-geo-detect {
   border-color: transparent;
   background: var(--tm-brand-600);
   color: #fff;
-  box-shadow: 0 6px 14px rgba(5, 150, 105, 0.25);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--tm-brand-600) 28%, transparent);
 }
 .tm-geo-chip:not(.is-active):hover {
   border-color: color-mix(in srgb, var(--tm-sea) 40%, transparent);
@@ -5700,7 +5726,7 @@ html.tm-splash-handoff:not(.tm-splash-settle),
 html.tm-splash-handoff:not(.tm-splash-settle) body,
 html.tm-splash-handoff:not(.tm-splash-settle) .tm-bg,
 html.tm-splash-handoff:not(.tm-splash-settle) .tm-main {
-  /* Keep the teal splash color behind the body so the boot → React splash
+  /* Keep the brand splash color behind the body so the boot → React splash
      handoff never flashes white (the app bg is near-white). */
   background-color: var(--tm-splash-bg) !important;
   background-image: none !important;
@@ -5711,7 +5737,7 @@ html.tm-splash-lock body {
   overflow: hidden !important;
 }
 
-/* After overlay unmounts: ease teal → app surface (no stark white snap). */
+/* After overlay unmounts: ease brand → app surface (no stark white snap). */
 html.tm-splash-settle body,
 html.tm-splash-settle .tm-bg,
 html.tm-splash-settle .tm-main {
@@ -5736,7 +5762,7 @@ html.dark.tm-splash-settle .tm-main {
   /* Exact same gradient as the React `.tm-splash` so the boot → React handoff
      is invisible (no background flicker). */
   background:
-    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.35), transparent 55%),
+    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--tm-sea-300) 55%, transparent), transparent 55%),
     radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--tm-sea-600) 55%, transparent), transparent 50%),
     linear-gradient(165deg, var(--tm-sea-700) 0%, var(--tm-sea-600) 42%, var(--tm-sea-800) 100%);
   pointer-events: none;
@@ -5761,7 +5787,7 @@ html.tm-first-paint .tm-boot-splash {
   padding: calc(1.25rem + var(--safe-area-inset-top, 0px)) 1.35rem
     calc(1.5rem + var(--safe-area-inset-bottom, 0px));
   background:
-    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.35), transparent 55%),
+    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--tm-sea-300) 55%, transparent), transparent 55%),
     radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--tm-sea-600) 55%, transparent), transparent 50%),
     linear-gradient(165deg, var(--tm-sea-700) 0%, var(--tm-sea-600) 42%, var(--tm-sea-800) 100%);
   color: #fff;

@@ -1,6 +1,7 @@
 /* Brand theme allowlist — CSS presets in app/globals.css [data-brand-theme]. */
 
 export const BRAND_THEME_IDS = [
+  "maroon-plum",
   "green",
   "blue",
   "dark-purple",
@@ -13,19 +14,20 @@ export const BRAND_THEME_IDS = [
   "plum-magenta",
   "maroon-gold",
   "maroon-teal",
-  "maroon-plum",
   "purple-blue",
 ] as const;
 
 export type BrandThemeId = (typeof BRAND_THEME_IDS)[number];
 
-export const DEFAULT_BRAND_THEME: BrandThemeId = "green";
+/** Platform default brand — the decided "Maroon + Plum" combo. */
+export const DEFAULT_BRAND_THEME: BrandThemeId = "maroon-plum";
 
 export const BRAND_THEME_META: Record<
   BrandThemeId,
   { label: string; swatch: string; swatchAlt: string }
 > = {
-  green: { label: "Green (Default)", swatch: "#10b981", swatchAlt: "#0f766e" },
+  "maroon-plum": { label: "Maroon + Plum (Default)", swatch: "#b23c4d", swatchAlt: "#6e2650" },
+  green: { label: "Green", swatch: "#10b981", swatchAlt: "#0f766e" },
   blue: { label: "Royal Blue", swatch: "#3b82f6", swatchAlt: "#0284c7" },
   "dark-purple": { label: "Dark Purple", swatch: "#7c3aed", swatchAlt: "#5b21b6" },
   "purple-pink": { label: "Purple + Pink", swatch: "#a855f7", swatchAlt: "#ec4899" },
@@ -38,7 +40,6 @@ export const BRAND_THEME_META: Record<
   "maroon-gold": { label: "Maroon + Gold", swatch: "#871f29", swatchAlt: "#d97706" },
   "maroon-teal": { label: "Maroon + Teal", swatch: "#871f29", swatchAlt: "#0d9488" },
   "purple-blue": { label: "Purple + Blue", swatch: "#6366f1", swatchAlt: "#3b82f6" },
-  "maroon-plum": { label: "Maroon + Plum", swatch: "#871f29", swatchAlt: "#7d3766" },
 };
 
 const STORAGE_KEY = "trendsmart_brand_theme_v1";
@@ -46,7 +47,7 @@ const STORAGE_KEY = "trendsmart_brand_theme_v1";
 /** Legacy ids → nearest new preset (old localStorage / bookmarks). */
 const LEGACY_BRAND_MAP: Record<string, BrandThemeId> = {
   pink: "purple-pink",
-  grey: "green",
+  grey: "maroon-plum",
   orange: "red",
   yellow: "green",
   "blue-green": "blue",
@@ -74,7 +75,7 @@ export function getBrandColor(
     | "--tm-sea-700"
     | "--tm-accent"
     | "--tm-splash-bg" = "--tm-brand-500",
-  fallback = "#10b981",
+  fallback = "#b23c4d",
 ): string {
   if (typeof window === "undefined") {
     return BRAND_THEME_META[DEFAULT_BRAND_THEME].swatch || fallback;
@@ -95,7 +96,7 @@ export function getBrandColor(
 /** Keep browser chrome (theme-color / splash plate) in sync with active brand. */
 export function syncBrowserBrandChrome(): void {
   if (typeof document === "undefined") return;
-  const splash = getBrandColor("--tm-splash-bg", "#0f766e");
+  const splash = getBrandColor("--tm-splash-bg", "#7a1f30");
   const metas = document.querySelectorAll('meta[name="theme-color"]');
   metas.forEach((el) => el.setAttribute("content", splash));
   const root = document.documentElement;
@@ -122,7 +123,7 @@ export function applyBrandTheme(theme: BrandThemeId): void {
   }
 }
 
-/** Admin "Reset to default" — back to TrendsMart green. */
+/** Admin "Reset to default" — back to the decided Maroon + Plum default. */
 export function resetBrandTheme(): void {
   applyBrandTheme(DEFAULT_BRAND_THEME);
 }

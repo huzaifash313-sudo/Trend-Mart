@@ -69,7 +69,7 @@ function BrowserNotifyBridge() {
     try {
       const n = new Notification(latest.title, {
         body: latest.body,
-        icon: "/icon-192.png?v=10",
+        icon: "/icon-192.png?v=11",
         tag: `tm-live-${latest.id}`,
       });
       n.onclick = () => {

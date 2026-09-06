@@ -228,7 +228,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyCardStyle(prefs.cardStyle);
   }, [prefs.cardStyle]);
 
-  // Brand color theme (admin presets) — keep CSS + browser chrome in sync
+  // Brand color theme (admin presets) — keep CSS + browser chrome in sync.
+  // Boot script already painted the stored (or default maroon-plum) brand, so
+  // this just re-confirms + syncs chrome — no green flash on refresh.
   useLayoutEffect(() => {
     applyBrandTheme(readStoredBrandTheme());
     syncBrowserBrandChrome();
@@ -285,7 +287,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = useCallback(() => {
     setPrefs((prev) => {
-      // Simple light ↔ dark (professional emerald theme stays constant)
+      // Simple light ↔ dark (decided maroon-plum brand stays constant)
       const resolvedNow = resolveTheme(prev.mode);
       return { ...prev, mode: resolvedNow === "dark" ? "light" : "dark" };
     });

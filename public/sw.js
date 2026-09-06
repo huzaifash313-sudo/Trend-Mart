@@ -22,7 +22,7 @@ self.addEventListener("install", (event) => {
     (async () => {
       try {
         const cache = await caches.open(SHELL_CACHE);
-        await cache.addAll(["/offline", "/trendsmart-mark.png?v=10"]);
+        await cache.addAll(["/offline", "/trendsmart-mark.png?v=11"]);
       } catch {
         /* offline page / icon may be unavailable during install */
       }
@@ -124,8 +124,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: (data && data.body) || "",
-    icon: (data && data.icon) || "/trendsmart-mark.png?v=10",
-    badge: (data && data.badge) || "/trendsmart-mark.png?v=10",
+    icon: (data && data.icon) || "/trendsmart-mark.png?v=11",
+    badge: (data && data.badge) || "/trendsmart-mark.png?v=11",
     tag: (data && data.tag) || "trendsmart-order",
     data: {
       url: (data && data.url) || "/",

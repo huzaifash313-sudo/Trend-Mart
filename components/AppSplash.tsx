@@ -17,15 +17,15 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  * the session-scoped `SPLASH_KEY`.
  *
  * Beat (deliberately slow + smooth so it never feels rushed):
- *   1) Logo pops in centered on the green/seagreen stage
+ *   1) Logo pops in centered on the maroon/plum splash stage
  *   2) Logo rises + shrinks while "TrendsMart" reveals letter-by-letter
  *   3) Three value lines slide in one by one
  *   4) Hold for reading while home data prefetches — if it's not ready yet a
  *      small loading pill appears instead of a dead wait
- *   5) Slow cross-fade into the (already-warm) homepage — no green→white snap
+ *   5) Slow cross-fade into the (already-warm) homepage — no maroon→white snap
  *
  * `SPLASH_KEY` is written only when the intro finishes — never at start — so
- * Strict Mode remounts and mid-animation tab switches cannot strand the teal
+ * Strict Mode remounts and mid-animation tab switches cannot strand the brand
  * boot cover or abort a first-run play.
  */
 const STAGE_MS = {
@@ -100,20 +100,20 @@ function clearSplashChrome() {
     "tm-boot-splash",
     "tm-first-paint",
   );
-  // Any inline teal the boot script painted must not outlive the intro.
+  // Any inline brand plate the boot script painted must not outlive the intro.
   root.style.removeProperty("background-color");
 }
 
-/** Hold brand green under the UI, then ease into the app surface (no white snap). */
+/** Hold brand color under the UI, then ease into the app surface (no white snap). */
 function releaseSplashBackground() {
   const root = document.documentElement;
   // The page is already white underneath (settle was armed at exit start), so
-  // we only need to clear the splash lock / boot classes + inline teal.
+  // we only need to clear the splash lock / boot classes + inline brand plate.
   clearSplashChrome();
   window.setTimeout(() => {
     root.classList.remove("tm-splash-settle");
-    // Drop any inline teal the boot script painted onto <html> so the app
-    // surface's own background shows — no green residue after the intro.
+    // Drop any inline brand plate the boot script painted onto <html> so the
+    // app surface's own background shows — no brand-colored residue.
     root.style.removeProperty("background-color");
   }, 520);
 }
@@ -203,8 +203,8 @@ export default function AppSplash() {
   const beginExit = (exitMs: number) => {
     if (isStopped() || exitingRef.current) return;
     exitingRef.current = true;
-    // Arm the app surface BEFORE fading so the teal overlay fades into a
-    // ready white page — no green→white snap when the overlay unmounts.
+    // Arm the app surface BEFORE fading so the brand overlay fades into a
+    // ready white page — no maroon→white snap when the overlay unmounts.
     const root = document.documentElement;
     root.classList.add("tm-splash-settle");
     root.style.removeProperty("background-color");
@@ -352,7 +352,7 @@ export default function AppSplash() {
           <span className="tm-splash-logo" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=10"
+              src="/trendsmart-mark.png?v=11"
               alt=""
               width={88}
               height={88}
