@@ -222,7 +222,8 @@ self.addEventListener("fetch", (event) => {
             broadcastConnection("offline");
             return cached;
           }
-          if (winner.res && winner.res.ok) {
+          if (winner.res) {
+            // Fresh answer (incl. non-2xx — show the server's real state).
             broadcastConnection("online");
             return winner.res;
           }
