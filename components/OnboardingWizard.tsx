@@ -358,11 +358,11 @@ export default function OnboardingWizard() {
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=15"
+              src="/trendsmart-mark.png?v=16"
               alt=""
               width={36}
               height={36}
-              className="rounded-xl object-contain shadow-lg shadow-black/25"
+              className="rounded-xl bg-white/95 object-contain p-1 shadow-lg shadow-black/20"
             />
             <span className="text-lg font-bold tracking-tight text-white">
               TrendsMart

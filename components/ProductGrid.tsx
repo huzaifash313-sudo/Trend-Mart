@@ -475,11 +475,11 @@ const ProductCard = memo(function ProductCard({
                 <button
                   type="button"
                   onClick={handleFavorite}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                isFavorite
-                  ? "text-emerald-600 dark:text-emerald-300"
-                  : "text-zinc-400 hover:text-emerald-600 dark:text-zinc-500 dark:hover:text-emerald-300"
-              }`}
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                    isFavorite
+                      ? "text-rose-500"
+                      : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
+                  }`}
                   aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
                 >
                   <HeartIcon filled={isFavorite} />

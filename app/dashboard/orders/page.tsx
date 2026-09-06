@@ -369,7 +369,7 @@ export default function MerchantOrdersPage() {
                     <button
                       type="button"
                       onClick={() => openCustomerWhatsApp(order)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-wa-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-wa-600"
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                       title={isAwaitingWhatsApp(order) ? "Verify order with customer on WhatsApp" : "Message customer on WhatsApp"}
                     >
                       <span aria-hidden="true">💬</span>

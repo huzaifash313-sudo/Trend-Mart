@@ -7,9 +7,8 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- Seed with the decided platform default: Maroon + Plum.
 INSERT INTO public.platform_settings (key, value) VALUES
-  ('brand_theme', jsonb_build_object('id', 'maroon-plum'))
+  ('brand_theme', jsonb_build_object('id', 'green'))
 ON CONFLICT (key) DO NOTHING;
 
 ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;

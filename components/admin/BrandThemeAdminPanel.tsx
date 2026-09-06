@@ -73,7 +73,7 @@ export default function BrandThemeAdminPanel() {
         applyBrandTheme(saved);
         addToast(
           saved === DEFAULT_BRAND_THEME
-            ? "Default Maroon + Plum theme restored for everyone."
+            ? "Default green theme restored for everyone."
             : `${BRAND_THEME_META[saved].label} published for the whole app.`,
           "success",
         );

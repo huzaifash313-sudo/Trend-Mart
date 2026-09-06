@@ -132,13 +132,13 @@ export function generateRootMetadata(): Metadata {
     },
     icons: {
       icon: [
-        { url: "/favicon.png?v=15", type: "image/png" },
-        { url: "/favicon-32.png?v=15", sizes: "32x32", type: "image/png" },
-        { url: "/favicon-16.png?v=15", sizes: "16x16", type: "image/png" },
-        { url: "/icon-192.png?v=15", sizes: "192x192", type: "image/png" },
-        { url: "/icon-512.png?v=15", sizes: "512x512", type: "image/png" },
+        { url: "/favicon.png?v=16", type: "image/png" },
+        { url: "/favicon-32.png?v=16", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-16.png?v=16", sizes: "16x16", type: "image/png" },
+        { url: "/icon-192.png?v=16", sizes: "192x192", type: "image/png" },
+        { url: "/icon-512.png?v=16", sizes: "512x512", type: "image/png" },
       ],
-      apple: [{ url: "/apple-touch-icon.png?v=15", sizes: "180x180", type: "image/png" }],
+      apple: [{ url: "/apple-touch-icon.png?v=16", sizes: "180x180", type: "image/png" }],
     },
   };
 }

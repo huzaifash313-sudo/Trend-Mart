@@ -15,34 +15,32 @@
   --tm-muted: #71717a;
   /*
    * Brand palette (single source for whole-app theme switching).
-   * Default = "Rich Wine Maroon" — a deep, saturated maroon with a soft plum
-   * bloom (primary #B72B51, hero/dark #711733). It reads dark + attractive in
-   * both modes. Admin presets only override these scales; Tailwind
-   * emerald-* / teal-* utilities are remapped via @theme, so the whole UI
-   * updates app-wide from this block.
+   * Default = current emerald + teal look (zero visual change).
+   * Admin presets later only override these scales — Tailwind emerald-* /
+   * teal-* utilities remapped via @theme below, so UI updates app-wide.
    */
-  --tm-brand-50: #fdf0f4;
-  --tm-brand-100: #f9e2ea;
-  --tm-brand-200: #f4c7d4;
-  --tm-brand-300: #e89ab1;
-  --tm-brand-400: #d46080;
-  --tm-brand-500: #b72b51;
-  --tm-brand-600: #941f42;
-  --tm-brand-700: #711733;
-  --tm-brand-800: #4e0f22;
-  --tm-brand-900: #360812;
-  --tm-brand-950: #20030a;
-  --tm-sea-50: #fcf1f5;
-  --tm-sea-100: #f8dfe9;
-  --tm-sea-200: #f0bfd1;
-  --tm-sea-300: #e18ba7;
-  --tm-sea-400: #cb547a;
-  --tm-sea-500: #a92850;
-  --tm-sea-600: #8c1e3e;
-  --tm-sea-700: #6a1630;
-  --tm-sea-800: #4c0d21;
-  --tm-sea-900: #3a0717;
-  --tm-sea-950: #24030e;
+  --tm-brand-50: #ecfdf5;
+  --tm-brand-100: #d1fae5;
+  --tm-brand-200: #a7f3d0;
+  --tm-brand-300: #6ee7b7;
+  --tm-brand-400: #34d399;
+  --tm-brand-500: #10b981;
+  --tm-brand-600: #059669;
+  --tm-brand-700: #047857;
+  --tm-brand-800: #065f46;
+  --tm-brand-900: #064e3b;
+  --tm-brand-950: #022c22;
+  --tm-sea-50: #f0fdfa;
+  --tm-sea-100: #ccfbf1;
+  --tm-sea-200: #99f6e4;
+  --tm-sea-300: #5eead4;
+  --tm-sea-400: #2dd4bf;
+  --tm-sea-500: #14b8a6;
+  --tm-sea-600: #0d9488;
+  --tm-sea-700: #0f766e;
+  --tm-sea-800: #115e59;
+  --tm-sea-900: #134e4a;
+  --tm-sea-950: #042f2e;
 
   --tm-accent: var(--tm-brand-500);
   --tm-accent-soft: var(--tm-brand-600);
@@ -52,7 +50,7 @@
   --tm-danger-soft: #f43f5e;
   --tm-amber: #f59e0b; /* deal / highlight badges */
   /* Exact PWA / splash brand plate — never flash stark white behind boot */
-  --tm-splash-bg: var(--tm-brand-700);
+  --tm-splash-bg: var(--tm-sea-700);
   --tm-brand-gradient: linear-gradient(
     135deg,
     var(--tm-brand-500) 0%,
@@ -157,42 +155,12 @@
   --color-cyan-400: var(--tm-sea-400);
   --color-cyan-500: var(--tm-sea-500);
   --color-cyan-600: var(--tm-sea-600);
-
-  /*
-   * True semantic greens — NOT remapped by brand themes.
-   * ok-* = the original emerald ramp (stock/available/positive/status).
-   * wa-*  = WhatsApp brand green (order/chat CTAs) + friendly hover steps.
-   * Brand-theme remaps above only touch emerald/teal/green/cyan; these stay
-   * genuinely green no matter which wine/maroon/purple brand is live.
-   */
-  --color-ok-50: #ecfdf5;
-  --color-ok-100: #d1fae5;
-  --color-ok-200: #a7f3d0;
-  --color-ok-300: #6ee7b7;
-  --color-ok-400: #34d399;
-  --color-ok-500: #10b981;
-  --color-ok-600: #059669;
-  --color-ok-700: #047857;
-  --color-ok-800: #065f46;
-  --color-ok-900: #064e3b;
-  --color-ok-950: #022c22;
-  --color-wa-50: #edfaf1;
-  --color-wa-100: #d3f5e0;
-  --color-wa-200: #a8ecc3;
-  --color-wa-300: #73dfa0;
-  --color-wa-400: #3dce7c;
-  --color-wa-500: #25d366;
-  --color-wa-600: #1db457;
-  --color-wa-700: #16914a;
-  --color-wa-800: #11713d;
-  --color-wa-900: #0b5730;
 }
 
 /*
  * Brand theme presets — html[data-brand-theme="…"]
  * Soft, ecommerce-safe combos (not neon / not over). Surfaces stay zinc.
- * plum-magenta = :root default (the decided platform brand; reset target for
- * admin). Every other preset only overrides brand + sea scales.
+ * green = :root default (reset target for admin).
  */
 html[data-brand-theme="blue"] {
   /* Royal blue — calm primary + sky soft accents */
@@ -324,193 +292,6 @@ html[data-brand-theme="maroon-pink"] {
   --tm-sea-950: #500724;
   --tm-splash-bg: var(--tm-brand-700);
 }
-html[data-brand-theme="maroon"] {
-  /* Pure maroon — rich wine/burgundy depth, warm rosewood support.
-     Brand & sea stay in the same warm family so nothing reads pink. */
-  --tm-brand-50: #fdf3f4;
-  --tm-brand-100: #fae3e6;
-  --tm-brand-200: #f2c3c9;
-  --tm-brand-300: #e698a3;
-  --tm-brand-400: #d2606f;
-  --tm-brand-500: #b23c4d;
-  --tm-brand-600: #94273a;
-  --tm-brand-700: #7a1f30;
-  --tm-brand-800: #5e1523;
-  --tm-brand-900: #450d18;
-  --tm-brand-950: #260409;
-  --tm-sea-50: #fbf5f4;
-  --tm-sea-100: #f7e6e3;
-  --tm-sea-200: #efcbc6;
-  --tm-sea-300: #e2a39c;
-  --tm-sea-400: #cc756c;
-  --tm-sea-500: #b0564d;
-  --tm-sea-600: #91403a;
-  --tm-sea-700: #75312e;
-  --tm-sea-800: #5a2423;
-  --tm-sea-900: #421616;
-  --tm-sea-950: #240707;
-  --tm-splash-bg: var(--tm-brand-700);
-}
-html[data-brand-theme="bright-maroon"] {
-  /* Bright maroon — vivid crimson-pop, warm and energetic.
-     Brand pops bright red-maroon; sea is a deeper wine for depth. */
-  --tm-brand-50: #fff0f4;
-  --tm-brand-100: #ffe0e7;
-  --tm-brand-200: #ffc0cf;
-  --tm-brand-300: #ff96ac;
-  --tm-brand-400: #f75a7e;
-  --tm-brand-500: #e02b52;
-  --tm-brand-600: #c1133c;
-  --tm-brand-700: #a0102f;
-  --tm-brand-800: #84102b;
-  --tm-brand-900: #6a0f25;
-  --tm-brand-950: #3c0310;
-  --tm-sea-50: #fef2f3;
-  --tm-sea-100: #fde3e6;
-  --tm-sea-200: #fbc7cd;
-  --tm-sea-300: #f79aa6;
-  --tm-sea-400: #ef687a;
-  --tm-sea-500: #d94358;
-  --tm-sea-600: #b22c41;
-  --tm-sea-700: #8d2034;
-  --tm-sea-800: #6b1a2b;
-  --tm-sea-900: #531420;
-  --tm-sea-950: #2f080f;
-  --tm-splash-bg: var(--tm-brand-700);
-}
-html[data-brand-theme="royal-maroon"] {
-  /* Royal maroon — deep classic wine maroon, rich & regal.
-     Brand stays in a deep crimson-maroon family; no pink. */
-  --tm-brand-50: #fdf2f4;
-  --tm-brand-100: #fbe4e8;
-  --tm-brand-200: #f6c9d1;
-  --tm-brand-300: #efa1af;
-  --tm-brand-400: #e36e83;
-  --tm-brand-500: #c93e5a;
-  --tm-brand-600: #a52b45;
-  --tm-brand-700: #861f36;
-  --tm-brand-800: #681529;
-  --tm-brand-900: #4e0e1f;
-  --tm-brand-950: #2b050f;
-  --tm-sea-50: #fbf3f4;
-  --tm-sea-100: #f7e3e6;
-  --tm-sea-200: #efc7cd;
-  --tm-sea-300: #e29da7;
-  --tm-sea-400: #cf6c7a;
-  --tm-sea-500: #b64a59;
-  --tm-sea-600: #96333f;
-  --tm-sea-700: #772630;
-  --tm-sea-800: #591c24;
-  --tm-sea-900: #43151b;
-  --tm-sea-950: #250609;
-  --tm-splash-bg: var(--tm-brand-700);
-}
-html[data-brand-theme="plum-magenta"] {
-  /* Rich Wine Maroon — default brand (published as "plum-magenta" id).
-     Deep saturated maroon + soft plum support: #B72B51 primary, #711733
-     hero/dark, support #A92850. */
-  --tm-brand-50: #fdf0f4;
-  --tm-brand-100: #f9e2ea;
-  --tm-brand-200: #f4c7d4;
-  --tm-brand-300: #e89ab1;
-  --tm-brand-400: #d46080;
-  --tm-brand-500: #b72b51;
-  --tm-brand-600: #941f42;
-  --tm-brand-700: #711733;
-  --tm-brand-800: #4e0f22;
-  --tm-brand-900: #360812;
-  --tm-brand-950: #20030a;
-  --tm-sea-50: #fcf1f5;
-  --tm-sea-100: #f8dfe9;
-  --tm-sea-200: #f0bfd1;
-  --tm-sea-300: #e18ba7;
-  --tm-sea-400: #cb547a;
-  --tm-sea-500: #a92850;
-  --tm-sea-600: #8c1e3e;
-  --tm-sea-700: #6a1630;
-  --tm-sea-800: #4c0d21;
-  --tm-sea-900: #3a0717;
-  --tm-sea-950: #24030e;
-  --tm-splash-bg: var(--tm-brand-700);
-}
-html[data-brand-theme="maroon-gold"] {
-  /* Mehroon + gold — same deep maroon, royal amber support */
-  --tm-brand-50: #fdf3f4;
-  --tm-brand-100: #fae3e6;
-  --tm-brand-200: #f2c3c9;
-  --tm-brand-300: #e698a3;
-  --tm-brand-400: #d2606f;
-  --tm-brand-500: #b23c4d;
-  --tm-brand-600: #94273a;
-  --tm-brand-700: #7a1f30;
-  --tm-brand-800: #5e1523;
-  --tm-brand-900: #450d18;
-  --tm-brand-950: #260409;
-  --tm-sea-50: #fffbeb;
-  --tm-sea-100: #fef3c7;
-  --tm-sea-200: #fde68a;
-  --tm-sea-300: #fcd34d;
-  --tm-sea-400: #fbbf24;
-  --tm-sea-500: #f59e0b;
-  --tm-sea-600: #d97706;
-  --tm-sea-700: #b45309;
-  --tm-sea-800: #92400e;
-  --tm-sea-900: #78350f;
-  --tm-sea-950: #451a03;
-  --tm-splash-bg: var(--tm-brand-700);
-}
-html[data-brand-theme="maroon-teal"] {
-  /* Mehroon + teal — deep maroon with a cool jewel accent */
-  --tm-brand-50: #fdf3f4;
-  --tm-brand-100: #fae3e6;
-  --tm-brand-200: #f2c3c9;
-  --tm-brand-300: #e698a3;
-  --tm-brand-400: #d2606f;
-  --tm-brand-500: #b23c4d;
-  --tm-brand-600: #94273a;
-  --tm-brand-700: #7a1f30;
-  --tm-brand-800: #5e1523;
-  --tm-brand-900: #450d18;
-  --tm-brand-950: #260409;
-  --tm-sea-50: #f0fdfa;
-  --tm-sea-100: #ccfbf1;
-  --tm-sea-200: #99f6e4;
-  --tm-sea-300: #5eead4;
-  --tm-sea-400: #2dd4bf;
-  --tm-sea-500: #14b8a6;
-  --tm-sea-600: #0d9488;
-  --tm-sea-700: #0f766e;
-  --tm-sea-800: #115e59;
-  --tm-sea-900: #134e4a;
-  --tm-sea-950: #042f2e;
-  --tm-splash-bg: var(--tm-brand-700);
-}
-html[data-brand-theme="maroon-plum"] {
-  /* Mehroon + plum — deep maroon warmed by a muted plum bloom */
-  --tm-brand-50: #fdf3f4;
-  --tm-brand-100: #fae3e6;
-  --tm-brand-200: #f2c3c9;
-  --tm-brand-300: #e698a3;
-  --tm-brand-400: #d2606f;
-  --tm-brand-500: #b23c4d;
-  --tm-brand-600: #94273a;
-  --tm-brand-700: #7a1f30;
-  --tm-brand-800: #5e1523;
-  --tm-brand-900: #450d18;
-  --tm-brand-950: #260409;
-  --tm-sea-50: #faf5f7;
-  --tm-sea-100: #f3e5eb;
-  --tm-sea-200: #e8cbd8;
-  --tm-sea-300: #d9a3ba;
-  --tm-sea-400: #c5729b;
-  --tm-sea-500: #a84c7d;
-  --tm-sea-600: #8a3565;
-  --tm-sea-700: #6e2650;
-  --tm-sea-800: #531a3c;
-  --tm-sea-900: #3a0f29;
-  --tm-sea-950: #200516;
-  --tm-splash-bg: var(--tm-brand-700);
-}
 html[data-brand-theme="purple-blue"] {
   /* Indigo purple ↔ royal blue mix */
   --tm-brand-50: #eef2ff;
@@ -537,33 +318,9 @@ html[data-brand-theme="purple-blue"] {
   --tm-sea-950: #172554;
   --tm-splash-bg: var(--tm-brand-700);
 }
-html[data-brand-theme="green"] {
-  /* Alternate "Green" preset — original emerald + sea look.
-     Platform default is Maroon + Plum (on :root); this block only kicks in
-     when an admin publishes / a user previews the green preset. */
-  --tm-brand-50: #ecfdf5;
-  --tm-brand-100: #d1fae5;
-  --tm-brand-200: #a7f3d0;
-  --tm-brand-300: #6ee7b7;
-  --tm-brand-400: #34d399;
-  --tm-brand-500: #10b981;
-  --tm-brand-600: #059669;
-  --tm-brand-700: #047857;
-  --tm-brand-800: #065f46;
-  --tm-brand-900: #064e3b;
-  --tm-brand-950: #022c22;
-  --tm-sea-50: #f0fdfa;
-  --tm-sea-100: #ccfbf1;
-  --tm-sea-200: #99f6e4;
-  --tm-sea-300: #5eead4;
-  --tm-sea-400: #2dd4bf;
-  --tm-sea-500: #14b8a6;
-  --tm-sea-600: #0d9488;
-  --tm-sea-700: #0f766e;
-  --tm-sea-800: #115e59;
-  --tm-sea-900: #134e4a;
-  --tm-sea-950: #042f2e;
-  --tm-splash-bg: var(--tm-brand-700);
+html[data-brand-theme="green"],
+html:not([data-brand-theme]) {
+  /* Default TrendsMart emerald + sea — values already on :root */
 }
 
 /*
@@ -665,16 +422,6 @@ html.dark .text-zinc-600:not([class*="dark:text-"]),
 html.dark .text-zinc-500:not([class*="dark:text-"]),
 html.dark .text-zinc-400:not([class*="dark:text-"]) {
   color: var(--tm-muted);
-}
-
-/* Brand accent text on dark charcoal surfaces: lift the 400 step to the light
-   wine/plum 300 step — #d46080 only reaches ~4:1 on the dark surface, while
-   #e89ab1 clears AA easily. Keeps every small icon/label readable in dark. */
-html.dark .text-emerald-400 {
-  color: var(--tm-brand-300);
-}
-html.dark .text-teal-400 {
-  color: var(--tm-sea-300);
 }
 
 /*
@@ -1426,7 +1173,7 @@ html.dark .tm-dashboard-save-bar {
 .tm-promo-strip {
   background:
     linear-gradient(105deg, var(--tm-brand-700) 0%, var(--tm-brand-600) 38%, var(--tm-sea-600) 72%, var(--tm-sea-700) 100%);
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12), 0 6px 18px color-mix(in srgb, var(--tm-brand-600) 25%, transparent);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12), 0 6px 18px rgba(5, 150, 105, 0.22);
 }
 html.dark .tm-promo-strip {
   background:
@@ -2034,14 +1781,12 @@ html.dark .trend-card:hover {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  /* Brand mark is now a rounded maroon tile carrying a white bag — let the
-     baked plate show through instead of a white chip behind it. */
-  background: transparent;
-  border-radius: 7px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.24),
-    0 0 0 1px color-mix(in srgb, var(--tm-brand-300) 30%, transparent);
+  border-radius: 9px;
+  /* White plate so teal mark stays visible on green header */
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   overflow: hidden;
+  padding: 3px;
 }
 .tm-navbar-logo-img,
 .tm-brand-mark-img {
@@ -2502,7 +2247,7 @@ html.dark .tm-home-deal-card {
 
 .tm-home-deal-media {
   min-height: 8.6rem;
-  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #fcf1f6 55%, #f6f0f3 100%);
+  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #ecfeff 55%, #f8fafc 100%);
 }
 @media (min-width: 640px) {
   .tm-home-deal-media {
@@ -2510,7 +2255,7 @@ html.dark .tm-home-deal-card {
   }
 }
 html.dark .tm-home-deal-media {
-  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #2c1322 100%);
+  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #0f172a 100%);
 }
 .tm-home-deal-media-fallback {
   background: linear-gradient(145deg, var(--tm-sea-200) 0%, var(--tm-sea-300) 45%, var(--tm-sea-400) 100%);
@@ -2674,18 +2419,13 @@ html.dark .tm-home-deal-shop-fallback {
 }
 .tm-home-deal-icon.is-on,
 .tm-home-deal-icon:hover {
-  color: var(--tm-brand-600);
-  border-color: color-mix(in srgb, var(--tm-brand-600) 22%, transparent);
+  color: #e11d48;
+  border-color: rgba(225, 29, 72, 0.2);
 }
 html.dark .tm-home-deal-icon {
   background: color-mix(in srgb, var(--tm-text-strong) 6%, transparent);
   border-color: color-mix(in srgb, var(--tm-text-strong) 10%, transparent);
   color: var(--tm-text-faint);
-}
-html.dark .tm-home-deal-icon.is-on,
-html.dark .tm-home-deal-icon:hover {
-  color: var(--tm-brand-300);
-  border-color: color-mix(in srgb, var(--tm-brand-300) 24%, transparent);
 }
 
 .tm-home-deal-add {
@@ -2847,7 +2587,7 @@ html.dark .tm-sponsored-card {
   flex: 0 0 auto;
   align-self: stretch;
   overflow: hidden;
-  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #fcf1f6 55%, #f6f0f3 100%);
+  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #ecfeff 55%, #f8fafc 100%);
 }
 /* In-flow 16:9 ratio child — Safari needs an in-flow sized box to anchor an
    absolutely-positioned `fill` image (same trick as .tm-product-media). */
@@ -2859,7 +2599,7 @@ html.dark .tm-sponsored-card {
   padding-bottom: 51.5%;
 }
 html.dark .tm-sponsored-media {
-  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #2c1322 100%);
+  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #0f172a 100%);
 }
 .tm-sponsored-media-fallback {
   background: linear-gradient(145deg, var(--tm-sea-200) 0%, var(--tm-sea-300) 45%, var(--tm-sea-400) 100%);
@@ -3907,7 +3647,7 @@ html.dark .tm-geo-tab.is-active .tm-geo-tab-icon {
   background: linear-gradient(120deg, var(--tm-brand-50), var(--tm-sea-50));
 }
 html.dark .tm-geo-live {
-  background: linear-gradient(120deg, rgba(84, 28, 56, 0.45), rgba(58, 16, 38, 0.35));
+  background: linear-gradient(120deg, rgba(6, 78, 59, 0.45), rgba(19, 78, 74, 0.35));
   border-color: color-mix(in srgb, var(--tm-sea-400) 28%, transparent);
 }
 .tm-geo-live-icon {
@@ -4019,7 +3759,7 @@ html.dark .tm-geo-detect {
 .tm-geo-radius-btn.is-active {
   background: var(--tm-brand-600);
   color: #fff;
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--tm-brand-600) 30%, transparent);
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.28);
 }
 .tm-geo-radius-btn:not(.is-active):hover {
   background: color-mix(in srgb, var(--tm-text-strong) 10%, transparent);
@@ -4092,7 +3832,7 @@ html.dark .tm-geo-detect {
   border-color: transparent;
   background: var(--tm-brand-600);
   color: #fff;
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--tm-brand-600) 28%, transparent);
+  box-shadow: 0 6px 14px rgba(5, 150, 105, 0.25);
 }
 .tm-geo-chip:not(.is-active):hover {
   border-color: color-mix(in srgb, var(--tm-sea) 40%, transparent);
@@ -4154,10 +3894,10 @@ html.dark .tm-geo-chip:not(.is-active):hover {
   padding: 0.95rem 1rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in srgb, var(--tm-sea-400) 35%, transparent);
-  background: linear-gradient(135deg, var(--tm-sea-50), #fcf1f6 60%, #f6f0f3);
+  background: linear-gradient(135deg, var(--tm-sea-50), #ecfeff 60%, #f8fafc);
 }
 html.dark .tm-geo-pakistan {
-  background: linear-gradient(135deg, rgba(84, 28, 56, 0.5), rgba(28, 11, 21, 0.72));
+  background: linear-gradient(135deg, rgba(19, 78, 74, 0.45), rgba(15, 23, 42, 0.6));
   border-color: color-mix(in srgb, var(--tm-sea-400) 25%, transparent);
 }
 .tm-geo-pakistan-title {
@@ -4279,7 +4019,7 @@ html.dark .tm-geo-reset:hover {
   flex: 0 0 auto;
   align-self: stretch;
   overflow: hidden;
-  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #fcf1f6 55%, #f6f0f3 100%);
+  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #ecfeff 55%, #f8fafc 100%);
 }
 .tm-product-media::before {
   content: "";
@@ -4322,15 +4062,15 @@ html.dark .tm-geo-reset:hover {
   }
 }
 html.dark .tm-product-media {
-  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #2c1322 100%);
+  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #0f172a 100%);
 }
 .tm-product-placeholder {
   position: absolute;
   inset: 0;
-  background: linear-gradient(160deg, var(--tm-sea-100) 0%, #f2deeb 50%, #ece5e9 100%);
+  background: linear-gradient(160deg, var(--tm-sea-100) 0%, #e0f2fe 50%, #f1f5f9 100%);
 }
 html.dark .tm-product-placeholder {
-  background: linear-gradient(160deg, var(--tm-sea-800) 0%, var(--tm-sea-900) 50%, #28111d 100%);
+  background: linear-gradient(160deg, var(--tm-sea-800) 0%, var(--tm-sea-900) 50%, #1e293b 100%);
 }
 
 .tm-product-body {
@@ -4474,11 +4214,11 @@ html.dark .tm-product-title {
   overflow: hidden;
   border-radius: 0.65rem;
   border: 1.5px dashed color-mix(in srgb, var(--tm-sea) 45%, var(--tm-sea-200));
-  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #fcf1f6 100%);
+  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #ecfeff 100%);
 }
 html.dark .tm-img-upload__preview {
   border-color: color-mix(in srgb, var(--tm-sea) 40%, transparent);
-  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #2c1322 100%);
+  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #0f172a 100%);
 }
 .tm-img-upload__btn {
   display: inline-flex;
@@ -4678,10 +4418,10 @@ html.dark .tm-multi-img__tile {
 }
 .tm-multi-img__tile img {
   object-fit: contain;
-  background: #f6f0f3;
+  background: #f8fafc;
 }
 html.dark .tm-multi-img__tile img {
-  background: #2c1322;
+  background: #0f172a;
 }
 .tm-multi-img__empty {
   display: flex;
@@ -4691,13 +4431,13 @@ html.dark .tm-multi-img__tile img {
   min-height: 3.25rem;
   border-radius: 0.75rem;
   border: 1.5px dashed color-mix(in srgb, var(--tm-sea) 45%, var(--tm-sea-200));
-  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #fcf1f6 100%);
+  background: linear-gradient(160deg, var(--tm-sea-50) 0%, #ecfeff 100%);
   padding: 0.6rem 0.75rem;
   text-align: center;
 }
 html.dark .tm-multi-img__empty {
   border-color: color-mix(in srgb, var(--tm-sea) 40%, transparent);
-  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #2c1322 100%);
+  background: linear-gradient(160deg, var(--tm-sea-950) 0%, #0f172a 100%);
 }
 
 /* Plain green text CTA — no pill, no border, no circle */
@@ -5773,7 +5513,7 @@ html.tm-splash-handoff:not(.tm-splash-settle),
 html.tm-splash-handoff:not(.tm-splash-settle) body,
 html.tm-splash-handoff:not(.tm-splash-settle) .tm-bg,
 html.tm-splash-handoff:not(.tm-splash-settle) .tm-main {
-  /* Keep the brand splash color behind the body so the boot → React splash
+  /* Keep the teal splash color behind the body so the boot → React splash
      handoff never flashes white (the app bg is near-white). */
   background-color: var(--tm-splash-bg) !important;
   background-image: none !important;
@@ -5784,7 +5524,7 @@ html.tm-splash-lock body {
   overflow: hidden !important;
 }
 
-/* After overlay unmounts: ease brand → app surface (no stark white snap). */
+/* After overlay unmounts: ease teal → app surface (no stark white snap). */
 html.tm-splash-settle body,
 html.tm-splash-settle .tm-bg,
 html.tm-splash-settle .tm-main {
@@ -5809,7 +5549,7 @@ html.dark.tm-splash-settle .tm-main {
   /* Exact same gradient as the React `.tm-splash` so the boot → React handoff
      is invisible (no background flicker). */
   background:
-    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--tm-sea-300) 55%, transparent), transparent 55%),
+    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.35), transparent 55%),
     radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--tm-sea-600) 55%, transparent), transparent 50%),
     linear-gradient(165deg, var(--tm-sea-700) 0%, var(--tm-sea-600) 42%, var(--tm-sea-800) 100%);
   pointer-events: none;
@@ -5834,7 +5574,7 @@ html.tm-first-paint .tm-boot-splash {
   padding: calc(1.25rem + var(--safe-area-inset-top, 0px)) 1.35rem
     calc(1.5rem + var(--safe-area-inset-bottom, 0px));
   background:
-    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--tm-sea-300) 55%, transparent), transparent 55%),
+    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.35), transparent 55%),
     radial-gradient(90% 70% at 100% 100%, color-mix(in srgb, var(--tm-sea-600) 55%, transparent), transparent 50%),
     linear-gradient(165deg, var(--tm-sea-700) 0%, var(--tm-sea-600) 42%, var(--tm-sea-800) 100%);
   color: #fff;
@@ -5942,14 +5682,15 @@ html.tm-first-paint .tm-boot-splash {
   align-items: center;
   justify-content: center;
   border-radius: 1.25rem;
-  /* Mark ships as a rounded maroon plate + white bag; no white chip needed */
-  background: transparent;
+  background: #ffffff;
   box-shadow:
-    0 12px 36px rgba(0, 0, 0, 0.26),
-    0 0 0 1px color-mix(in srgb, var(--tm-sea-300) 28%, transparent);
+    0 12px 36px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.4);
+  padding: 0.55rem;
   transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1),
     width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.7s ease;
+    border-radius 0.7s ease,
+    padding 0.7s ease;
   animation: tm-splash-logo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 

@@ -309,8 +309,8 @@ export async function subscribeToPushNotifications(
       try {
         await registration.showNotification("TrendsMart alerts ready", {
           body: "Ab sirf zaroori order updates aayenge — app band ho to bhi.",
-          icon: "/trendsmart-mark.png?v=15",
-          badge: "/trendsmart-mark.png?v=15",
+          icon: "/trendsmart-mark.png?v=16",
+          badge: "/trendsmart-mark.png?v=16",
           tag: "tm-push-enabled",
           data: { url: "/settings/notifications" },
         } as NotificationOptions);

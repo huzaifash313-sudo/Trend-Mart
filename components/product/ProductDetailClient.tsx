@@ -518,7 +518,7 @@ export default function ProductDetailClient({ code }: { code: string }) {
                 !shop?.whatsapp_number ||
                 (mixBag.length === 0 && (!variantsReady || comboSoldOut))
               }
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-wa-500 py-2.5 text-sm font-semibold text-white shadow-sm shadow-wa-600/30 transition-all hover:bg-wa-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <WhatsAppIcon /> {mixBag.length > 1 ? "Order mix" : "Order"}
             </button>

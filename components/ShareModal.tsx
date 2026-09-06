@@ -136,7 +136,7 @@ export default function ShareModal({
             </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <button type="button" onClick={handleWhatsAppShare} className="flex flex-col items-center gap-1.5 rounded-xl bg-wa-50 px-3 py-3 text-center transition-colors hover:bg-wa-100 dark:bg-wa-900/20 dark:hover:bg-wa-900/30"><WhatsAppIcon /><span className="text-xs font-semibold text-wa-700 dark:text-wa-300">WhatsApp</span></button>
+            <button type="button" onClick={handleWhatsAppShare} className="flex flex-col items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-3 text-center transition-colors hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40"><WhatsAppIcon /><span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">WhatsApp</span></button>
             <button type="button" onClick={handleTwitterShare} className="flex flex-col items-center gap-1.5 rounded-xl bg-zinc-100 px-3 py-3 text-center transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"><TwitterXIcon /><span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">X / Twitter</span></button>
             <button type="button" onClick={handleNativeShare} className="flex flex-col items-center gap-1.5 rounded-xl bg-zinc-100 px-3 py-3 text-center transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"><ShareIcon /><span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">More</span></button>
           </div>

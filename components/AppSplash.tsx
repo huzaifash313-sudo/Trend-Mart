@@ -17,15 +17,15 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  * the session-scoped `SPLASH_KEY`.
  *
  * Beat (deliberately slow + smooth so it never feels rushed):
- *   1) Logo pops in centered on the maroon/plum splash stage
+ *   1) Logo pops in centered on the green/seagreen stage
  *   2) Logo rises + shrinks while "TrendsMart" reveals letter-by-letter
  *   3) Three value lines slide in one by one
  *   4) Hold for reading while home data prefetches — if it's not ready yet a
  *      small loading pill appears instead of a dead wait
- *   5) Slow cross-fade into the (already-warm) homepage — no maroon→white snap
+ *   5) Slow cross-fade into the (already-warm) homepage — no green→white snap
  *
  * `SPLASH_KEY` is written only when the intro finishes — never at start — so
- * Strict Mode remounts and mid-animation tab switches cannot strand the brand
+ * Strict Mode remounts and mid-animation tab switches cannot strand the teal
  * boot cover or abort a first-run play.
  */
 const STAGE_MS = {
@@ -100,20 +100,20 @@ function clearSplashChrome() {
     "tm-boot-splash",
     "tm-first-paint",
   );
-  // Any inline brand plate the boot script painted must not outlive the intro.
+  // Any inline teal the boot script painted must not outlive the intro.
   root.style.removeProperty("background-color");
 }
 
-/** Hold brand color under the UI, then ease into the app surface (no white snap). */
+/** Hold brand green under the UI, then ease into the app surface (no white snap). */
 function releaseSplashBackground() {
   const root = document.documentElement;
   // The page is already white underneath (settle was armed at exit start), so
-  // we only need to clear the splash lock / boot classes + inline brand plate.
+  // we only need to clear the splash lock / boot classes + inline teal.
   clearSplashChrome();
   window.setTimeout(() => {
     root.classList.remove("tm-splash-settle");
-    // Drop any inline brand plate the boot script painted onto <html> so the
-    // app surface's own background shows — no brand-colored residue.
+    // Drop any inline teal the boot script painted onto <html> so the app
+    // surface's own background shows — no green residue after the intro.
     root.style.removeProperty("background-color");
   }, 520);
 }
@@ -161,41 +161,11 @@ function stageTiming(): StageTiming {
   return STAGE_MS;
 }
 
-/* Short, human value intro — no page mockups, just "what TrendsMart is".
-   Monochrome glyphs (white on plum) keep the intro 100% brand-consistent —
-   no stray colourful emoji on the boot stage. */
-function BagGlyph() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-      <path d="M3 6h18" />
-      <path d="M16 10a4 4 0 0 1-8 0" />
-    </svg>
-  );
-}
-function ChatGlyph() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
-    </svg>
-  );
-}
-function TruckGlyph() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
-      <path d="M15 18H9" />
-      <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
-      <circle cx="17" cy="18" r="2" />
-      <circle cx="7" cy="18" r="2" />
-    </svg>
-  );
-}
-
+/* Short, human value intro — no page mockups, just "what TrendsMart is". */
 const FEATURES = [
-  { glyph: <BagGlyph />, title: "Local shops nearby", subtitle: "Discover trusted stores in your area" },
-  { glyph: <ChatGlyph />, title: "Order on WhatsApp", subtitle: "Direct chat with the shop — no confusion" },
-  { glyph: <TruckGlyph />, title: "Fast delivery", subtitle: "Your neighbourhood, delivered to your door" },
+  { icon: "🛍️", title: "Local shops nearby", subtitle: "Discover trusted stores in your area" },
+  { icon: "💬", title: "Order on WhatsApp", subtitle: "Direct chat with the shop — no confusion" },
+  { icon: "🚚", title: "Fast delivery", subtitle: "Your neighbourhood, delivered to your door" },
 ] as const;
 
 export default function AppSplash() {
@@ -233,8 +203,8 @@ export default function AppSplash() {
   const beginExit = (exitMs: number) => {
     if (isStopped() || exitingRef.current) return;
     exitingRef.current = true;
-    // Arm the app surface BEFORE fading so the brand overlay fades into a
-    // ready white page — no maroon→white snap when the overlay unmounts.
+    // Arm the app surface BEFORE fading so the teal overlay fades into a
+    // ready white page — no green→white snap when the overlay unmounts.
     const root = document.documentElement;
     root.classList.add("tm-splash-settle");
     root.style.removeProperty("background-color");
@@ -382,7 +352,7 @@ export default function AppSplash() {
           <span className="tm-splash-logo" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/trendsmart-mark.png?v=15"
+              src="/trendsmart-mark.png?v=16"
               alt=""
               width={88}
               height={88}
@@ -413,7 +383,7 @@ export default function AppSplash() {
             {FEATURES.map((f) => (
               <li key={f.title} className="tm-splash-feature">
                 <span className="tm-splash-feature-icon" aria-hidden="true">
-                  {f.glyph}
+                  {f.icon}
                 </span>
                 <span className="tm-splash-feature-text">
                   <strong>{f.title}</strong>

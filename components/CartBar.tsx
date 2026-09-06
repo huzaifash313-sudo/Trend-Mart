@@ -360,7 +360,7 @@ export default function CartBar() {
                 <button
                   type="button"
                   onClick={() => setCheckoutShop(shopGroups[0]!)}
-                  className="shrink-0 rounded-full bg-wa-500 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-wa-600/25 transition-all hover:bg-wa-600 active:scale-95"
+                  className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95"
                 >
                   Order via WhatsApp
                 </button>
