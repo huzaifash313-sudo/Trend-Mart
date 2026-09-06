@@ -157,6 +157,35 @@
   --color-cyan-400: var(--tm-sea-400);
   --color-cyan-500: var(--tm-sea-500);
   --color-cyan-600: var(--tm-sea-600);
+
+  /*
+   * True semantic greens — NOT remapped by brand themes.
+   * ok-* = the original emerald ramp (stock/available/positive/status).
+   * wa-*  = WhatsApp brand green (order/chat CTAs) + friendly hover steps.
+   * Brand-theme remaps above only touch emerald/teal/green/cyan; these stay
+   * genuinely green no matter which wine/maroon/purple brand is live.
+   */
+  --color-ok-50: #ecfdf5;
+  --color-ok-100: #d1fae5;
+  --color-ok-200: #a7f3d0;
+  --color-ok-300: #6ee7b7;
+  --color-ok-400: #34d399;
+  --color-ok-500: #10b981;
+  --color-ok-600: #059669;
+  --color-ok-700: #047857;
+  --color-ok-800: #065f46;
+  --color-ok-900: #064e3b;
+  --color-ok-950: #022c22;
+  --color-wa-50: #edfaf1;
+  --color-wa-100: #d3f5e0;
+  --color-wa-200: #a8ecc3;
+  --color-wa-300: #73dfa0;
+  --color-wa-400: #3dce7c;
+  --color-wa-500: #25d366;
+  --color-wa-600: #1db457;
+  --color-wa-700: #16914a;
+  --color-wa-800: #11713d;
+  --color-wa-900: #0b5730;
 }
 
 /*
@@ -2005,12 +2034,14 @@ html.dark .trend-card:hover {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
-  /* White plate so teal mark stays visible on green header */
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  /* Brand mark is now a rounded maroon tile carrying a white bag — let the
+     baked plate show through instead of a white chip behind it. */
+  background: transparent;
+  border-radius: 7px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.24),
+    0 0 0 1px color-mix(in srgb, var(--tm-brand-300) 30%, transparent);
   overflow: hidden;
-  padding: 3px;
 }
 .tm-navbar-logo-img,
 .tm-brand-mark-img {
@@ -5911,15 +5942,14 @@ html.tm-first-paint .tm-boot-splash {
   align-items: center;
   justify-content: center;
   border-radius: 1.25rem;
-  background: #ffffff;
+  /* Mark ships as a rounded maroon plate + white bag; no white chip needed */
+  background: transparent;
   box-shadow:
-    0 12px 36px rgba(0, 0, 0, 0.22),
-    0 0 0 1px rgba(255, 255, 255, 0.4);
-  padding: 0.55rem;
+    0 12px 36px rgba(0, 0, 0, 0.26),
+    0 0 0 1px color-mix(in srgb, var(--tm-sea-300) 28%, transparent);
   transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1),
     width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.7s ease,
-    padding 0.7s ease;
+    border-radius 0.7s ease;
   animation: tm-splash-logo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 

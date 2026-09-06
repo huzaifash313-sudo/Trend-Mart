@@ -682,11 +682,18 @@ export default function WhatsAppCheckoutModal({
   const phone = toWhatsAppDigits(shop.whatsapp_number ?? "");
 
   // Accent class names
-  const accentBg = `bg-${accentColor}-600`;
-  const accentBgHover = `hover:bg-${accentColor}-700`;
-  const accentRing = `focus:ring-${accentColor}-500`;
-  const accentLight = `bg-${accentColor}-50`;
-  const accentText = `text-${accentColor}-700`;
+  // The checkout modal IS the WhatsApp order flow, so the default "emerald"
+  // accent resolves to the true WhatsApp brand green (wa-*), not the brand
+  // remap. Shops can still pass their own accent (e.g. a store theme) — that
+  // keeps using the original accent-* ramp untouched.
+  const isWaAccent = accentColor === "emerald";
+  const accentBg = isWaAccent ? "bg-wa-500" : `bg-${accentColor}-600`;
+  const accentBgHover = isWaAccent ? "hover:bg-wa-600" : `hover:bg-${accentColor}-700`;
+  const accentRingSoft = isWaAccent ? "focus:ring-wa-600/25" : `focus:ring-${accentColor}-500/20`;
+  const accentLight = isWaAccent ? "bg-wa-100" : `bg-${accentColor}-50`;
+  const accentText = isWaAccent ? "text-wa-700" : `text-${accentColor}-700`;
+  const accentBorder = isWaAccent ? "focus:border-wa-600" : `focus:border-${accentColor}-500`;
+  const accentShadow = isWaAccent ? "shadow-wa-600/30" : `shadow-${accentColor}-600/25`;
 
   // ── Quantity Handlers ───────────────────────────────────────────────────
   const updateQuantity = useCallback((itemId: string, delta: number) => {
@@ -1854,7 +1861,7 @@ export default function WhatsAppCheckoutModal({
                 type="button"
                 onClick={handleGoToShipping}
                 disabled={items.length === 0 || itemsNeedingVariant.length > 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment}
-                className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
+                className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg ${accentShadow} transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {noFulfillment
                   ? "Orders Paused — Try Later"
@@ -1904,7 +1911,7 @@ export default function WhatsAppCheckoutModal({
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerName
                       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                      : `border-zinc-200 focus:border-${accentColor}-500 ${accentRing}/20`
+                      : `border-zinc-200 ${accentBorder} ${accentRingSoft}`
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
                 {errors.customerName && <p className="mt-1 text-xs text-red-500">{errors.customerName}</p>}
@@ -1931,7 +1938,7 @@ export default function WhatsAppCheckoutModal({
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerPhone
                       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                      : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                      : `border-zinc-200 ${accentBorder} ${accentRingSoft}`
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
                 {errors.customerPhone && <p className="mt-1 text-xs text-red-500">{errors.customerPhone}</p>}
@@ -1984,7 +1991,7 @@ export default function WhatsAppCheckoutModal({
                       className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                         errors.shippingAddress
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                          : `border-zinc-200 ${accentBorder} ${accentRingSoft}`
                       } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                     />
                     <p className="mt-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
@@ -2008,7 +2015,7 @@ export default function WhatsAppCheckoutModal({
                       className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                         errors.shippingAddress
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                          : `border-zinc-200 ${accentBorder} ${accentRingSoft}`
                       } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                     />
                     {errors.shippingAddress && <p className="mt-1 text-xs text-red-500">{errors.shippingAddress}</p>}
@@ -2040,7 +2047,7 @@ export default function WhatsAppCheckoutModal({
                   value={shipping.deliveryNotes}
                   onChange={(e) => setShipping(s => ({ ...s, deliveryNotes: e.target.value }))}
                   placeholder={isPickup ? "E.g. I'll call when I arrive" : "Delivery instructions"}
-                  className={`w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-${accentColor}-500 focus:outline-none focus:ring-2 focus:ring-${accentColor}-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
+                  className={`w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 ${accentBorder} focus:outline-none focus:ring-2 ${accentRingSoft} dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
               </div>
             </div>
@@ -2056,7 +2063,7 @@ export default function WhatsAppCheckoutModal({
               </button>
               <button
                 type="submit"
-                className={`flex-1 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover}`}
+                className={`flex-1 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg ${accentShadow} transition-all ${accentBgHover}`}
               >
                 Continue →
               </button>
@@ -2182,7 +2189,7 @@ export default function WhatsAppCheckoutModal({
                 type="button"
                 onClick={handlePlaceOrder}
                 disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg ${accentShadow} transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting ? (
                   <><SpinnerIcon /> Placing Order...</>

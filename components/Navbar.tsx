@@ -110,7 +110,7 @@ function BrandMark({ size = 34 }: { size?: number }) {
     <span className="tm-navbar-logo" aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/trendsmart-mark.png?v=14"
+        src="/trendsmart-mark.png?v=15"
         alt=""
         width={size}
         height={size}

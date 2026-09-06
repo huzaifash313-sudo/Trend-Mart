@@ -914,7 +914,7 @@ function ShopDetailInner({ id }: { id: string }) {
             logoPlacement="hidden"
           >
             {shop.is_live && (
-              <span className="absolute left-3 top-3 z-[1] inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[0.65rem] font-semibold text-white shadow">
+              <span className="absolute left-3 top-3 z-[1] inline-flex items-center gap-1 rounded-full bg-ok-500 px-2 py-0.5 text-[0.65rem] font-semibold text-white shadow">
                 <span className="tm-live-dot h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
                 Live
               </span>
@@ -928,7 +928,7 @@ function ShopDetailInner({ id }: { id: string }) {
                     : shop.category === "Electronics"
                       ? "bg-blue-500/80"
                       : shop.category === "Grocery"
-                        ? "bg-emerald-500/80"
+                        ? "bg-ok-500/80"
                         : shop.category === "Cosmetics"
                           ? "bg-fuchsia-500/80"
                           : "bg-zinc-500/80"

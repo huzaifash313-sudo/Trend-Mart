@@ -139,7 +139,7 @@ export default function VariantSkuMatrix({
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold disabled:opacity-40 ${
                   sold
                     ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    : "bg-ok-100 text-ok-700 dark:bg-ok-900/30 dark:text-ok-400"
                 }`}
               >
                 {sold ? "Sold out" : "In stock"}

@@ -544,7 +544,7 @@ export default function GarmentVariantSelector({
               <span
                 className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${
                   isAvailable
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    ? "bg-ok-100 text-ok-700 dark:bg-ok-900/30 dark:text-ok-400"
                     : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
                 }`}
               >

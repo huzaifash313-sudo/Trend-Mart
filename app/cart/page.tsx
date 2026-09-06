@@ -483,7 +483,7 @@ export default function CartPage() {
                     type="button"
                     onClick={() => setCheckoutShop(group)}
                     disabled={group.items.some((i) => itemNeedsVariant(i, variantData))}
-                    className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-full bg-wa-500 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-wa-600/25 transition-all hover:bg-wa-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {group.items.some((i) => itemNeedsVariant(i, variantData))
                       ? "Select options first"

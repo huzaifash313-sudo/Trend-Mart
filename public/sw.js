@@ -1,12 +1,12 @@
-/* TrendsMart SW v50 — push + image cache + offline navigation fallback.
+/* TrendsMart SW v51 — push + image cache + offline navigation fallback.
    Document navigations are network-first; on total network failure we serve
    /offline. Only same-origin / Cloudinary / Next image proxy are SWR-cached
    (SW fetch uses connect-src; caching flickr/unsplash/wikimedia causes CSP noise).
    Chat pushes: suppress when viewing that convo; in-app banner when app visible;
    OS notification only when fully backgrounded. */
 
-const IMAGE_CACHE = "tm-images-v50";
-const SHELL_CACHE = "tm-shell-v50";
+const IMAGE_CACHE = "tm-images-v51";
+const SHELL_CACHE = "tm-shell-v51";
 const KEEP = new Set([IMAGE_CACHE, SHELL_CACHE]);
 
 function isSwCacheableImage(url, req) {
@@ -22,7 +22,7 @@ self.addEventListener("install", (event) => {
     (async () => {
       try {
         const cache = await caches.open(SHELL_CACHE);
-        await cache.addAll(["/offline", "/trendsmart-mark.png?v=14"]);
+        await cache.addAll(["/offline", "/trendsmart-mark.png?v=15"]);
       } catch {
         /* offline page / icon may be unavailable during install */
       }
@@ -124,8 +124,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: (data && data.body) || "",
-    icon: (data && data.icon) || "/trendsmart-mark.png?v=14",
-    badge: (data && data.badge) || "/trendsmart-mark.png?v=14",
+    icon: (data && data.icon) || "/trendsmart-mark.png?v=15",
+    badge: (data && data.badge) || "/trendsmart-mark.png?v=15",
     tag: (data && data.tag) || "trendsmart-order",
     data: {
       url: (data && data.url) || "/",
