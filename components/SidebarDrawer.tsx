@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/services/authService";
 import { SHOP_CATEGORIES, CATEGORY_ICONS, isDineInCategory } from "@/types";
 import PwaInstallTip from "@/components/PwaInstallTip";
+import { useTheme } from "@/context/ThemeContext";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons                                                          */
@@ -16,6 +17,23 @@ function CloseIcon() {
   return (
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
 }
@@ -150,6 +168,8 @@ function StoreIconMenu() {
 interface SidebarDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  /** "drawer" = mobile slide-out overlay; "persistent" = desktop pinned sidebar. */
+  variant?: "drawer" | "persistent";
 }
 
 /**
@@ -171,7 +191,9 @@ interface SidebarDrawerProps {
  *   - `touch-action: pan-y` on scrollable content for touch-event stability
  *   - `transform: translateZ(0)` to force GPU compositing on mobile
  */
-export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
+export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: SidebarDrawerProps) {
+  const isPersistent = variant === "persistent";
+  const { resolved, toggleTheme } = useTheme();
   const [session, setSession] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
@@ -274,7 +296,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
 
   /* ── Body Scroll Lock with iOS Safe Handling ─────────────────────────── */
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isPersistent) return;
 
     // Save current scroll position and active element
     const scrollY = window.scrollY;
@@ -316,11 +338,11 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
         previousActiveElement.current.focus();
       }
     };
-  }, [isOpen]);
+  }, [isOpen, isPersistent]);
 
   /* ── Keyboard: Escape to close + Focus Trap ──────────────────────────── */
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isPersistent) return;
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -366,13 +388,18 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
 
     document.addEventListener("keydown", handleKey, { capture: true });
     return () => document.removeEventListener("keydown", handleKey, { capture: true });
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isPersistent]);
+
+  /* ── Nav link click — close the mobile drawer, keep desktop sidebar pinned ── */
+  const handleNavClick = useCallback(() => {
+    if (!isPersistent) onClose();
+  }, [isPersistent, onClose]);
 
   /* ── Sign Out handler (clear cache + hard redirect — no soft-nav glitch) ── */
   const handleSignOut = useCallback(async () => {
-    onClose();
+    handleNavClick();
     await signOut({ redirectTo: "/" });
-  }, [onClose]);
+  }, [handleNavClick]);
 
   /* ── Safe backdrop click — stopPropagation on drawer prevents double fire ── */
   const handleBackdropClick = useCallback(
@@ -398,34 +425,40 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   /* ──────────────────────────────────────────────────────────────────────── */
   return (
     <>
-      {/* Backdrop — highest z-index with glassmorphic blur */}
-      <div
-        className={`fixed inset-0 z-[9999] bg-black/50 backdrop-blur-md transition-all duration-400 ${
-          isOpen
-            ? "opacity-100 pointer-events-auto"
-            : "pointer-events-none opacity-0"
-        }`}
-        onClick={handleBackdropClick}
-        aria-hidden="true"
-      />
+      {/* Backdrop — highest z-index with glassmorphic blur (mobile drawer only) */}
+      {!isPersistent && (
+        <div
+          className={`fixed inset-0 z-[9999] bg-black/50 backdrop-blur-md transition-all duration-400 lg:hidden ${
+            isOpen
+              ? "opacity-100 pointer-events-auto"
+              : "pointer-events-none opacity-0"
+          }`}
+          onClick={handleBackdropClick}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Drawer panel — sits above backdrop on the left */}
+      {/* Panel — mobile drawer (overlay) or desktop persistent sidebar */}
       <aside
         ref={drawerRef}
-        className={`fixed left-0 top-0 z-[10000] flex h-dvh w-80 max-w-[88vw] flex-col bg-white/95 shadow-2xl backdrop-blur-xl transition-transform duration-350 ease-[cubic-bezier(0.4,0,0.2,1)] dark:bg-[color:var(--tm-surface)]/95 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Navigation menu"
+        className={
+          isPersistent
+            ? `tm-sidebar-persistent hidden lg:flex flex-col ${isOpen ? "" : "is-closed"}`
+            : `fixed left-0 top-0 z-[10000] flex h-dvh w-80 max-w-[88vw] flex-col bg-white/95 shadow-2xl backdrop-blur-xl transition-transform duration-350 ease-[cubic-bezier(0.4,0,0.2,1)] dark:bg-[color:var(--tm-surface)]/95 lg:hidden ${
+                isOpen ? "translate-x-0" : "-translate-x-full"
+              }`
+        }
+        {...(isPersistent
+          ? { "aria-label": "Navigation menu" }
+          : { role: "dialog", "aria-modal": "true", "aria-label": "Navigation menu" })}
         onTouchStart={handleDrawerTouchStart}
         style={{ willChange: "transform" }}
       >
-        {/* Header — brand + close button */}
+        {/* Header — brand + theme toggle + close/collapse */}
         <div className="flex items-center justify-between border-b border-zinc-200/60 px-5 py-4 dark:border-zinc-800/60">
           <Link
             href="/"
-            onClick={onClose}
+            onClick={handleNavClick}
             className="inline-flex items-center gap-1.5 text-xl font-extrabold tracking-tight"
             aria-label="TrendsMart — Go to homepage"
           >
@@ -441,15 +474,26 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               TrendsMart
             </span>
           </Link>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-            aria-label="Close menu"
-          >
-            <CloseIcon />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              aria-label="Toggle dark or light mode"
+              title="Toggle dark / light mode"
+            >
+              {resolved === "dark" ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              aria-label={isPersistent ? "Collapse menu" : "Close menu"}
+            >
+              <CloseIcon />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Links — Full rich navigation */}
@@ -463,7 +507,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             <li>
               <Link
                 href="/"
-                onClick={onClose}
+                onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               >
                 <HomeSidebarIcon /> Home
@@ -474,7 +518,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             <li>
               <Link
                 href="/products"
-                onClick={onClose}
+                onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               >
                 <SearchIconMenu /> Products
@@ -485,7 +529,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             <li>
               <Link
                 href="/deals"
-                onClick={onClose}
+                onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-amber-50 hover:text-amber-700 dark:text-zinc-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-400"
               >
                 <TagDealIcon /> Deals
@@ -496,7 +540,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             <li>
               <Link
                 href="/wishlist"
-                onClick={onClose}
+                onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-rose-50 hover:text-rose-600 dark:text-zinc-300 dark:hover:bg-rose-900/20 dark:hover:text-rose-400"
               >
                 <HeartIcon /> Wishlist
@@ -514,7 +558,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             <li>
               <Link
                 href="/orders"
-                onClick={onClose}
+                onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 <OrdersIcon /> My Orders
@@ -547,7 +591,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                     <li key={cat}>
                       <Link
                         href={`/search?category=${encodeURIComponent(cat)}`}
-                        onClick={onClose}
+                        onClick={handleNavClick}
                         className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                       >
                         <span aria-hidden="true" className="text-lg">
@@ -568,7 +612,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
             <li>
               <Link
                 href="/settings"
-                onClick={onClose}
+                onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 <CogIcon /> Settings
@@ -604,7 +648,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
                             >
                               <DashboardIcon /> Dashboard
@@ -613,7 +657,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/assistant"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-indigo-700 transition-all hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
                             >
                               <span aria-hidden="true">🤖</span> AI Business Coach
@@ -622,7 +666,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/orders"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <OrdersIcon /> Orders
@@ -631,7 +675,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/products"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <span aria-hidden="true">📦</span> Products
@@ -642,7 +686,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                               <li>
                                 <Link
                                   href="/dashboard/kitchen"
-                                  onClick={onClose}
+                                  onClick={handleNavClick}
                                   className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                                 >
                                   <span aria-hidden="true">🍳</span> Kitchen Board
@@ -651,7 +695,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                               <li>
                                 <Link
                                   href="/dashboard/tables"
-                                  onClick={onClose}
+                                  onClick={handleNavClick}
                                   className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                                 >
                                   <span aria-hidden="true">🪑</span> QR Tables
@@ -663,7 +707,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                             <li>
                               <Link
                                 href={`/shop/${merchantShopId}`}
-                                onClick={onClose}
+                                onClick={handleNavClick}
                                 className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                               >
                                 <StoreIconMenu /> View My Store
@@ -673,7 +717,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/settings"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <StoreIconMenu /> Store Settings
@@ -682,7 +726,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/analytics"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <span aria-hidden="true">📊</span> Analytics
@@ -691,7 +735,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/inquiries"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <span aria-hidden="true">💬</span> Messages
@@ -700,7 +744,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/finances"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <span aria-hidden="true">💰</span> Finances
@@ -709,7 +753,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/leads"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <span aria-hidden="true">🎯</span> Leads
@@ -718,7 +762,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                           <li>
                             <Link
                               href="/dashboard/ads"
-                              onClick={onClose}
+                              onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
                               <span aria-hidden="true">📣</span> Ads
@@ -731,14 +775,14 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                     <>
                       <Link
                         href="/account"
-                        onClick={onClose}
+                        onClick={handleNavClick}
                         className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
                       >
                         <DashboardIcon /> My Account
                       </Link>
                       <Link
                         href="/account/assistant"
-                        onClick={onClose}
+                        onClick={handleNavClick}
                         className="mt-1 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
                       >
                         <span aria-hidden="true" className="text-base">🤖</span> TrendBot
@@ -759,7 +803,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                 <>
                   <Link
                     href="/assistant"
-                    onClick={onClose}
+                    onClick={handleNavClick}
                     className="mb-2 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
                   >
                     <span aria-hidden="true" className="text-base">🤖</span> AI Shopping Assistant
@@ -768,7 +812,7 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
                     href="/login"
                     onClick={(e) => {
                       e.preventDefault();
-                      onClose();
+                      handleNavClick();
                       window.location.assign("/login");
                     }}
                     className="flex items-center gap-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/40"

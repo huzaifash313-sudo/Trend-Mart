@@ -1968,6 +1968,71 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   }
 }
 
+/* ── Persistent desktop sidebar (auto-open on laptop) ───────────────────── */
+:root {
+  --tm-sidebar-width: 272px;
+}
+
+/* Smoothly shift the whole page when the desktop sidebar opens/closes.
+   Mobile never gets this offset — the drawer is a full-screen overlay. */
+@media (min-width: 1024px) {
+  html.tm-sidebar-open body {
+    padding-left: calc(var(--safe-area-inset-left, 0px) + var(--tm-sidebar-width));
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    transition: padding-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* The floating cart bar is full-width + fixed, so it must follow the same
+   offset as the page body or it would sit on top of the pinned sidebar. */
+@media (min-width: 1024px) {
+  html.tm-sidebar-open .tm-cartbar-root {
+    left: var(--tm-sidebar-width);
+  }
+}
+
+@media (min-width: 1024px) {
+  .tm-cartbar-root {
+    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Persistent sidebar shell — fixed beneath the brand bar, full height.
+   `display` is controlled by Tailwind (`hidden lg:flex`) so the overlay drawer
+   and the persistent sidebar never render on the same viewport. */
+.tm-sidebar-persistent {
+  position: fixed;
+  top: var(--tm-navbar-sticky-offset, 62px);
+  left: 0;
+  bottom: 0;
+  z-index: 40;
+  width: var(--tm-sidebar-width, 272px);
+  max-width: 88vw;
+  background: var(--tm-surface, #ffffff);
+  border-right: 1px solid var(--tm-border, #e4e4e7);
+  box-shadow: 1px 0 24px rgba(0, 0, 0, 0.05);
+  transform: translateX(0);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.tm-sidebar-persistent.is-closed {
+  transform: translateX(-100%);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-sidebar-persistent,
+  body,
+  .tm-cartbar-root {
+    transition: none;
+  }
+}
+
 /* Off-screen cards skip paint work while scrolling long grids. */
 .tm-product-card,
 .shop-card {

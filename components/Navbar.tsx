@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import SidebarDrawer from "@/components/SidebarDrawer";
 import NavbarNotificationButton from "@/components/NavbarNotificationButton";
-import { useTheme } from "@/context/ThemeContext";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -24,23 +24,6 @@ function SearchIcon() {
   return (
     <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg className="tm-ic-sun h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg className="tm-ic-moon h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
 }
@@ -128,22 +111,63 @@ function BrandMark({ size = 34 }: { size?: number }) {
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { toggleTheme } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [portalReady, setPortalReady] = useState(false);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+
+  // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
+  const isStandalone =
+    pathname === "/offline" ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/t/");
 
   useEffect(() => {
     setPortalReady(true);
   }, []);
 
+  // Restore the user's last desktop sidebar preference (auto-open by default).
+  useLayoutEffect(() => {
+    try {
+      if (localStorage.getItem("trendsmart_sidebar_open_v1") === "0") {
+        setSidebarOpen(false);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Drive the page offset so the whole storefront shifts for the pinned sidebar.
+  useLayoutEffect(() => {
+    if (isStandalone) return;
+    const root = document.documentElement;
+    root.classList.toggle("tm-sidebar-open", sidebarOpen);
+    root.classList.toggle("tm-sidebar-collapsed", !sidebarOpen);
+    return () => {
+      root.classList.remove("tm-sidebar-open");
+      root.classList.remove("tm-sidebar-collapsed");
+    };
+  }, [isStandalone, sidebarOpen]);
+
   const navigateToSearch = useCallback(() => router.push("/products"), [router]);
 
-  // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
-  if (
-    pathname === "/offline" ||
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/t/")
-  ) {
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("trendsmart_sidebar_open_v1", next ? "1" : "0");
+      } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  const handleHamburger = useCallback(() => {
+    if (isDesktop) {
+      toggleSidebar();
+    } else {
+      setDrawerOpen(true);
+    }
+  }, [isDesktop, toggleSidebar]);
+
+  if (isStandalone) {
     return null;
   }
 
@@ -156,9 +180,9 @@ export default function Navbar() {
         <div className="tm-navbar-inner">
           <button
             type="button"
-            onClick={() => setDrawerOpen(true)}
+            onClick={handleHamburger}
             className="tm-navbar-icon-btn"
-            aria-label="Open menu"
+            aria-label="Toggle navigation menu"
           >
             <HamburgerIcon />
           </button>
@@ -179,16 +203,6 @@ export default function Navbar() {
           </Link>
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="tm-navbar-icon-btn tm-theme-toggle"
-              aria-label="Toggle dark or light mode"
-              title="Toggle dark / light mode"
-            >
-              <MoonIcon />
-              <SunIcon />
-            </button>
             <NavbarNotificationButton />
             <button
               type="button"
@@ -205,10 +219,18 @@ export default function Navbar() {
 
       {portalReady
         ? createPortal(
-            <SidebarDrawer
-              isOpen={drawerOpen}
-              onClose={() => setDrawerOpen(false)}
-            />,
+            <>
+              <SidebarDrawer
+                variant="drawer"
+                isOpen={drawerOpen}
+                onClose={() => setDrawerOpen(false)}
+              />
+              <SidebarDrawer
+                variant="persistent"
+                isOpen={sidebarOpen}
+                onClose={toggleSidebar}
+              />
+            </>,
             document.body,
           )
         : null}
