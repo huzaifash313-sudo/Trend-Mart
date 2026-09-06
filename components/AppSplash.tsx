@@ -30,9 +30,9 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  *   1) Logo pops in centered on the green/seagreen stage
  *   2) Logo rises + shrinks while "TrendsMart" reveals letter-by-letter
  *   3) Three value lines slide in one by one
- *   4) Hold for reading while home data prefetches — if it's not ready yet a
- *      small loading pill appears instead of a dead wait
- *   5) Slow cross-fade into the (already-warm) homepage — no green→white snap
+ *   4) THEN a loading spinner appears and home data prefetches — no network
+ *      or CPU work runs during the intro beats, so the animation stays smooth
+ *   5) Spinner ends → slow cross-fade into the (now-warm) homepage
  *
  * `SPLASH_KEY` is written only when the intro finishes — never at start — so
  * Strict Mode remounts and mid-animation tab switches cannot strand the teal
@@ -42,7 +42,8 @@ const STAGE_MS = {
   logoHold: 380, // >= .tm-splash-logo pop (0.34s): logo rests before boot→React handoff
   brand: 280,
   details: 340,
-  holdMin: 140,
+  /** Minimum spinner time so the loading phase reads as deliberate (not a flash). */
+  holdMin: 400,
   /** Keep in sync with `.tm-splash--exit` animation duration in globals.css */
   exit: 340,
   /** Never block home forever if network is slow. */
@@ -204,7 +205,6 @@ export default function AppSplash() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("off");
-  const [dataReady, setDataReady] = useState(false);
   const timersRef = useRef<number[]>([]);
   const unmountedRef = useRef(false);
   const exitingRef = useRef(false);
@@ -292,49 +292,55 @@ export default function AppSplash() {
     document.documentElement.classList.add("tm-splash-lock");
     setPhase("logo");
     dataReadyRef.current = false;
-    setDataReady(false);
 
     const ms = stageTiming();
 
     // Offline launch: skip the data-wait entirely — a cached home is already
     // under the splash and there is nothing to prefetch without a network.
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
-    if (offline) {
-      dataReadyRef.current = true;
-      setDataReady(true);
-    }
 
-    // Warm the homepage cache while the customer watches the intro.
-    const prefetch = offline
-      ? Promise.resolve()
-      : Promise.allSettled([
-          queryClient.prefetchInfiniteQuery({
-            queryKey: [...queryKeys.shopsInfinite, PUBLIC_SHOP_PAGE_SIZE],
-            queryFn: ({ pageParam }) =>
-              unwrap(
-                fetchShops({
-                  publicOnly: true,
-                  limit: PUBLIC_SHOP_PAGE_SIZE,
-                  offset: pageParam as number,
-                }),
-              ),
-            initialPageParam: 0,
-            staleTime: 2 * 60_000,
-          }),
-          queryClient.prefetchQuery({
-            queryKey: queryKeys.stories,
-            queryFn: () => unwrap(fetchActiveStories()),
-            staleTime: 2 * 60_000,
-          }),
-          queryClient.prefetchQuery({
-            queryKey: queryKeys.deals(48),
-            queryFn: () => unwrap(fetchActiveDeals(48)),
-            staleTime: 2 * 60_000,
-          }),
-        ]).then(() => {
-          dataReadyRef.current = true;
-          if (!unmountedRef.current && !exitingRef.current) setDataReady(true);
-        });
+    // Data loading is DEFERRED: nothing runs in the background during the
+    // intro beats (logo → wordmark → three value lines), so the animation
+    // never competes with network/CPU work and stays buttery smooth. The
+    // prefetch only kicks off once the intro is fully shown, behind the
+    // loading spinner.
+    let prefetch: Promise<void> | null = null;
+    const startPrefetch = (): Promise<void> => {
+      if (prefetch) return prefetch;
+      if (offline) {
+        dataReadyRef.current = true;
+        prefetch = Promise.resolve();
+        return prefetch;
+      }
+      prefetch = Promise.allSettled([
+        queryClient.prefetchInfiniteQuery({
+          queryKey: [...queryKeys.shopsInfinite, PUBLIC_SHOP_PAGE_SIZE],
+          queryFn: ({ pageParam }) =>
+            unwrap(
+              fetchShops({
+                publicOnly: true,
+                limit: PUBLIC_SHOP_PAGE_SIZE,
+                offset: pageParam as number,
+              }),
+            ),
+          initialPageParam: 0,
+          staleTime: 2 * 60_000,
+        }),
+        queryClient.prefetchQuery({
+          queryKey: queryKeys.stories,
+          queryFn: () => unwrap(fetchActiveStories()),
+          staleTime: 2 * 60_000,
+        }),
+        queryClient.prefetchQuery({
+          queryKey: queryKeys.deals(48),
+          queryFn: () => unwrap(fetchActiveDeals(48)),
+          staleTime: 2 * 60_000,
+        }),
+      ]).then(() => {
+        dataReadyRef.current = true;
+      });
+      return prefetch;
+    };
 
     // Boot cover removal is handled by the useLayoutEffect above — it waits
     // until the React splash is showing the logo in its resting pose so the
@@ -352,25 +358,27 @@ export default function AppSplash() {
     }, t);
     t += ms.details;
 
-    // 3) Hold for reading + finish prefetch if needed, then slow fade out
+    // 3) Loading: the intro is fully shown — start the prefetch NOW (nothing
+    //    ran during the beats above) and keep the spinner up while it warms.
     trackTimeout(() => {
       if (isStopped() || exitingRef.current) return;
       setPhase("hold");
       const holdStarted = Date.now();
+      const loading = startPrefetch();
       void (async () => {
         // Wait for data to be ready OR the max wait window.
         await Promise.race([
-          prefetch,
+          loading,
           new Promise<void>((resolve) => {
             trackTimeout(resolve, ms.maxWaitForData);
           }),
         ]);
         if (isStopped() || exitingRef.current) return;
-        // If data still isn't ready, show the loading pill and keep waiting
-        // up to the hard cap so home is never blank.
+        // If data still isn't ready, keep the spinner going up to the hard
+        // cap so home is never blank.
         if (!dataReadyRef.current) {
           await Promise.race([
-            prefetch,
+            loading,
             new Promise<void>((resolve) => {
               trackTimeout(resolve, ms.hardCapWait);
             }),
@@ -456,10 +464,10 @@ export default function AppSplash() {
             ))}
           </ul>
 
-          {phase === "hold" && !dataReady && (
+          {phase === "hold" && (
             <div className="tm-splash-loading" role="status" aria-live="polite">
               <span className="tm-splash-spinner" aria-hidden="true" />
-              <span>Warming up your local shops…</span>
+              <span>Loading your local shops…</span>
             </div>
           )}
         </div>
