@@ -1,10 +1,9 @@
 /* TrendsMart SW v54 — offline-first app shell.
    Goals:
    - Repeat PWA opens feel native: successful visits to PUBLIC pages are
-     cached, so the next launch (even fully offline) opens the real home page
-     instead of the plain /offline fallback.
-   - Network-first navigations with a short cache fallback (no long white
-     screens on flaky/slow networks).
+     cached, and cached copies are served INSTANTLY on the next navigation
+     (stale-while-revalidate) while the network refreshes them in the
+     background — no waiting on the network for the shell on every open.
    - App assets (/ _next/static JS/CSS, fonts, icons) are cached as they are
      used (SWR), so a cached page can still hydrate when offline.
    - Images (Cloudinary / Next image proxy) stay SWR-cached as before.
@@ -127,12 +126,32 @@ async function openPageCache() {
   return caches.open(PAGE_CACHE);
 }
 
+/* Brand assets precached at install so even a fully-offline / first-failed
+   launch never shows a bare teal box — the logo tile is already in the cache. */
+const INSTALL_PRECACHE = [
+  "/offline",
+  "/trendsmart-mark.png?v=16",
+  "/trendmart-mark.png?v=16",
+  "/icon-192.png?v=16",
+  "/icon-512.png?v=16",
+  "/apple-touch-icon.png?v=16",
+  "/manifest.webmanifest",
+];
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       try {
         const cache = await caches.open(SHELL_CACHE);
-        await cache.addAll(["/offline", "/trendsmart-mark.png?v=16"]);
+        // addAll fails wholesale on a single miss; tolerate partial misses so
+        // one unavailable asset never blocks the whole precache.
+        await Promise.all(
+          INSTALL_PRECACHE.map((u) =>
+            cache
+              .add(u)
+              .catch(() => undefined),
+          ),
+        );
       } catch {
         /* offline page / icon may be unavailable during install */
       }
@@ -185,56 +204,46 @@ self.addEventListener("fetch", (event) => {
         const pageCache = cacheable ? await openPageCache() : null;
         const cached = cacheable ? await pageCache.match(pageUrl) : undefined;
 
-        // Try the network. On success: return fresh + refresh the cache copy.
-        const netPromise = (async () => {
-          try {
-            const res = await fetch(req);
-            if (res && res.ok && cacheable) {
-              event.waitUntil(
-                pageCache
-                  .put(pageUrl, res.clone())
-                  .then(() => trimCache(PAGE_CACHE, PAGE_CACHE_LIMIT))
-                  .catch(() => {}),
-              );
-            }
-            return { res };
-          } catch {
-            return { err: true };
-          }
-        })();
-
         if (cached) {
-          // Network-first, but never leave the user staring at a blank page:
-          // if the network hasn't answered within ~2.2s (or fails outright),
-          // show the cached copy immediately and keep refreshing in the bg.
-          const winner = await Promise.race([
-            netPromise,
-            new Promise((resolve) =>
-              setTimeout(() => resolve({ timeout: true }), 2200),
-            ),
-          ]);
-          if (winner.timeout) {
-            event.waitUntil(netPromise.catch(() => {}));
-            return cached;
-          }
-          if (winner.err) {
-            event.waitUntil(netPromise.catch(() => {}));
-            broadcastConnection("offline");
-            return cached;
-          }
-          if (winner.res) {
-            // Fresh answer (incl. non-2xx — show the server's real state).
-            broadcastConnection("online");
-            return winner.res;
-          }
+          // Stale-while-revalidate for PUBLIC pages: return the cached copy
+          // immediately (repeat PWA opens are near-instant — no network wait),
+          // then refresh the cache in the background for next time.
+          event.waitUntil(
+            (async () => {
+              try {
+                const res = await fetch(req);
+                if (res && res.ok && cacheable) {
+                  await pageCache.put(pageUrl, res.clone());
+                  await trimCache(PAGE_CACHE, PAGE_CACHE_LIMIT);
+                  broadcastConnection("online");
+                } else if (res) {
+                  // Fresh but non-ok (e.g. 500) — serve the server's state next
+                  // time too, but keep the current view working right now.
+                  broadcastConnection("online");
+                }
+              } catch {
+                broadcastConnection("offline");
+              }
+            })(),
+          );
           return cached;
         }
 
-        // No cached copy — wait for the real network (don't give up early).
-        const result = await netPromise;
-        if (result && !result.err && result.res) {
+        // No cached copy yet — try the network (don't give up early).
+        try {
+          const res = await fetch(req);
+          if (res && res.ok && cacheable) {
+            event.waitUntil(
+              pageCache
+                .put(pageUrl, res.clone())
+                .then(() => trimCache(PAGE_CACHE, PAGE_CACHE_LIMIT))
+                .catch(() => {}),
+            );
+          }
           broadcastConnection("online");
-          return result.res;
+          return res;
+        } catch {
+          /* offline below */
         }
 
         // Truly offline and nothing cached for this page.

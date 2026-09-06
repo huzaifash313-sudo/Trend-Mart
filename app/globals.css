@@ -5558,7 +5558,7 @@ html.tm-splash-lock body {
 html.tm-splash-settle body,
 html.tm-splash-settle .tm-bg,
 html.tm-splash-settle .tm-main {
-  transition: background-color 0.45s ease;
+  transition: background-color 0.3s ease;
   background-color: var(--tm-bg) !important;
 }
 
@@ -5573,7 +5573,11 @@ html.dark.tm-splash-settle .tm-main {
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 13000;
+  /* ABOVE the React `.tm-splash` (13001): the static boot logo stays visible
+     while React's logo pop-in runs underneath, so the handoff never shows a
+     logo-less gradient or a double logo. AppSplash drops the cover the moment
+     the React logo reaches its resting pose (pixel-identical to this one). */
+  z-index: 13002;
   align-items: center;
   justify-content: center;
   /* Exact same gradient as the React `.tm-splash` so the boot → React handoff
@@ -5637,8 +5641,8 @@ html.tm-first-paint .tm-boot-splash {
 }
 
 .tm-splash--exit {
-  /* Must stay in sync with AppSplash STAGE_MS.exit (520ms). */
-  animation: tm-splash-fade-out 0.52s ease forwards;
+  /* Must stay in sync with AppSplash STAGE_MS.exit (340ms). */
+  animation: tm-splash-fade-out 0.34s ease forwards;
   pointer-events: none;
 }
 
@@ -5746,7 +5750,9 @@ html.tm-first-paint .tm-boot-splash {
     width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
     border-radius 0.7s ease,
     padding 0.7s ease;
-  animation: tm-splash-logo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Snappier pop: must finish before STAGE_MS.logoHold ends so the boot →
+     React handoff happens against the logo's resting pose (no mid-pop swap). */
+  animation: tm-splash-logo-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Boot cover is green-only; the React splash logo pops in exactly once.

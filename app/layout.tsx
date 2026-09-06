@@ -91,8 +91,22 @@ const THEME_BOOTSTRAP = `(function(){try{var k="trendsmart_theme_prefs_v4";var r
  *  - A fresh browser session landing on "/" (session flag unset).
  * Refresh / in-session visits keep showing nothing so browsing is never
  * interrupted by the cover. The inline teal is painted only here and removed
- * by AppSplash.releaseSplashBackground() when the intro finishes. */
-const SPLASH_BOOTSTRAP = `(function(){try{var r=document.documentElement;var p=location.pathname||"/";var home=p==="/"||p==="";var st=function(){try{return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||(window.matchMedia&&window.matchMedia("(display-mode: fullscreen)").matches)||navigator.standalone===true;}catch(e){return false;}}();var full=home&&(st||sessionStorage.getItem("tm_splash_seen_v6")!=="1");if(full){r.style.backgroundColor="var(--tm-splash-bg)";r.classList.add("tm-boot-splash","tm-splash-lock");}}catch(e){}})();`;
+ * by AppSplash.releaseSplashBackground() when the intro finishes.
+ *
+ * The background is set as `var(--tm-splash-bg, #0f766e)` — a literal teal
+ * fallback so the root canvas is branded even on the very first frame, before
+ * globals.css (and its CSS custom properties) has finished loading. Without
+ * this the browser could flash an unpainted black/white window between the
+ * native splash and the boot cover on slow devices. */
+const SPLASH_CRITICAL_CSS = `
+#tm-boot-splash{display:none}
+html.tm-boot-splash{background-color:#0f766e}
+html.tm-boot-splash #tm-boot-splash{display:flex;position:fixed;inset:0;z-index:13002;align-items:center;justify-content:center;background:radial-gradient(120% 80% at 50% -10%,rgba(94,234,212,.35),transparent 55%),radial-gradient(90% 70% at 100% 100%,rgba(13,148,136,.55),transparent 50%),linear-gradient(165deg,#0f766e 0%,#0d9488 42%,#115e59 100%);pointer-events:none}
+#tm-boot-splash .tm-boot-logo{display:inline-flex;height:5.5rem;width:5.5rem;align-items:center;justify-content:center;border-radius:1.25rem;background:#fff;box-shadow:0 12px 36px rgba(0,0,0,.22),0 0 0 1px rgba(255,255,255,.4);padding:.55rem}
+#tm-boot-splash .tm-boot-logo img{display:block;width:100%;height:100%;object-fit:contain}
+`;
+
+const SPLASH_BOOTSTRAP = `(function(){try{var r=document.documentElement;var p=location.pathname||"/";var home=p==="/"||p==="";var st=function(){try{return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||(window.matchMedia&&window.matchMedia("(display-mode: fullscreen)").matches)||navigator.standalone===true;}catch(e){return false;}}();var full=home&&(st||sessionStorage.getItem("tm_splash_seen_v6")!=="1");if(full){r.style.setProperty("background-color","var(--tm-splash-bg, #0f766e)");r.classList.add("tm-boot-splash","tm-splash-lock");}}catch(e){}})();`;
 
 const SITE_JSON_LD = generateSiteJsonLd();
 
@@ -120,6 +134,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             tile appears instantly, no empty white box waiting on the image. */}
         <link rel="preload" as="image" href="/trendsmart-mark.png?v=16" />
         <link rel="preload" as="image" href="/trendmart-mark.png?v=16" />
+        {/* Critical splash CSS is inlined (not a <link>) so the branded boot
+            cover paints on the very first frame — it never waits on the main
+            stylesheet, which kills the black/blank gap on slow Android. The
+            same rules exist in globals.css for the app itself. */}
+        <style
+          dangerouslySetInnerHTML={{ __html: SPLASH_CRITICAL_CSS }}
+        />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: SPLASH_BOOTSTRAP }} />
         {SITE_JSON_LD.map((block, i) => (

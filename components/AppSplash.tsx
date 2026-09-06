@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queries";
@@ -33,37 +39,39 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  * boot cover or abort a first-run play.
  */
 const STAGE_MS = {
-  logoHold: 420,
-  brand: 520,
-  details: 640,
-  holdMin: 280,
+  logoHold: 380, // >= .tm-splash-logo pop (0.34s): logo rests before boot→React handoff
+  brand: 280,
+  details: 340,
+  holdMin: 140,
   /** Keep in sync with `.tm-splash--exit` animation duration in globals.css */
-  exit: 420,
+  exit: 340,
   /** Never block home forever if network is slow. */
-  maxWaitForData: 700,
+  maxWaitForData: 550,
   /** Hard cap for the whole hold phase before we bail out to home. */
-  hardCapWait: 1800,
+  hardCapWait: 1000,
 };
 
 const REDUCED_MS = {
-  logoHold: 80,
-  brand: 100,
-  details: 120,
-  holdMin: 80,
-  exit: 180,
-  maxWaitForData: 200,
-  hardCapWait: 400,
+  logoHold: 120,
+  brand: 70,
+  details: 80,
+  holdMin: 60,
+  exit: 120,
+  maxWaitForData: 160,
+  hardCapWait: 300,
 };
 
 /** Slow networks / Save-Data: skip the marketing beat and open the app. */
 const SLOW_NET_MS = {
-  logoHold: 160,
-  brand: 180,
-  details: 200,
-  holdMin: 100,
-  exit: 220,
-  maxWaitForData: 300,
-  hardCapWait: 700,
+  /* Stays >= the logo pop (0.34s) so the boot logo holds seamlessly; the
+     beats after it are cut to a minimum. */
+  logoHold: 380,
+  brand: 140,
+  details: 160,
+  holdMin: 80,
+  exit: 160,
+  maxWaitForData: 260,
+  hardCapWait: 600,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -203,6 +211,31 @@ export default function AppSplash() {
   const finishedRef = useRef(false);
   const dataReadyRef = useRef(false);
 
+  /* Boot-cover handoff (kills the double-flash).
+   * The static boot cover now sits ABOVE the React splash (z-index 13002), so
+   * from first paint until this effect runs, the user sees exactly one branded
+   * cover. We drop the boot cover the moment the React splash shows the logo
+   * in the same resting pose the boot logo uses (5.5rem, centered):
+   *   - normal: after the logo pop-in finishes, when phase hits "brand" — the
+   *     very first painted frame of that phase is still the resting pose, so
+   *     the swap is pixel-invisible.
+   *   - reduced-motion: CSS disables the pop, so the logo is already identical
+   *     at "logo" and we swap there instead.
+   * This guarantees no frame is ever painted with neither cover, and the logo
+   * never appears to "pop twice".
+   */
+  useLayoutEffect(() => {
+    if (phase === "off") return;
+    let reduced = false;
+    try {
+      reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      /* ignore */
+    }
+    if (phase === "logo" && !reduced) return;
+    removeBootSplash();
+  }, [phase]);
+
   const clearTimers = () => {
     timersRef.current.forEach((id) => window.clearTimeout(id));
     timersRef.current = [];
@@ -303,13 +336,9 @@ export default function AppSplash() {
           if (!unmountedRef.current && !exitingRef.current) setDataReady(true);
         });
 
-    trackTimeout(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!unmountedRef.current) removeBootSplash();
-        });
-      });
-    }, 0);
+    // Boot cover removal is handled by the useLayoutEffect above — it waits
+    // until the React splash is showing the logo in its resting pose so the
+    // handoff is seamless (no double-flash, no blank frame).
 
     // 1) Logo alone, then rise + wordmark
     trackTimeout(() => {
