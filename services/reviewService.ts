@@ -350,6 +350,47 @@ export interface ReviewSessionContext {
   canSubmit: boolean;
 }
 
+/**
+ * Product-scoped review eligibility for the signed-in customer (UI gating).
+ *
+ * Mirrors the strict rules of the shop-level context but for ONE product:
+ * only the exact account that received a DELIVERED order containing this
+ * product may rate it — no fake/test order bypass. The server POST endpoint
+ * re-verifies independently before any write, so this is only for showing /
+ * hiding the "Rate this product" button.
+ */
+export type ProductReviewContext = ReviewSessionContext;
+
+export async function fetchProductReviewContext(
+  productId: string,
+): Promise<ProductReviewContext> {
+  const empty: ProductReviewContext = {
+    signedIn: false,
+    isOwner: false,
+    displayName: "",
+    alreadyReviewed: false,
+    canSubmit: false,
+  };
+  if (!productId || !/^[0-9a-f-]{36}$/i.test(productId.trim())) return empty;
+
+  try {
+    const res = await fetch(
+      `/api/reviews/product-context?productId=${encodeURIComponent(productId.trim())}`,
+      { headers: { Accept: "application/json" } },
+    );
+    const payload = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      data?: ProductReviewContext;
+    };
+    if (!res.ok || !payload.success || !payload.data) return empty;
+    return payload.data;
+  } catch (err) {
+    logError(err, { module: "reviewService.fetchProductReviewContext", meta: { productId } });
+    return empty;
+  }
+}
+
 export async function fetchReviewSessionContext(
   shopId: string,
   ownerId?: string | null,

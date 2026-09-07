@@ -4132,6 +4132,34 @@ html.dark .tm-geo-reset:hover {
 .tm-product-card--compact .tm-product-offer-strip {
   height: 1.25rem;
 }
+
+/* Clean listing tile (/products browse) — Daraz-style, perfectly uniform:
+   square media that any uploaded image fills edge-to-edge, 2-line title and
+   price only. All other info lives behind the quick view on tap. */
+.tm-product-card--clean .tm-product-media::before {
+  padding-bottom: 100%;
+}
+.tm-product-card--clean {
+  height: 100%;
+}
+.tm-product-card--clean .tm-product-body {
+  gap: 0.12rem;
+  justify-content: space-between;
+}
+.tm-product-card--clean .tm-product-title {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  min-height: 2.45em;
+  margin-bottom: 0.1rem;
+}
+.tm-product-card--clean .tm-product-footer {
+  margin-top: auto;
+}
+.tm-product-card--clean .tm-product-shop,
+.tm-product-card--clean .tm-product-actions,
+.tm-product-card--clean .tm-product-offer-strip {
+  display: none;
+}
 @media (min-width: 1024px) {
   .tm-product-card--compact {
     contain-intrinsic-size: 200px 320px;
@@ -7090,25 +7118,42 @@ html.dark .tm-rail-more {
   position: relative;
 }
 
-/* ── Compact fixed grid (home feed) — no scroll, 4 cols phone → 5 laptop ── */
+/* ── Home feed shelf: ≥sm fixed 5-col grid; phones swipe 2 cards per view ── */
 .tm-mini-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.4rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.55rem;
   align-items: stretch;
 }
-@media (min-width: 640px) {
-  .tm-mini-grid {
-    gap: 0.55rem;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-}
 
-/* ── Daraz-style mini tile (whole tile is one tap target) ────────────────── */
-/* ≈3 visible rows: phones show the first 12 (4-col × 3); ≥sm all 15 (5-col
-   × 3) — no horizontal scroll, the rest lives on the More → page. */
+/* Phones: single swipeable row — every tile is ~half the shelf (2 per view),
+   keep it short (12 tiles max), rest scrolls horizontally. */
 @media (max-width: 639.98px) {
-  .tm-mini-grid .tm-mini-tile:nth-child(n + 13) {
+  .tm-mini-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.45rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 0.125rem;
+    scrollbar-width: none;
+    padding-bottom: 0.2rem;
+  }
+  .tm-mini-grid::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  .tm-mini-grid > .tm-mini-tile {
+    flex: 0 0 auto;
+    width: calc((100% - 0.45rem) / 2);
+    max-width: calc((100% - 0.45rem) / 2);
+    scroll-snap-align: start;
+  }
+  .tm-mini-grid > .tm-mini-tile:nth-child(n + 13) {
     display: none;
   }
 }
@@ -7143,7 +7188,9 @@ html.dark .tm-rail-more {
   transform: translateY(0);
 }
 
-/* Square image area — product-style (object-contain on clean card) */
+/* Square image area — product-style. object-cover makes ANY uploaded image
+   (camera portrait, DSLR landscape, whatever) fill the whole box uniformly —
+   no short/tall letterbox gaps between tiles. */
 .tm-mini-tile-media {
   position: relative;
   display: block;
@@ -7157,8 +7204,8 @@ html.dark .tm-mini-tile-media {
   background: color-mix(in srgb, var(--tm-surface) 80%, #000 20%);
 }
 .tm-mini-tile-media img {
-  object-fit: contain;
-  padding: 0.1rem;
+  object-fit: cover;
+  object-position: center;
 }
 .tm-mini-tile-fallback {
   display: flex;

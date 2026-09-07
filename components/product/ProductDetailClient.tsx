@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import type { MarketplaceProduct, Product, Shop } from "@/types";
 import { fetchProductByReference } from "@/services/productService";
 import { fetchShopById } from "@/services/shopService";
+import { fetchProductReviewContext, type ProductReviewContext } from "@/services/reviewService";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { getProductImages } from "@/lib/productImages";
 import { hasPriceTiers, priceForQuantity, tierPreviewLabels } from "@/lib/priceTiers";
@@ -18,6 +19,7 @@ import { getSafeImageUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import ProductOrderModal from "@/components/ProductOrderModal";
+import ProductRatingModal from "@/components/ProductRatingModal";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { computeVariantPricing, customerVariantGroups } from "@/lib/variantPricing";
 import { isComboUnavailable } from "@/lib/variantMatrix";
@@ -26,6 +28,7 @@ import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { ProductDetailSkeleton } from "@/components/Skeletons";
 import CompactRating from "@/components/CompactRating";
+import { createClient } from "@/lib/supabase/client";
 
 function BackIcon() {
   return (
@@ -97,6 +100,8 @@ export default function ProductDetailClient({ code }: { code: string }) {
   const [itemNotes, setItemNotes] = useState("");
   const [added, setAdded] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [ratingCtx, setRatingCtx] = useState<ProductReviewContext | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +115,8 @@ export default function ProductDetailClient({ code }: { code: string }) {
     setItemNotes("");
     setQuantity(1);
     setAdded(false);
+    setRatingOpen(false);
+    setRatingCtx(null);
 
     (async () => {
       const res = await fetchProductByReference(code);
@@ -125,6 +132,9 @@ export default function ProductDetailClient({ code }: { code: string }) {
         return;
       }
       setProduct(res.data);
+      void fetchProductReviewContext(res.data.id).then((ctx) => {
+        if (!cancelled) setRatingCtx(ctx);
+      });
 
       const shopRes = await fetchShopById(res.data.shop_id);
       if (cancelled) return;
@@ -144,6 +154,35 @@ export default function ProductDetailClient({ code }: { code: string }) {
       cancelled = true;
     };
   }, [code]);
+
+  /** Re-check eligibility when the user signs in/out while the page is open,
+   *  so the "Rate this product" button appears/disappears without a reload. */
+  useEffect(() => {
+    if (!product?.id) return;
+    let cancelled = false;
+    const supabase = createClient();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      if (!product?.id) return;
+      void fetchProductReviewContext(product.id).then((ctx) => {
+        if (!cancelled) setRatingCtx(ctx);
+      });
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, [product?.id]);
+
+  /** After a successful rating: refresh the shown stars/count + context. */
+  const handleRated = useCallback(() => {
+    setRatingOpen(false);
+    if (!product) return;
+    void fetchProductReviewContext(product.id).then(setRatingCtx);
+    // Reload product meta so avg_rating / review_count on this page update.
+    void fetchProductByReference(code).then((res) => {
+      if (res.success && res.data) setProduct(res.data);
+    });
+  }, [code, product]);
 
   const images = useMemo(() => getProductImages(product), [product]);
   const safeIndex = images.length ? Math.min(activeIndex, images.length - 1) : 0;
@@ -387,6 +426,31 @@ export default function ProductDetailClient({ code }: { code: string }) {
                 }
                 size="sm"
               />
+              {/* Verified-purchase review gate — only the account with a
+                  delivered order for this product can open the form. */}
+              {ratingCtx?.signedIn && !ratingCtx.isOwner && ratingCtx.canSubmit ? (
+                <button
+                  type="button"
+                  onClick={() => setRatingOpen(true)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100 active:scale-95 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-800/60 dark:hover:bg-amber-900/40"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  Rate this product
+                </button>
+              ) : ratingCtx?.signedIn && !ratingCtx.isOwner && ratingCtx.alreadyReviewed ? (
+                <p className="mt-2 inline-flex items-center gap-1 text-[0.7rem] font-medium text-emerald-700 dark:text-emerald-400">
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  You rated this product
+                </p>
+              ) : ratingCtx?.signedIn && !ratingCtx.isOwner ? (
+                <p className="mt-2 text-[0.7rem] text-zinc-400 dark:text-zinc-500">
+                  Rate it after your order for this product is delivered.
+                </p>
+              ) : null}
             </div>
             {product.description && (
               <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
@@ -536,6 +600,18 @@ export default function ProductDetailClient({ code }: { code: string }) {
           </p>
         </div>
       </div>
+
+      {ratingOpen && product && (
+        <ProductRatingModal
+          productId={product.id}
+          shopId={product.shop_id}
+          productName={product.name}
+          imageUrl={product.image_url}
+          shopName={product.shop_name ?? shop?.name}
+          onClose={() => setRatingOpen(false)}
+          onRated={handleRated}
+        />
+      )}
 
       {orderOpen && shop && (
         <ProductOrderModal

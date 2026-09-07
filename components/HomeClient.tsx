@@ -36,6 +36,7 @@ import ShopCard from "@/components/ShopCard";
 import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
+import { dealCommerceId } from "@/lib/dealCommerce";
 import { useQueryClient } from "@tanstack/react-query";
 import { useShopsInfinite, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { useConnection } from "@/lib/connection";
@@ -810,15 +811,37 @@ function HomeClient({
     return chunks;
   }, [visibleShops]);
 
-  const feedRails = useMemo<ReactNode[]>(() => {
-    const first: ReactNode = (
-      <DealsRail key="rail-0" deals={activeDeals} />
-    );
-    const second: ReactNode = <ProductsRail key="rail-1" myShopId={myShopId} />;
-    const third: ReactNode = <SponsoredRail key="rail-2" />;
-    // Deals → products → sponsored → deals → … (rails repeat as pages load)
-    return [first, second, third];
-  }, [activeDeals, myShopId]);
+  /*
+   * One compact shelf after EVERY shop chunk — deals → products → sponsored →
+   * deals → … Each occurrence gets a slot index: deals/products rotate their
+   * item window so a shelf shown later on the same page never repeats the same
+   * tiles (and "Top picks" skips items the "Hot deals" shelf already showed).
+   */
+  const dealProductIds = useMemo(
+    () => new Set(activeDeals.map((d) => dealCommerceId(d))),
+    [activeDeals],
+  );
+  const renderFeedRail = useCallback(
+    (ci: number): ReactNode => {
+      const slot = Math.floor(ci / 3);
+      const kind = ci % 3;
+      if (kind === 0) {
+        return <DealsRail key={`deal-rail-${ci}`} deals={activeDeals} slot={slot} />;
+      }
+      if (kind === 1) {
+        return (
+          <ProductsRail
+            key={`product-rail-${ci}`}
+            myShopId={myShopId}
+            slot={slot}
+            excludeProductIds={dealProductIds}
+          />
+        );
+      }
+      return <SponsoredRail key={`sponsored-rail-${ci}`} />;
+    },
+    [activeDeals, myShopId, dealProductIds],
+  );
 
   /* Auto-load the next page of shops when the sentinel scrolls into view —
      infinite marketplace scroll instead of clicking "Show more". */
@@ -1185,7 +1208,6 @@ function HomeClient({
         {!loading && !hardFail && displayShops.length > 0 && (
           <>
             {shopChunks.map((chunk, ci) => {
-              const rail = feedRails[ci % feedRails.length];
               return (
                 <div key={`shop-chunk-${ci}`} className={ci > 0 ? "mt-2 sm:mt-4" : ""}>
                   <VirtualizedGrid
@@ -1213,10 +1235,9 @@ function HomeClient({
                     }}
                   />
                   {/* Compact rail — one after every shop chunk, cycling
-                      deals → products → sponsored. Even on a short feed (a
-                      single chunk) the rails still show, so the page never
-                      ends as a bare grid. */}
-                  {rail}
+                      deals → products → sponsored. Each occurrence rotates
+                      fresh items so shelves never repeat on the same page. */}
+                  {renderFeedRail(ci)}
                 </div>
               );
             })}

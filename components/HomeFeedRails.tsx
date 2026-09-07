@@ -1,14 +1,16 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Home compact grids (deals / top products / sponsored)        */
+/*  TrendsMart — Home compact shelves (deals / top products / sponsored)      */
 /*                                                                            */
 /*  Daraz-style MINI tiles: image + title + price only — no wishlist heart,   */
 /*  no Add/Order buttons on the card. The whole tile opens the same quick     */
 /*  view where Order / Add to Cart / Wishlist live.                           */
 /*                                                                            */
-/*  Fixed grid · 4 columns phone → 5 columns tablet/laptop · ~3 rows          */
-/*  (12 tiles phones / 15 tiles desktop) · NO horizontal scroll.              */
+/*  Phones: swipeable shelf — 2 cards per row, rest scrolls horizontally so   */
+/*  the shelf stays short. Tablet/laptop: fixed 5-col × 3 rows, 15 tiles,     */
+/*  no scroll. Repeated shelves (after deeper shop chunks) rotate the window  */
+/*  so the same deals/products never show twice on one page.                  */
 /* -------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,6 +19,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { MarketplaceProduct, Product, Shop } from "@/types";
 import { isDealActiveOnDate, toPkDateKey, type ShopDeal } from "@/lib/dealSchedule";
+import { dealCommerceId } from "@/lib/dealCommerce";
 import { getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import { formatPrice, getProductDiscount } from "@/lib/formatters";
@@ -37,7 +40,8 @@ const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), 
   loading: () => null,
 });
 
-const RAIL_LIMIT = 15; // 5 × 3 rows on desktop, 12 of these on phones (4 × 3)
+const RAIL_LIMIT = 15; // 5 × 3 rows on desktop · phones show a short swipeable shelf
+const PRODUCT_POOL = 60; // bigger fetch pool so every "Top picks" shelf shows a fresh window
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
 
@@ -87,7 +91,6 @@ function MiniTile({
   price,
   originalPrice,
   badge,
-  shopName,
   onOpen,
 }: {
   imageUrl: string | null | undefined;
@@ -96,7 +99,6 @@ function MiniTile({
   originalPrice?: number | null;
   /** Extra corner chip (e.g. deal badge). Falls back to % off chip. */
   badge?: string | null;
-  shopName?: string | null;
   onOpen: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
@@ -119,8 +121,7 @@ function MiniTile({
             src={safeSrc}
             alt=""
             fill
-            sizes="(max-width: 640px) 25vw, 20vw"
-            className="object-contain"
+            sizes="(max-width: 640px) 50vw, 20vw"
             loading="lazy"
             quality={70}
             onError={() => setImgError(true)}
@@ -139,11 +140,6 @@ function MiniTile({
         <span className="tm-mini-tile-title" title={title}>
           {title}
         </span>
-        {shopName ? (
-          <span className="tm-mini-tile-shop" title={shopName}>
-            {shopName}
-          </span>
-        ) : null}
         <span className="tm-mini-tile-price-row">
           <span className="tm-mini-tile-price">{formatPrice(price)}</span>
           {originalPrice && originalPrice > price ? (
@@ -157,15 +153,27 @@ function MiniTile({
   );
 }
 
+/** Keep `count` items of a list but START from a rotated offset so repeated
+ *  shelves on the same page never show the exact same window of items. */
+function rotateWindow<T>(items: T[], count: number, slot: number): T[] {
+  const len = items.length;
+  if (len === 0) return [];
+  if (len <= count) return items;
+  const start = (Math.max(0, slot) * count) % len;
+  return Array.from({ length: count }, (_, i) => items[(start + i) % len]!);
+}
+
 /* ── Deals grid ───────────────────────────────────────────────────────────── */
 
 interface DealsRailProps {
   deals: ShopDeal[];
   title?: string;
   moreHref?: string;
+  /** Occurrence index — repeated shelves rotate their window so items differ. */
+  slot?: number;
 }
 
-function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals" }: DealsRailProps) {
+function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals", slot = 0 }: DealsRailProps) {
   const [openDeal, setOpenDeal] = useState<ShopDeal | null>(null);
 
   const visible = useMemo(() => {
@@ -178,8 +186,20 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals" }: Dea
     );
     const featured = live.filter((d) => d.is_featured);
     const rest = live.filter((d) => !d.is_featured);
-    return [...featured, ...rest].slice(0, RAIL_LIMIT);
-  }, [deals]);
+
+    // The same product is often re-featured by several shops as its own deal
+    // row — collapse to ONE tile per product so a shelf never shows the same
+    // item twice (first/featured shop wins; the rest still live on /deals).
+    const seen = new Set<string>();
+    const unique = [...featured, ...rest].filter((d) => {
+      const key = dealCommerceId(d);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return rotateWindow(unique, RAIL_LIMIT, slot);
+  }, [deals, slot]);
 
   if (visible.length === 0) return null;
 
@@ -200,7 +220,6 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals" }: Dea
               originalPrice={
                 Number(deal.original_price ?? discount.originalPrice) || null
               }
-              shopName={deal.shop_name ?? null}
               onOpen={() => {
                 setOpenDeal(deal);
                 trackProductView({
@@ -228,6 +247,11 @@ interface ProductsRailProps {
   myShopId: string | null;
   title?: string;
   moreHref?: string;
+  /** Occurrence index — repeated shelves rotate their window so items differ. */
+  slot?: number;
+  /** Marketplace product ids already shown by the deals shelf on this page —
+   *  skipped first so "Top picks" doesn't echo the same items as "Hot deals". */
+  excludeProductIds?: ReadonlySet<string>;
 }
 
 interface ProductOrderIntent {
@@ -237,20 +261,38 @@ interface ProductOrderIntent {
   notes?: string;
 }
 
-function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/products" }: ProductsRailProps) {
+function ProductsRailInner({
+  myShopId,
+  title = "Top picks",
+  moreHref = "/products",
+  slot = 0,
+  excludeProductIds,
+}: ProductsRailProps) {
   const { addToast } = useToast();
   const { addItem } = useCart();
 
   const productsQuery = useMarketplaceProducts({
     sort: "popular",
-    limit: RAIL_LIMIT,
+    limit: PRODUCT_POOL,
     availableOnly: true,
   });
 
   const products = useMemo(() => {
-    const all = productsQuery.data ?? [];
-    return all.filter((p) => !myShopId || p.shop_id !== myShopId).slice(0, RAIL_LIMIT);
-  }, [productsQuery.data, myShopId]);
+    const all = (productsQuery.data ?? []).filter(
+      (p) => !myShopId || p.shop_id !== myShopId,
+    );
+    if (all.length === 0) return all;
+
+    // Deals already shown on this page go to the back of the queue.
+    let ordered = all;
+    if (excludeProductIds && excludeProductIds.size > 0) {
+      const kept = all.filter((p) => !excludeProductIds.has(p.id));
+      const dup = all.filter((p) => excludeProductIds.has(p.id));
+      ordered = kept.length > 0 ? [...kept, ...dup] : all;
+    }
+
+    return rotateWindow(ordered, RAIL_LIMIT, slot);
+  }, [productsQuery.data, myShopId, slot, excludeProductIds]);
 
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
@@ -400,7 +442,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
                 title={product.name}
                 price={product.price}
                 originalPrice={discount.originalPrice}
-                shopName={product.shop_name ?? null}
                 onOpen={() => {
                   if (product.is_available === false) return;
                   openQuickView(product);
