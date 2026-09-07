@@ -133,7 +133,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Logo must be cached before the boot cover paints — the splash logo
             tile appears instantly, no empty white box waiting on the image. */}
         <link rel="preload" as="image" href="/trendsmart-mark.png?v=16" />
-        <link rel="preload" as="image" href="/trendmart-mark.png?v=16" />
         {/* Critical splash CSS is inlined (not a <link>) so the branded boot
             cover paints on the very first frame — it never waits on the main
             stylesheet, which kills the black/blank gap on slow Android. The
