@@ -20,7 +20,6 @@ import { SHOP_CATEGORIES } from "@/types";
 import {
   sortStoriesUnseenFirst,
   getViewedStoryIds,
-  formatStoryViewCount,
 } from "@/lib/storyViewed";
 import { toggleFavorite as toggleFav, getAllFavorites } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
@@ -63,9 +62,11 @@ const EMPTY_STORIES: Story[] = [];
 const EMPTY_COUPONS: Record<string, Coupon[]> = {};
 
 /**
- * WhatsApp/Instagram-style partial story ring. The gradient arc shrinks as more
- * of the shop's stories are viewed; the gray ring underneath shows the seen
- * portion. All-seen → fully gray, nothing-seen → full gradient.
+ * WhatsApp/Instagram-style segmented story ring.
+ * The ring is divided into one arc segment PER story (max 12): a shop with 5
+ * stories shows 5 arcs, exactly like WhatsApp/Instagram. Stories the customer
+ * has ALREADY watched render as dim/seen arcs; unwatched ones stay vivid with
+ * the brand gradient. A single story is a clean full gradient ring.
  *
  * Gradient defs live INSIDE this SVG — external <defs> in a 0×0 svg break on
  * mobile Safari. Ring geometry is CSS-locked so global svg { height:auto }
@@ -87,8 +88,80 @@ function StoryRing({
   const STROKE = 2.5;
   const r = (SIZE - STROKE) / 2;
   const C = 2 * Math.PI * r;
-  const seenFrac = total > 0 ? Math.max(0, Math.min(seen / total, 1)) : 0;
-  const unseenFrac = 1 - seenFrac;
+  const count = Math.max(1, Math.min(12, Math.round(total) || 1));
+  const watched = Math.max(0, Math.min(seen, count));
+  const allSeen = watched >= count;
+
+  /** Ring is one clean circle when only a single story exists. */
+  if (count === 1) {
+    return (
+      <div className="tm-story-ring">
+        <svg
+          className="tm-story-ring-svg"
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          width={SIZE}
+          height={SIZE}
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--tm-brand-400)" />
+              <stop offset="50%" stopColor="var(--tm-sea-400)" />
+              <stop offset="100%" stopColor="var(--tm-brand-600)" />
+            </linearGradient>
+          </defs>
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={r}
+            fill="none"
+            strokeWidth={STROKE}
+            className="tm-story-ring-track"
+          />
+          {!allSeen && (
+            <circle
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={r}
+              fill="none"
+              strokeWidth={STROKE}
+              strokeLinecap="round"
+              stroke={`url(#${gradId})`}
+            />
+          )}
+        </svg>
+        <div className="tm-story-ring-avatar">{children}</div>
+      </div>
+    );
+  }
+
+  /* Multi-story: split the circle into `count` equal arcs with tiny gaps. */
+  const gapFrac = count >= 8 ? 0.045 : 0.06; // arc gap fraction of one pitch
+  const pitchDeg = 360 / count;
+  const arcDeg = pitchDeg * (1 - gapFrac);
+
+  const segments = Array.from({ length: count }, (_, i) => {
+    // first `watched` arcs = already-seen (dim), rest = unviewed (vivid)
+    const isSeen = i < watched;
+    const rotate = i * pitchDeg; // svg wrapper already rotates -90° via CSS
+    return (
+      <circle
+        key={`seg-${i}`}
+        cx={SIZE / 2}
+        cy={SIZE / 2}
+        r={r}
+        fill="none"
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        stroke={isSeen ? undefined : `url(#${gradId})`}
+        className={isSeen ? "tm-story-ring-seg--seen" : undefined}
+        strokeDasharray={`${Math.max(0.001, (arcDeg / 360) * C - 0.5)} ${C}`}
+        transform={`rotate(${rotate} ${SIZE / 2} ${SIZE / 2})`}
+        style={{ opacity: 1 }}
+      />
+    );
+  });
+
   return (
     <div className="tm-story-ring">
       <svg
@@ -113,17 +186,7 @@ function StoryRing({
           strokeWidth={STROKE}
           className="tm-story-ring-track"
         />
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={r}
-          fill="none"
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-          stroke={unseenFrac > 0 ? `url(#${gradId})` : "none"}
-          strokeDasharray={`${Math.max(unseenFrac * C - 1, 0)} ${C}`}
-          style={{ opacity: unseenFrac > 0 ? 1 : 0 }}
-        />
+        {segments}
       </svg>
       <div className="tm-story-ring-avatar">{children}</div>
     </div>
@@ -156,10 +219,6 @@ function MyStoryRingButton({
     ? storyThumb || shop.logo_url || lead?.shop_logo_url || null
     : null;
   const initial = shop.name?.trim()?.charAt(0).toUpperCase() || "S";
-  const totalViews = stories.reduce(
-    (sum, s) => sum + Math.max(0, Number(s.view_count) || 0),
-    0,
-  );
 
   const avatar = thumbUrl ? (
     <Image
@@ -190,19 +249,13 @@ function MyStoryRingButton({
               type="button"
               onClick={onView}
               className="tm-story-item-hit"
-              aria-label={`Preview your live stor${stories.length === 1 ? "y" : "ies"}${totalViews > 0 ? `, ${totalViews} views` : ""}`}
+              aria-label={`Preview your live stor${stories.length === 1 ? "y" : "ies"}`}
               title="View your stories"
             >
               <StoryRing total={stories.length} seen={0} gradId="tmStoryGradMine">
                 {avatar}
               </StoryRing>
             </button>
-
-            {stories.length > 1 ? (
-              <span className="tm-story-count tm-story-count--mine" aria-hidden>
-                {stories.length}
-              </span>
-            ) : null}
 
             {/* Tiny corner + → add one more story */}
             <button
@@ -247,12 +300,6 @@ function MyStoryRingButton({
       <span className="tm-story-ring-label tm-story-ring-label--mine">
         {hasLiveStories ? "Your story" : "Add story"}
       </span>
-      {hasLiveStories ? (
-        <span className="tm-story-views-label" aria-hidden>
-          {formatStoryViewCount(totalViews)}{" "}
-          {totalViews === 1 ? "view" : "views"}
-        </span>
-      ) : null}
     </div>
   );
 }
@@ -871,10 +918,6 @@ function HomeClient({
               const initial = label.charAt(0).toUpperCase() || "?";
               const startIndex = storyGroups.slice(0, gIdx).reduce((n, g) => n + g.length, 0);
               const firstUnseenInGroup = group.findIndex((s) => !viewedStoryIds.has(s.id));
-              const groupViews = group.reduce(
-                (sum, s) => sum + Math.max(0, Number(s.view_count) || 0),
-                0,
-              );
               return (
                 <button
                   key={first.id}
@@ -886,7 +929,7 @@ function HomeClient({
                     setStoryViewerOpen(true);
                   }}
                   className="tm-story-item"
-                  aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : `, ${group.length - seenCount} unviewed`}, ${groupViews} views`}
+                  aria-label={`${label}${group.length > 1 ? `, ${group.length} stories` : " story"}${allSeen ? " (viewed)" : `, ${group.length - seenCount} unviewed`}`}
                 >
                   <div className="tm-story-item-frame">
                     <StoryRing
@@ -911,17 +954,8 @@ function HomeClient({
                         </div>
                       )}
                     </StoryRing>
-                    {group.length > 1 ? (
-                      <span className="tm-story-count" aria-hidden>
-                        {group.length}
-                      </span>
-                    ) : null}
                   </div>
                   <span className="tm-story-ring-label">{label}</span>
-                  <span className="tm-story-views-label" aria-hidden>
-                    {formatStoryViewCount(groupViews)}{" "}
-                    {groupViews === 1 ? "view" : "views"}
-                  </span>
                 </button>
               );
             })
