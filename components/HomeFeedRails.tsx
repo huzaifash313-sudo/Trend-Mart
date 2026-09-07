@@ -1,37 +1,33 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Home compact feed grids (deals / top products / sponsored)   */
+/*  TrendsMart — Home compact grids (deals / top products / sponsored)        */
 /*                                                                            */
-/*  Inserted BETWEEN chunks of the live-shops feed so the homepage reads like  */
-/*  a marketplace: shops → small deals grid → shops → small products grid →    */
-/*  shops → sponsored → …                                                     */
+/*  Daraz-style MINI tiles: image + title + price only — no wishlist heart,   */
+/*  no Add/Order buttons on the card. The whole tile opens the same quick     */
+/*  view where Order / Add to Cart / Wishlist live.                           */
 /*                                                                            */
-/*  Every rail is a FIXED compact grid (no auto-scroll / no marquee):          */
-/*   - small product-style tiles · 4 columns on phone → 5 on laptop           */
-/*   - at most 15 tiles shown (≈3 rows on a 5-column laptop)                   */
-/*   - header carries title + "More … →"                                      */
-/*   - tapping a tile opens the same quick view (Order / Add / Wishlist)       */
+/*  Fixed grid · 4 columns phone → 5 columns tablet/laptop · ~3 rows          */
+/*  (12 tiles phones / 15 tiles desktop) · NO horizontal scroll.              */
 /* -------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { MarketplaceProduct, Product, Shop } from "@/types";
 import { isDealActiveOnDate, toPkDateKey, type ShopDeal } from "@/lib/dealSchedule";
 import { getDealImages } from "@/lib/productImages";
+import { getSafeImageUrl } from "@/services/storageService";
+import { formatPrice, getProductDiscount } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
 import { useCart } from "@/context/CartContext";
 import { useMarketplaceProducts } from "@/lib/queries";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { fetchShopById } from "@/services/shopService";
-import { customerVariantGroups } from "@/lib/variantPricing";
 import { trackProductView, trackCategoryInterest } from "@/lib/behavior";
 import { logProductClick } from "@/services/analyticsService";
 import { dealToProduct } from "@/lib/dealCommerce";
-import DealCard from "@/components/DealCard";
-import { ProductCard } from "@/components/ProductGrid";
 
 const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), { ssr: false });
 const ProductOrderModal = dynamic(() => import("@/components/ProductOrderModal"), { ssr: false });
@@ -41,10 +37,9 @@ const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), 
   loading: () => null,
 });
 
-/** Max tiles shown per rail (~3 rows of 5 on laptop, ~4 rows of 4 on phone). */
-const RAIL_LIMIT = 15;
+const RAIL_LIMIT = 15; // 5 × 3 rows on desktop, 12 of these on phones (4 × 3)
 
-/* ── Small pieces ─────────────────────────────────────────────────────────── */
+/* ── Header ───────────────────────────────────────────────────────────────── */
 
 function ChevronRight() {
   return (
@@ -79,6 +74,89 @@ function RailHeading({
   );
 }
 
+/* ── Daraz-style mini tile (no buttons — whole tile opens quick view) ─────── */
+
+function percentOff(price: number, original: number | null | undefined): number {
+  if (!original || original <= price || price <= 0) return 0;
+  return Math.max(1, Math.round((1 - price / original) * 100));
+}
+
+function MiniTile({
+  imageUrl,
+  title,
+  price,
+  originalPrice,
+  badge,
+  shopName,
+  onOpen,
+}: {
+  imageUrl: string | null | undefined;
+  title: string;
+  price: number;
+  originalPrice?: number | null;
+  /** Extra corner chip (e.g. deal badge). Falls back to % off chip. */
+  badge?: string | null;
+  shopName?: string | null;
+  onOpen: () => void;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const safeSrc =
+    imageUrl && !imgError ? getSafeImageUrl(imageUrl, "product", "card") : null;
+  const off = percentOff(price, originalPrice);
+  const initial = title.trim().charAt(0).toUpperCase() || "?";
+  const showBadge = badge?.trim() ? badge.trim() : null;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="tm-mini-tile"
+      aria-label={`View ${title}`}
+    >
+      <span className="tm-mini-tile-media">
+        {safeSrc ? (
+          <Image
+            src={safeSrc}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 25vw, 20vw"
+            className="object-contain"
+            loading="lazy"
+            quality={70}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <span className="tm-mini-tile-fallback">{initial}</span>
+        )}
+        {off > 0 ? (
+          <span className="tm-mini-tile-off">{off}% OFF</span>
+        ) : showBadge ? (
+          <span className="tm-mini-tile-badge">{showBadge}</span>
+        ) : null}
+      </span>
+
+      <span className="tm-mini-tile-body">
+        <span className="tm-mini-tile-title" title={title}>
+          {title}
+        </span>
+        {shopName ? (
+          <span className="tm-mini-tile-shop" title={shopName}>
+            {shopName}
+          </span>
+        ) : null}
+        <span className="tm-mini-tile-price-row">
+          <span className="tm-mini-tile-price">{formatPrice(price)}</span>
+          {originalPrice && originalPrice > price ? (
+            <span className="tm-mini-tile-was">
+              {formatPrice(originalPrice)}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 /* ── Deals grid ───────────────────────────────────────────────────────────── */
 
 interface DealsRailProps {
@@ -96,9 +174,8 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals" }: Dea
       (d) =>
         d.is_active &&
         isDealActiveOnDate(d, today) &&
-        Boolean(d.image_url || (d.images && d.images.length)),
+        Boolean(d.image_url || (d.images && d.images.length) || d.price != null),
     );
-    // Featured first, then newest — balanced small shelf.
     const featured = live.filter((d) => d.is_featured);
     const rest = live.filter((d) => !d.is_featured);
     return [...featured, ...rest].slice(0, RAIL_LIMIT);
@@ -110,27 +187,35 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals" }: Dea
     <section aria-label={title} className="tm-rail">
       <RailHeading icon={<span aria-hidden>⚡</span>} title={title} moreLabel="More deals" moreHref={moreHref} />
       <div className="tm-mini-grid">
-        {visible.map((deal) => (
-          <div key={deal.id} className="tm-mini-cell">
-            <DealCard
-              deal={deal}
-              compact
-              priority={false}
+        {visible.map((deal) => {
+          const product = dealToProduct(deal);
+          const discount = getProductDiscount(product);
+          const image = getDealImages(deal)[0] ?? deal.image_url ?? null;
+          return (
+            <MiniTile
+              key={deal.id}
+              imageUrl={image}
+              title={deal.title}
+              price={Number(deal.price ?? product.price) || 0}
+              originalPrice={
+                Number(deal.original_price ?? discount.originalPrice) || null
+              }
+              shopName={deal.shop_name ?? null}
               onOpen={() => {
                 setOpenDeal(deal);
                 trackProductView({
-                  id: dealToProduct(deal).id,
+                  id: product.id,
                   name: deal.title,
                   price: Number(deal.price) || 0,
-                  imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
+                  imageUrl: image,
                   shopId: deal.shop_id,
                   shopName: deal.shop_name,
                   category: null,
                 });
               }}
             />
-          </div>
-        ))}
+          );
+        })}
       </div>
       {openDeal ? <DealQuickView deal={openDeal} onClose={() => setOpenDeal(null)} /> : null}
     </section>
@@ -153,7 +238,6 @@ interface ProductOrderIntent {
 }
 
 function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/products" }: ProductsRailProps) {
-  const router = useRouter();
   const { addToast } = useToast();
   const { addItem } = useCart();
 
@@ -173,7 +257,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
   const [orderIntent, setOrderIntent] = useState<ProductOrderIntent | null>(null);
   const [orderShop, setOrderShop] = useState<Shop | null>(null);
 
-  /* Live product favourites (DB for signed-in, localStorage for guests). */
   useEffect(() => {
     let cancelled = false;
     const refresh = () => {
@@ -215,31 +298,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
       void logProductClick(full.shop_id, full.id);
     },
     [fullFor],
-  );
-
-  const handleProductClick = useCallback(
-    (product: Product) => {
-      if (product.is_available === false) return;
-      openQuickView(product);
-    },
-    [openQuickView],
-  );
-
-  const handleAddToCart = useCallback(
-    (product: Product) => {
-      const full = fullFor(product);
-      if (full.is_available === false) {
-        addToast("This product is unavailable.", "error");
-        return;
-      }
-      if (customerVariantGroups(full.variants).length > 0) {
-        openQuickView(product);
-        return;
-      }
-      addItem(full, { id: full.shop_id, name: full.shop_name || "Store", whatsapp_number: full.shop_whatsapp || "" }, 1);
-      addToast(`"${full.name}" added to cart`, "success");
-    },
-    [addItem, addToast, fullFor, openQuickView],
   );
 
   /** Direct order — resolve the full shop first, then open WhatsApp checkout. */
@@ -299,21 +357,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
     [addItem, addToast, fullFor],
   );
 
-  const handleOrderFromCard = useCallback(
-    (product: Product) => {
-      if (product.is_available === false) {
-        addToast("This product is unavailable.", "error");
-        return;
-      }
-      if (customerVariantGroups(product.variants).length > 0) {
-        openQuickView(product);
-        return;
-      }
-      void handleOrder({ product, quantity: 1 });
-    },
-    [addToast, handleOrder, openQuickView],
-  );
-
   const handleFavorite = useCallback(
     async (product: { id: string; name?: string; image_url?: string | null }, next: boolean) => {
       setFavorites((prev) => {
@@ -337,13 +380,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
     [addToast],
   );
 
-  const handleShopClick = useCallback(
-    (product: { shop_id?: string }) => {
-      if (product.shop_id) router.push(`/shop/${product.shop_id}`);
-    },
-    [router],
-  );
-
   if (productsQuery.isLoading || products.length === 0) return null;
 
   const quickViewShop = quickView
@@ -355,25 +391,23 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
       <section aria-label={title} className="tm-rail">
         <RailHeading icon={<span aria-hidden>🔥</span>} title={title} moreLabel="More products" moreHref={moreHref} />
         <div className="tm-mini-grid">
-          {products.map((product) => (
-            <div key={product.id} className="tm-mini-cell">
-              <ProductCard
-                product={product}
-                compact
-                isFavorite={favorites.has(product.id)}
-                isPinned={false}
-                categoryLabel={undefined}
-                showShopMeta={false}
-                offerContext={null}
-                priority={false}
-                onProductClick={() => handleProductClick(product)}
-                onAddToCart={() => handleAddToCart(product)}
-                onOrder={() => handleOrderFromCard(product)}
-                onFavoriteToggle={() => void handleFavorite(product, !favorites.has(product.id))}
-                onShopClick={handleShopClick}
+          {products.map((product) => {
+            const discount = getProductDiscount(product);
+            return (
+              <MiniTile
+                key={product.id}
+                imageUrl={product.image_url}
+                title={product.name}
+                price={product.price}
+                originalPrice={discount.originalPrice}
+                shopName={product.shop_name ?? null}
+                onOpen={() => {
+                  if (product.is_available === false) return;
+                  openQuickView(product);
+                }}
               />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
