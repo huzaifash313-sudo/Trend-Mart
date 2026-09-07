@@ -369,7 +369,7 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals" }: Dea
     // Featured first, then newest — a balanced, pretty strip.
     const featured = live.filter((d) => d.is_featured);
     const rest = live.filter((d) => !d.is_featured);
-    return [...featured, ...rest].slice(0, 16);
+    return [...featured, ...rest].slice(0, 15);
   }, [deals]);
 
   if (visible.length === 0) return null;

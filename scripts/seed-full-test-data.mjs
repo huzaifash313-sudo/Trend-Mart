@@ -87,8 +87,16 @@ const sizeOpts = (base, map = { Small: -120, Medium: 0, Large: 130, Family: 320 
 const weightOpts = (base) => sizeOpts(base, { "250g": P(base * 0.3), "500g": P(base * 0.55), "1kg": base, "2kg": P(base * 1.9) });
 const volOpts = (base) => sizeOpts(base, { "250ml": P(base * 0.45), "500ml": P(base * 0.8), "1L": base, "1.5L": P(base * 1.35) });
 const pcsOpts = (base) => sizeOpts(base, { "6 pc": P(base * 0.7), "12 pc": base, "24 pc": P(base * 1.8), "50 pc": P(base * 3.4) });
-const garmentSizes = { name: "Size", options: ["S", "M", "L", "XL", "XXL"].map((l) => ({ label: l })) };
-const kidSizes = { name: "Size", options: ["2-3Y", "4-5Y", "6-8Y", "9-11Y"].map((l) => ({ label: l })) };
+/* Clothing size with real-world price deltas — bigger sizes cost more, and the
+   smallest size is slightly cheaper, so selecting XL/XXL changes the price. */
+const garmentSizeOpts = (base) => sizeOpts(base, {
+  S: P(base * -0.05), M: 0, L: P(base * 0.05), XL: P(base * 0.12), XXL: P(base * 0.2),
+});
+/* Kids clothing: bigger age ranges carry a small premium. */
+const kidSizeOpts = (base) => sizeOpts(base, {
+  "2-3Y": P(base * -0.08), "4-5Y": 0, "6-8Y": P(base * 0.08), "9-11Y": P(base * 0.15),
+});
+/* Footwear is flat across sizes (real shops price UK6–UK11 the same). */
 const shoeSizes = { name: "Size (UK)", options: ["UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11"].map((l) => ({ label: l })) };
 const colorOpts = (cols, priced = {}) => ({
   name: "Color",
@@ -99,9 +107,22 @@ const spiceOpts = { name: "Spice Level", options: ["Mild", "Medium", "Hot"].map(
 const packs = (arr) => arr.map(([q, price]) => ({ min_qty: q, price: P(price) }));
 const json = (v) => (v ? JSON.stringify(v) : null);
 
-/* ── image URLs ────────────────────────────────────────────────────────────── */
-const LF = (kw, lock, w = 800) => `https://loremflickr.com/${w}/${w}/${kw}?lock=${lock}`;
+/* ── image URLs (Unsplash only — Flickr/loremflickr are blocked in PK) ───── */
 const US = (id, w = 800) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
+
+/* Verified-good photo ids (written by scripts/repair-images.mjs). When the
+   cache is present we ONLY use ids that were live-checked, so re-running this
+   seed never reintroduces broken/blocked images. */
+const _vCache = join(ROOT, "scripts", ".verified-unsplash.json");
+const VERIFIED_GOOD = (() => {
+  try {
+    if (existsSync(_vCache)) {
+      const { good } = JSON.parse(readFileSync(_vCache, "utf8"));
+      if (Array.isArray(good) && good.length > 20) return new Set(good);
+    }
+  } catch { /* ignore */ }
+  return null;
+})();
 
 const POOLS = {
   food: ["1513104890138-7c749659a591", "1568901346375-23c9450c58cd", "1571091718767-18b5b1457add", "1565299624946-b28f40a0ae38", "1594212699903-ec8a3eca50f5", "1604382354936-07c5d9983bd3", "1589302168068-964664d93dc0", "1563379091339-03b21ab4a4f8"],
@@ -142,22 +163,40 @@ const CAT_META = {
   "Others / Universal": { kw: "products,store", pool: "generic" },
 };
 
-/** Build a gallery of `count` distinct-looking real photos for a product. */
-function buildImages(cat, productSeed, count) {
+/** Pick deterministic verified Unsplash ids for a category + seed offset. */
+function pickId(cat, seed, offset = 0) {
   const meta = CAT_META[cat] || CAT_META["Others / Universal"];
-  const kw = meta.kw;
   const pool = POOLS[meta.pool] || POOLS.generic;
-  const urls = [];
-  for (let i = 0; i < count; i++) {
-    // deterministic lock per product+position => stable, unique-looking photo
-    urls.push(LF(kw, (productSeed * 131 + i * 977) % 85000 + 1, 800));
-    // blend a curated Unsplash shot every other position
-    urls.push(US(pool[(productSeed + i) % pool.length], 800));
+  // When a verified-good cache exists, restrict to live-checked ids only.
+  const usable = VERIFIED_GOOD ? pool.filter((id) => VERIFIED_GOOD.has(id)) : pool;
+  const arr = usable.length > 0 ? usable : pool;
+  if (arr.length === 0) return null;
+  return arr[(Math.abs(seed) + offset * 7) % arr.length];
+}
+
+/** Build a gallery of `count` distinct verified Unsplash URLs. */
+function buildImages(cat, productSeed, count) {
+  const ids = [];
+  let off = 0;
+  let stuck = 0;
+  while (ids.length < count) {
+    const id = pickId(cat, productSeed, off++);
+    if (!id) break;
+    if (!ids.includes(id)) {
+      ids.push(id);
+      stuck = 0;
+    } else {
+      // no new id found — don't spin forever on tiny pools
+      if (++stuck > (POOLS[CAT_META[cat]?.pool] || []).length + 4) break;
+    }
   }
-  // interleave: lorem (0), unsplash (1), lorem (2)...
-  const out = [];
-  for (let i = 0; i < count; i++) out.push(i % 2 === 0 ? urls[i * 2] : urls[i * 2 + 1]);
-  return out;
+  return ids.map((id) => US(id, 800));
+}
+
+/** Single deterministic verified image URL for shops/stories/ads. */
+function imgFor(cat, seed, w = 800) {
+  const id = pickId(cat, seed, 3);
+  return id ? US(id, w) : US("1513104890138-7c749659a591", w);
 }
 
 /* ── store registry (50) ───────────────────────────────────────────────────── */
@@ -483,18 +522,38 @@ const MENUS = {
   ],
 };
 
-function variantFor(kind, price, index) {
+function variantFor(kind, price, index, name, category) {
   if (kind === "size") return [sizeOpts(price)];
   if (kind === "weight") return [weightOpts(price)];
   if (kind === "vol") return [volOpts(price)];
   if (kind === "pcs") return [pcsOpts(price)];
-  if (kind === "garment") return [garmentSizes];
-  if (kind === "kid") return [kidSizes];
+  if (kind === "garment") return [garmentSizeOpts(price)];
+  if (kind === "kid") return [kidSizeOpts(price)];
   if (kind === "shoe") return [shoeSizes];
-  if (kind.startsWith("color:")) return [garmentSizes, colorOpts(kind.slice(6).split(","))];
+  if (kind.startsWith("color:")) {
+    // Only real apparel keeps letter/age sizes; other colour products (bags,
+    // bedsheets, electronics, toys) just get the colour picker.
+    if (category === "Fashion & Apparel") {
+      const nm = name || "";
+      const isKids = /^(kids|boys|girls|baby|toddler)/i.test(nm) || /kid/i.test(nm);
+      return isKids
+        ? [kidSizeOpts(price), colorOpts(kind.slice(6).split(","))]
+        : [garmentSizeOpts(price), colorOpts(kind.slice(6).split(","))];
+    }
+    return [colorOpts(kind.slice(6).split(","))];
+  }
   if (kind.startsWith("flavor:")) return [flavorOpts(price, kind.slice(7).split(","))];
   // give "none" items a light optional variant so even simple rows test the picker
-  if (index % 3 === 0) return [flavorOpts(price, ["Regular", "Large", "Jumbo"])];
+  if (index % 3 === 0) {
+    return [{
+      name: "Pack",
+      options: [
+        { label: "Single", price: P(price), original_price: origP(P(price)) },
+        { label: "Double", price: P(price * 1.9), original_price: origP(P(price * 1.9)) },
+        { label: "Family", price: P(price * 3.2), original_price: origP(P(price * 3.2)) },
+      ],
+    }];
+  }
   return null;
 }
 
@@ -556,7 +615,6 @@ function buildProducts(shops) {
       const productSeed = serial + 1;
       const gallery = buildImages(shop.category, productSeed, imgCount);
       const discount = serial % 4 === 0; // every 4th product is "on sale"
-      const variants = variantFor(kind, price, serial);
 
       // Row uniqueness within a shop: include the menu index so repeating base
       // names across shops never collide with the same id.
@@ -564,6 +622,8 @@ function buildProducts(shops) {
       const pid = uuid5(`prod:${shop.shopId}:${j}:${nameFull}`);
       const isUnavailable = serial % 97 === 0; // tiny sprinkle of sold-out rows
       const stock = serial % 41 === 0 ? "out_of_stock" : serial % 17 === 0 ? "low_stock" : "in_stock";
+      // Kids rows get age-range sizes; adults get S–XXL with real price deltas.
+      const variants = variantFor(kind, price, serial, nameFull, shop.category);
 
       products.push({
         id: pid,
@@ -697,13 +757,12 @@ async function createAds(shops) {
   const rows = [];
   for (let i = 0; i < 6; i++) {
     const s = shops[i % shops.length];
-    const kw = CAT_META[s.category].kw.replace(/,/g, ",");
     rows.push({
       id: uuid5(`ad:home:${i}`),
       shop_id: s.shopId,
       title: [`Big Sale at ${s.name}`, `${s.name} — Up to 30% off`, `Fresh deals from ${s.name}`, `${s.name} free delivery`, `${s.name} weekly special`, `${s.name} combo offers`][i],
       subtitle: "Limited time — order now on WhatsApp.",
-      image_url: LF(kw + ",banner,offer", 700 + i * 13, 1200),
+      image_url: imgFor(s.category, 700 + i * 13, 1200),
       link_url: `/shop/${s.shopId}`,
       badge_label: "Sponsored",
       placement: i % 2 === 0 ? "homepage_top" : "homepage_feed",
@@ -850,8 +909,8 @@ async function main() {
     location: s.location,
     address_display: s.address,
     whatsapp_number: s.whatsapp,
-    logo_url: LF(CAT_META[s.category].kw.replace(/,/g, ",") + ",shop", 100 + s.idx * 17, 400),
-    banner_url: LF(CAT_META[s.category].kw.replace(/,/g, ",") + ",storefront", 200 + s.idx * 31, 1200),
+    logo_url: imgFor(s.category, 100 + s.idx * 17, 400),
+    banner_url: imgFor(s.category, 200 + s.idx * 31, 1200),
     is_live: true,
     verification_status: "approved",
     latitude: s.lat,
@@ -935,13 +994,12 @@ async function main() {
   const storyRows = [];
   for (let i = 0; i < shops.length; i += 3) {
     const s = shops[i];
-    const kw = CAT_META[s.category].kw.replace(/,/g, ",");
     const count = 1 + (i % 2); // 1-2 stories per chosen shop
     for (let st = 0; st < count; st++) {
       storyRows.push({
         id: uuid5(`story:${s.shopId}:${st}`),
         shop_id: s.shopId,
-        image_url: LF(kw + ",offer", 500 + i * 7 + st * 3, 600),
+        image_url: imgFor(s.category, 500 + i * 7 + st * 3, 640),
         caption: st === 0 ? `New arrivals at ${s.name}!` : `Limited-time ${["offer", "sale", "combo", "fresh stock"][st]} — order on WhatsApp`,
         expires_at: addDays(today, 1),
         created_at: new Date(Date.now() - st * 3600000).toISOString(),

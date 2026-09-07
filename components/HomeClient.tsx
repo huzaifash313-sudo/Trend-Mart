@@ -751,13 +751,14 @@ function HomeClient({
   /* Reset filter-local windowing is no longer needed — server pages accumulate. */
   const visibleShops = displayShops;
 
-  /* Feed rhythm: chunks of ~24 live shops (one infinite-scroll page) with a
-     compact deals/products/sponsored rail inserted after every chunk so the
-     page keeps surprising the shopper as they scroll (marketplace flow). */
+  /* Feed rhythm: chunks of ~10 live shops with a compact rail woven in after
+     EVERY chunk — deals → products → sponsored → deals → … so the shopper hits
+     a surprise shelf roughly every 2 rows of stores (marketplace flow). */
+  const FEED_CHUNK_SIZE = 10;
   const shopChunks = useMemo(() => {
     const chunks: ShopWithDistance[][] = [];
-    for (let i = 0; i < visibleShops.length; i += PAGE_SIZE) {
-      chunks.push(visibleShops.slice(i, i + PAGE_SIZE) as ShopWithDistance[]);
+    for (let i = 0; i < visibleShops.length; i += FEED_CHUNK_SIZE) {
+      chunks.push(visibleShops.slice(i, i + FEED_CHUNK_SIZE) as ShopWithDistance[]);
     }
     return chunks;
   }, [visibleShops]);
