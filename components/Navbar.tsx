@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, type CSSProperties, type FormEvent } from "react";
+import { useState, useEffect, useLayoutEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import SidebarDrawer from "@/components/SidebarDrawer";
 import NavbarNotificationButton from "@/components/NavbarNotificationButton";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -16,14 +15,6 @@ function HamburgerIcon() {
   return (
     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
       <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }
@@ -109,14 +100,10 @@ function BrandMark({ size = 34 }: { size?: number }) {
 /* -------------------------------------------------------------------------- */
 
 export default function Navbar() {
-  const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [portalReady, setPortalReady] = useState(false);
-  // Global search typed straight into the brand bar (desktop+).
-  const [navQuery, setNavQuery] = useState("");
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
   const isStandalone =
@@ -142,26 +129,6 @@ export default function Navbar() {
     };
   }, [isStandalone]);
 
-  const navigateToSearch = useCallback(() => router.push("/products"), [router]);
-
-  const submitNavSearch = useCallback(
-    (e: FormEvent) => {
-      e.preventDefault();
-      const q = navQuery.trim();
-      router.push(q ? `/products?q=${encodeURIComponent(q)}` : "/products");
-    },
-    [navQuery, router],
-  );
-
-  const handleHamburger = useCallback(() => {
-    if (isDesktop) {
-      // Desktop sidebar is pinned & non-collapsible — hamburger is hidden lg+,
-      // but keep a safe no-op so shared handlers stay consistent.
-      return;
-    }
-    setDrawerOpen(true);
-  }, [isDesktop]);
-
   if (isStandalone) {
     return null;
   }
@@ -173,12 +140,13 @@ export default function Navbar() {
         <TrendBackdrop />
 
         <div className="tm-navbar-inner">
-          {/* Hamburger — mobile only. On desktop the sidebar is pinned open,
-              so the toggle has been removed entirely. */}
+          {/* Hamburger — mobile only (<1024px). Hidden via custom CSS media
+              rule because `.tm-navbar-icon-btn`'s display beats Tailwind's
+              `lg:hidden` utility (custom CSS outranks layered utilities). */}
           <button
             type="button"
-            onClick={handleHamburger}
-            className="tm-navbar-icon-btn lg:hidden"
+            onClick={() => setDrawerOpen(true)}
+            className="tm-navbar-icon-btn tm-navbar-menu-btn"
             aria-label="Open navigation menu"
           >
             <HamburgerIcon />
@@ -199,46 +167,8 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Overall search — one bar for shops, products, deals (md+).
-              Submits to the marketplace where all of it is searchable. */}
-          <div className="tm-navbar-search-slot">
-            <form role="search" className="tm-navbar-search" onSubmit={submitNavSearch}>
-              <SearchIcon />
-              <input
-                type="search"
-                value={navQuery}
-                onChange={(e) => setNavQuery(e.target.value)}
-                placeholder="Search shops, products, deals…"
-                aria-label="Search TrendsMart"
-                enterKeyHint="search"
-                className="tm-navbar-search-input"
-              />
-              {navQuery ? (
-                <button
-                  type="button"
-                  aria-label="Clear search"
-                  onClick={() => setNavQuery("")}
-                  className="tm-navbar-search-clear"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              ) : null}
-            </form>
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <NavbarNotificationButton />
-            {/* Mobile search entry — opens the same overall search */}
-            <button
-              type="button"
-              onClick={navigateToSearch}
-              className="tm-navbar-icon-btn md:hidden"
-              aria-label="Search products and shops"
-            >
-              <SearchIcon />
-            </button>
           </div>
         </div>
       </div>

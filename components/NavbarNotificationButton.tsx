@@ -1,31 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { NotificationBell, useNotifications } from "@/components/NotificationListener";
-import { createClient } from "@/lib/supabase/client";
 
 /**
- * Navbar-mounted notification bell (next to search).
- * Visible only when a user is signed in.
+ * Navbar-mounted notification bell.
+ * Always rendered — signed-in users get their DB-backed notification list and
+ * unread badge; guests simply see an empty panel (no silent gap in the bar).
  */
 export default function NavbarNotificationButton() {
-  const [visible, setVisible] = useState(false);
   const { unreadCount, notifications, togglePanel } = useNotifications();
-
-  useEffect(() => {
-    const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }) => {
-      setVisible(!!data.user);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setVisible(!!session?.user);
-    });
-    return () => {
-      sub.subscription.unsubscribe();
-    };
-  }, []);
-
-  if (!visible) return null;
 
   return (
     <NotificationBell
