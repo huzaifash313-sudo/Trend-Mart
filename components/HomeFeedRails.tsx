@@ -1,27 +1,20 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Home feed rails (deals / top products / sponsored)           */
+/*  TrendsMart — Home compact feed grids (deals / top products / sponsored)   */
 /*                                                                            */
-/*  Inserted BETWEEN chunks of the live-shops feed every ~24 shops so the     */
-/*  homepage reads like a living marketplace: shops → deals → shops →         */
-/*  top products → shops → sponsored → shops …                                */
+/*  Inserted BETWEEN chunks of the live-shops feed so the homepage reads like  */
+/*  a marketplace: shops → small deals grid → shops → small products grid →    */
+/*  shops → sponsored → …                                                     */
 /*                                                                            */
-/*  Each rail shares the same visual language:                                */
-/*   - slim header with title + "More … →" link on the right                  */
-/*   - gentle auto-scrolling marquee (pause on hover / reduced motion)        */
-/*   - tap a card → quick view with Add / Order / wishlist                    */
+/*  Every rail is a FIXED compact grid (no auto-scroll / no marquee):          */
+/*   - small product-style tiles · 4 columns on phone → 5 on laptop           */
+/*   - at most 15 tiles shown (≈3 rows on a 5-column laptop)                   */
+/*   - header carries title + "More … →"                                      */
+/*   - tapping a tile opens the same quick view (Order / Add / Wishlist)       */
 /* -------------------------------------------------------------------------- */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,27 +41,15 @@ const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), 
   loading: () => null,
 });
 
-/* ── Shared constants ─────────────────────────────────────────────────────── */
-
-const RAIL_GAP_PX = 10;
-const AUTO_PX_PER_SEC = 34;
-const RESUME_AFTER_MS = 3200;
-const ARROW_EASE_MS = 460;
-
-/** Card slot width per viewport — 2 phones → 3 small → 4 tablet → 5 laptop+. */
-const RAIL_SLOT =
-  "w-[calc(50%-5px)] shrink-0 sm:w-[calc(33.333%-6.667px)] md:w-[calc(25%-7.5px)] lg:w-[calc(20%-8px)]";
+/** Max tiles shown per rail (~3 rows of 5 on laptop, ~4 rows of 4 on phone). */
+const RAIL_LIMIT = 15;
 
 /* ── Small pieces ─────────────────────────────────────────────────────────── */
 
-function Chevron({ dir }: { dir: "left" | "right" }) {
+function ChevronRight() {
   return (
     <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {dir === "left" ? (
-        <polyline points="15 18 9 12 15 6" />
-      ) : (
-        <polyline points="9 18 15 12 9 6" />
-      )}
+      <polyline points="9 18 15 12 9 6" />
     </svg>
   );
 }
@@ -79,7 +60,7 @@ function RailHeading({
   moreLabel,
   moreHref,
 }: {
-  icon?: ReactNode;
+  icon?: React.ReactNode;
   title: string;
   moreLabel: string;
   moreHref: string;
@@ -92,265 +73,13 @@ function RailHeading({
       </h2>
       <Link href={moreHref} className="tm-rail-more">
         {moreLabel}
-        <Chevron dir="right" />
+        <ChevronRight />
       </Link>
     </div>
   );
 }
 
-function wrapOffset(x: number, width: number): number {
-  if (width <= 0) return 0;
-  let v = x % width;
-  if (v < 0) v += width;
-  return v;
-}
-
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
-/* ── Generic auto-scrolling marquee shelf ─────────────────────────────────── */
-
-interface RailMarqueeProps<T> {
-  items: T[];
-  getKey: (item: T) => string;
-  renderCard: (item: T, index: number) => ReactNode;
-}
-
-function RailMarquee<T>({ items, getKey, renderCard }: RailMarqueeProps<T>) {
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const setRef = useRef<HTMLDivElement>(null);
-
-  const offsetRef = useRef(0);
-  const setWidthRef = useRef(0);
-  const pauseUntilRef = useRef(0);
-  const draggingRef = useRef(false);
-  const dragStartXRef = useRef(0);
-  const dragStartOffsetRef = useRef(0);
-  const movedRef = useRef(false);
-  const animRef = useRef<number | null>(null);
-
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [copies, setCopies] = useState(2);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduceMotion(mq.matches);
-    const onChange = () => setReduceMotion(mq.matches);
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, []);
-
-  const applyTransform = useCallback(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    track.style.transform = `translate3d(${-offsetRef.current}px, 0, 0)`;
-  }, []);
-
-  /** Measure one set + choose enough duplicates to always fill the viewport. */
-  const measure = useCallback(() => {
-    const setEl = setRef.current;
-    const vp = viewportRef.current;
-    if (!setEl) return;
-    const setW = setEl.offsetWidth;
-    const vpW = vp?.clientWidth ?? setW;
-    setWidthRef.current = setW;
-    if (setW > 0) {
-      const needed = Math.max(2, Math.ceil((vpW * 1.25) / setW) + 1);
-      setCopies(needed);
-    }
-    setReady(setW > 0);
-    applyTransform();
-  }, [applyTransform]);
-
-  useEffect(() => {
-    measure();
-    const ro =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => measure())
-        : null;
-    if (setRef.current) ro?.observe(setRef.current);
-    if (viewportRef.current) ro?.observe(viewportRef.current);
-    return () => ro?.disconnect();
-  }, [measure, items]);
-
-  /* Continuous rAF scroll — pauses while dragging / briefly after interaction. */
-  useEffect(() => {
-    if (reduceMotion || items.length === 0 || !ready) return;
-    let raf = 0;
-    let last = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min(0.048, (now - last) / 1000);
-      last = now;
-      const setW = setWidthRef.current;
-      if (setW > 0 && !draggingRef.current && Date.now() >= pauseUntilRef.current) {
-        if (animRef.current == null) {
-          offsetRef.current = wrapOffset(offsetRef.current + AUTO_PX_PER_SEC * dt, setW);
-          applyTransform();
-        }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [reduceMotion, items.length, ready, applyTransform]);
-
-  const pauseAuto = useCallback((ms = RESUME_AFTER_MS) => {
-    pauseUntilRef.current = Date.now() + ms;
-  }, []);
-
-  const nudge = useCallback(
-    (dir: -1 | 1) => {
-      pauseAuto(6000);
-      const card = setRef.current?.querySelector<HTMLElement>("[data-rail-card]");
-      const stepPx = card
-        ? card.offsetWidth + RAIL_GAP_PX
-        : (viewportRef.current?.clientWidth ?? 240) * 0.5;
-      const setW = setWidthRef.current || 1;
-      if (animRef.current != null) {
-        cancelAnimationFrame(animRef.current);
-        animRef.current = null;
-      }
-      const from = offsetRef.current;
-      const to = from + dir * stepPx;
-      const start = performance.now();
-      const stepAnim = (now: number) => {
-        const t = Math.min(1, (now - start) / ARROW_EASE_MS);
-        offsetRef.current = wrapOffset(from + (to - from) * easeOutCubic(t), setW);
-        applyTransform();
-        if (t < 1) animRef.current = requestAnimationFrame(stepAnim);
-        else {
-          animRef.current = null;
-          offsetRef.current = wrapOffset(offsetRef.current, setW);
-          applyTransform();
-        }
-      };
-      animRef.current = requestAnimationFrame(stepAnim);
-    },
-    [applyTransform, pauseAuto],
-  );
-
-  const onPointerDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (e.button !== 0 && e.pointerType === "mouse") return;
-      draggingRef.current = true;
-      movedRef.current = false;
-      dragStartXRef.current = e.clientX;
-      dragStartOffsetRef.current = offsetRef.current;
-      pauseAuto(10_000);
-      if (animRef.current != null) {
-        cancelAnimationFrame(animRef.current);
-        animRef.current = null;
-      }
-    },
-    [pauseAuto],
-  );
-
-  const onPointerMove = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (!draggingRef.current) return;
-      const dx = e.clientX - dragStartXRef.current;
-      if (Math.abs(dx) > 8) {
-        if (!movedRef.current) {
-          movedRef.current = true;
-          try {
-            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-          } catch {
-            /* ignore */
-          }
-        }
-        offsetRef.current = wrapOffset(
-          dragStartOffsetRef.current - dx,
-          setWidthRef.current || 1,
-        );
-        applyTransform();
-      }
-    },
-    [applyTransform],
-  );
-
-  const onPointerUp = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-      pauseAuto(RESUME_AFTER_MS);
-      window.setTimeout(() => {
-        movedRef.current = false;
-      }, 0);
-    },
-    [pauseAuto],
-  );
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="tm-rail-stage relative">
-      {/* Desktop nudge arrows */}
-      <button
-        type="button"
-        aria-label="Scroll left"
-        onClick={() => nudge(-1)}
-        className="tm-rail-nav-btn tm-rail-nav-btn--prev"
-      >
-        <Chevron dir="left" />
-      </button>
-      <button
-        type="button"
-        aria-label="Scroll right"
-        onClick={() => nudge(1)}
-        className="tm-rail-nav-btn tm-rail-nav-btn--next"
-      >
-        <Chevron dir="right" />
-      </button>
-
-      <div
-        ref={viewportRef}
-        className="tm-rail-viewport relative overflow-hidden"
-        style={{ touchAction: "pan-y", cursor: reduceMotion ? "grab" : undefined }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onMouseEnter={() => pauseAuto(8000)}
-        onPointerEnter={() => pauseAuto(8000)}
-        onMouseLeave={() => pauseAuto(600)}
-        onPointerLeave={() => pauseAuto(600)}
-      >
-        <div
-          ref={trackRef}
-          className="flex w-max will-change-transform"
-          style={{ transform: "translate3d(0,0,0)", backfaceVisibility: "hidden" }}
-        >
-          {Array.from({ length: copies }, (_, c) => (
-            <div
-              key={`set-${c}`}
-              ref={c === 0 ? setRef : undefined}
-              className="flex shrink-0 items-stretch"
-              style={{ gap: RAIL_GAP_PX }}
-              aria-hidden={c !== 0}
-            >
-              {items.map((item, i) => (
-                <div key={`${getKey(item)}-${c}`} data-rail-card className={`${RAIL_SLOT}`}>
-                  {renderCard(item, i)}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Deals rail ───────────────────────────────────────────────────────────── */
+/* ── Deals grid ───────────────────────────────────────────────────────────── */
 
 interface DealsRailProps {
   deals: ShopDeal[];
@@ -364,53 +93,51 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals" }: Dea
   const visible = useMemo(() => {
     const today = toPkDateKey();
     const live = deals.filter(
-      (d) => d.is_active && isDealActiveOnDate(d, today) && (d.image_url || (d.images && d.images.length)),
+      (d) =>
+        d.is_active &&
+        isDealActiveOnDate(d, today) &&
+        Boolean(d.image_url || (d.images && d.images.length)),
     );
-    // Featured first, then newest — a balanced, pretty strip.
+    // Featured first, then newest — balanced small shelf.
     const featured = live.filter((d) => d.is_featured);
     const rest = live.filter((d) => !d.is_featured);
-    return [...featured, ...rest].slice(0, 15);
+    return [...featured, ...rest].slice(0, RAIL_LIMIT);
   }, [deals]);
 
   if (visible.length === 0) return null;
 
   return (
     <section aria-label={title} className="tm-rail">
-      <RailHeading
-        icon={<span aria-hidden>⚡</span>}
-        title={title}
-        moreLabel="More deals"
-        moreHref={moreHref}
-      />
-      <RailMarquee
-        items={visible}
-        getKey={(d) => d.id}
-        renderCard={(deal) => (
-          <DealCard
-            deal={deal}
-            compact
-            priority={false}
-            onOpen={() => {
-              setOpenDeal(deal);
-              trackProductView({
-                id: dealToProduct(deal).id,
-                name: deal.title,
-                price: Number(deal.price) || 0,
-                imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
-                shopId: deal.shop_id,
-                shopName: deal.shop_name,
-                category: null,
-              });
-            }}
-          />
-        )}
-      />
+      <RailHeading icon={<span aria-hidden>⚡</span>} title={title} moreLabel="More deals" moreHref={moreHref} />
+      <div className="tm-mini-grid">
+        {visible.map((deal) => (
+          <div key={deal.id} className="tm-mini-cell">
+            <DealCard
+              deal={deal}
+              compact
+              priority={false}
+              onOpen={() => {
+                setOpenDeal(deal);
+                trackProductView({
+                  id: dealToProduct(deal).id,
+                  name: deal.title,
+                  price: Number(deal.price) || 0,
+                  imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
+                  shopId: deal.shop_id,
+                  shopName: deal.shop_name,
+                  category: null,
+                });
+              }}
+            />
+          </div>
+        ))}
+      </div>
       {openDeal ? <DealQuickView deal={openDeal} onClose={() => setOpenDeal(null)} /> : null}
     </section>
   );
 }
 
-/* ── Top products rail ────────────────────────────────────────────────────── */
+/* ── Top products grid ────────────────────────────────────────────────────── */
 
 interface ProductsRailProps {
   myShopId: string | null;
@@ -432,15 +159,13 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
 
   const productsQuery = useMarketplaceProducts({
     sort: "popular",
-    limit: 20,
+    limit: RAIL_LIMIT,
     availableOnly: true,
   });
 
   const products = useMemo(() => {
     const all = productsQuery.data ?? [];
-    return all
-      .filter((p) => !myShopId || p.shop_id !== myShopId)
-      .slice(0, 14);
+    return all.filter((p) => !myShopId || p.shop_id !== myShopId).slice(0, RAIL_LIMIT);
   }, [productsQuery.data, myShopId]);
 
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
@@ -467,19 +192,15 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
     };
   }, []);
 
-  const shopPickFor = useCallback(
-    (p: MarketplaceProduct): Pick<Shop, "id" | "name" | "whatsapp_number"> => ({
-      id: p.shop_id,
-      name: p.shop_name || "Store",
-      whatsapp_number: p.shop_whatsapp || "",
-    }),
-    [],
+  const fullFor = useCallback(
+    (product: Product): MarketplaceProduct =>
+      (products.find((p) => p.id === product.id) ?? product) as MarketplaceProduct,
+    [products],
   );
 
   const openQuickView = useCallback(
     (product: Product) => {
-      const full = (products.find((p) => p.id === product.id) ??
-        product) as MarketplaceProduct;
+      const full = fullFor(product);
       setQuickView(full);
       trackProductView({
         id: full.id,
@@ -493,7 +214,7 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
       trackCategoryInterest(full.shop_category ?? full.category_id, "click");
       void logProductClick(full.shop_id, full.id);
     },
-    [products],
+    [fullFor],
   );
 
   const handleProductClick = useCallback(
@@ -506,28 +227,25 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
 
   const handleAddToCart = useCallback(
     (product: Product) => {
-      if (product.is_available === false) {
+      const full = fullFor(product);
+      if (full.is_available === false) {
         addToast("This product is unavailable.", "error");
         return;
       }
-      if (customerVariantGroups(product.variants).length > 0) {
+      if (customerVariantGroups(full.variants).length > 0) {
         openQuickView(product);
         return;
       }
-      const full = (products.find((p) => p.id === product.id) ??
-        product) as MarketplaceProduct;
-      addItem(full, shopPickFor(full), 1);
+      addItem(full, { id: full.shop_id, name: full.shop_name || "Store", whatsapp_number: full.shop_whatsapp || "" }, 1);
       addToast(`"${full.name}" added to cart`, "success");
     },
-    [addItem, addToast, openQuickView, shopPickFor, products],
+    [addItem, addToast, fullFor, openQuickView],
   );
 
   /** Direct order — resolve the full shop first, then open WhatsApp checkout. */
   const handleOrder = useCallback(
     async (intent: ProductOrderIntent) => {
-      const product = intent.product;
-      const full = (products.find((p) => p.id === product.id) ??
-        product) as MarketplaceProduct;
+      const full = fullFor(intent.product);
       if (full.is_available === false) {
         addToast("This product is unavailable.", "error");
         return;
@@ -537,7 +255,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
         name: full.shop_name || "Store",
         whatsapp_number: full.shop_whatsapp || "",
       };
-
       addItem(full, shopPick, intent.quantity, intent.variant, intent.notes);
       trackProductView({
         id: full.id,
@@ -548,7 +265,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
         shopName: full.shop_name,
         category: full.shop_category ?? full.category_id ?? null,
       });
-
       const fallback: Shop = {
         id: full.shop_id,
         name: shopPick.name,
@@ -567,7 +283,6 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
       };
       setOrderShop(fallback);
       setOrderIntent(intent);
-
       try {
         const res = await fetchShopById(full.shop_id);
         if (res.success && res.data.shop) {
@@ -581,7 +296,7 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
         /* keep fallback */
       }
     },
-    [addItem, addToast, products],
+    [addItem, addToast, fullFor],
   );
 
   const handleOrderFromCard = useCallback(
@@ -608,12 +323,7 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
         return n;
       });
       try {
-        await toggleFavorite(
-          product.id,
-          "product",
-          product.name || "Product",
-          product.image_url ?? undefined,
-        );
+        await toggleFavorite(product.id, "product", product.name || "Product", product.image_url ?? undefined);
       } catch {
         setFavorites((prev) => {
           const n = new Set(prev);
@@ -636,40 +346,35 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
 
   if (productsQuery.isLoading || products.length === 0) return null;
 
-  const quickViewShop = quickView ? shopPickFor(quickView) : null;
+  const quickViewShop = quickView
+    ? { id: quickView.shop_id, name: quickView.shop_name || "Store", whatsapp_number: quickView.shop_whatsapp || "" }
+    : null;
 
   return (
     <>
       <section aria-label={title} className="tm-rail">
-        <RailHeading
-          icon={<span aria-hidden>🔥</span>}
-          title={title}
-          moreLabel="More products"
-          moreHref={moreHref}
-        />
-        <RailMarquee
-          items={products}
-          getKey={(p) => p.id}
-          renderCard={(product) => (
-            <ProductCard
-              product={product}
-              compact
-              isFavorite={favorites.has(product.id)}
-              isPinned={false}
-              categoryLabel={undefined}
-              showShopMeta
-              offerContext={null}
-              priority={false}
-              onProductClick={() => handleProductClick(product)}
-              onAddToCart={() => handleAddToCart(product)}
-              onOrder={() => handleOrderFromCard(product)}
-              onFavoriteToggle={() =>
-                void handleFavorite(product, !favorites.has(product.id))
-              }
-              onShopClick={handleShopClick}
-            />
-          )}
-        />
+        <RailHeading icon={<span aria-hidden>🔥</span>} title={title} moreLabel="More products" moreHref={moreHref} />
+        <div className="tm-mini-grid">
+          {products.map((product) => (
+            <div key={product.id} className="tm-mini-cell">
+              <ProductCard
+                product={product}
+                compact
+                isFavorite={favorites.has(product.id)}
+                isPinned={false}
+                categoryLabel={undefined}
+                showShopMeta={false}
+                offerContext={null}
+                priority={false}
+                onProductClick={() => handleProductClick(product)}
+                onAddToCart={() => handleAddToCart(product)}
+                onOrder={() => handleOrderFromCard(product)}
+                onFavoriteToggle={() => void handleFavorite(product, !favorites.has(product.id))}
+                onShopClick={handleShopClick}
+              />
+            </div>
+          ))}
+        </div>
       </section>
 
       {quickView && quickViewShop && (
@@ -678,9 +383,7 @@ function ProductsRailInner({ myShopId, title = "Top picks", moreHref = "/product
           shop={quickViewShop}
           onClose={() => setQuickView(null)}
           isWishlisted={favorites.has(quickView.id)}
-          onWishlistToggle={() =>
-            void handleFavorite(quickView, !favorites.has(quickView.id))
-          }
+          onWishlistToggle={() => void handleFavorite(quickView, !favorites.has(quickView.id))}
           onOrder={(order) => {
             setQuickView(null);
             void handleOrder(order);

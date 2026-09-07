@@ -7089,65 +7089,53 @@ html.dark .tm-rail-more {
 .tm-rail-stage {
   position: relative;
 }
-.tm-rail-viewport {
-  margin-inline: -0.9rem;
-  padding-inline: 0.9rem;
-}
-@media (min-width: 1024px) {
-  .tm-rail-viewport {
-    margin-inline: 0;
-    padding-inline: 2.6rem;
-  }
-}
-.tm-rail-viewport > div {
-  user-select: none;
-}
-.tm-rail-viewport:active > div {
-  cursor: grabbing;
-}
 
-/* Nudge arrows — overlay mid-row on desktop only */
-.tm-rail-nav-btn {
-  position: absolute;
-  top: 50%;
-  z-index: 12;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 2.1rem;
-  height: 2.1rem;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--tm-border) 90%, transparent);
-  background: color-mix(in srgb, var(--tm-surface) 88%, transparent);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  color: var(--tm-text);
-  box-shadow: var(--tm-shadow-md);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease,
-    opacity 0.15s ease;
-  opacity: 0;
+/* ── Compact fixed grid (home feed) — no scroll, 4 cols phone → 5 laptop ── */
+.tm-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  align-items: stretch;
+}
+@media (min-width: 640px) {
+  .tm-mini-grid {
+    gap: 0.55rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.tm-mini-cell {
+  min-width: 0;
+}
+/* ≈3 visible rows: phones keep the first 12 (4-col × 3), ≥sm shows all 15
+   (5-col × 3) — no horizontal scroll, the rest lives on the More → page. */
+@media (max-width: 639.98px) {
+  .tm-mini-grid .tm-mini-cell:nth-child(n + 13) {
+    display: none;
+  }
+}
+.tm-mini-cell > .tm-product-card {
+  width: 100%;
+  height: 100%;
+}
+/* Keep deal/product tiles equal height & tidy inside the tiny grid */
+.tm-mini-grid .tm-product-card {
+  border-radius: var(--tm-radius-md);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--tm-sea-600) 8%, transparent);
+}
+.tm-mini-grid .tm-product-card:hover {
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--tm-sea-600) 18%, transparent);
+}
+/* Slightly tighter text so 4-5 tiles per row stay readable + compact */
+.tm-mini-grid .tm-product-title {
+  font-size: 11px;
 }
 @media (min-width: 1024px) {
-  .tm-rail-nav-btn {
-    display: inline-flex;
-  }
-  .tm-rail-stage:hover .tm-rail-nav-btn {
-    opacity: 1;
-  }
-  .tm-rail-nav-btn:hover {
-    background: var(--tm-surface);
-    transform: translateY(-50%) scale(1.05);
+  .tm-mini-grid .tm-product-title {
+    font-size: 12px;
   }
 }
-.tm-rail-nav-btn--prev {
-  left: 0.6rem;
-}
-.tm-rail-nav-btn--next {
-  right: 0.6rem;
+.tm-mini-grid .tm-product-actions {
+  margin-top: 0.1rem;
 }
 
 /* Make product/deal cards fill their rail slot so rows stay equal height */
