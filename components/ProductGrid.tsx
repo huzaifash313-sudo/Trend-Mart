@@ -10,7 +10,7 @@ import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
-import { hasPriceTiers, tierPreviewLabels } from "@/lib/priceTiers";
+import { hasPriceTiers, normalizeTiers, tierMode } from "@/lib/priceTiers";
 import CompactRating from "@/components/CompactRating";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import KebabMenu, { type KebabMenuItem } from "@/components/KebabMenu";
@@ -272,10 +272,18 @@ export const ProductCard = memo(function ProductCard({
   }, [onPinToggle, onEdit, onDelete, product, isPinned]);
 
   const { hasDiscount, originalPrice, discountPercent } = getProductDiscount(product);
-  const bulkTierChips = useMemo(
-    () => (hasPriceTiers(product.price_tiers) ? tierPreviewLabels(product.price_tiers).slice(0, 2) : []),
-    [product.price_tiers],
-  );
+  const bulkTierChips = useMemo(() => {
+    if (!hasPriceTiers(product.price_tiers)) return [];
+    // Only genuine bulk tiers (2+ units) belong on the card; the single-unit
+    // row duplicates the base price and just crowds the layout.
+    const bulk = normalizeTiers(product.price_tiers).filter((t) => t.min_qty > 1);
+    if (bulk.length === 0) return [];
+    const mode = tierMode(product.price_tiers);
+    return bulk.slice(0, 2).map((t) => {
+      const price = `Rs ${Math.round(t.price).toLocaleString("en-PK")}`;
+      return mode === "unit" ? `${t.min_qty}+ = ${price} each` : `${t.min_qty}-pack = ${price}`;
+    });
+  }, [product.price_tiers]);
   const offerTags = useMemo(
     () => buildProductOfferTags(product, offerContext),
     [product, offerContext],
@@ -439,33 +447,47 @@ export const ProductCard = memo(function ProductCard({
             >
               {priceLabel}
             </p>
-            {hasDiscount && originalPrice != null ? (
-              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-                <span className="whitespace-nowrap text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
-                  {formatRupees(originalPrice)}
-                </span>
-                {discountPercent > 0 ? (
-                  <span className="whitespace-nowrap rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-                    {discountPercent}% OFF
-                  </span>
+
+            {/*
+              Fixed two-slot meta zone — every card reserves exactly the same
+              space for the "old price / % OFF" line and the "bulk price" line,
+              so a discounted or bulk-priced product can never make its card
+              taller (or push its buttons lower) than a plain one.
+            */}
+            <div
+              className="tm-product-meta"
+              aria-hidden={!hasDiscount && bulkTierChips.length === 0}
+            >
+              <div className="tm-product-meta-row">
+                {hasDiscount && originalPrice != null ? (
+                  <>
+                    <span className="tm-product-meta-old whitespace-nowrap text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
+                      {formatRupees(originalPrice)}
+                    </span>
+                    {discountPercent > 0 ? (
+                      <span className="tm-product-meta-off whitespace-nowrap rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                        {discountPercent}% OFF
+                      </span>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
-            ) : null}
-            {bulkTierChips.length > 0 ? (
-              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
+              <div className="tm-product-meta-row">
                 {bulkTierChips.map((chip) => (
                   <span
                     key={chip}
-                    className="whitespace-nowrap rounded bg-teal-50 px-1 py-px text-[9px] font-semibold leading-none text-teal-700 dark:bg-teal-950/40 dark:text-teal-300"
+                    className="tm-product-meta-bulk whitespace-nowrap rounded bg-teal-50 px-1 py-px text-[9px] font-semibold leading-none text-teal-700 dark:bg-teal-950/40 dark:text-teal-300"
                   >
                     {chip}
                   </span>
                 ))}
-                <span className="whitespace-nowrap text-[9px] leading-none text-zinc-400 dark:text-zinc-500">
-                  bulk price
-                </span>
+                {bulkTierChips.length > 0 ? (
+                  <span className="tm-product-meta-bulklabel whitespace-nowrap text-[9px] leading-none text-zinc-400 dark:text-zinc-500">
+                    bulk price
+                  </span>
+                ) : null}
               </div>
-            ) : null}
+            </div>
           </div>
 
           {/* Actions — customer row only; owner manage uses the 3-dot menu above */}
