@@ -13,10 +13,13 @@ interface KnowledgeEntry {
 }
 
 const APP_KNOWLEDGE: KnowledgeEntry[] = [
+  // ── Location / city ────────────────────────────────────────────────────
   {
-    keys: ["gujranwala", "lahore", "city", "kis city", "mera shehar", "area"],
-    q: "Kaunsi city?",
-    a: "TrendsMart *kisi bhi city* mein account bana sakte hain. Filhaal soft launch pe local shops focus hai — apni location on karein, phir sirf un shops dikhengi jo aapke radius / delivery area mein deliver karti hain.",
+    keys: ["gujranwala", "lahore", "karachi", "islamabad", "rawalpindi", "faisalabad", "multan",
+           "city", "kis city", "mera shehar", "area", "kaunsi city", "kaun si city",
+           "kis jagah", "kahan available", "kithe available"],
+    q: "Kaunsi city mein available hai?",
+    a: "TrendsMart *kisi bhi city* mein account bana sakte hain. Apni location on karein — sirf wahi shops dikhenge jo aapke radius/delivery area mein deliver karti hain.",
     roles: "all",
     link: "/settings/location",
   },
@@ -260,24 +263,154 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
     link: "/login",
   },
   {
-    keys: ["how to use", "kaise use", "guide", "tutorial", "shuruat", "start"],
+    keys: ["how to use", "kaise use", "kaise istemaal", "guide", "tutorial", "shuruat", "start",
+           "kaise chalate", "kaise chalta", "app kaise", "use karna", "kithe se shuru",
+           "kithon shuru", "kaise karte"],
     q: "TrendsMart kaise use karein?",
-    a: "1) Homepage se shop/category choose karein\n2) Product cart mein add karein\n3) Checkout → WhatsApp order\n4) Status [Orders](/orders) par track karein\n\nTrendBot se product link bhi maang sakte hain.",
+    a: "1) Homepage se shop/category choose karein\n2) Product cart mein add karein\n3) Checkout → WhatsApp order bhejein\n4) Status [Orders](/orders) par track karein\n\nTrendBot se product link bhi maang sakte hain.",
     roles: "all",
     link: "/",
   },
   {
-    keys: ["safe", "secure", "scam", "trust", "reliable"],
+    keys: ["safe", "secure", "scam", "trust", "reliable", "safe hai", "bharosa", "sach mein",
+           "genuine", "fraud nahi", "real", "pakka"],
     q: "Kya TrendsMart safe hai?",
-    a: "Email verify ke baad merchant shop public ho sakti hai. Order WhatsApp par shop se direct confirm hota hai. Issues: pehle shop, phir [Support](/support).",
+    a: "Email verify ke baad merchant shop public ho sakti hai. Order WhatsApp par shop se direct confirm hota hai. Issues: pehle shop se, phir [Support](/support).",
     roles: "all",
     link: "/legal/merchant-guidelines",
   },
   {
-    keys: ["language", "urdu", "english", "roman urdu"],
-    q: "Kaunsi language?",
-    a: "TrendBot *Roman Urdu + English* dono samajhta hai — jaise \"best mobile ka link do\" ya \"show cheapest laptop\".",
+    keys: ["language", "urdu", "english", "roman urdu", "hindi", "punjabi", "kaunsi zaban",
+           "kaunsa language", "samjhata", "samajhta", "kya samajh"],
+    q: "Kaunsi language samajhta hai?",
+    a: "TrendBot *Roman Urdu, English, Urdu (Arabic script), Punjabi, aur Hindi* — sab samajhta hai. Jis language mein likhein, usi mein jawab milega.\n\nMisaal: 'best mobile ka link do' · 'سب سے سستا لیپ ٹاپ' · 'changa phone labbo' · 'mobile kahan milega'",
     roles: "all",
+  },
+
+  // ── Shop-specific search help ──────────────────────────────────────────
+  {
+    keys: ["specific shop", "ek dukan", "usi shop", "us store", "xyz shop", "kisi shop ka product",
+           "shop ka naam", "shop dhundo", "store dhundo", "shop find", "shop search"],
+    q: "Kisi specific shop ka product kaise dhundein?",
+    a: "Bas likhein: *\"Ahmed Store mein samsung milega?\"* — TrendBot us dukan ko dhundh ke usi ke products dikhayega.\n\nYa seedha [Products](/products) par ja ke shop filter use karein.",
+    roles: "customer",
+    link: "/products",
+  },
+
+  // ── Account / login / OTP ────────────────────────────────────────────
+  {
+    keys: ["otp nahi aaya", "otp nahi mila", "otp problem", "email verify nahi", "verification nahi",
+           "email nahi aaya", "confirm nahi", "login nahi ho raha", "sign in problem",
+           "account kholna", "register karna"],
+    q: "OTP / email verification problem",
+    a: "• Spam/Junk folder check karein\n• Email sahi likha ho?\n• Kuch minute wait karein — kabhi delay hota hai\n• Resend OTP ka option bhi hoga\n\nPhir bhi masla ho to [Support](/support) karein — email aur issue describe karein.",
+    roles: "all",
+    link: "/support",
+  },
+  {
+    keys: ["password bhul", "password forgot", "password yaad nahi", "password reset",
+           "password change", "passcode bhul"],
+    q: "Password bhul gaye?",
+    a: "[Forgot Password](/auth/forgot-password) par ja kar email enter karein — reset link milega. \n\nNew password set karein phir [Login](/login) karein.",
+    roles: "all",
+    link: "/auth/forgot-password",
+  },
+
+  // ── Notifications ────────────────────────────────────────────────────
+  {
+    keys: ["notification nahi aa rahi", "notification off", "push notification", "bell nahi",
+           "alert nahi", "order notification", "koi notification nahi", "notify"],
+    q: "Notifications kaise chalayein?",
+    a: "1. Browser permission allow karein (prompt aane par 'Allow' dabayein)\n2. [Notification settings](/settings/notifications) se on karein\n3. Order updates mostly Dashboard aur WhatsApp se aate hain\n\nMobile par browser notification support vary karta hai.",
+    roles: "all",
+    link: "/settings/notifications",
+  },
+
+  // ── Product availability / stock ─────────────────────────────────────
+  {
+    keys: ["stock mein hai", "available hai kya", "milega kya", "stock check", "in stock",
+           "out of stock", "available nahi", "khatam", "stocked", "maujood hai"],
+    q: "Product available hai kya?",
+    a: "TrendBot live catalog se products dikhata hai — sirf 'available' marked items show hote hain.\n\n• 'Out of Stock' products listed nahi honge\n• Exact stock count merchants khud manage karte hain\n• Kisi specific product ke liye shop se directly WhatsApp karein",
+    roles: "all",
+    link: "/products",
+  },
+
+  // ── Multi-vendor / multiple shops in cart ────────────────────────────
+  {
+    keys: ["alag alag shop", "multiple shops", "do shops", "alag cart", "different shops",
+           "ek se zyada shop", "kai shops", "multi shop"],
+    q: "Alag alag shops se ek saath order?",
+    a: "Cart mein alag shops ke products add ho sakte hain. Lekin WhatsApp order *har shop ke liye alag* jata hai — checkout par har shop ka alag WhatsApp message compile hota hai.",
+    roles: "customer",
+    link: "/cart",
+  },
+
+  // ── Punjabi language entries ──────────────────────────────────────────
+  {
+    keys: ["kithe miluga", "kithe milega", "kidhar milega", "kithon miluga", "kithay miluga",
+           "labbo", "labo", "labh", "kithay hai dukan"],
+    q: "Product/shop kahan milega?",
+    a: "TrendBot se seedha poochein ya [Products search](/products) use karein. Apna location on rakhein taake qareeb wale results pehle aayein.",
+    roles: "all",
+    link: "/products",
+  },
+  {
+    keys: ["changa phone", "vadhia laptop", "changa product", "vadhia mobile", "changay kapray",
+           "changi dukan", "vadhia deal"],
+    q: "Best product recommend karo",
+    a: "Kaunsa product chahiye — naam ya category batayein, main live catalog se best options link ke saath dikhaunga!",
+    roles: "all",
+    link: "/products",
+  },
+
+  // ── Hindi language entries ────────────────────────────────────────────
+  {
+    keys: ["mobile kahan milega", "laptop kahan milega", "phone kahan milega", "kahan se khareedun",
+           "kahan se khareedein", "kahan milega sasta", "sabse sasta kahan"],
+    q: "Product kahan se khareedein?",
+    a: "TrendsMart par local shops ke products browse karein — *\"best mobile ka link do\"* likhein, main seedha product link dunga. Ya [Products](/products) par ja ke category filter use karein.",
+    roles: "all",
+    link: "/products",
+  },
+  {
+    keys: ["order kaise karte", "order kaise karna", "khareedna kaise", "shopping kaise",
+           "kaise order lagayein", "order kaise dena"],
+    q: "Order kaise karein?",
+    a: "1️⃣ Shop/product browse karein\n2️⃣ Cart mein add karein\n3️⃣ Checkout → naam, phone, address\n4️⃣ WhatsApp tap → order shop ko jata hai\n\n[Shuruat karein](/products)",
+    roles: "all",
+    link: "/products",
+  },
+
+  // ── Merchant: product listing speed ─────────────────────────────────
+  {
+    keys: ["jaldi product add", "fast product", "jaldi list", "quick product", "product jaldi",
+           "ek minute mein", "fast listing", "bulk add", "jhat product"],
+    q: "Products jaldi kaise add karein?",
+    a: "Dashboard → Products → *Quick Add* — sirf 4 fields: Naam, Category, Price, Image. Bas! Product live ho jata hai. Description, discount, aur stock toggle baad mein add kar sakte hain.",
+    roles: "merchant",
+    link: "/dashboard/products",
+  },
+
+  // ── Contact / reach platform ─────────────────────────────────────────
+  {
+    keys: ["huzaifa se milna", "owner se baat", "platform team", "admin se baat",
+           "trendsmart team", "trendsmart contact", "admin contact"],
+    q: "TrendsMart team se contact",
+    a: "Platform ke liye [Support Desk](/support) use karein — ticket raise karein with details.\n\n*Owner:* Huzaifa — platform TrendsMart unka hai.",
+    roles: "all",
+    link: "/support",
+  },
+
+  // ── App kya kya kar sakta hai (capabilities) ─────────────────────────
+  {
+    keys: ["trendbot kya kya kar", "trendbot ki taaqat", "trendbot kya de sakta",
+           "bot se kya pooch", "ai se kya pooch", "kya kya pooch sakta", "bot capabilities",
+           "bot features", "ai features", "chatbot help"],
+    q: "TrendBot se kya kya pooch sakte hain?",
+    a: "*TrendBot — aap yeh sab pooch sakte hain:*\n\n• 🛍️ Product link — 'best mobile ka link do'\n• 🏪 Shop dhundhna — 'qareeb ki grocery shop'\n• 🏪 Specific shop mein product — 'Ahmed Store mein samsung'\n• 📦 Order status, tracking, refund policy\n• 🚚 Delivery fees, min order, checkout help\n• 📊 Merchant: live sales, analytics, growth tips\n• 📋 App features, legal policies\n• 🔥 Deals aur discounts\n\nKisi bhi language mein poochhein — Urdu, English, Punjabi, Hindi sab OK!",
+    roles: "all",
+    link: "/assistant",
   },
 ];
 

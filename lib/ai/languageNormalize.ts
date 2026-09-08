@@ -1,15 +1,22 @@
 /* Multilingual normalize — English / Roman Urdu / Urdu / Punjabi → searchable form */
 
-/** Common Urdu (Arabic script) → Roman / English marketplace terms */
+/** Common Urdu + Hindi (Arabic/Devanagari script) → Roman/English marketplace terms */
 const URDU_SCRIPT_MAP: Record<string, string> = {
+  // ── Devices ───────────────────────────────────────────────────────────
   "موبائل": "mobile",
   "فون": "phone",
   "لیپٹاپ": "laptop",
   "کمپیوٹر": "computer",
   "گھڑی": "watch",
   "گھري": "watch",
+  "ایئرفون": "earphone",
   "کان": "earphone",
   "ہیڈفون": "headphone",
+  "ٹیبلٹ": "tablet",
+  "چارجر": "charger",
+  "کیمرہ": "camera",
+
+  // ── Food ──────────────────────────────────────────────────────────────
   "برگر": "burger",
   "پزا": "pizza",
   "پیزا": "pizza",
@@ -20,6 +27,11 @@ const URDU_SCRIPT_MAP: Record<string, string> = {
   "دودھ": "milk",
   "مرغی": "chicken",
   "گوشت": "gosht",
+  "دہی": "yogurt",
+  "چائے": "tea",
+  "لسی": "lassi",
+
+  // ── Fashion ───────────────────────────────────────────────────────────
   "جوتے": "shoes",
   "قمیض": "shirt",
   "شلوار": "shalwar",
@@ -27,90 +39,182 @@ const URDU_SCRIPT_MAP: Record<string, string> = {
   "کپڑے": "clothes",
   "پرفیوم": "perfume",
   "میک اپ": "makeup",
+  "بیگ": "bag",
+  "چشمہ": "glasses",
+
+  // ── Health ────────────────────────────────────────────────────────────
   "دوا": "medicine",
   "فارمیسی": "pharmacy",
+  "دواخانہ": "pharmacy",
+
+  // ── Shopping intent ───────────────────────────────────────────────────
   "دکان": "shop",
   "دکاندار": "shop",
+  "دکانیں": "shops",
+  "بازار": "market",
   "سستا": "sasta",
+  "سستی": "sasta",
   "بہترین": "best",
   "کہاں": "kahan",
+  "کہاں ملے گا": "kahan milega",
   "چاہیے": "chahiye",
   "دکھاؤ": "dikhao",
   "بتائیں": "batao",
+  "ڈھونڈو": "dhundo",
+  "تلاش": "search",
+  "مدد": "help",
+  "قریب": "qareeb",
+  "قریبی": "nearby",
+
+  // ── App terms ─────────────────────────────────────────────────────────
   "آرڈر": "order",
+  "آرڈرز": "orders",
   "کارٹ": "cart",
   "ڈیلیوری": "delivery",
   "قیمت": "price",
   "ریٹ": "rate",
   "لنک": "link",
-  "تلاش": "search",
-  "مدد": "help",
-  "آرڈرز": "orders",
   "خواہش": "wishlist",
+  "ادائیگی": "payment",
+  "واپسی": "refund",
+  "منسوخ": "cancel",
+
+  // ── Punjabi (Shahmukhi script) ────────────────────────────────────────
+  "کیتھے": "kahan",
+  "دسو": "batao",
+  "ویکھو": "dikhao",
+  "لبھو": "dhundo",
+  "چاہیدا": "chahiye",
+  "سستا": "sasta",
+  "چنگا": "best",
+  "وਧੀਆ": "best",
 };
 
-/** Punjabi / Saraiki / common local roman → English marketplace terms */
+/** Punjabi / Saraiki / Hindi / common local roman → English marketplace terms */
 const LOCAL_ROMAN_MAP: Record<string, string> = {
-  // Punjabi-ish / colloquial
+  // ── Devices (Punjabi/Hindi typos) ─────────────────────────────────────
   mobil: "mobile",
   mobail: "mobile",
+  moble: "mobile",
   fon: "phone",
   phonee: "phone",
   leptoop: "laptop",
   leptop: "laptop",
   labtop: "laptop",
+  laptoop: "laptop",
   kammputer: "computer",
+  komputer: "computer",
   ghari: "watch",
   ghadi: "watch",
+  ghori: "watch",
   kanwale: "earphone",
   handsfree: "earphone",
-  // food
+  earfone: "earphone",
+  headfone: "headphone",
+
+  // ── Food (Punjabi/Hindi) ───────────────────────────────────────────────
   bargar: "burger",
+  bugger: "burger",
   peza: "pizza",
   piza: "pizza",
   biryaniyan: "biryani",
+  biriyani: "biryani",
   karahi: "karahi",
   kadhai: "karahi",
   chawal: "rice",
+  chaawal: "rice",
   aata: "atta",
   doodh: "milk",
+  dudh: "milk",
   murgi: "chicken",
   murghi: "chicken",
+  chicken: "chicken",
   goshat: "gosht",
-  // fashion
+  maas: "gosht",
+  maas: "gosht",
+  dahi: "yogurt",
+  lassi: "lassi",
+  chai: "tea",
+
+  // ── Fashion ───────────────────────────────────────────────────────────
   jutay: "shoes",
   jootay: "shoes",
   jutte: "shoes",
+  joote: "shoes",
   kapray: "clothes",
   kapre: "clothes",
+  kaprhy: "clothes",
   qameez: "shirt",
   kameez: "shirt",
-  // intent words
+  shalwar: "shalwar",
+  dupatta: "dupatta",
+  kurta: "kurta",
+
+  // ── Intent words — Punjabi ─────────────────────────────────────────────
   chahida: "chahiye",
   chahidi: "chahiye",
   chahiday: "chahiye",
+  chaida: "chahiye",
   daso: "batao",
   dasso: "batao",
+  das: "batao",
   vekhao: "dikhao",
   vikhao: "dikhao",
+  vekh: "dekho",
   labbo: "dhundo",
   labo: "dhundo",
+  labb: "dhundo",
   kithe: "kahan",
   kithay: "kahan",
+  kidhar: "kahan",
+  kidhar: "kahan",
   sasta: "sasta",
   sasti: "sasta",
   sastay: "sasta",
+  saste: "sasta",
   changa: "best",
   changi: "best",
+  changay: "best",
   vadhia: "best",
-  // categories shorthand
+  wadhia: "best",
+  mila: "milega",
+  miluga: "milega",
+  miluga: "milega",
+
+  // ── Intent words — Hindi ───────────────────────────────────────────────
+  chahiye: "chahiye",
+  chaahiye: "chahiye",
+  dikhana: "dikhao",
+  dikhaao: "dikhao",
+  batana: "batao",
+  bataao: "batao",
+  dhundhna: "dhundo",
+  dhundhein: "dhundo",
+  kharidna: "khareedna",
+  khareedna: "order",
+  lena: "chahiye",
+  lelo: "chahiye",
+  sabse: "sab se",
+  sabase: "sab se",
+  sasta: "sasta",
+  ucheema: "best",
+  behtareen: "best",
+  behtarin: "best",
+  sahi: "best",
+
+  // ── Category shorthand ────────────────────────────────────────────────
   kiryana: "kiryana",
   karyana: "kiryana",
+  kirana: "kiryana",
   sabzi: "vegetables",
   sabziyan: "vegetables",
+  tarkari: "vegetables",
   mithai: "sweets",
   dawai: "medicine",
+  dawa: "medicine",
   dawakhana: "pharmacy",
+  chemist: "pharmacy",
+  dawaee: "medicine",
 };
 
 const CATEGORY_ALIASES: Record<string, string> = {

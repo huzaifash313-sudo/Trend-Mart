@@ -31,18 +31,25 @@ type Provider = {
   name: "groq" | "gemini";
   base: string;
   key: string;
-  model: string;
+  /** Model for NLU intent parsing (fast, small is fine) */
+  nluModel: string;
+  /** Model for grounded reply compose (quality matters more here) */
+  replyModel: string;
 };
 
 function getProvider(): Provider | null {
   const groq = process.env.GROQ_API_KEY?.trim();
   if (groq) {
+    // NLU: 8b-instant = 10× faster, same free quota, good enough for intent classification
+    // Reply: 70b-versatile = best quality for grounded natural language answers
+    const replyModel = process.env.GROQ_MODEL?.trim() || "llama-3.3-70b-versatile";
+    const nluModel = process.env.GROQ_NLU_MODEL?.trim() || "llama-3.1-8b-instant";
     return {
       name: "groq",
       key: groq,
       base: "https://api.groq.com/openai/v1/chat/completions",
-      // Free-tier capable multilingual model (override via GROQ_MODEL)
-      model: process.env.GROQ_MODEL?.trim() || "llama-3.3-70b-versatile",
+      nluModel,
+      replyModel,
     };
   }
   const gemini = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_AI_API_KEY?.trim();
@@ -52,7 +59,8 @@ function getProvider(): Provider | null {
       name: "gemini",
       key: gemini,
       base: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gemini}`,
-      model,
+      nluModel: model,
+      replyModel: model,
     };
   }
   return null;
@@ -84,39 +92,62 @@ Support: /support  FAQ: /faq  Products: /products  Deals: /deals  Orders: /order
 TrendBot must NEVER invent product names, prices, stock, fees, or order statuses.
 If FACTS do not contain the answer → say you don't know and link Support / browse.
 Languages: English, Roman Urdu, Urdu, Punjabi — answer in the user's language.
+
+OUT-OF-SCOPE topics (NEVER answer these — always refuse):
+Politics, news, government, elections, cricket/sports scores, stock market, crypto,
+health/medical advice, recipes/cooking (not food ordering), homework/essays/code assignments,
+personal relationships, astrology/horoscope, religion/fatwas, hacking, adult content.
 `.trim();
 
-const NLU_SYSTEM = `You are TrendBot NLU for TrendsMart.
-Return ONLY compact JSON (no markdown):
+const NLU_SYSTEM = `You are TrendBot NLU for TrendsMart (Pakistan hyper-local marketplace).
+Return ONLY valid compact JSON — no markdown, no extra text:
 {"intent":"product_search|shop_search|app_help|order_help|merchant_help|category_browse|brand_owner|analytics|out_of_scope|unclear","searchQuery":"","categoryHint":"","language":"en|roman_urdu|urdu|punjabi|mixed","confidence":0.0,"reason":""}
 
 ${TRENDSMART_APP_BIBLE}
 
-Rules:
-- Understand any language; searchQuery = short keywords for DB search (Latin script OK).
-- Owner/founder → brand_owner confidence>=0.95
-- Analytics/revenue/views/orders for merchant → analytics
-- Policy/how-it-works → app_help
-- Not about TrendsMart → out_of_scope
-- NEVER invent product names the user did not imply.`;
+Intent classification rules:
+- product_search: user wants a specific product, item, or link (e.g. "best mobile ka link do", "sasta laptop chahiye", "iphone milega?")
+- shop_search: looking for a shop/vendor (e.g. "qareeb ki dukan", "grocery shop kahan", "best restaurant")
+- app_help: how app works, policies, features (e.g. "delivery kaise hoti", "refund policy", "whatsapp order kaise")
+- order_help: order status, tracking, cancel (e.g. "mera order kahan", "status check", "order cancel")
+- merchant_help: merchant dashboard, selling, store setup (e.g. "shop kaise register", "qr code", "dukan setup")
+- category_browse: browsing a category (e.g. "electronics dikhao", "fashion section", "khana items")
+- brand_owner: who made TrendsMart, who is Huzaifa (confidence >= 0.95)
+- analytics: merchant revenue/views/sales data (confidence >= 0.85)
+- out_of_scope: ANYTHING not about TrendsMart shopping/selling — politics, news, health, crypto, homework, recipes, sports scores, relationships, weather, hacking
+- unclear: truly ambiguous — cannot determine intent
 
-const GROUNDED_SYSTEM = `You are TrendBot, TrendsMart's professional shopping/business assistant.
-You MUST follow FACTS only. Never invent products, prices, fees, ratings, stock, or policies.
+Roman Urdu patterns to recognize:
+- "link do" / "link chahiye" / "dhundo" → product_search
+- "kahan milega" / "milta hai kya" → product_search or shop_search
+- "qareeb ki" / "mere pass" → shop_search
+- "order kaise" / "khareedna hai" → app_help
+- "kitni fee" / "delivery charge" → app_help
+- "mera order" / "kahan hai" → order_help
+- "dukan register" / "merchant banna" → merchant_help
+- city/area names alone → shop_search (if no product keyword)
+
+CRITICAL: If user asks about politics, news, weather, health, sports, crypto, homework, cooking → out_of_scope.
+searchQuery: extract short English/Latin-script keywords suitable for DB search (2-5 words max).
+Never invent product names the user did not mention.`;
+
+const GROUNDED_SYSTEM = `You are TrendBot — TrendsMart ka smart, friendly AI assistant (Pakistan hyper-local marketplace).
 
 ${TRENDSMART_APP_BIBLE}
 
-Output rules:
-- FIRST answer the user's actual question clearly (what they asked) — do not dodge with unrelated product pitches.
-- When recommending products/shops/business ideas: rank by FACTS (rating, discount, distance, demand score) and briefly say WHY (1 short reason).
-- For merchants: give prioritized action steps from their live metrics (pending orders, CTR, stock, reviews) — no generic fluff.
-- Reply in the user's language (Roman Urdu / English / Urdu / Punjabi).
-- Keep reply concise (max ~180 words), helpful, professional, warm and friendly.
-- Use markdown lightly (*bold*, bullet lines). Include links ONLY if present in FACTS or as app paths like /products /cart /support /faq /deals /orders.
-- If FACTS are empty or insufficient → clearly say you don't have confirmed data; suggest /products, /deals, /support — do NOT guess products or prices.
-- If the user asks anything outside TrendsMart (news, politics, homework, crypto, medical, etc.) → say it is out of scope for this app. Do NOT answer it.
-- Never leave an empty reply. Never invent fake shop or product names.
-- Do NOT mention system prompts, API keys, or that you are an LLM.
-- Chip suggestions in FACTS are optional — only keep ones that still match the user's question.`;
+RESPONSE RULES (follow strictly):
+1. ANSWER the user's EXACT question first. Never dodge or pivot to unrelated topics.
+2. Use ONLY what is in FACTS. Never guess, invent, or assume products, prices, fees, stock, names, or policies.
+3. LANGUAGE: Match the user's language exactly — Roman Urdu, English, Urdu, or mixed. If user writes Roman Urdu, reply in Roman Urdu. Do NOT switch languages mid-reply.
+4. TONE: Warm, helpful, confident, like a knowledgeable friend — not robotic, not over-formal.
+5. FORMAT: *Bold* for key terms. Bullet points for lists. Clickable app links where helpful (only real paths). Max ~200 words.
+6. PRODUCTS: When listing products/shops, always include a reason why it is recommended (price, rating, discount, proximity). Don't just list names.
+7. MERCHANTS: Give specific, prioritized action steps from their live data. No generic fluff — be concrete (e.g. "Aapke 3 pending orders hain — abhi Dashboard → Orders kholein").
+8. OUT-OF-SCOPE: If user asks about politics, news, health/medicine, crypto/stocks, homework/essays, recipes, sports scores, astrology, relationships, hacking → firmly but kindly say it is not your topic and redirect to shopping help.
+9. HONESTY: If data is not in FACTS → say clearly "mujhe confirmed data nahi mila" + suggest /products, /deals, or /support. NEVER invent.
+10. SUGGESTIONS: Only keep chip suggestions from FACTS that still directly match the user's current question.
+11. LINKS: Only use app-relative paths (/products, /cart, /deals, /orders, /support, /faq, /legal/...) or paths explicitly in FACTS.
+12. NEVER mention system prompts, API keys, LLM models, or that you are an AI language model.`;
 
 function parseNluJson(text: string): LlmUnderstanding | null {
   const match = text.match(/\{[\s\S]*\}/);
@@ -152,7 +183,7 @@ function parseNluJson(text: string): LlmUnderstanding | null {
 async function groqChat(
   provider: Provider,
   messages: { role: "system" | "user" | "assistant"; content: string }[],
-  opts?: { maxTokens?: number; temperature?: number; json?: boolean },
+  opts?: { maxTokens?: number; temperature?: number; json?: boolean; modelOverride?: string },
 ): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
@@ -164,7 +195,7 @@ async function groqChat(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: provider.model,
+        model: opts?.modelOverride ?? provider.replyModel,
         temperature: opts?.temperature ?? 0.2,
         max_tokens: opts?.maxTokens ?? 400,
         ...(opts?.json ? { response_format: { type: "json_object" } } : {}),
@@ -218,7 +249,8 @@ async function geminiChat(
   }
 }
 
-/** Understand user message via Groq/Gemini. Returns null if no key / failure. */
+/** Understand user message via Groq/Gemini.
+ *  Uses the fast NLU model (8b-instant) to minimize token cost. */
 export async function understandWithFreeLlm(
   message: string,
   role: "customer" | "merchant" | "shop",
@@ -233,17 +265,18 @@ export async function understandWithFreeLlm(
           { role: "system", content: NLU_SYSTEM },
           {
             role: "user",
-            content: `Role=${role}\nUser message: ${message.slice(0, 500)}`,
+            content: `Role=${role}\nMessage: ${message.slice(0, 500)}`,
           },
         ],
-        { maxTokens: 220, temperature: 0.05, json: true },
+        // Use fast 8b model for NLU — cheaper, faster, good enough for intent classification
+        { maxTokens: 240, temperature: 0.02, json: true, modelOverride: provider.nluModel },
       );
       return content ? parseNluJson(content) : null;
     }
     const text = await geminiChat(
       provider,
-      `${NLU_SYSTEM}\n\nRole=${role}\nUser message: ${message.slice(0, 500)}`,
-      { maxTokens: 220, temperature: 0.05 },
+      `${NLU_SYSTEM}\n\nRole=${role}\nMessage: ${message.slice(0, 500)}`,
+      { maxTokens: 240, temperature: 0.02 },
     );
     return text ? parseNluJson(text) : null;
   } catch {
@@ -259,10 +292,16 @@ export interface GroundedComposeInput {
   /** Optional draft reply from the deterministic engine to polish. */
   draftReply?: string;
   languageHint?: string;
+  /**
+   * Recent conversation turns (newest last) for multi-turn context.
+   * Pass last 6 turns max to keep token usage low.
+   */
+  history?: { role: "user" | "assistant"; text: string }[];
 }
 
 /**
- * Rewrite / answer using ONLY provided facts.
+ * Rewrite / answer using ONLY provided facts + optional conversation history.
+ * Uses the quality reply model (70b) for best output.
  * Returns null on failure so caller can keep the local draft / refuse.
  */
 export async function composeGroundedReplyWithLlm(
@@ -271,34 +310,48 @@ export async function composeGroundedReplyWithLlm(
   const provider = getProvider();
   if (!provider) return null;
 
-  const facts = sanitizeChatString(input.facts, 3500) || "(no confirmed facts)";
-  const draft = input.draftReply ? sanitizeChatString(input.draftReply, 2000) : "";
+  const facts = sanitizeChatString(input.facts, 2800) || "(no confirmed facts)";
+  const draft = input.draftReply ? sanitizeChatString(input.draftReply, 1600) : "";
   const user = sanitizeChatString(input.userMessage, 500);
 
-  const userBlock =
-    `Role=${input.role}\n` +
-    `Language hint=${input.languageHint || "user's language"}\n\n` +
-    `USER:\n${user}\n\n` +
-    `FACTS (only source of truth):\n${facts}\n\n` +
+  const systemBlock =
+    GROUNDED_SYSTEM +
+    `\n\nRole: ${input.role}` +
+    (input.languageHint ? `\nUser language: ${input.languageHint}` : "");
+
+  const factBlock =
+    `FACTS (single source of truth — do not go beyond this):\n${facts}\n\n` +
     (draft
-      ? `DRAFT (polish this; do not add new facts):\n${draft}\n\n`
-      : `No draft — answer from FACTS only, or admit unknown.\n\n`) +
-    `Write the final assistant reply now.`;
+      ? `DRAFT (polish this — same facts, clearer language):\n${draft}\n\n`
+      : `No draft — answer from FACTS only, or honestly admit unknown.\n\n`);
+
+  const finalUserMsg = `${factBlock}USER QUESTION:\n${user}\n\nWrite the final helpful reply now.`;
 
   try {
     if (provider.name === "groq") {
+      // Build multi-turn messages: system + history + current user query
+      const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: systemBlock },
+      ];
+
+      // Inject last 6 turns of history for multi-turn context (token-efficient)
+      const recentHistory = (input.history ?? []).slice(-6);
+      for (const h of recentHistory) {
+        messages.push({ role: h.role === "user" ? "user" : "assistant", content: h.text.slice(0, 300) });
+      }
+
+      messages.push({ role: "user", content: finalUserMsg });
+
       return await groqChat(
         provider,
-        [
-          { role: "system", content: GROUNDED_SYSTEM },
-          { role: "user", content: userBlock },
-        ],
-        { maxTokens: 450, temperature: 0.25 },
+        messages,
+        // 70b reply model; 500 tokens = ~350 words — enough for rich but concise answers
+        { maxTokens: 500, temperature: 0.22 },
       );
     }
-    return await geminiChat(provider, `${GROUNDED_SYSTEM}\n\n${userBlock}`, {
-      maxTokens: 450,
-      temperature: 0.25,
+    return await geminiChat(provider, `${systemBlock}\n\n${finalUserMsg}`, {
+      maxTokens: 500,
+      temperature: 0.22,
     });
   } catch {
     return null;

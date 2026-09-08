@@ -87,22 +87,86 @@ export const buildHelpfulGuideReply = buildHonestRefuseReply;
 /** Clear off-app / irrelevant topics — refuse instead of guessing. */
 export function isOutOfScope(message: string): boolean {
   const t = message.toLowerCase().trim();
-  if (!t) return false;
+  if (!t || t.length < 4) return false;
 
-  // Explicit TrendsMart / shopping cues → stay in scope
+  // ── Hard in-scope anchors — always stay in app ────────────────────────────
   if (
-    /(trendsmart|trend\s*mart|trendbot|shop|dukan|product|order|cart|checkout|delivery|refund|merchant|whatsapp|coupon|deal|wishlist|dashboard)/i.test(
-      t,
-    )
+    /(trendsmart|trend\s*mart|trendbot|trend bot|shopping|shop|dukan|dukandar|product|order|cart|checkout|delivery|refund|merchant|whatsapp|coupon|deal|wishlist|dashboard|qr code|payment|cod|cash on delivery)/i.test(t)
   ) {
     return false;
   }
 
-  return (
-    /(who is the prime minister|prime minister|president of|write (an )?essay|homework|exam (paper|question)|bitcoin|crypto (price|invest)|stock market|share market tip|medical diagnosis|prescribe|doctor advice|hack|crack password|nsfw|porn|adult content|weather (today|forecast)|cricket score|football score|recipe for|how to cook|translate this|code (for|in) (python|java|c\+\+)|leetcode|girlfriend|boyfriend|love advice|horoscope|lottery)/i.test(
-      t,
-    )
-  );
+  // ── Politics / government / current affairs ───────────────────────────────
+  if (
+    /(prime minister|wazir azam|president of pakistan|imran khan|pm modi|narendra modi|donald trump|joe biden|government|parliament|assembly|election|vote|voter|imf pakistan|dollar rate|rupee rate|forex|exchange rate|petrol price|petrol kitna|petrol rate|diesel rate|inflation|economy pakistan|budget pakistan|gdp|news kya hai|khabar|breaking news|current affair|army|military|ispr|isi\b|raw\b|establishment|martial law|constitution|fir|police case|fir kaise|thana|darj)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Health / medical ──────────────────────────────────────────────────────
+  if (
+    /(medical diagnosis|diagnose|prescribe|doctor advice|doctor se|hospital|dawai batao|medicine for|tablet batao|injection|surgery|bimari|beemar hoon|fever ka|bukhar ka|dard ka|dawa kya|symptoms of|disease|cancer|diabetes|blood pressure|sugar level|pregnancy test|covid|vaccination|vaccine|mental health|depression ka|anxiety ka|psychiatrist)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Finance / crypto / stock ──────────────────────────────────────────────
+  if (
+    /(bitcoin|crypto (price|invest|buy)|ethereum|binance|nft|stock market|share market tip|mutual fund|forex trading|trading tips|gold rate today|gold price today|sensex|nifty|psx index|invest in stocks|bonds khariden|real estate invest|property invest)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Entertainment / celebrity / sports scores ─────────────────────────────
+  if (
+    /(cricket score|match score|football score|ipl score|psl score|fifa|world cup score|who won match|man city|real madrid|barcelona|celebrity gossip|actor ka|actress ka|drama review|film review|movie review|bollywood|lollywood|hollywood news|song lyrics|gana|mehfil|ost|drama ost)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Education / homework / essays ─────────────────────────────────────────
+  if (
+    /(write (an |a )?essay|homework|exam (paper|question)|past paper|matric paper|inter paper|fa paper|ba paper|thesis likhna|assignment likhna|translate (this|into|to)|translation of|english mein translate|urdu mein translate|explain (this )?(poem|stanza|chapter)|math (problem|solve)|mathematics|physics (question|solve)|chemistry|biology question|code (for|in) (python|java|c\+\+|javascript|html)|leetcode|hackerrank|programming kaise|data structure)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Personal / social / relationship ────────────────────────────────────
+  if (
+    /(girlfriend|boyfriend|love advice|pyar|mohabbat|rishta|shadi kaise|shaadi advice|divorce|talaq|ladki patao|ladka patao|dosti|dost kaise|life advice|zindagi mein|personality develop|motivation quote|shayari|poetry likhna|poem likhna)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Weather / astrology ───────────────────────────────────────────────────
+  if (
+    /(weather (today|forecast|report|kaisa hai)|aaj mosam|barish hogi|temperature kitna|horoscope|zodiac|kundli|astrology|palmistry|future batao|qismat)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Hacking / illegal / harmful ───────────────────────────────────────────
+  if (
+    /(hack|crack password|facebook hack|whatsapp hack|account hack|phishing|malware|virus banana|nsfw|porn|adult content|sex|nude|18\+|gambling|jua|satta|lottery ticket|prize bond predict)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Religion / fatwa ─────────────────────────────────────────────────────
+  if (
+    /(fatwa|halal (or )?haram|namaz padhna|rakat|quran (tafsir|tarjuma)|hadith number|islamic ruling|sharia law|kya islam mein|kya quran mein)/i.test(t)
+  ) {
+    return true;
+  }
+
+  // ── Generic cooking / recipes (unrelated to food orders) ─────────────────
+  if (
+    /^(recipe for|how to (cook|bake|make) |biryani recipe|karahi recipe|daal recipe|roti kaise|sabzi kaise banain|cake banana|khana banana|ghar pe kaise banain).{0,40}$/i.test(t)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**

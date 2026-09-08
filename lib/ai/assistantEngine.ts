@@ -31,7 +31,12 @@ import {
 import { resolveMessageWithHistory, type HistoryMessage } from "@/lib/ai/sessionContext";
 import { getShopCategoryPrompts } from "@/lib/ai/shopCategoryPrompts";
 import { getThinkingSteps } from "@/lib/ai/thinkingSteps";
-import { looksLikeUniversalSearch, runUniversalSearch } from "@/lib/ai/universalSearch";
+import {
+  detectShopSpecificProductQuery,
+  looksLikeUniversalSearch,
+  runUniversalSearch,
+  searchByShopNameAndProduct,
+} from "@/lib/ai/universalSearch";
 import { buildHonestFallbackReply } from "@/lib/ai/smartFallback";
 import { normalizeUserLanguage } from "@/lib/ai/languageNormalize";
 import { runLocalNlu } from "@/lib/ai/localNlu";
@@ -1451,26 +1456,33 @@ function mergeLocalAndLlmNlu(
 /**
  * Groq polish — FACTS = draft only. Never polish product cards (links stay exact).
  * Never polish refuses (stay exact). Reject polish that invents new http(s) links.
- * Weak/unclear drafts still get polished so replies stay on-topic.
+ * Only triggers LLM when confidence < 0.72 OR intent is unclear/fallback.
+ * Strong deterministic replies skip LLM entirely → zero API tokens spent.
  */
 async function finalizeAssistantReply(
   res: AssistantResponse,
   role: AssistantRole,
   userMessage: string,
+  history?: HistoryMessage[],
 ): Promise<AssistantResponse> {
   const gated = ensureAssistantReply(res, role, userMessage) as AssistantResponse;
 
   if (!hasFreeLlmKey()) return gated;
-  if (gated.products?.length) return gated;
+  if (gated.products?.length) return gated;                              // product cards: keep exact links
   if (gated.intent === "honest_refuse" || gated.intent === "empty") return gated;
-  if (gated.intent === "delivery_help") return gated;
-  if (["auth", "no_shop"].includes(gated.intent)) return gated;
+  if (gated.intent === "delivery_help") return gated;                    // policy: never rephrase
+  if (["auth", "no_shop", "app_knowledge", "brand_knowledge"].includes(gated.intent)) return gated;
+  if (gated.intent === "live_pulse") return gated;                       // live data: keep exact
 
+  // ── Only call LLM when reply is weak / unclear — save tokens ────────────
   const weak =
-    gated.confidence < 0.62 ||
+    gated.confidence < 0.72 ||
     gated.intent === "unclear" ||
     gated.intent === "fallback" ||
-    gated.intent === "honest_fallback";
+    gated.intent === "honest_fallback" ||
+    gated.intent === "general";
+
+  if (!weak) return gated;   // ← strong deterministic reply → skip LLM entirely
 
   try {
     const polished = await composeGroundedReplyWithLlm({
@@ -1479,10 +1491,15 @@ async function finalizeAssistantReply(
       facts:
         `Intent=${gated.intent}; confidence=${gated.confidence}\n` +
         (gated.suggestions?.length
-          ? `Allowed chip suggestions (only keep if on-topic): ${gated.suggestions.join(" | ")}\n`
+          ? `Follow-up chip suggestions (keep only if on-topic): ${gated.suggestions.join(" | ")}\n`
           : "") +
         `Confirmed draft (do not invent beyond this):\n${gated.reply}`,
       draftReply: gated.reply,
+      // Pass last 5 turns for context (limit to keep tokens low)
+      history: history
+        ?.filter((h) => h.role !== "system")
+        .slice(-5)
+        .map((h) => ({ role: h.role as "user" | "assistant", text: h.text })),
     });
     if (polished && polished.length >= 24) {
       const draftLinks = new Set(
@@ -1494,15 +1511,15 @@ async function finalizeAssistantReply(
       return ensureAssistantReply(
         {
           ...gated,
-          reply: polished.slice(0, 2500),
-          confidence: weak ? Math.max(gated.confidence, 0.72) : gated.confidence,
+          reply: polished.slice(0, 2200),
+          confidence: Math.max(gated.confidence, 0.75),
         },
         role,
         userMessage,
       ) as AssistantResponse;
     }
   } catch {
-    /* keep deterministic reply */
+    /* keep deterministic reply on any failure */
   }
   return gated;
 }
@@ -1637,7 +1654,8 @@ export async function runAssistant(
   const historyResolved = resolveMessageWithHistory(rawMessage, req.history);
   const role = req.role;
   const result = await runAssistantCore(supabase, req, historyResolved, role);
-  return finalizeAssistantReply(result, role, historyResolved);
+  // Pass history so grounded LLM has multi-turn context (only used for weak replies)
+  return finalizeAssistantReply(result, role, historyResolved, req.history);
 }
 
 async function runAssistantCore(
@@ -1693,7 +1711,8 @@ async function runAssistantCore(
       preferredQuery,
     });
 
-  if (isOutOfScope(historyResolved)) {
+  // Local NLU out-of-scope fast-path (zero API tokens)
+  if (nlu.intent === "out_of_scope" || isOutOfScope(historyResolved)) {
     return withThinking(
       buildHonestRefuseReply({ reason: "out_of_scope", query: historyResolved.slice(0, 40), role }),
       role,
@@ -1826,6 +1845,21 @@ async function runAssistantCore(
       return withThinking(generateBusinessAdvisorReply(snapshot, historyResolved), role);
     }
     return withThinking(generatePlatformTrendsReply(snapshot), role);
+  }
+
+  // ── Shop-by-name + product: "Ahmed Store mein laptop dhundo" ───────────
+  if (role !== "merchant") {
+    const shopSpecific = detectShopSpecificProductQuery(historyResolved)
+      ?? detectShopSpecificProductQuery(message);
+    if (shopSpecific) {
+      const result = await searchByShopNameAndProduct(
+        supabase,
+        shopSpecific.shopName,
+        shopSpecific.productQuery,
+        role,
+      );
+      if (result) return withThinking(result as AssistantResponse, role, shopSpecific.productQuery);
+    }
   }
 
   // ── Product search (local NLU) ──────────────────────────────────────────
