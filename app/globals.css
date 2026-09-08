@@ -7138,10 +7138,18 @@ html.dark .tm-rail-more {
    cards stay tiny (not big/tall). Extra tiles scroll horizontally and the
    rail auto-loops (see useMiniRailAutoLoop). First 12 tiles render. */
 @media (max-width: 639.98px) {
+  /* Switch from flex to CSS Grid so ALL tiles in the single row share
+     the SAME height automatically (grid row sizing = tallest item).
+     flex had a height: 100% circular-reference issue on mobile browsers
+     that caused uneven card heights. */
   .tm-mini-grid {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: stretch;
+    display: grid;
+    grid-auto-flow: column;
+    /* One explicit row — every tile lands in this row → equal height */
+    grid-template-rows: auto;
+    /* Each column is 1/4 of the visible container (minus 3 gaps + a tiny
+       safe buffer so the strip doesn't clip the last visible card edge). */
+    grid-auto-columns: calc((100% - 2rem) / 4);
     gap: 0.45rem;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -7156,10 +7164,12 @@ html.dark .tm-rail-more {
     width: 0;
     height: 0;
   }
+  /* Grid handles column sizing — reset the base height:100% so grid
+     auto-sizing works correctly without a circular % reference. */
   .tm-mini-grid > .tm-mini-tile {
-    flex: 0 0 auto;
-    width: calc((100% - 1.8rem) / 4);
-    max-width: calc((100% - 1.8rem) / 4);
+    height: auto;
+    width: 100%;
+    min-width: 0;
   }
   .tm-mini-grid > .tm-mini-tile:nth-child(n + 13) {
     display: none;

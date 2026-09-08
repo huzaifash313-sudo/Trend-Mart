@@ -41,7 +41,27 @@ const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), 
 });
 
 const RAIL_LIMIT = 15; // 5 × 3 rows on desktop · phones show a short swipeable shelf
-const PRODUCT_POOL = 60; // bigger fetch pool so every "Top picks" shelf shows a fresh window
+const PRODUCT_POOL = 60; // bigger fetch pool so every "For You" shelf shows a fresh window
+
+/* -------------------------------------------------------------------------- */
+/*  Daily rotation seed                                                        */
+/*                                                                            */
+/*  Returns the day-of-year (PKT) so homepage shelves show a fresh window     */
+/*  of deals/products every day automatically — no server changes needed.     */
+/*  Combined with the per-chunk slot it ensures deep-page shelves also differ.*/
+/* -------------------------------------------------------------------------- */
+function getDailySlot(): number {
+  try {
+    // Resolve current day in Pakistan Standard Time (UTC+5).
+    const pkStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" });
+    const pk = new Date(pkStr);
+    const yearStart = new Date(pk.getFullYear(), 0, 1);
+    return Math.floor((pk.getTime() - yearStart.getTime()) / 86_400_000);
+  } catch {
+    // Fallback if the browser doesn't support the timeZone option.
+    return Math.floor(Date.now() / 86_400_000);
+  }
+}
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
 
@@ -251,7 +271,7 @@ interface DealsRailProps {
   slot?: number;
 }
 
-function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals", slot = 0 }: DealsRailProps) {
+function DealsRailInner({ deals, title = "Top Deals", moreHref = "/deals", slot = 0 }: DealsRailProps) {
   const [openDeal, setOpenDeal] = useState<ShopDeal | null>(null);
 
   const visible = useMemo(() => {
@@ -262,8 +282,22 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals", slot 
         isDealActiveOnDate(d, today) &&
         Boolean(d.image_url || (d.images && d.images.length) || d.price != null),
     );
-    const featured = live.filter((d) => d.is_featured);
-    const rest = live.filter((d) => !d.is_featured);
+
+    // Sort each group by discount % descending — biggest savings surface first.
+    const byDiscount = (a: ShopDeal, b: ShopDeal): number => {
+      const discA =
+        a.original_price && a.price && Number(a.original_price) > 0
+          ? (1 - Number(a.price) / Number(a.original_price)) * 100
+          : 0;
+      const discB =
+        b.original_price && b.price && Number(b.original_price) > 0
+          ? (1 - Number(b.price) / Number(b.original_price)) * 100
+          : 0;
+      return discB - discA;
+    };
+
+    const featured = [...live.filter((d) => d.is_featured)].sort(byDiscount);
+    const rest = [...live.filter((d) => !d.is_featured)].sort(byDiscount);
 
     // The same product is often re-featured by several shops as its own deal
     // row — collapse to ONE tile per product so a shelf never shows the same
@@ -276,7 +310,10 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals", slot 
       return true;
     });
 
-    return rotateWindow(unique, RAIL_LIMIT, slot);
+    // Daily rotation: shift the window by the day-of-year so the shelf shows
+    // a fresh selection every midnight (PKT), combined with the per-chunk slot
+    // so successive shelves on the same page never repeat the same tiles.
+    return rotateWindow(unique, RAIL_LIMIT, getDailySlot() + slot);
   }, [deals, slot]);
 
   const railRef = useMiniRailAutoLoop(visible.length);
@@ -284,7 +321,7 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals", slot 
 
   return (
     <section aria-label={title} className="tm-rail">
-      <RailHeading icon={<span aria-hidden>⚡</span>} title={title} moreLabel="More deals" moreHref={moreHref} />
+      <RailHeading icon={<span aria-hidden>🏷️</span>} title={title} moreLabel="More deals" moreHref={moreHref} />
       <div className="tm-mini-grid" ref={railRef}>
         {visible.map((deal) => {
           const product = dealToProduct(deal);
@@ -342,7 +379,7 @@ interface ProductOrderIntent {
 
 function ProductsRailInner({
   myShopId,
-  title = "Top picks",
+  title = "For You",
   moreHref = "/products",
   slot = 0,
   excludeProductIds,
@@ -350,8 +387,10 @@ function ProductsRailInner({
   const { addToast } = useToast();
   const { addItem } = useCart();
 
+  // "for_you" uses the personalization engine (behavior signals + shop diversity)
+  // so the shelf adapts to each user's browsing/wishlist category affinity.
   const productsQuery = useMarketplaceProducts({
-    sort: "popular",
+    sort: "for_you",
     limit: PRODUCT_POOL,
     availableOnly: true,
   });
@@ -370,7 +409,11 @@ function ProductsRailInner({
       ordered = kept.length > 0 ? [...kept, ...dup] : all;
     }
 
-    return rotateWindow(ordered, RAIL_LIMIT, slot);
+    // Daily rotation: shift the window by the day-of-year (PKT) × 3 so the
+    // "For You" shelf shows a noticeably different slice each day. Multiplying
+    // by 3 means each new day skips ~3 slots, keeping variety high even with a
+    // small product pool. Per-chunk slot is added for in-page diversity.
+    return rotateWindow(ordered, RAIL_LIMIT, getDailySlot() * 3 + slot);
   }, [productsQuery.data, myShopId, slot, excludeProductIds]);
 
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
@@ -511,7 +554,7 @@ function ProductsRailInner({
   return (
     <>
       <section aria-label={title} className="tm-rail">
-        <RailHeading icon={<span aria-hidden>🔥</span>} title={title} moreLabel="More products" moreHref={moreHref} />
+        <RailHeading icon={<span aria-hidden>✨</span>} title={title} moreLabel="More products" moreHref={moreHref} />
         <div className="tm-mini-grid" ref={railRef}>
           {products.map((product) => {
             const discount = getProductDiscount(product);
