@@ -8,6 +8,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { suggestSearchCorrections } from "@/lib/fuzzySearch";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -266,57 +267,74 @@ const TABS: { value: Tab; label: string }[] = [
 export default function SearchResultsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const qParam = searchParams.get("q") ?? "";
+  const qParam    = searchParams.get("q") ?? "";
   const typeParam = (searchParams.get("type") as Tab) ?? "all";
 
-  const [query, setQuery] = useState(qParam);
+  const [query, setQuery]       = useState(qParam);
   const [activeTab, setActiveTab] = useState<Tab>(
     TABS.some((t) => t.value === typeParam) ? typeParam : "all",
   );
-  const [data, setData] = useState<SearchResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const [data, setData]         = useState<SearchResponse | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const abortRef                = useRef<AbortController | null>(null);
+  const debounceRef             = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch results when query or tab changes
-  const doSearch = useCallback(
-    async (q: string, type: Tab) => {
-      const trimmed = q.trim();
-      if (!trimmed) {
-        setData(null);
-        return;
+  /* ── Core fetch ─────────────────────────────────────────────────────── */
+  const doSearch = useCallback(async (q: string, type: Tab) => {
+    const trimmed = q.trim();
+    if (!trimmed) { setData(null); return; }
+
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({ q: trimmed, limit: "10" });
+      if (type !== "all") params.set("type", type);
+      const res  = await fetch(`/api/search?${params}`, { signal: ctrl.signal });
+      if (!res.ok) throw new Error("Search failed");
+      const json = (await res.json()) as SearchResponse;
+      setData(json);
+    } catch (err) {
+      if ((err as { name?: string }).name !== "AbortError") {
+        setError("Search failed. Please try again.");
       }
-      abortRef.current?.abort();
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        const params = new URLSearchParams({ q: trimmed, limit: "8" });
-        if (type !== "all") params.set("type", type);
-        const res = await fetch(`/api/search?${params}`, { signal: ctrl.signal });
-        if (!res.ok) throw new Error("Search failed");
-        const json = (await res.json()) as SearchResponse;
-        setData(json);
-      } catch (err) {
-        if ((err as { name?: string }).name !== "AbortError") {
-          setError("Search failed. Please try again.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-
-  // Run on mount and when URL changes
+  /* ── Run when URL param changes (Enter / tab change) ────────────────── */
   useEffect(() => {
     void doSearch(qParam, activeTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qParam, activeTab]);
 
+  /* ── Live / debounced search as user types (400 ms) ─────────────────── */
+  useEffect(() => {
+    const trimmed = query.trim();
+    // Don't re-fire if query matches the URL param (already fetched above)
+    if (trimmed === qParam.trim()) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!trimmed) { setData(null); return; }
+
+    debounceRef.current = setTimeout(() => {
+      void doSearch(trimmed, activeTab);
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, activeTab]);
+
+  /* ── Form submit → update URL (persist query in browser history) ────── */
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const q = query.trim();
@@ -328,7 +346,7 @@ export default function SearchResultsClient() {
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
-    const params = new URLSearchParams({ q: qParam });
+    const params = new URLSearchParams({ q: qParam || query });
     if (tab !== "all") params.set("type", tab);
     router.replace(`/search?${params}`, { scroll: false });
   };
@@ -349,6 +367,16 @@ export default function SearchResultsClient() {
 
   const hasResults =
     data && (data.counts.products > 0 || data.counts.shops > 0 || data.counts.deals > 0);
+
+  // "Did you mean" suggestions — only shown on empty results
+  const suggestions = useMemo(
+    () => (!hasResults && (qParam || query.trim()) ? suggestSearchCorrections(qParam || query, 5) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasResults, qParam, query],
+  );
+
+  // Display query — use live query if URL hasn't been updated yet
+  const displayQ = qParam || query.trim();
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-6 md:px-4 md:py-5">
@@ -417,17 +445,40 @@ export default function SearchResultsClient() {
       )}
 
       {/* Empty state — query typed but no results */}
-      {!loading && !error && qParam && !hasResults && data && (
-        <div className="py-16 text-center">
+      {!loading && !error && displayQ && !hasResults && data && (
+        <div className="py-12 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800">
             <span className="text-2xl">🔍</span>
           </div>
           <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
-            No results for &ldquo;{qParam}&rdquo;
+            No results for &ldquo;{displayQ}&rdquo;
           </h3>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Try different keywords or browse categories below.
+            Try different keywords or check the spelling.
           </p>
+
+          {/* "Did you mean" suggestions */}
+          {suggestions.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 text-xs text-zinc-400 dark:text-zinc-500">Did you mean?</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setQuery(s);
+                      router.push(`/search?q=${encodeURIComponent(s)}`);
+                    }}
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-400"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link
               href="/products"
