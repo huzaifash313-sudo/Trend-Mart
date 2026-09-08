@@ -1495,11 +1495,11 @@ async function finalizeAssistantReply(
           : "") +
         `Confirmed draft (do not invent beyond this):\n${gated.reply}`,
       draftReply: gated.reply,
-      // Pass last 5 turns for context (limit to keep tokens low)
+      // Pass last 5 turns for context (limit to keep tokens low).
+      // HistoryMessage.role is already "user" | "assistant" — no system filter needed.
       history: history
-        ?.filter((h) => h.role !== "system")
-        .slice(-5)
-        .map((h) => ({ role: h.role as "user" | "assistant", text: h.text })),
+        ?.slice(-5)
+        .map((h) => ({ role: h.role, text: h.text })),
     });
     if (polished && polished.length >= 24) {
       const draftLinks = new Set(

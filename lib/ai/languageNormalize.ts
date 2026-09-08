@@ -85,9 +85,7 @@ const URDU_SCRIPT_MAP: Record<string, string> = {
   "ویکھو": "dikhao",
   "لبھو": "dhundo",
   "چاہیدا": "chahiye",
-  "سستا": "sasta",
   "چنگا": "best",
-  "وਧੀਆ": "best",
 };
 
 /** Punjabi / Saraiki / Hindi / common local roman → English marketplace terms */
@@ -131,7 +129,6 @@ const LOCAL_ROMAN_MAP: Record<string, string> = {
   chicken: "chicken",
   goshat: "gosht",
   maas: "gosht",
-  maas: "gosht",
   dahi: "yogurt",
   lassi: "lassi",
   chai: "tea",
@@ -167,7 +164,6 @@ const LOCAL_ROMAN_MAP: Record<string, string> = {
   kithe: "kahan",
   kithay: "kahan",
   kidhar: "kahan",
-  kidhar: "kahan",
   sasta: "sasta",
   sasti: "sasta",
   sastay: "sasta",
@@ -178,7 +174,6 @@ const LOCAL_ROMAN_MAP: Record<string, string> = {
   vadhia: "best",
   wadhia: "best",
   mila: "milega",
-  miluga: "milega",
   miluga: "milega",
 
   // ── Intent words — Hindi ───────────────────────────────────────────────
@@ -196,7 +191,6 @@ const LOCAL_ROMAN_MAP: Record<string, string> = {
   lelo: "chahiye",
   sabse: "sab se",
   sabase: "sab se",
-  sasta: "sasta",
   ucheema: "best",
   behtareen: "best",
   behtarin: "best",
