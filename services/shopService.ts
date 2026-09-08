@@ -264,7 +264,13 @@ export async function fetchShops(opts?: {
       }
     }
 
-    query = query.order("name", { ascending: true });
+    // Rank by engagement signals — most-loved / busiest shops surface first.
+    // Falls back to alphabetical only as a final tiebreaker for new shops with
+    // no rating data yet so they still appear instead of being buried.
+    query = query
+      .order("avg_rating", { ascending: false, nullsFirst: false })
+      .order("review_count", { ascending: false, nullsFirst: false })
+      .order("name", { ascending: true });
 
     const limit =
       opts?.limit && opts.limit > 0 ? Math.min(opts.limit, 500) : undefined;

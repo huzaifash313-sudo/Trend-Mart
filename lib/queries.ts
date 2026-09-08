@@ -136,6 +136,24 @@ export function useDeals(limit = 48) {
   });
 }
 
+/** Paginated deals for the /deals page — infinite scroll, 24 per page. */
+export const DEALS_PAGE_SIZE = 24;
+
+export function useDealsInfinite() {
+  return useInfiniteQuery({
+    queryKey: ["deals", "infinite"] as const,
+    queryFn: ({ pageParam }) =>
+      unwrap(fetchActiveDeals(DEALS_PAGE_SIZE, pageParam as number)),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const fetched = allPages.reduce((n, p) => n + p.length, 0);
+      return lastPage.length >= DEALS_PAGE_SIZE ? fetched : undefined;
+    },
+    staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useShopCoupons(shopIds: string[]) {
   return useQuery({
     queryKey: queryKeys.coupons(shopIds),

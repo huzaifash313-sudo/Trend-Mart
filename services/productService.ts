@@ -596,14 +596,33 @@ async function runMarketplaceRows(
 }
 
 /**
- * Blend fuzzy relevance (0–100) with real popularity signals — parent shop
- * reviews/rating, total orders and real clicks — into one search score.
- * Relevance still leads: a cold exact match outranks a weak fuzzy one, but
- * strong demand can lift a near match above an ignored exact match.
+ * Blend fuzzy relevance with popularity, freshness, and discount signals.
+ *
+ * Score breakdown:
+ *   50% — fuzzy relevance      (exact/prefix matches beat weak fuzzy hits)
+ *   25% — popularity           (orders + clicks + rating + reviews)
+ *   15% — freshness            (newer products slightly preferred)
+ *   10% — discount signal      (on-sale products get a small lift)
+ *
+ * This keeps exact-match cold items above weak-fuzzy popular ones, while
+ * letting strong-demand products overtake borderline relevance matches.
  */
 export function blendSearchScore(relevance: number, product: MarketplaceProduct): number {
   const popularity = scoreProductPopularity(product);
-  return relevance * 0.62 + popularity * 0.38;
+
+  // Freshness: 0–100 where 100 = listed in the last 24 h, decays over 30 days
+  const ageMs = product.created_at ? Date.now() - Date.parse(product.created_at) : 0;
+  const freshness = Math.max(0, 100 - (ageMs / (30 * 24 * 60 * 60 * 1000)) * 100);
+
+  // Discount: square-root curve so 20% OFF ≠ trivially better than 10%
+  const { discountPercent } = (product as { discountPercent?: number });
+  const rawDiscount =
+    product.original_price && product.original_price > product.price
+      ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
+      : (discountPercent ?? 0);
+  const discountSignal = rawDiscount > 0 ? Math.sqrt(Math.min(rawDiscount, 60) / 60) * 100 : 0;
+
+  return relevance * 0.5 + popularity * 0.25 + freshness * 0.15 + discountSignal * 0.1;
 }
 
 /**

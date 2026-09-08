@@ -187,7 +187,7 @@ function ProductsPageInner() {
           void fetchNextPage();
         }
       },
-      { rootMargin: "600px" },
+      { rootMargin: "1200px" },
     );
     observer.observe(el);
     return () => observer.disconnect();

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useCart } from "@/context/CartContext";
 import type { TrendBotPose } from "@/components/trendbot/TrendBotAvatar";
 import {
   buildContextualWelcome,
@@ -33,6 +34,11 @@ export default function TrendBotHost() {
   const hidden = shouldHideGlobalTrendBot(pathname);
   const pageCtx = resolveTrendBotPageContext(pathname);
   const pack = useMemo(() => getTrendBotPagePack(pageCtx), [pageCtx]);
+
+  // Raise TrendBot above the CartBar when the user has items in cart,
+  // so the TrendBot FAB and the CartBar trash button never overlap.
+  const { totalItems } = useCart();
+  const cartVisible = totalItems > 0;
 
   const [open, setOpen] = useState(false);
   const [teaser, setTeaser] = useState<string | null>(null);
@@ -169,7 +175,11 @@ export default function TrendBotHost() {
       {teaser && !open ? (
         <div
           className="tm-trendbot-bubble fixed right-3 z-[119] max-w-[min(210px,calc(100vw-4.5rem))]"
-          style={{ bottom: "calc(7.35rem + env(safe-area-inset-bottom, 0px))" }}
+          style={{
+            bottom: cartVisible
+              ? "calc(11.2rem + env(safe-area-inset-bottom, 0px))"
+              : "calc(7.35rem + env(safe-area-inset-bottom, 0px))",
+          }}
         >
           <div className="rounded-xl rounded-br-sm border border-emerald-100 bg-white px-2.5 py-2 text-left shadow-lg dark:border-emerald-900/40 dark:bg-zinc-900">
             {/* Header row — TrendBot label, voice toggle, close */}
@@ -228,6 +238,7 @@ export default function TrendBotHost() {
       {!open ? (
         <TrendBotLauncher
           side="right"
+          bottomOffset={cartVisible ? "cart" : "default"}
           wiggle={wiggle}
           pose={pose}
           strolling={strolling}

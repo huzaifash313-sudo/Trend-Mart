@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import DealCard from "@/components/DealCard";
 import SearchInput from "@/components/SearchInput";
 import FadeScrollX from "@/components/FadeScrollX";
+import VirtualizedGrid from "@/components/VirtualizedGrid";
 import { dealToProduct } from "@/lib/dealCommerce";
 import {
   formatOfferDayLabel,
@@ -21,7 +22,7 @@ import { type Coupon } from "@/services/couponService";
 import { type ShopDeliveryMeta } from "@/services/shopDeliveryMeta";
 import { SHOP_CATEGORIES, type Shop, type ShopCategory } from "@/types";
 import {
-  useDeals,
+  useDealsInfinite,
   useShops,
   useShopCoupons,
   useShopDeliveryMeta,
@@ -102,13 +103,31 @@ function DealsInner() {
   });
   const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
 
-  const dealsQuery = useDeals(100);
+  const dealsQuery = useDealsInfinite();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  // Trigger next page when sentinel enters viewport.
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || !dealsQuery.hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && dealsQuery.hasNextPage && !dealsQuery.isFetchingNextPage) {
+          void dealsQuery.fetchNextPage();
+        }
+      },
+      { rootMargin: "1200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [dealsQuery.hasNextPage, dealsQuery.isFetchingNextPage, dealsQuery.fetchNextPage]);
+
   const deals = useMemo(() => {
-    const all = dealsQuery.data ?? EMPTY_DEALS;
+    const all = dealsQuery.data?.pages.flat() ?? EMPTY_DEALS;
     return myShopId ? all.filter((d) => d.shop_id !== myShopId) : all;
   }, [dealsQuery.data, myShopId]);
   const loading = dealsQuery.isLoading;
-  const error = dealsQuery.error ? dealsQuery.error.message : null;
+  const error = dealsQuery.error ? (dealsQuery.error as Error).message : null;
 
   // Real shop rows (with coordinates) to reuse the proximity engine for deals.
   const shopsQuery = useShops();
@@ -753,29 +772,49 @@ function DealsInner() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
-          {filtered.map((deal, i) => (
-            <DealCard
-              key={deal.id}
-              deal={deal}
-              priority={i < 2}
-              offerTags={getOfferTags(deal.shop_id)}
-              onOpen={() => {
-                setQuickViewDeal(deal);
-                const p = dealToProduct(deal);
-                trackProductView({
-                  id: p.id,
-                  name: deal.title,
-                  price: Number(deal.price) || 0,
-                  imageUrl: deal.image_url,
-                  shopId: deal.shop_id,
-                  shopName: deal.shop_name,
-                  category: null,
-                });
-              }}
-            />
-          ))}
-        </div>
+        <>
+          <VirtualizedGrid
+            items={filtered}
+            getKey={(deal) => deal.id}
+            columnBreakpoints={{ base: 2, md: 3, lg: 4, xl: 5 }}
+            estimateRowHeight={300}
+            renderItem={(deal, i) => (
+              <DealCard
+                deal={deal}
+                priority={i < 4}
+                offerTags={getOfferTags(deal.shop_id)}
+                onOpen={() => {
+                  setQuickViewDeal(deal);
+                  const p = dealToProduct(deal);
+                  trackProductView({
+                    id: p.id,
+                    name: deal.title,
+                    price: Number(deal.price) || 0,
+                    imageUrl: deal.image_url,
+                    shopId: deal.shop_id,
+                    shopName: deal.shop_name,
+                    category: null,
+                  });
+                }}
+              />
+            )}
+          />
+          {/* Infinite scroll sentinel */}
+          <div ref={loadMoreRef} className="h-1" aria-hidden="true" />
+          {dealsQuery.isFetchingNextPage && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5 mt-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="tm-product-card flex flex-col overflow-hidden">
+                  <div className="tm-product-media animate-pulse bg-amber-50 dark:bg-amber-950/20" />
+                  <div className="tm-product-body flex flex-col gap-0.5">
+                    <div className="h-3.5 w-[88%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+                    <div className="h-3 w-[55%] animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {quickViewDeal && (

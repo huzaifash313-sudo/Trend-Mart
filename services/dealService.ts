@@ -392,9 +392,13 @@ export async function fetchDealById(
   }
 }
 
-export async function fetchActiveDeals(limit = 100): Promise<ServiceResult<ShopDeal[]>> {
+export async function fetchActiveDeals(
+  limit = 100,
+  offset = 0,
+): Promise<ServiceResult<ShopDeal[]>> {
   const supabase = createClient();
   const cap = Math.min(Math.max(limit, 12), 160);
+  const start = Math.max(0, Math.floor(offset));
   try {
     const { data, error } = await selectWithFallback(
       LIST_SELECT_ATTEMPTS,
@@ -406,25 +410,30 @@ export async function fetchActiveDeals(limit = 100): Promise<ServiceResult<ShopD
       },
       async (select) => {
         // Prefer featured first when column exists; fall back without that order.
-        const withFeatured = await supabase
+        let q = supabase
           .from("shop_deals")
           .select(select)
           .eq("is_active", true)
           .order("is_featured", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(cap);
+          .order("created_at", { ascending: false });
+
+        // Apply cursor pagination: range(start, end) for proper server-side paging.
+        q = q.range(start, start + cap - 1);
+
+        const withFeatured = await q;
 
         if (
           withFeatured.error &&
           /is_featured/i.test(errText(withFeatured.error))
         ) {
-          const plain = await supabase
+          let plain = supabase
             .from("shop_deals")
             .select(select)
             .eq("is_active", true)
             .order("created_at", { ascending: false })
-            .limit(cap);
-          return { data: plain.data, error: plain.error };
+            .range(start, start + cap - 1);
+          const res = await plain;
+          return { data: res.data, error: res.error };
         }
 
         return { data: withFeatured.data, error: withFeatured.error };

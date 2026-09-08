@@ -9,6 +9,7 @@ import {
 import { TREND_BOT_NAME, TREND_BOT_WELCOME_SHOP } from "@/lib/ai/trendBotBrand";
 import { TrendBotLauncher } from "@/components/trendbot/TrendBotLauncher";
 import { TrendBotPanel } from "@/components/trendbot/TrendBotPanel";
+import { useCart } from "@/context/CartContext";
 
 interface ChatWidgetProps {
   shopId: string;
@@ -24,6 +25,10 @@ export default function ChatWidget({
 }: ChatWidgetProps) {
   const [open, setOpen] = useState(false);
   const shopPack = getTrendBotPagePack("shop");
+
+  // Raise TrendBot above the CartBar when the cart is non-empty so the FAB
+  // doesn't overlap the clear-cart button on the right edge of the CartBar.
+  const { totalItems } = useCart();
 
   const prompts = useMemo(() => {
     const category = getShopCategoryPrompts(shopCategory, shopName);
@@ -49,7 +54,7 @@ export default function ChatWidget({
       {!open ? (
         <TrendBotLauncher
           side="right"
-          bottomOffset="raised"
+          bottomOffset={totalItems > 0 ? "cart" : "raised"}
           shopName={shopName}
           onOpen={() => setOpen(true)}
         />

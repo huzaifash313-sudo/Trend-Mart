@@ -135,7 +135,8 @@ export default function Navbar() {
     setSearchOpen(false);
     setSearchQuery("");
     if (q) {
-      router.push(`/?q=${encodeURIComponent(q)}`);
+      // Unified search — shows products + shops + deals together
+      router.push(`/search?q=${encodeURIComponent(q)}`);
     } else {
       router.push("/");
     }

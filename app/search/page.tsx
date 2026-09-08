@@ -1,20 +1,20 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import SearchResultsClient from "./SearchResultsClient";
+
+export const metadata: Metadata = {
+  title: "Search — TrendsMart",
+  description: "Search products, shops, and deals across TrendsMart.",
+};
 
 /**
- * Legacy /search — marketplace products now live at /products.
- * Preserve query string so old links and CategoryGrid keep working.
+ * Unified search results page — replaces the old redirect-only stub.
+ * Shows products, shops, and deals from a single API call (/api/search).
  */
-export default async function SearchRedirectPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const params = await searchParams;
-  const qs = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (typeof value === "string" && value) qs.set(key, value);
-    else if (Array.isArray(value) && value[0]) qs.set(key, value[0]);
-  }
-  const suffix = qs.toString();
-  redirect(suffix ? `/products?${suffix}` : "/products");
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchResultsClient />
+    </Suspense>
+  );
 }
