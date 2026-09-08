@@ -4132,34 +4132,6 @@ html.dark .tm-geo-reset:hover {
 .tm-product-card--compact .tm-product-offer-strip {
   height: 1.25rem;
 }
-
-/* Clean listing tile (/products browse) — Daraz-style, perfectly uniform:
-   square media that any uploaded image fills edge-to-edge, 2-line title and
-   price only. All other info lives behind the quick view on tap. */
-.tm-product-card--clean .tm-product-media::before {
-  padding-bottom: 100%;
-}
-.tm-product-card--clean {
-  height: 100%;
-}
-.tm-product-card--clean .tm-product-body {
-  gap: 0.12rem;
-  justify-content: space-between;
-}
-.tm-product-card--clean .tm-product-title {
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  min-height: 2.45em;
-  margin-bottom: 0.1rem;
-}
-.tm-product-card--clean .tm-product-footer {
-  margin-top: auto;
-}
-.tm-product-card--clean .tm-product-shop,
-.tm-product-card--clean .tm-product-actions,
-.tm-product-card--clean .tm-product-offer-strip {
-  display: none;
-}
 @media (min-width: 1024px) {
   .tm-product-card--compact {
     contain-intrinsic-size: 200px 320px;
@@ -7118,7 +7090,7 @@ html.dark .tm-rail-more {
   position: relative;
 }
 
-/* ── Home feed shelf: ≥sm fixed 5-col grid; phones swipe 2 cards per view ── */
+/* ── Home feed shelf: ≥sm fixed 5-col grid; phones compact auto-scroll ─── */
 .tm-mini-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -7126,8 +7098,9 @@ html.dark .tm-rail-more {
   align-items: stretch;
 }
 
-/* Phones: single swipeable row — every tile is ~half the shelf (2 per view),
-   keep it short (12 tiles max), rest scrolls horizontally. */
+/* Phones: ONE compact strip of small square cards — ~4 tiles per view so the
+   cards stay tiny (not big/tall). Extra tiles scroll horizontally and the
+   rail auto-loops (see useMiniRailAutoLoop). First 12 tiles render. */
 @media (max-width: 639.98px) {
   .tm-mini-grid {
     display: flex;
@@ -7137,8 +7110,8 @@ html.dark .tm-rail-more {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    scroll-padding-inline: 0.125rem;
+    /* No scroll-snap here: the rail auto-scrolls in a smooth endless loop,
+       and snap fighting a running rAF would make the strip jitter / stall. */
     scrollbar-width: none;
     padding-bottom: 0.2rem;
   }
@@ -7149,12 +7122,35 @@ html.dark .tm-rail-more {
   }
   .tm-mini-grid > .tm-mini-tile {
     flex: 0 0 auto;
-    width: calc((100% - 0.45rem) / 2);
-    max-width: calc((100% - 0.45rem) / 2);
-    scroll-snap-align: start;
+    width: calc((100% - 1.8rem) / 4);
+    max-width: calc((100% - 1.8rem) / 4);
   }
   .tm-mini-grid > .tm-mini-tile:nth-child(n + 13) {
     display: none;
+  }
+  /* Compact body on small tiles — name one line, tighter price, tiny box. */
+  .tm-mini-grid > .tm-mini-tile .tm-mini-tile-body {
+    padding: 0.24rem 0.26rem 0.28rem;
+    gap: 0.08rem;
+  }
+  .tm-mini-grid > .tm-mini-tile .tm-mini-tile-title {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    min-height: 0;
+    font-size: 0.62rem;
+    line-height: 1.3;
+  }
+  .tm-mini-grid > .tm-mini-tile .tm-mini-tile-shop {
+    font-size: 0.52rem;
+  }
+  .tm-mini-grid > .tm-mini-tile .tm-mini-tile-price-row {
+    padding-top: 0.08rem;
+  }
+  .tm-mini-grid > .tm-mini-tile .tm-mini-tile-price {
+    font-size: 0.7rem;
+  }
+  .tm-mini-grid > .tm-mini-tile .tm-mini-tile-was {
+    font-size: 0.55rem;
   }
 }
 .tm-mini-tile {

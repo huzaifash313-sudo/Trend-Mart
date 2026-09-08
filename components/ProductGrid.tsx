@@ -166,10 +166,6 @@ interface ProductGridProps {
   emptyState?: ReactNode;
   columns?: "2" | "3" | "4" | "auto";
   compact?: boolean;
-  /** Daraz-style clean listing tile: image + title + price only. All other
-   *  info (shop meta, rating, Add/Order, offer ticker) hides behind the
-   *  quick-view opened by tapping the card. Used by the /products browse. */
-  clean?: boolean;
   categoryLabel?: string;
   showShopMeta?: boolean;
   /** Shop-level offers (store page) — shown as dark tags on product images. */
@@ -181,7 +177,6 @@ interface ProductGridProps {
 export const ProductCard = memo(function ProductCard({
   product,
   compact,
-  clean = false,
   isFavorite,
   categoryLabel,
   showShopMeta,
@@ -199,7 +194,6 @@ export const ProductCard = memo(function ProductCard({
 }: {
   product: Product;
   compact: boolean;
-  clean?: boolean;
   isFavorite: boolean;
   categoryLabel?: string;
   showShopMeta?: boolean;
@@ -300,7 +294,7 @@ export const ProductCard = memo(function ProductCard({
       }}
       className={`tm-product-card group flex scroll-mt-24 cursor-pointer flex-col overflow-hidden${
         compact ? " tm-product-card--compact" : ""
-      }${clean ? " tm-product-card--clean" : ""}`}
+      }`}
       role="button"
       tabIndex={0}
       aria-label={`View ${product.name}`}
@@ -317,9 +311,7 @@ export const ProductCard = memo(function ProductCard({
             src={getSafeImageUrl(product.image_url, "product", "card")}
             alt={imageAlt}
             fill
-            className={`transition-transform duration-300 group-hover:scale-[1.02] ${
-              clean ? "object-cover" : "object-contain"
-            }`}
+            className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             priority={priority}
             loading={priority ? "eager" : "lazy"}
@@ -350,7 +342,7 @@ export const ProductCard = memo(function ProductCard({
           </span>
         ) : null}
 
-        {!clean ? <OfferTickerMarquee tags={offerTags} /> : null}
+        <OfferTickerMarquee tags={offerTags} />
 
         {manage && kebabItems.length > 0 ? (
           <div
@@ -389,7 +381,7 @@ export const ProductCard = memo(function ProductCard({
           {product.name}
         </h3>
 
-        {clean ? null : showShopMeta && product.shop_name ? (
+        {showShopMeta && product.shop_name ? (
           <div className="tm-product-shop">
             <button
               type="button"
@@ -431,7 +423,7 @@ export const ProductCard = memo(function ProductCard({
               className="ml-auto shrink-0"
             />
           </div>
-        ) : !clean && !compact && product.description ? (
+        ) : !compact && product.description ? (
           <p className="tm-product-shop line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
             {product.description}
           </p>
@@ -458,13 +450,8 @@ export const ProductCard = memo(function ProductCard({
                   </span>
                 ) : null}
               </div>
-            ) : clean ? (
-              /* Reserve the exact height of the strikethrough/discount line so
-                 every clean tile (with or without an original price) is the
-                 same height — perfectly level rows. */
-              <div className="mt-0.5 h-[0.85rem]" aria-hidden="true" />
             ) : null}
-            {!clean && bulkTierChips.length > 0 ? (
+            {bulkTierChips.length > 0 ? (
               <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
                 {bulkTierChips.map((chip) => (
                   <span
@@ -481,10 +468,8 @@ export const ProductCard = memo(function ProductCard({
             ) : null}
           </div>
 
-          {/* Actions — customer row only (hidden on clean tiles — quick view
-              opens on tap where Add/Order/wishlist live); owner manage uses
-              the 3-dot menu above */}
-          {!manage && !clean && (onFavoriteToggle || (product.is_available && (onAddToCart || onOrder))) ? (
+          {/* Actions — customer row only; owner manage uses the 3-dot menu above */}
+          {!manage && (onFavoriteToggle || (product.is_available && (onAddToCart || onOrder))) ? (
             <div className="tm-product-actions">
               {onFavoriteToggle ? (
                 <button
@@ -571,7 +556,6 @@ export default function ProductGrid({
   emptyState,
   columns = "auto",
   compact = false,
-  clean = false,
   categoryLabel,
   showShopMeta = false,
   offerContext = null,
@@ -627,7 +611,6 @@ export default function ProductGrid({
         <ProductCard
           product={product}
           compact={compact}
-          clean={clean}
           isFavorite={favorites.has(product.id)}
           isPinned={pinnedIds.has(product.id)}
           categoryLabel={categoryLabel}

@@ -841,7 +841,7 @@ function ProductsPageInner() {
         loading={loading}
         columns="auto"
         compact
-        clean
+        showShopMeta
         favorites={favorites}
         getOfferContext={getOfferContext}
         onProductClick={handleProductClick}

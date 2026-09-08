@@ -109,11 +109,17 @@ export default function VirtualizedGrid<T>({
         style={
           {
             gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+            alignItems: "stretch",
           } as CSSProperties
         }
       >
         {items.map((item, index) => (
-          <div key={getKey(item, index)}>{renderItem(item, index)}</div>
+          /* display:contents lets the item become a real grid child so it
+             stretches to the row height (equal-height cards, exactly like
+             the deals grid). The wrapper only carries the React key. */
+          <div key={getKey(item, index)} style={{ display: "contents" }}>
+            {renderItem(item, index)}
+          </div>
         ))}
       </div>
     );
@@ -151,12 +157,17 @@ export default function VirtualizedGrid<T>({
               className={`grid ${gapClassName}`}
               style={{
                 gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
+                alignItems: "stretch",
               }}
             >
               {rowItems.map((item, i) => {
                 const index = start + i;
                 return (
-                  <div key={getKey(item, index)}>{renderItem(item, index)}</div>
+                  /* Same display:contents trick as the non-virtual branch —
+                     items become real grid children and stretch equal. */
+                  <div key={getKey(item, index)} style={{ display: "contents" }}>
+                    {renderItem(item, index)}
+                  </div>
                 );
               })}
             </div>

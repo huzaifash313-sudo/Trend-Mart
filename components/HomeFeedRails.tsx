@@ -13,7 +13,7 @@
 /*  so the same deals/products never show twice on one page.                  */
 /* -------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -163,6 +163,84 @@ function rotateWindow<T>(items: T[], count: number, slot: number): T[] {
   return Array.from({ length: count }, (_, i) => items[(start + i) % len]!);
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Auto-loop marquee (phones only)                                           */
+/*                                                                            */
+/*  On a phone the rail is one compact horizontal strip (~4 small tiles per   */
+/*  view). When it has more tiles than the screen, it gently scrolls itself   */
+/*  in an endless loop so shoppers keep seeing fresh cards without swiping.   */
+/*  Pauses on hover / touch / reduced motion and never fights a manual swipe. */
+/* -------------------------------------------------------------------------- */
+
+function useMiniRailAutoLoop(limit: number) {
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia?.("(min-width: 640px)");
+    if (mq?.matches) {
+      setEnabled(false);
+      return;
+    }
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    setEnabled(!reduce && limit > 4);
+  }, [limit]);
+
+  useEffect(() => {
+    const el = railRef.current;
+    if (!enabled || !el) return;
+    const canScroll = el.scrollWidth > el.clientWidth + 4;
+    if (!canScroll) return;
+
+    let raf = 0;
+    let paused = false;
+    let last = performance.now();
+    const SPEED_PX_PER_SEC = 34;
+
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (paused || document.hidden) {
+        last = now;
+        return;
+      }
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 0) return;
+      el.scrollLeft += SPEED_PX_PER_SEC * dt;
+      if (el.scrollLeft >= max - 0.5) el.scrollLeft = 0; // seamless loop
+    };
+
+    const pause = () => {
+      paused = true;
+    };
+    const resume = () => {
+      paused = false;
+      last = performance.now();
+    };
+
+    el.addEventListener("pointerenter", pause);
+    el.addEventListener("pointerleave", resume);
+    el.addEventListener("touchstart", pause, { passive: true });
+    el.addEventListener("touchend", resume, { passive: true });
+    el.addEventListener("focusin", pause);
+    el.addEventListener("focusout", resume);
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("pointerenter", pause);
+      el.removeEventListener("pointerleave", resume);
+      el.removeEventListener("touchstart", pause);
+      el.removeEventListener("touchend", resume);
+      el.removeEventListener("focusin", pause);
+      el.removeEventListener("focusout", resume);
+    };
+  }, [enabled]);
+
+  return railRef;
+}
+
 /* ── Deals grid ───────────────────────────────────────────────────────────── */
 
 interface DealsRailProps {
@@ -201,12 +279,13 @@ function DealsRailInner({ deals, title = "Hot deals", moreHref = "/deals", slot 
     return rotateWindow(unique, RAIL_LIMIT, slot);
   }, [deals, slot]);
 
+  const railRef = useMiniRailAutoLoop(visible.length);
   if (visible.length === 0) return null;
 
   return (
     <section aria-label={title} className="tm-rail">
       <RailHeading icon={<span aria-hidden>⚡</span>} title={title} moreLabel="More deals" moreHref={moreHref} />
-      <div className="tm-mini-grid">
+      <div className="tm-mini-grid" ref={railRef}>
         {visible.map((deal) => {
           const product = dealToProduct(deal);
           const discount = getProductDiscount(product);
@@ -422,6 +501,7 @@ function ProductsRailInner({
     [addToast],
   );
 
+  const railRef = useMiniRailAutoLoop(products.length);
   if (productsQuery.isLoading || products.length === 0) return null;
 
   const quickViewShop = quickView
@@ -432,7 +512,7 @@ function ProductsRailInner({
     <>
       <section aria-label={title} className="tm-rail">
         <RailHeading icon={<span aria-hidden>🔥</span>} title={title} moreLabel="More products" moreHref={moreHref} />
-        <div className="tm-mini-grid">
+        <div className="tm-mini-grid" ref={railRef}>
           {products.map((product) => {
             const discount = getProductDiscount(product);
             return (
