@@ -21,6 +21,7 @@ import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import ProductGrid from "@/components/ProductGrid";
 import CustomSelect from "@/components/CustomSelect";
 import FeaturedDealsStrip from "@/components/FeaturedDealsStrip";
+import DealCard from "@/components/DealCard";
 import { isDealActiveOnDate, toPkDateKey } from "@/lib/dealSchedule";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
@@ -382,6 +383,16 @@ function ShopDetailInner({ id }: { id: string }) {
         shop_whatsapp: d.shop_whatsapp || shop.whatsapp_number,
       }));
   }, [shop, deals]);
+
+  // Split live deals → featured (spotlight) vs rest (all-deals grid)
+  const featuredShopDeals = useMemo(
+    () => liveShopDeals.filter((d) => d.is_featured),
+    [liveShopDeals],
+  );
+  const restShopDeals = useMemo(
+    () => liveShopDeals.filter((d) => !d.is_featured),
+    [liveShopDeals],
+  );
 
   // Deep links: #deals | #deal-{id} | #product-{id} (from WhatsApp order links)
   useEffect(() => {
@@ -1254,18 +1265,47 @@ function ShopDetailInner({ id }: { id: string }) {
             )}
           </section>
         ) : liveShopDeals.length > 0 ? (
-          <section id="deals" aria-label="Store deals" className="scroll-mt-20">
+          <section id="deals" aria-label="Store deals" className="scroll-mt-20 space-y-6">
             {/* Zero-height anchors keep WhatsApp #deal-{id} deep links working. */}
             {liveShopDeals.map((d) => (
               <div key={`deal-anchor-${d.id}`} id={`deal-${d.id}`} className="h-0 overflow-hidden" aria-hidden="true" />
             ))}
-            <FeaturedDealsStrip
-              deals={liveShopDeals}
-              title="Deals"
-              seeAllHref="/deals"
-              variant="home"
-              getOfferTags={() => shopDealOfferTags}
-            />
+
+            {/* ── Featured / pinned spotlight strip ──────────────────────── */}
+            {featuredShopDeals.length > 0 && (
+              <FeaturedDealsStrip
+                deals={featuredShopDeals}
+                title="✨ Featured Deals"
+                seeAllHref="/deals"
+                variant="home"
+                preferFeatured={false}
+                limit={featuredShopDeals.length}
+                getOfferTags={() => shopDealOfferTags}
+              />
+            )}
+
+            {/* ── All remaining deals — full visible grid ─────────────────── */}
+            {restShopDeals.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
+                    {featuredShopDeals.length > 0 ? "More Deals" : "All Deals"}
+                  </h2>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[0.65rem] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                    {restShopDeals.length} deal{restShopDeals.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                  {restShopDeals.map((deal) => (
+                    <DealCard
+                      key={deal.id}
+                      deal={deal}
+                      offerTags={shopDealOfferTags}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         ) : null}
 

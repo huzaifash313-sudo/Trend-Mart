@@ -149,9 +149,10 @@ export default function Navbar() {
     }
   }, [searchOpen]);
 
-  // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
+  // Standalone flows — these pages bring their own chrome (no navbar/sidebar).
   const isStandalone =
     pathname === "/offline" ||
+    pathname === "/login" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/t/");
 
@@ -160,18 +161,21 @@ export default function Navbar() {
   }, []);
 
   // Drive the page offset so the whole storefront shifts for the pinned sidebar.
-  // The desktop sidebar is intentionally ALWAYS open — there is no collapse
-  // control, so we never restore a "closed" preference.
   useLayoutEffect(() => {
     if (isStandalone) return;
     const root = document.documentElement;
-    root.classList.add("tm-sidebar-open");
-    root.classList.remove("tm-sidebar-collapsed");
+    if (sidebarOpen) {
+      root.classList.add("tm-sidebar-open");
+      root.classList.remove("tm-sidebar-collapsed");
+    } else {
+      root.classList.remove("tm-sidebar-open");
+      root.classList.add("tm-sidebar-collapsed");
+    }
     return () => {
       root.classList.remove("tm-sidebar-open");
       root.classList.remove("tm-sidebar-collapsed");
     };
-  }, [isStandalone]);
+  }, [isStandalone, sidebarOpen]);
 
   if (isStandalone) {
     return null;
@@ -184,12 +188,15 @@ export default function Navbar() {
         <TrendBackdrop />
 
         <div className="tm-navbar-inner">
-          {/* Hamburger — mobile only (<1024px) */}
+          {/* Hamburger — mobile: opens drawer; desktop: toggles persistent sidebar */}
           <button
             type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="tm-navbar-icon-btn tm-navbar-menu-btn"
-            aria-label="Open navigation menu"
+            onClick={() => {
+              setDrawerOpen(true);             // mobile drawer (hidden on desktop by CSS)
+              setSidebarOpen((prev) => !prev); // desktop persistent sidebar toggle
+            }}
+            className="tm-navbar-icon-btn"
+            aria-label="Toggle navigation menu"
           >
             <HamburgerIcon />
           </button>
@@ -230,17 +237,14 @@ export default function Navbar() {
             </label>
           </form>
 
-          {/* ── Mobile tappable search pill (< lg) — replaces the bare icon ── */}
+          {/* ── Mobile search icon (< lg) — taps open the full overlay ── */}
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border border-white/25 bg-white/20 px-3.5 py-2 text-left text-white/80 backdrop-blur-[2px] transition-colors active:bg-white/30 lg:hidden"
-            aria-label="Open search"
+            className="tm-navbar-icon-btn lg:hidden"
+            aria-label="Search"
           >
-            <span className="shrink-0 opacity-80">
-              <SearchNavIcon />
-            </span>
-            <span className="flex-1 truncate text-[13px] leading-none">Search stores, products…</span>
+            <SearchNavIcon />
           </button>
 
           {/* ── Right-side action icons ── */}
@@ -314,7 +318,7 @@ export default function Navbar() {
               <SidebarDrawer
                 variant="persistent"
                 isOpen={sidebarOpen}
-                onClose={() => setSidebarOpen(true)}
+                onClose={() => setSidebarOpen(false)}
               />
             </>,
             document.body,

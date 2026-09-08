@@ -21,6 +21,15 @@ function CloseIcon() {
   );
 }
 
+function SidebarCollapseIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
+      <line x1="4" y1="6" x2="4" y2="18" />
+    </svg>
+  );
+}
+
 function SunIcon() {
   return (
     <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -484,9 +493,18 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
             >
               {resolved === "dark" ? <SunIcon /> : <MoonIcon />}
             </button>
-            {/* Only the mobile drawer gets a close (X). The desktop sidebar is
-                intentionally pinned open — no collapse control at all. */}
-            {!isPersistent ? (
+            {/* Mobile drawer → X close; Desktop persistent → « collapse */}
+            {isPersistent ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-emerald-600 dark:hover:bg-zinc-800 dark:hover:text-emerald-400"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <SidebarCollapseIcon />
+              </button>
+            ) : (
               <button
                 ref={closeButtonRef}
                 type="button"
@@ -496,7 +514,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
               >
                 <CloseIcon />
               </button>
-            ) : null}
+            )}
           </div>
         </div>
 
