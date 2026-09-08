@@ -375,6 +375,7 @@ export const ProductCard = memo(function ProductCard({
           {product.name}
         </h3>
 
+        {/* Bulk / tier info is shown in the QuickView popup — never on the card */}
         {showShopMeta && product.shop_name ? (
           <div className="tm-product-shop">
             <button
@@ -417,15 +418,19 @@ export const ProductCard = memo(function ProductCard({
               className="ml-auto shrink-0"
             />
           </div>
-        ) : !compact && product.description ? (
+        ) : !compact && product.description &&
+            !(Array.isArray(product.price_tiers) && product.price_tiers.length > 0) ? (
+          /* Hide description when the product has bulk/tier pricing — that info
+             is shown properly inside the QuickView popup instead. */
           <p className="tm-product-shop line-clamp-1 text-[11px] leading-tight text-zinc-400 dark:text-zinc-500">
             {product.description}
           </p>
         ) : null}
 
         <div className={`tm-product-footer flex flex-col ${compact ? "gap-1" : "gap-1.5"}`}>
-          {/* Price — full width so it never collapses into a vertical stack */}
-          <div className="min-w-0">
+          {/* Price row — price + % OFF badge + original all on ONE line so card
+              heights stay identical whether a product has a discount or not. */}
+          <div className="min-w-0 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
             <p
               className={`whitespace-nowrap font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${
                 compact ? "text-[13px] sm:text-sm" : "text-sm sm:text-[15px]"
@@ -434,26 +439,19 @@ export const ProductCard = memo(function ProductCard({
               {priceLabel}
             </p>
 
-            {/* Meta line: [% OFF badge] [strikethrough original price] — badge
-                first so the most eye-catching info is always leftmost. Reserved
-                on every card to keep uniform heights. */}
-            <div
-              className="tm-product-meta"
-              aria-hidden={!hasDiscount || originalPrice == null}
-            >
-              {hasDiscount && originalPrice != null ? (
-                <>
-                  {discountPercent > 0 ? (
-                    <span className="tm-product-meta-off rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-                      {discountPercent}% OFF
-                    </span>
-                  ) : null}
-                  <span className="tm-product-meta-old text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
-                    {formatRupees(originalPrice)}
-                  </span>
-                </>
-              ) : null}
-            </div>
+            {/* % OFF badge — inline right after the price */}
+            {hasDiscount && discountPercent > 0 ? (
+              <span className="shrink-0 rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                {discountPercent}% OFF
+              </span>
+            ) : null}
+
+            {/* Strikethrough original — inline after the badge */}
+            {hasDiscount && originalPrice != null ? (
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
+                {formatRupees(originalPrice)}
+              </span>
+            ) : null}
           </div>
 
           {/* Actions — customer row only; owner manage uses the 3-dot menu above */}

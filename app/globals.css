@@ -4274,18 +4274,10 @@ html.dark .tm-product-title {
   margin-top: 0.12rem;
 }
 
-/* Fixed-size "meta" line inside the price block (ProductCard only).
-   A single inline row — strikethrough original price + % OFF chip sit side
-   by side. Reserved height on EVERY card so discounted products can never
-   make one card taller or push its action row lower than a plain product's. */
+/* Price row — price + % OFF + original are now on ONE inline flex row.
+   No reserved min-height needed because every card shows the price itself. */
 .tm-product-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin-top: 0.2rem;
-  min-height: 0.95rem;
-  min-width: 0;
-  overflow: hidden;
+  /* kept as selector for any legacy references — no visual effect */
 }
 .tm-product-meta-old {
   min-width: 0;

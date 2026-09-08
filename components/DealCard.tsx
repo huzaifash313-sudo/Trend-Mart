@@ -530,24 +530,23 @@ function DealCard({
           <div className="tm-product-footer flex flex-col justify-end gap-0.5">
             {hasPrice && priceLabel ? (
               <>
-                <p
-                  className="text-[13px] font-bold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-sm"
-                  title={formatRupees(Number(deal.price))}
-                >
-                  {priceLabel}
-                </p>
-                <div className="flex min-h-[0.95rem] flex-wrap items-center gap-x-1 gap-y-0.5">
+                {/* Price + % OFF + original all on ONE inline row — consistent card height */}
+                <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                  <p
+                    className="whitespace-nowrap text-[13px] font-bold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-sm"
+                    title={formatRupees(Number(deal.price))}
+                  >
+                    {priceLabel}
+                  </p>
+                  {hasDiscount && discountPercent > 0 ? (
+                    <span className="shrink-0 rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                      {discountPercent}% OFF
+                    </span>
+                  ) : null}
                   {hasDiscount && originalPrice != null ? (
-                    <>
-                      <span className="text-[10px] leading-none text-zinc-400 line-through tabular-nums">
-                        {formatDealPrice(originalPrice)}
-                      </span>
-                      {discountPercent > 0 ? (
-                        <span className="rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-                          {discountPercent}% OFF
-                        </span>
-                      ) : null}
-                    </>
+                    <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] leading-none text-zinc-400 line-through tabular-nums">
+                      {formatDealPrice(originalPrice)}
+                    </span>
                   ) : (
                     <span className="text-[10px] leading-none text-zinc-400">{whenTag}</span>
                   )}
