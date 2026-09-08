@@ -4214,33 +4214,27 @@ html.dark .tm-product-title {
   margin-top: 0.12rem;
 }
 
-/* Fixed-size "meta" zone inside the price block (ProductCard only).
-   Always reserves the SAME two micro-lines ("old price / % OFF" and
-   "bulk price"), so discounted / bulk products can never make one card
-   taller or push its action row lower than a plain product's. */
+/* Fixed-size "meta" line inside the price block (ProductCard only).
+   A single inline row — strikethrough original price + % OFF chip sit side
+   by side. Reserved height on EVERY card so discounted products can never
+   make one card taller or push its action row lower than a plain product's. */
 .tm-product-meta {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 0.16rem;
-  margin-top: 0.2rem;
-  min-height: calc(2 * 0.95rem + 0.16rem);
-  min-width: 0;
-  overflow: hidden;
-}
-.tm-product-meta-row {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  min-width: 0;
+  margin-top: 0.2rem;
   min-height: 0.95rem;
+  min-width: 0;
   overflow: hidden;
 }
-.tm-product-meta-row > span {
-  flex: 0 1 auto;
+.tm-product-meta-old {
   min-width: 0;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
+}
+.tm-product-meta-off {
+  flex-shrink: 0;
 }
 
 /* Dark moving offer “patti” on product images */
@@ -7133,6 +7127,9 @@ html.dark .tm-rail-more {
 .tm-mini-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Force every row to the SAME height so cards one above another line up
+     perfectly even when one product's meta runs longer than a neighbour's. */
+  grid-auto-rows: minmax(0, 1fr);
   gap: 0.55rem;
   align-items: stretch;
 }
@@ -7231,6 +7228,9 @@ html.dark .tm-rail-more {
   display: block;
   width: 100%;
   aspect-ratio: 1 / 1;
+  /* Media box must never collapse inside the flex column (short images or a
+     missing image would otherwise shrink the card). */
+  flex: 0 0 auto;
   overflow: hidden;
   background: #fff;
   border-bottom: 1px solid color-mix(in srgb, var(--tm-border) 55%, transparent);
@@ -7298,6 +7298,8 @@ html.dark .tm-mini-tile-fallback {
   font-weight: 600;
   line-height: 1.25;
   color: var(--tm-text);
+  /* Reserve EXACTLY the clamped line count on every tile so a short name can
+     never make one card shorter than a two-line name beside it. */
   min-height: 1.7rem;
 }
 .tm-mini-tile-shop {
@@ -7307,14 +7309,22 @@ html.dark .tm-mini-tile-fallback {
   white-space: nowrap;
   font-size: 0.6rem;
   color: var(--tm-muted);
+  /* Same slot reserved whether or not a tile shows a shop name. */
+  min-height: 0.75rem;
+  line-height: 1.25;
 }
 .tm-mini-tile-price-row {
   display: flex;
-  flex-wrap: wrap;
+  /* NEVER wrap: a long strikethrough price would wrap below and stretch one
+     card taller than its neighbours. Overflow is ellipsized instead. */
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 0.3rem;
   margin-top: auto;
   padding-top: 0.15rem;
+  min-height: 1.1rem;
+  min-width: 0;
+  overflow: hidden;
 }
 .tm-mini-tile-price {
   font-size: 0.78rem;
@@ -7322,12 +7332,18 @@ html.dark .tm-mini-tile-fallback {
   color: var(--tm-text-strong);
   letter-spacing: -0.01em;
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 .tm-mini-tile-was {
   font-size: 0.62rem;
   color: var(--tm-text-faint);
   text-decoration: line-through;
   white-space: nowrap;
+  /* Shrink + ellipsis rather than pushing a second row. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Make product/deal cards fill their rail slot so rows stay equal height */
