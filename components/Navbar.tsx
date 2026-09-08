@@ -209,40 +209,42 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* ── Desktop search bar (lg+) — sits center of navbar ── */}
+          {/* ── Desktop search bar (lg+) — solid white pill, clearly visible on teal ── */}
           <form
             onSubmit={handleSearchSubmit}
-            className="mx-4 hidden flex-1 lg:flex"
+            className="mx-3 hidden flex-1 lg:flex"
             role="search"
           >
-            <label className="relative flex w-full max-w-md items-center">
-              <span className="pointer-events-none absolute left-3 text-white/60">
+            <label className="relative flex w-full items-center">
+              <span className="pointer-events-none absolute left-3.5 text-zinc-400">
                 <SearchNavIcon />
               </span>
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search shops, products…"
+                placeholder="Search shops, products, deals…"
                 aria-label="Search shops and products"
-                className="w-full rounded-full border border-white/20 bg-white/10 py-2 pl-10 pr-4 text-sm text-white placeholder:text-white/55 backdrop-blur-sm transition focus:border-white/40 focus:bg-white/18 focus:outline-none focus:ring-2 focus:ring-white/25"
+                className="w-full rounded-full border-0 bg-white py-[9px] pl-11 pr-5 text-sm text-zinc-800 placeholder:text-zinc-400 shadow-sm outline-none ring-0 transition-shadow focus:shadow-md focus:ring-2 focus:ring-white/60 dark:bg-white/15 dark:text-white dark:placeholder:text-white/50 dark:focus:ring-white/30"
               />
             </label>
           </form>
 
-          {/* ── Right-side action icons ── */}
-          <div className="ml-auto flex shrink-0 items-center gap-0.5 lg:ml-0">
-            {/* Mobile search icon — opens overlay (hidden at lg+ via CSS, not Tailwind
-                utility, because tm-navbar-icon-btn is unlayered CSS that beats lg:hidden) */}
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="tm-navbar-icon-btn tm-navbar-search-mobile-btn"
-              aria-label="Search"
-            >
+          {/* ── Mobile tappable search pill (< lg) — replaces the bare icon ── */}
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border border-white/25 bg-white/20 px-3.5 py-2 text-left text-white/80 backdrop-blur-[2px] transition-colors active:bg-white/30 lg:hidden"
+            aria-label="Open search"
+          >
+            <span className="shrink-0 opacity-80">
               <SearchNavIcon />
-            </button>
+            </span>
+            <span className="flex-1 truncate text-[13px] leading-none">Search stores, products…</span>
+          </button>
 
+          {/* ── Right-side action icons ── */}
+          <div className="flex shrink-0 items-center gap-0.5">
             {/* Cart icon with item-count badge */}
             <Link
               href="/cart"

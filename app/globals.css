@@ -1740,18 +1740,27 @@ html.dark .trend-card:hover {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;  /* tighter on mobile so the search pill has more room */
   height: var(--tm-navbar-content-height);
   min-height: var(--tm-navbar-content-height);
   max-height: var(--tm-navbar-content-height);
   max-width: 72rem;
   margin-inline: auto;
-  padding: 0 14px;
-  padding-left: calc(14px + var(--safe-area-inset-left, 0px));
-  padding-right: calc(14px + var(--safe-area-inset-right, 0px));
+  padding: 0 10px;
+  padding-left: calc(10px + var(--safe-area-inset-left, 0px));
+  padding-right: calc(10px + var(--safe-area-inset-right, 0px));
 }
 
 @media (min-width: 640px) {
+  .tm-navbar-inner {
+    gap: 12px;
+    padding: 0 16px;
+    padding-left: calc(16px + var(--safe-area-inset-left, 0px));
+    padding-right: calc(16px + var(--safe-area-inset-right, 0px));
+  }
+}
+
+@media (min-width: 1024px) {
   .tm-navbar-inner {
     gap: 16px;
     padding: 0 20px;
@@ -1929,13 +1938,10 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   }
 }
 
-/* Mobile-only search icon in the navbar right cluster — hidden at desktop
-   (lg+) because the full search bar is rendered inside the navbar at those
-   widths. Same specificity issue as .tm-navbar-menu-btn above. */
-@media (min-width: 1024px) {
-  .tm-navbar-search-mobile-btn {
-    display: none !important;
-  }
+/* Mobile search pill is rendered via React (lg:hidden Tailwind class) so
+   no extra CSS rule needed here — selector kept as a no-op for history. */
+.tm-navbar-search-mobile-btn {
+  /* replaced by the tappable pill; selector retained for back-compat */
 }
 
 /* Mobile perf: kill infinite navbar animations + expensive backdrop blur.
