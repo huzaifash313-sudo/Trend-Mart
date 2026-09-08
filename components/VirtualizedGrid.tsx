@@ -151,10 +151,15 @@ export default function VirtualizedGrid<T>({
               left: 0,
               width: "100%",
               transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+              /* Row gap: padding-bottom is measured by the virtualizer so
+                 successive rows are spaced exactly like a CSS-grid row-gap.
+                 10 px ≈ gap-2.5 (matches the non-virtual non-col gap). */
+              paddingBottom: "10px",
             }}
           >
+            {/* Column-gap only — row gap is handled by paddingBottom above */}
             <div
-              className={`grid ${gapClassName}`}
+              className={`grid gap-x-2.5 sm:gap-x-3`}
               style={{
                 gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`,
                 alignItems: "stretch",

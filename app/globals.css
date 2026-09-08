@@ -4145,6 +4145,57 @@ html.dark .tm-geo-reset:hover {
     contain-intrinsic-size: 200px 320px;
   }
 }
+
+/* ── Mobile 2-col card: aggressively compact so cards don't eat the screen ── */
+/*
+ * On small phones the 2-column grid makes each card ~167 px wide. The base
+ * 68 % image height plus two-line title reserve makes cards way too tall.
+ * These overrides bring each card to a clean, uniform, space-efficient size.
+ */
+@media (max-width: 639.98px) {
+  /* Shorter image slot — saves ~23 px per card on a 375 px device */
+  .tm-product-media::before {
+    padding-bottom: 54%;
+  }
+
+  /* Tighter body: smaller padding + reduced gap between elements */
+  .tm-product-body {
+    padding: 0.22rem 0.26rem 0.22rem;
+    gap: 0.05rem;
+  }
+
+  /* One-line title on tiny cards — reserves exactly one line (not two) so
+     every card body has the same height regardless of name length. */
+  .tm-product-title {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    min-height: calc(1 * 1.22em);
+    font-size: 0.72rem;
+  }
+
+  /* Smaller shop/rating row */
+  .tm-product-shop {
+    min-height: 0.7rem;
+  }
+
+  /* Tighter meta (strikethrough + OFF badge) */
+  .tm-product-meta {
+    margin-top: 0.05rem;
+    min-height: 0.72rem;
+    gap: 0.2rem;
+  }
+
+  /* Footer: less top margin */
+  .tm-product-footer {
+    margin-top: 0.06rem;
+  }
+
+  /* Action row: tighter top padding */
+  .tm-product-actions {
+    padding-top: 0.12rem;
+  }
+}
+
 html.dark .tm-product-media {
   background: linear-gradient(160deg, var(--tm-sea-950) 0%, #0f172a 100%);
 }

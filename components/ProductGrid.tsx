@@ -435,25 +435,23 @@ export const ProductCard = memo(function ProductCard({
               {priceLabel}
             </p>
 
-            {/*
-              Fixed one-slot meta line — reserved on EVERY card so a product
-              with an "old price + % OFF" can never make its card taller or
-              push the action row down vs a plain product.
-            */}
+            {/* Meta line: [% OFF badge] [strikethrough original price] — badge
+                first so the most eye-catching info is always leftmost. Reserved
+                on every card to keep uniform heights. */}
             <div
               className="tm-product-meta"
               aria-hidden={!hasDiscount || originalPrice == null}
             >
               {hasDiscount && originalPrice != null ? (
                 <>
-                  <span className="tm-product-meta-old text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
-                    {formatRupees(originalPrice)}
-                  </span>
                   {discountPercent > 0 ? (
                     <span className="tm-product-meta-off rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
                       {discountPercent}% OFF
                     </span>
                   ) : null}
+                  <span className="tm-product-meta-old text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
+                    {formatRupees(originalPrice)}
+                  </span>
                 </>
               ) : null}
             </div>
