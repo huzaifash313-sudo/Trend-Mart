@@ -63,7 +63,9 @@ export default function Footer() {
   return (
     <footer className="tm-site-footer mt-auto border-t border-zinc-200 bg-white dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-bg)]">
       {/* ── Mobile: compact, clears BottomNav ───────────────────────── */}
-      <div className={`mx-auto max-w-6xl px-4 pt-5 md:hidden ${mobilePad}`}>
+      {/* aria-hidden — same links are in the desktop footer below; screen
+          readers only traverse one of the two identical link trees. */}
+      <div className={`mx-auto max-w-6xl px-4 pt-5 md:hidden ${mobilePad}`} aria-hidden="true">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-base font-bold text-emerald-600 dark:text-emerald-400"

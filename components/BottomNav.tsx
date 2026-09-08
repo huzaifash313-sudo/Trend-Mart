@@ -350,13 +350,17 @@ export default function BottomNav() {
   const isProductsActive =
     pathname === "/products" ||
     pathname.startsWith("/products/");
+  // When auth is still resolving (authPending), never mark any tab as active
+  // for the account position — avoids the "…" appearing active on the homepage
+  // because authHref temporarily falls back to "/" (which always matches pathname).
   const isAccountActive =
-    pathname === accountHref ||
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/account") ||
-    pathname.startsWith("/admin") ||
-    pathname === "/login" ||
-    pathname === "/signup";
+    !authPending &&
+    (pathname === accountHref ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/account") ||
+      pathname.startsWith("/admin") ||
+      pathname === "/login" ||
+      pathname === "/signup");
 
   const handleCenterAdd = () => {
     if (merchantShop) {
@@ -401,7 +405,7 @@ export default function BottomNav() {
           : "Sign in to open a store";
 
   const sideTabClass = (active: boolean) =>
-    `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.62rem] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
+    `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[11px] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
       active
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-zinc-500 hover:text-zinc-700 dark:text-[color:var(--tm-muted)] dark:hover:text-[color:var(--tm-text)]"
@@ -437,7 +441,7 @@ export default function BottomNav() {
           >
             <PlusIcon />
           </button>
-          <span className="mt-0.5 text-[0.58rem] font-semibold text-emerald-700 dark:text-emerald-400">
+          <span className="mt-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
             {centerLabel}
           </span>
         </div>

@@ -67,7 +67,16 @@ function shouldSkipHeavy(): boolean {
   return false;
 }
 
-/** Prefer soft / friendly English voices (works well for Roman Urdu tips too). */
+/**
+ * Prefer Urdu / Hindi voices for Roman Urdu TrendBot tips.
+ * Falls back to a clear female English-Indian voice if Urdu not available.
+ *
+ * Device support:
+ *  - Android: Google Urdu / Hindi TTS (ur-PK, hi-IN)
+ *  - iOS 16+:  Samira (ur-PK) built-in
+ *  - Windows:  Microsoft Urdu (ur-PK) if Language Pack installed
+ *  - Fallback: Google UK English Female / en-IN (clear, accent familiar)
+ */
 function pickVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
   ensureVoicesLoaded();
@@ -78,15 +87,31 @@ function pickVoice(): SpeechSynthesisVoice | null {
     let s = 0;
     const name = v.name.toLowerCase();
     const lang = v.lang.toLowerCase();
-    if (/en(-|_)?(gb|us|in|au|ie)/i.test(lang)) s += 8;
-    else if (/^en/i.test(lang)) s += 5;
-    else if (/ur|hi/i.test(lang)) s += 4;
-    if (/female|woman|zira|samantha|karen|moira|google uk english female|neural|natural/i.test(name)) {
-      s += 10;
-    }
-    if (/microsoft.*(aria|jenny|sara|neerja)|google.*female/i.test(name)) s += 6;
-    if (/male|david|mark|ravi/i.test(name)) s -= 4;
-    if (v.localService) s += 1;
+
+    // ── Urdu first (Roman Urdu reads naturally in ur-PK voice) ──
+    if (/ur(-|_)?pk/i.test(lang)) s += 20;
+    else if (/^ur\b/i.test(lang)) s += 18;
+
+    // ── Hindi / South-Asian accent (very close to Roman Urdu rhythm) ──
+    else if (/hi(-|_)?(in|pk)/i.test(lang)) s += 12;
+    else if (/^hi\b/i.test(lang)) s += 10;
+
+    // ── English Indian — familiar accent, clear ──
+    else if (/en(-|_)?in/i.test(lang)) s += 8;
+    else if (/en(-|_)?(gb|us|au)/i.test(lang)) s += 5;
+    else if (/^en/i.test(lang)) s += 3;
+
+    // ── Prefer female / neural voices (clearer, friendlier) ──
+    if (/female|woman|samira|neerja|neural|natural|google uk english female/i.test(name)) s += 10;
+    if (/microsoft.*(aria|jenny|sara|neerja|haruka)/i.test(name)) s += 8;
+    if (/google.*(urdu|hindi|female)/i.test(name)) s += 6;
+
+    // ── Penalise harsh male voices ──
+    if (/\bmale\b|david|mark|ravi/i.test(name)) s -= 5;
+
+    // ── Local service = lower latency ──
+    if (v.localService) s += 2;
+
     return s;
   };
 
@@ -145,18 +170,38 @@ export function speakTrendBotLine(
 
   try {
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text.slice(0, 160).trim());
-    // Soft, slightly playful voice
-    utter.rate = options?.cute === false ? 1 : 1.05;
-    utter.pitch = options?.cute === false ? 1 : 1.22;
-    utter.volume = 0.88;
+    // Strip emoji from spoken text — TTS engines often mispronounce them
+    const spoken = text
+      .replace(/[\u{1F300}-\u{1FFFF}]/gu, "")
+      .replace(/[\u2600-\u26FF\u2700-\u27BF]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .slice(0, 160)
+      .trim();
+    if (!spoken) return false;
+
+    const utter = new SpeechSynthesisUtterance(spoken);
     const voice = pickVoice();
+
     if (voice) {
       utter.voice = voice;
-      utter.lang = voice.lang || "en-IN";
+      const vl = voice.lang.toLowerCase();
+      // Use the voice's native language so TTS engine interprets phonemes correctly
+      utter.lang = voice.lang;
+      // Urdu/Hindi TTS sounds best at a slightly slower, natural pace
+      if (/^ur|^hi/i.test(vl)) {
+        utter.rate = options?.cute === false ? 0.95 : 1.0;
+        utter.pitch = options?.cute === false ? 1 : 1.08;
+      } else {
+        utter.rate = options?.cute === false ? 1 : 1.05;
+        utter.pitch = options?.cute === false ? 1 : 1.18;
+      }
     } else {
-      utter.lang = "en-IN";
+      // Fallback: use ur-PK lang so the browser may select a matching engine
+      utter.lang = "ur-PK";
+      utter.rate = 0.95;
+      utter.pitch = 1.0;
     }
+    utter.volume = 0.9;
     // Chrome sometimes needs a tiny delay after cancel
     window.setTimeout(() => {
       try {
@@ -188,10 +233,11 @@ export function speakTrendBotReply(
 
   if (options?.productName) {
     const n = options.productCount ?? 1;
+    // Roman Urdu — clear and kaam ki
     const line =
       n > 1
-        ? `I found ${n} options. Top pick is ${options.productName}.`
-        : `Best match is ${options.productName}.`;
+        ? `${n} options mile hain. Best pick hai ${options.productName}.`
+        : `Best match hai ${options.productName}.`;
     return speakTrendBotLine(line, { force: true, cute: true });
   }
 

@@ -168,14 +168,16 @@ export default function TrendBotHost() {
     <>
       {teaser && !open ? (
         <div
-          className="tm-trendbot-bubble fixed right-3 z-[119] max-w-[min(260px,calc(100vw-5rem))]"
+          className="tm-trendbot-bubble fixed right-3 z-[119] max-w-[min(210px,calc(100vw-4.5rem))]"
           style={{ bottom: "calc(7.35rem + env(safe-area-inset-bottom, 0px))" }}
         >
-          <div className="rounded-2xl rounded-br-sm border border-emerald-100 bg-white px-3.5 py-2.5 text-left text-xs font-medium leading-snug text-zinc-700 shadow-lg dark:border-emerald-900/40 dark:bg-zinc-900 dark:text-zinc-200">
-            <span className="mb-0.5 flex items-center justify-between gap-2">
-              <span className="text-[0.6rem] font-bold uppercase tracking-wide text-emerald-600">
+          <div className="rounded-xl rounded-br-sm border border-emerald-100 bg-white px-2.5 py-2 text-left shadow-lg dark:border-emerald-900/40 dark:bg-zinc-900">
+            {/* Header row — TrendBot label, voice toggle, close */}
+            <div className="mb-1 flex items-center gap-1">
+              <span className="text-[0.58rem] font-bold uppercase tracking-wide text-emerald-600 flex-1">
                 {TREND_BOT_NAME}
               </span>
+              {/* Voice toggle */}
               <button
                 type="button"
                 onClick={() => {
@@ -183,13 +185,25 @@ export default function TrendBotHost() {
                   setTrendBotVoiceMuted(next);
                   setVoiceMuted(next);
                 }}
-                className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[0.55rem] font-semibold text-zinc-500 dark:bg-zinc-800"
+                className="flex h-4 w-4 items-center justify-center rounded-full text-[0.55rem] text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 aria-label={voiceMuted ? "Unmute TrendBot voice" : "Mute TrendBot voice"}
-                title={voiceMuted ? "Unmute voice" : "Mute voice"}
               >
                 {voiceMuted ? "🔇" : "🔊"}
               </button>
-            </span>
+              {/* Close / dismiss bubble */}
+              <button
+                type="button"
+                onClick={() => setTeaser(null)}
+                className="flex h-4 w-4 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                aria-label="Dismiss message"
+              >
+                <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Teaser text — tapping opens the full TrendBot panel */}
             <button
               type="button"
               onClick={() => {
@@ -197,11 +211,16 @@ export default function TrendBotHost() {
                 setOpen(true);
                 flashPose("happy", 780);
               }}
-              className="w-full text-left"
+              className="block w-full text-left text-[11px] font-medium leading-snug text-zinc-700 dark:text-zinc-200"
               aria-label="Open TrendBot chat"
             >
               {teaser}
             </button>
+
+            {/* Tap hint */}
+            <p className="mt-1 text-[9px] text-zinc-400 dark:text-zinc-500">
+              Tap to chat →
+            </p>
           </div>
         </div>
       ) : null}
@@ -216,10 +235,10 @@ export default function TrendBotHost() {
             setTeaser(null);
             setOpen(true);
             flashPose("happy", 780);
-            speakTrendBotLine("Hi! Ask me anything — products, deals, or orders.", {
-              routeKey: "open:panel",
-              cute: true,
-            });
+            speakTrendBotLine(
+              "Salam! TrendBot yahan hai. Products, deals, ya koi bhi sawaal — batao.",
+              { routeKey: "open:panel", cute: true },
+            );
           }}
         />
       ) : null}

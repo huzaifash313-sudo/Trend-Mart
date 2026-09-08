@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, type CSSProperties } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import SidebarDrawer from "@/components/SidebarDrawer";
 import NavbarNotificationButton from "@/components/NavbarNotificationButton";
+import { useCart } from "@/context/CartContext";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -15,6 +16,24 @@ function HamburgerIcon() {
   return (
     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
       <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
+    </svg>
+  );
+}
+
+function SearchNavIcon() {
+  return (
+    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function CartNavIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
     </svg>
   );
 }
@@ -101,9 +120,33 @@ function BrandMark({ size = 34 }: { size?: number }) {
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { totalItems } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [portalReady, setPortalReady] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSearchSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    setSearchOpen(false);
+    setSearchQuery("");
+    if (q) {
+      router.push(`/?q=${encodeURIComponent(q)}`);
+    } else {
+      router.push("/");
+    }
+  };
+
+  // Auto-focus when mobile search opens
+  useEffect(() => {
+    if (searchOpen) {
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [searchOpen]);
 
   // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
   const isStandalone =
@@ -140,9 +183,7 @@ export default function Navbar() {
         <TrendBackdrop />
 
         <div className="tm-navbar-inner">
-          {/* Hamburger — mobile only (<1024px). Hidden via custom CSS media
-              rule because `.tm-navbar-icon-btn`'s display beats Tailwind's
-              `lg:hidden` utility (custom CSS outranks layered utilities). */}
+          {/* Hamburger — mobile only (<1024px) */}
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -167,11 +208,97 @@ export default function Navbar() {
             </span>
           </Link>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1">
+          {/* ── Desktop search bar (lg+) — sits center of navbar ── */}
+          <form
+            onSubmit={handleSearchSubmit}
+            className="mx-4 hidden flex-1 lg:flex"
+            role="search"
+          >
+            <label className="relative flex w-full max-w-md items-center">
+              <span className="pointer-events-none absolute left-3 text-white/60">
+                <SearchNavIcon />
+              </span>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search shops, products…"
+                aria-label="Search shops and products"
+                className="w-full rounded-full border border-white/20 bg-white/10 py-2 pl-10 pr-4 text-sm text-white placeholder:text-white/55 backdrop-blur-sm transition focus:border-white/40 focus:bg-white/18 focus:outline-none focus:ring-2 focus:ring-white/25"
+              />
+            </label>
+          </form>
+
+          {/* ── Right-side action icons ── */}
+          <div className="ml-auto flex shrink-0 items-center gap-0.5 lg:ml-0">
+            {/* Mobile search icon — opens overlay (hidden at lg+ via CSS, not Tailwind
+                utility, because tm-navbar-icon-btn is unlayered CSS that beats lg:hidden) */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="tm-navbar-icon-btn tm-navbar-search-mobile-btn"
+              aria-label="Search"
+            >
+              <SearchNavIcon />
+            </button>
+
+            {/* Cart icon with item-count badge */}
+            <Link
+              href="/cart"
+              className="tm-navbar-icon-btn relative"
+              aria-label={`Cart${totalItems > 0 ? `, ${totalItems} items` : ""}`}
+            >
+              <CartNavIcon />
+              {totalItems > 0 && (
+                <span
+                  className="absolute -right-0.5 -top-0.5 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-[color:var(--tm-surface)]"
+                  aria-hidden="true"
+                >
+                  {totalItems > 99 ? "99+" : totalItems}
+                </span>
+              )}
+            </Link>
+
             <NavbarNotificationButton />
           </div>
         </div>
       </div>
+
+      {/* ── Mobile full-screen search overlay ── */}
+      {searchOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex flex-col bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setSearchOpen(false)}
+        >
+          <form
+            onSubmit={handleSearchSubmit}
+            className="m-3 mt-[calc(var(--tm-navbar-sticky-offset,3.875rem)+0.75rem)]"
+            onClick={(e) => e.stopPropagation()}
+            role="search"
+          >
+            <label className="relative flex items-center">
+              <span className="pointer-events-none absolute left-4 text-zinc-400">
+                <SearchNavIcon />
+              </span>
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search shops, products…"
+                aria-label="Search shops and products"
+                className="w-full rounded-2xl border border-zinc-200 bg-white py-3.5 pl-11 pr-16 text-base text-zinc-900 shadow-xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+              <button
+                type="submit"
+                className="absolute right-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+              >
+                Search
+              </button>
+            </label>
+          </form>
+        </div>
+      )}
 
       {portalReady
         ? createPortal(

@@ -1929,6 +1929,15 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   }
 }
 
+/* Mobile-only search icon in the navbar right cluster — hidden at desktop
+   (lg+) because the full search bar is rendered inside the navbar at those
+   widths. Same specificity issue as .tm-navbar-menu-btn above. */
+@media (min-width: 1024px) {
+  .tm-navbar-search-mobile-btn {
+    display: none !important;
+  }
+}
+
 /* Mobile perf: kill infinite navbar animations + expensive backdrop blur.
    Mid/low Android phones hang when blur + letter-chase run during scroll. */
 @media (max-width: 767px) {

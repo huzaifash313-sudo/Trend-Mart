@@ -290,7 +290,6 @@ export const ProductCard = memo(function ProductCard({
       className={`tm-product-card group flex scroll-mt-24 cursor-pointer flex-col overflow-hidden${
         compact ? " tm-product-card--compact" : ""
       }`}
-      role="button"
       tabIndex={0}
       aria-label={`View ${product.name}`}
       onKeyDown={(e) => {

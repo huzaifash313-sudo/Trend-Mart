@@ -178,7 +178,7 @@ function ShopCard({
           <Link
             href={href}
             title={shop.name}
-            className="tm-shop-name line-clamp-2 min-w-0 flex-1 break-words text-[12.5px] font-bold leading-tight tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-[13.5px] dark:text-zinc-50 dark:group-hover:text-emerald-300"
+            className="tm-shop-name line-clamp-2 min-w-0 flex-1 break-words text-[13px] font-bold leading-tight tracking-tight text-zinc-900 transition-colors duration-200 group-hover:text-emerald-700 sm:text-sm dark:text-zinc-50 dark:group-hover:text-emerald-300"
           >
             {shop.name}
           </Link>
@@ -190,7 +190,7 @@ function ShopCard({
                 e.stopPropagation();
                 onToggleFavorite();
               }}
-              className={`icon-only -mr-0.5 -mt-0.5 shrink-0 rounded-full p-0.5 transition-transform duration-200 hover:scale-110 active:scale-95 ${
+              className={`icon-only -mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform duration-200 hover:scale-110 active:scale-95 ${
                 favorited
                   ? "text-rose-500"
                   : "text-zinc-400 hover:text-rose-500 dark:text-zinc-500"
@@ -243,13 +243,13 @@ function ShopCard({
 
         <p
           title={category}
-          className="tm-title-clamp-2 mt-0.5 text-[10.5px] font-medium leading-snug text-teal-700 dark:text-teal-300 sm:text-[11.5px]"
+          className="tm-title-clamp-2 mt-0.5 text-[11px] font-medium leading-snug text-teal-700 dark:text-teal-300 sm:text-xs"
         >
           {category}
         </p>
 
         <p
-          className="mt-0.5 inline-flex min-w-0 items-center gap-0.5 text-[10.5px] leading-none text-zinc-500 dark:text-zinc-400"
+          className="mt-0.5 inline-flex min-w-0 items-center gap-0.5 text-[11px] leading-none text-zinc-500 dark:text-zinc-400 sm:text-xs"
           title={shop.location}
         >
           <PinIcon />
@@ -258,8 +258,8 @@ function ShopCard({
           </span>
         </p>
 
-        <div className="mt-auto pt-1">
-          <Link href={href} className="tm-cta btn-compact h-7 w-full text-[11.5px] sm:h-8 sm:text-[12.5px]">
+        <div className="mt-auto pt-1.5">
+          <Link href={href} className="tm-cta btn-compact h-9 w-full text-xs sm:h-9">
             View store
           </Link>
         </div>

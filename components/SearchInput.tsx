@@ -78,7 +78,7 @@ export default function SearchInput({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           aria-label={ariaLabel}
-          className={`w-full ${radius} border border-zinc-200 bg-white py-2.5 pl-10 ${rightPad} text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100`}
+          className={`w-full ${radius} border border-zinc-200 bg-white py-2.5 pl-10 ${rightPad} text-sm text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/25`}
         />
         {hasClear ? (
           <button

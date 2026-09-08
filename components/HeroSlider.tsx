@@ -335,7 +335,7 @@ export default function HeroSlider({
               e.stopPropagation();
               goPrev();
             }}
-            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-zinc-700 shadow-lg opacity-0 backdrop-blur-sm transition-all hover:bg-white hover:scale-110 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 group-hover:opacity-100 sm:left-4 sm:p-2.5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-zinc-700 shadow-lg backdrop-blur-sm transition-all hover:scale-110 hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:left-4 sm:p-2.5 sm:opacity-0 sm:group-hover:opacity-100 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-900"
             aria-label="Previous slide"
           >
             <ChevronLeftIcon />
@@ -347,7 +347,7 @@ export default function HeroSlider({
               e.stopPropagation();
               goNext();
             }}
-            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-zinc-700 shadow-lg opacity-0 backdrop-blur-sm transition-all hover:bg-white hover:scale-110 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 group-hover:opacity-100 sm:right-4 sm:p-2.5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-zinc-700 shadow-lg backdrop-blur-sm transition-all hover:scale-110 hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:right-4 sm:p-2.5 sm:opacity-0 sm:group-hover:opacity-100 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-900"
             aria-label="Next slide"
           >
             <ChevronRightIcon />

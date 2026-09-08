@@ -23,6 +23,27 @@ const DEFAULT_GRADIENT = "from-gray-400 to-zinc-500";
 
 const MAX_TILES = 10;
 
+/**
+ * Short display names for category tiles — long names get truncated at small
+ * sizes, so we use concise labels while keeping the full name in aria-label.
+ */
+const SHORT_CATEGORY_NAMES: Record<string, string> = {
+  "Fast Food & Restaurants": "Fast Food",
+  "Electronics & Gadgets": "Electronics",
+  "Health & Beauty": "Beauty",
+  "Home & Living": "Home",
+  "Bakery & Sweets": "Bakery",
+  "Sports & Fitness": "Sports",
+  "Grocery & Kiryana": "Grocery",
+  "Fruits & Vegetables": "Fruits",
+  "Pharmacy & Medical": "Pharmacy",
+  "Fashion & Apparel": "Fashion",
+  "Automotive Accessories": "Auto",
+  "Toys & Baby Care": "Kids",
+  "Handmade & Crafts": "Crafts",
+  "Others / Universal": "Others",
+};
+
 export interface HomeCategoriesProps {
   /** Ordered categories — "All" first, affinity-reordered on client. */
   categories: readonly ShopCategory[];
@@ -111,7 +132,9 @@ export default function HomeCategories({
               >
                 <span className="tm-home-cat-emoji">{iconFor(cat)}</span>
               </span>
-              <span className="tm-home-cat-label">{cat === "All" ? "All" : cat}</span>
+              <span className="tm-home-cat-label">
+                {cat === "All" ? "All" : (SHORT_CATEGORY_NAMES[cat] ?? cat)}
+              </span>
             </button>
           );
         })}

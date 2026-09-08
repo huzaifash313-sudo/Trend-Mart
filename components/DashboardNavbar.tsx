@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/services/authService";
 import type { AlertCounts } from "@/services/alertService";
@@ -93,8 +94,10 @@ function AlertPopover({ counts, onClose }: { counts: AlertCounts; onClose: () =>
 
 export default function DashboardNavbar() {
   const supabase = createClient();
+  const pathname = usePathname();
 
   const [shopId, setShopId] = useState<string | null>(null);
+  const [shopSlug, setShopSlug] = useState<string | null>(null);
   const [shopCategory, setShopCategory] = useState<string | null>(null);
   const [alertCounts, setAlertCounts] = useState<AlertCounts>({ lowStock: 0, pendingOrders: 0, urgentInquiries: 0, total: 0 });
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -107,9 +110,10 @@ export default function DashboardNavbar() {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error || !user?.id || cancelled) return;
         setShopId(null);
-        const { data: shop } = await supabase.from("shops").select("id, category").eq("owner_id", user.id).maybeSingle();
+        const { data: shop } = await supabase.from("shops").select("id, slug, category").eq("owner_id", user.id).maybeSingle();
         if (!cancelled && shop?.id) {
           setShopId(shop.id);
+          setShopSlug(typeof shop.slug === "string" ? shop.slug : null);
           setShopCategory(typeof shop.category === "string" ? shop.category : null);
         }
       } catch (err) { logError(err, { module: "DashboardNavbar.resolveShop" }); }
@@ -118,6 +122,22 @@ export default function DashboardNavbar() {
     resolveShop();
     return () => { cancelled = true; };
   }, [supabase]);
+
+  /** Returns true when the nav link path matches current pathname */
+  const isActive = useCallback((href: string) => {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    return pathname.startsWith(href);
+  }, [pathname]);
+
+  /** Class for a desktop nav link — highlights the currently active page */
+  const navLinkClass = useCallback((href: string) => {
+    const active = isActive(href);
+    return `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+      active
+        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+        : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+    }`;
+  }, [isActive]);
 
   useEffect(() => {
     if (!shopId) return;
@@ -152,7 +172,7 @@ export default function DashboardNavbar() {
         {/* Visit live storefront */}
         {!loading && shopId && (
           <Link
-            href={`/shop/${shopId}`}
+            href={shopSlug ? `/shop/${shopSlug}` : `/shop/${shopId}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-3 sm:text-sm"
@@ -199,28 +219,47 @@ export default function DashboardNavbar() {
 
         {loading && <div className="h-8 w-8 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />}
 
-        {/* Desktop nav links */}
-        <nav className="hidden md:flex items-center gap-1" aria-label="Dashboard navigation">
-          <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Overview</Link>
-          <Link href="/dashboard/orders" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Orders</Link>
+        {/* Desktop nav links — scrollable when too many fit */}
+        <nav
+          className="hidden md:flex items-center gap-0.5 overflow-x-auto scrollbar-none"
+          aria-label="Dashboard navigation"
+          style={{ scrollbarWidth: "none" }}
+        >
+          <Link href="/dashboard" className={navLinkClass("/dashboard")}>Overview</Link>
+          <Link href="/dashboard/orders" className={navLinkClass("/dashboard/orders")}>Orders</Link>
           {isDineInCategory(shopCategory) && (
             <>
-              <Link href="/dashboard/kitchen" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Kitchen</Link>
-              <Link href="/dashboard/tables" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Tables</Link>
+              <Link href="/dashboard/kitchen" className={navLinkClass("/dashboard/kitchen")}>Kitchen</Link>
+              <Link href="/dashboard/tables" className={navLinkClass("/dashboard/tables")}>Tables</Link>
             </>
           )}
-          <Link href="/dashboard/products" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Products</Link>
-          <Link href="/dashboard/assistant" className="rounded-lg px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20">TrendBot</Link>
-          <Link href="/dashboard/inquiries" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Messages</Link>
-          <Link href="/dashboard/settings" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Settings</Link>
-          <Link href="/dashboard/leads" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Leads</Link>
-          <Link href="/dashboard/finances" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Finances</Link>
-          <Link href="/dashboard/ads" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800">Ads</Link>
+          <Link href="/dashboard/products" className={navLinkClass("/dashboard/products")}>Products</Link>
+          <Link
+            href="/dashboard/assistant"
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+              isActive("/dashboard/assistant")
+                ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/25 dark:text-indigo-400"
+                : "text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
+            }`}
+          >
+            TrendBot
+          </Link>
+          <Link href="/dashboard/inquiries" className={navLinkClass("/dashboard/inquiries")}>Messages</Link>
+          <Link href="/dashboard/settings" className={navLinkClass("/dashboard/settings")}>Settings</Link>
+          <Link href="/dashboard/leads" className={navLinkClass("/dashboard/leads")}>Leads</Link>
+          <Link href="/dashboard/finances" className={navLinkClass("/dashboard/finances")}>Finances</Link>
+          <Link href="/dashboard/ads" className={navLinkClass("/dashboard/ads")}>Ads</Link>
         </nav>
 
-        {/* Sign Out */}
-        <button type="button" onClick={handleSignOut} className="shrink-0 rounded-lg border border-zinc-300 px-4 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800">
-          Sign Out
+        {/* Divider + Sign Out — visually separated from nav links */}
+        <div className="hidden h-5 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700 md:block" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+          aria-label="Sign out of dashboard"
+        >
+          Sign out
         </button>
       </div>
     </header>

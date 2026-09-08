@@ -4,14 +4,14 @@ export const TREND_BOT_NAME = "TrendBot";
 export const TREND_BOT_TAGLINE = "TrendsMart AI · Free · Live data";
 
 export const TREND_BOT_TEASERS = [
-  "👋 Main TrendBot hoon — mujh se app ka kuch bhi pucho!",
-  "🔍 Best mobile ka link chahiye? Main dhundh ke de deta hoon!",
-  "🛒 Cart, deals, shops — sab samajhta hoon. Tap karo!",
-  "💡 Konsa business karun? Live marketplace data se bataunga!",
-  "📦 Order track, delivery, wishlist — pooch lo!",
-  "🏪 Qareeb ki dukanain — main recommend kar sakta hoon!",
-  "✨ Free AI, koi API key nahi — abhi try karo!",
-  "🤖 Salam! Main TrendsMart ka smart assistant hoon.",
+  "Salam! Main TrendBot hoon — kuch bhi pooch sakte ho!",
+  "Best mobile ka link chahiye? Naam batao — dhundh deta hoon!",
+  "Cart, deals, shops — sab samajhta hoon. Tap karo!",
+  "Kaunsa business karun? Live marketplace data se bataunga!",
+  "Order track, delivery, wishlist — pooch lo!",
+  "Qareeb ki dukanain — main recommend kar sakta hoon!",
+  "Free AI assistant — koi API key nahi, abhi try karo!",
+  "TrendsMart ka smart assistant hoon — kisi bhi sawaal ka jawab deta hoon.",
 ];
 
 export const TREND_BOT_WELCOME_CUSTOMER =

@@ -41,13 +41,13 @@ interface PagePack {
 const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   home: {
     teasers: [
-      "🏠 Ghar pe ho — nearby shops ya best deals pooch lo!",
-      "✨ Main TrendBot hoon — product link chahiye to naam likho!",
-      "🛒 Browse karte raho — madad chahiye to tap!",
+      "🏠 Ghar pe ho — qareeb ki shops ya best deals pooch lo!",
+      "✨ Product link chahiye? Bas naam likho — main dhundh deta hoon!",
+      "🛒 Koi bhi cheez samajhni ho — tap karo, main yahan hoon!",
     ],
     voiceLines: [
-      "Hey! Welcome. Ask me for nearby shops or product links.",
-      "Hi friend! I can find cute deals for you.",
+      "Assalam o alaikum! TrendBot yahan hai. Apni pasandida shop ya deal poochein.",
+      "Salam! Qareeb ki dukaan ya sasta product chahiye? Batao, main dhundh deta hoon.",
     ],
     prompts: [
       "Best deals kahan hain?",
@@ -60,13 +60,13 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   },
   deals: {
     teasers: [
-      "🔥 Wooo deals! Konsa offer chahiye — batao!",
-      "💥 Discount hunt? Main help karta hoon!",
+      "🔥 Deals dhoond rahe ho? Konsa offer chahiye — batao!",
+      "Discount hunt mein hoon — TrendBot help karta hai!",
       "🏷️ Deal samajh nahi aa rahi? Tap karke pooch lo!",
     ],
     voiceLines: [
-      "Woo deals! Tell me what you want and I will pick the best.",
-      "Nice discounts! Need my top tip?",
+      "Salam! Aaj ke best deals main bata sakta hoon. Kya chahiye?",
+      "Discount dhoond rahe ho? Apni zaroorat batao, sahi deal suggest karta hoon.",
     ],
     prompts: [
       "Aaj ke best deals?",
@@ -80,12 +80,12 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   products: {
     teasers: [
       "📦 Product dhoond rahe ho? Naam likho — link dunga!",
-      "🔎 Sasta / best pick? Main catalog se bataunga!",
-      "✨ Filters confuse? Main clear guide karta hoon!",
+      "Sasta ya best quality? Main catalog se sahi option bataunga!",
+      "Filters confuse kar rahe hain? Main clear guide karta hoon!",
     ],
     voiceLines: [
-      "Looking for something? Say the name and I will find it.",
-      "I can recommend the best match from live catalog.",
+      "Koi product chahiye? Naam batao, main live catalog se link nikalta hoon.",
+      "Sasta ya best wala? Dono options batata hoon, aap decide karo.",
     ],
     prompts: [
       "Best mobile ka link do",
@@ -98,12 +98,12 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   },
   shop: {
     teasers: [
-      "🏪 Is store ke products / delivery pooch sakte ho!",
-      "💬 Timing, fees, order flow — main yahin help karta hoon!",
+      "🏪 Is store ke products ya delivery ke baare mein pooch lo!",
+      "Timing, fees, order steps — sab yahin clear ho jata hai!",
     ],
     voiceLines: [
-      "This store looks good. Ask about products or delivery.",
-      "Need help ordering from this shop?",
+      "Is dukaan ke baare mein kuch poochna hai? Products, delivery, ya timings?",
+      "Order karna ho ya delivery fee pata karni ho — main madad karta hoon.",
     ],
     prompts: [
       "Is shop ke products?",
@@ -116,12 +116,12 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   },
   cart: {
     teasers: [
-      "🛒 Checkout stuck? Main order steps bataunga!",
-      "📍 Location / delivery fee confuse? Tap karo!",
+      "🛒 Checkout mein atke ho? Main order steps bataunga!",
+      "Delivery fee ya location confuse? Tap karo, clear kar deta hoon!",
     ],
     voiceLines: [
-      "Ready to checkout? I can explain delivery fees.",
-      "Need help placing your WhatsApp order?",
+      "Cart mein items hain. Checkout kaise karna hai, main samjha sakta hoon.",
+      "WhatsApp par order karna asaan hai. Koi confusion ho to batao.",
     ],
     prompts: [
       "Checkout kaise karun?",
@@ -134,12 +134,12 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   },
   orders: {
     teasers: [
-      "📦 Order status? Main guide karta hoon!",
-      "🚚 Tracking confuse? Tap karke pooch lo!",
+      "📦 Order ka status janana hai? Main guide karta hoon!",
+      "Tracking ya refund ka masla hai? Pooch lo, abhi clear karta hoon!",
     ],
     voiceLines: [
-      "Need order help? Ask me about tracking.",
-      "I can explain order statuses.",
+      "Order ke baare mein koi sawal hai? Status, tracking, ya refund — batao.",
+      "Delivery ka wait kar rahe ho? Main status explain kar sakta hoon.",
     ],
     prompts: [
       "Order status kaise dekhu?",
@@ -152,12 +152,12 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   },
   merchant: {
     teasers: [
-      "📊 Business tip chahiye? Live data se bataunga!",
-      "🚀 Growth / fees / products — merchant coach ready!",
+      "📊 Business tip chahiye? Live data se bata sakta hoon!",
+      "Apni dukaan ki growth ke liye — TrendBot coach ready hai!",
     ],
     voiceLines: [
-      "Business coach ready. Ask me for growth tips from your live data.",
-      "I can recommend the best next move for your store.",
+      "Apni shop ki performance dekhni hai? Main live data se summary de sakta hoon.",
+      "Business coach yahan hai. Sales badhane ke liye kya karna chahiye — batao.",
     ],
     prompts: [
       "Meri shop ki live summary",
@@ -170,12 +170,12 @@ const PAGE_PACKS: Record<TrendBotPageContext, PagePack> = {
   },
   general: {
     teasers: [
-      "👋 Main TrendBot hoon — app ka kuch bhi pucho!",
-      "💡 Madad chahiye? Tap karo!",
+      "Main TrendBot hoon — app ka kuch bhi pooch sakte ho!",
+      "Madad chahiye? Bas tap karo — main yahan hoon!",
     ],
     voiceLines: [
-      "Hi, I am TrendBot. How can I help?",
-      "Ask me about products, deals, or orders.",
+      "Salam! TrendBot yahan hai. Products, deals, ya orders — kuch bhi poochein.",
+      "Koi bhi sawaal ho — main jawab dene ki koshish karta hoon.",
     ],
     prompts: [
       "TrendsMart kaise kaam karta hai?",
