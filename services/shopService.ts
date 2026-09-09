@@ -465,6 +465,56 @@ export async function fetchShopById(
   }
 }
 
+const STOREFRONT_PRODUCT_SELECT =
+  "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, is_pinned, stock_status, category_id, sub_category_id, created_at, short_code, variants";
+const STOREFRONT_PRODUCT_SELECT_LEGACY =
+  "id, shop_id, name, title, description, price, original_price, compare_at_price, deal_expires_at, currency, image_url, images, is_available, stock_status, category_id, sub_category_id, created_at, variants";
+
+/**
+ * Paginated storefront catalog — used for "load more" after the first page
+ * from `fetchShopById`. Keeps large shops from mounting everything at once.
+ */
+export async function fetchShopProductsPage(
+  shopId: string,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<ServiceResult<Product[]>> {
+  const limit = Math.min(
+    Math.max(opts.limit ?? SHOP_STOREFRONT_PRODUCT_LIMIT, 8),
+    48,
+  );
+  const offset = Math.max(0, opts.offset ?? 0);
+  const supabase = createClient();
+
+  try {
+    const first = await supabase
+      .from("products")
+      .select(STOREFRONT_PRODUCT_SELECT)
+      .eq("shop_id", shopId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (first.error && isMissingColumnError(first.error)) {
+      const retry = await supabase
+        .from("products")
+        .select(STOREFRONT_PRODUCT_SELECT_LEGACY)
+        .eq("shop_id", shopId)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+      if (retry.error) throw retry.error;
+      return { success: true, data: (retry.data as Product[]) ?? [] };
+    }
+
+    if (first.error) throw first.error;
+    return { success: true, data: (first.data as Product[]) ?? [] };
+  } catch (err) {
+    logError(err, {
+      module: "shopService.fetchShopProductsPage",
+      meta: { shopId, limit, offset },
+    });
+    return { success: false, error: toError(err) };
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────── */
 /*  Authenticated Mutations (called from dashboard)                            */
 /* ──────────────────────────────────────────────────────────────────────────── */

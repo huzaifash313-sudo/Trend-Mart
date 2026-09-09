@@ -12,14 +12,17 @@ export const PUBLIC_SHOP_LIMIT = 48;
 /** Active stories seed for homepage tray. */
 export const PUBLIC_STORY_LIMIT = 48;
 
-/** Products loaded with a shop storefront detail page. */
-export const SHOP_STOREFRONT_PRODUCT_LIMIT = 48;
+/** First page of products on a shop storefront (load-more continues). */
+export const SHOP_STOREFRONT_PRODUCT_LIMIT = 24;
 
 /** Client fuzzy search pool per query leg (was 250). */
 export const MARKETPLACE_SEARCH_POOL = 96;
 
-/** Keep at most this many product cards mounted while infinite-scrolling. */
+/**
+ * @deprecated Prefer VirtualizedGrid windowing — do not tail-slice lists
+ * (that jumps scroll). Kept for any legacy callers.
+ */
 export const MAX_MOUNTED_PRODUCTS = 96;
 
-/** Virtualize grids once item count exceeds this. */
-export const VIRTUALIZE_AFTER = 24;
+/** Virtualize grids once item count exceeds this (lower = smoother mobile). */
+export const VIRTUALIZE_AFTER = 12;

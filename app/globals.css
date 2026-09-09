@@ -2037,6 +2037,13 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
 .shop-card {
   content-visibility: auto;
   contain-intrinsic-size: auto 320px;
+  /* Keep scroll position stable when cards above mount/unmount. */
+  overflow-anchor: none;
+}
+
+/* Feed / catalog scroll containers — browser anchors load-more inserts. */
+.tm-feed-scroll-stable {
+  overflow-anchor: auto;
 }
 
 /* Brand CTA — green + sea green (primary ecommerce actions) */

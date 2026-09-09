@@ -41,7 +41,7 @@ const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), 
 });
 
 const RAIL_LIMIT = 15; // 5 × 3 rows on desktop · phones show a short swipeable shelf
-const PRODUCT_POOL = 60; // bigger fetch pool so every "For You" shelf shows a fresh window
+const PRODUCT_POOL = 36; // enough for rotated shelves without a heavy first fetch
 
 /* -------------------------------------------------------------------------- */
 /*  Daily rotation seed                                                        */

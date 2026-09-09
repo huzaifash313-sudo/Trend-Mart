@@ -15,6 +15,7 @@ import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import KebabMenu, { type KebabMenuItem } from "@/components/KebabMenu";
 import VirtualizedGrid from "@/components/VirtualizedGrid";
 import { VIRTUALIZE_AFTER } from "@/lib/mobilePerf";
+import { observeInView } from "@/lib/inViewObserver";
 
 export { buildDeliveryTickerLabel } from "@/lib/shopOfferLabels";
 
@@ -103,13 +104,8 @@ export function OfferTickerMarquee({ tags }: { tags: string[] }) {
 
   useEffect(() => {
     const el = rootRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      ([entry]) => setActive(Boolean(entry?.isIntersecting)),
-      { rootMargin: "40px", threshold: 0.01 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    if (!el) return;
+    return observeInView(el, setActive);
   }, []);
 
   if (tags.length === 0) return null;
@@ -606,7 +602,8 @@ export default function ProductGrid({
           categoryLabel={categoryLabel}
           showShopMeta={showShopMeta}
           offerContext={getOfferContext?.(product) ?? offerContext}
-          priority={index < 2}
+          /* Only the first paint row should compete for LCP bandwidth. */
+          priority={index < 2 && products.length <= VIRTUALIZE_AFTER * 2}
           onProductClick={onProductClick}
           onAddToCart={onAddToCart}
           onOrder={onOrder}

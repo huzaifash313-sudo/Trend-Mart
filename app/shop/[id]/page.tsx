@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useMemo, useCallback } from "react";
+import { useState, useEffect, use, useMemo, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
@@ -38,6 +38,8 @@ import { buildShopOfferSlides, formatOfferRemaining } from "@/lib/shopOfferTicke
 import { type Coupon } from "@/services/couponService";
 import type { ShopDeal } from "@/lib/dealSchedule";
 import { useShopDetail } from "@/lib/queries";
+import { fetchShopProductsPage } from "@/services/shopService";
+import { SHOP_STOREFRONT_PRODUCT_LIMIT } from "@/lib/mobilePerf";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   type StorefrontDisplayPrefs,
@@ -199,6 +201,9 @@ function ShopDetailInner({ id }: { id: string }) {
   const shop = shopQuery.data?.shop ?? null;
   const { location } = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
+  const [hasMoreProducts, setHasMoreProducts] = useState(false);
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
+  const productLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -305,6 +310,7 @@ function ShopDetailInner({ id }: { id: string }) {
       setError(null);
       const d = shopQuery.data;
       setProducts(d.products);
+      setHasMoreProducts(d.products.length >= SHOP_STOREFRONT_PRODUCT_LIMIT);
       setIsOwner(d.isOwner);
       setDisplayPrefs(d.prefs);
       setCoupons(d.coupons);
@@ -315,6 +321,54 @@ function ShopDetailInner({ id }: { id: string }) {
       trackCategoryInterest(d.shop.category, "view");
     }
   }, [shopQuery.data, shopQuery.isLoading, shopQuery.isError, shopQuery.error]);
+
+  const loadMoreProducts = useCallback(async () => {
+    if (!shop?.id || loadingMoreProducts || !hasMoreProducts) return;
+    setLoadingMoreProducts(true);
+    try {
+      const res = await fetchShopProductsPage(shop.id, {
+        offset: products.length,
+        limit: SHOP_STOREFRONT_PRODUCT_LIMIT,
+      });
+      if (!res.success) {
+        addToast(res.error || "Could not load more products", "error");
+        return;
+      }
+      const next = res.data;
+      setProducts((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        const merged = [...prev];
+        for (const p of next) {
+          if (!seen.has(p.id)) merged.push(p);
+        }
+        return merged;
+      });
+      setHasMoreProducts(next.length >= SHOP_STOREFRONT_PRODUCT_LIMIT);
+    } finally {
+      setLoadingMoreProducts(false);
+    }
+  }, [
+    shop?.id,
+    loadingMoreProducts,
+    hasMoreProducts,
+    products.length,
+    addToast,
+  ]);
+
+  useEffect(() => {
+    const el = productLoadMoreRef.current;
+    if (!el || !hasMoreProducts) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasMoreProducts && !loadingMoreProducts) {
+          void loadMoreProducts();
+        }
+      },
+      { rootMargin: "900px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreProducts, loadingMoreProducts, loadMoreProducts]);
 
   // Refresh catalog when merchant adds from in-store modal
   useEffect(() => {
@@ -1425,22 +1479,44 @@ function ShopDetailInner({ id }: { id: string }) {
                 description={searchQuery || activeSubCategoryId ? "Try another sub-category or keyword." : "Check back later."}
               />
             ) : (
-              <ProductGrid
-                products={filteredProducts}
-                columns="auto"
-                compact={true}
-                categoryLabel={shop.category}
-                offerContext={productOfferContext}
-                onProductClick={isOwner ? ownerEditProduct : handleProductClick}
-                onAddToCart={isOwner ? undefined : handleAddToCart}
-                onOrder={isOwner ? undefined : handleGridOrder}
-                onFavoriteToggle={isOwner ? undefined : handleWishlistToggle}
-                onEdit={isOwner ? ownerEditProduct : undefined}
-                onPinToggle={isOwner ? handlePinProduct : undefined}
-                onDelete={isOwner ? handleDeleteProduct : undefined}
-                pinnedIds={pinnedProductIds}
-                favorites={wishlistIds}
-              />
+              <>
+                <ProductGrid
+                  products={filteredProducts}
+                  columns="auto"
+                  compact={true}
+                  categoryLabel={shop.category}
+                  offerContext={productOfferContext}
+                  onProductClick={isOwner ? ownerEditProduct : handleProductClick}
+                  onAddToCart={isOwner ? undefined : handleAddToCart}
+                  onOrder={isOwner ? undefined : handleGridOrder}
+                  onFavoriteToggle={isOwner ? undefined : handleWishlistToggle}
+                  onEdit={isOwner ? ownerEditProduct : undefined}
+                  onPinToggle={isOwner ? handlePinProduct : undefined}
+                  onDelete={isOwner ? handleDeleteProduct : undefined}
+                  pinnedIds={pinnedProductIds}
+                  favorites={wishlistIds}
+                />
+                {(hasMoreProducts || loadingMoreProducts) && (
+                  <div
+                    ref={productLoadMoreRef}
+                    className="mt-4 flex min-h-[3rem] flex-col items-center justify-center gap-3"
+                  >
+                    {loadingMoreProducts ? (
+                      <div className="w-full" aria-busy="true" aria-label="Loading more products">
+                        <ProductGridSkeleton count={4} />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void loadMoreProducts()}
+                        className="tm-btn-secondary rounded-full px-5 py-2 text-xs font-semibold"
+                      >
+                        Load more products
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}

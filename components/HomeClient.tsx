@@ -45,6 +45,8 @@ import { getTopAffinityCategories } from "@/lib/behavior";
 import VirtualizedGrid from "@/components/VirtualizedGrid";
 import HomeCategories from "@/components/HomeCategories";
 import { DealsRail, ProductsRail, SponsoredRail } from "@/components/HomeFeedRails";
+import LazyMount from "@/components/LazyMount";
+import { ShopCardGridSkeleton } from "@/components/Skeletons";
 import { PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
@@ -486,7 +488,7 @@ function HomeClient({
     if (veilGone) return;
     if (shopsQuery.isLoading) return;
     setVeilExiting(true);
-    const t = window.setTimeout(() => setVeilGone(true), 700);
+    const t = window.setTimeout(() => setVeilGone(true), 320);
     return () => window.clearTimeout(t);
   }, [veilGone, shopsQuery.isLoading]);
   // Safety net: never trap the user behind the veil on a hung request.
@@ -494,12 +496,12 @@ function HomeClient({
     if (veilGone) return;
     const hard = window.setTimeout(() => {
       setVeilExiting(true);
-      window.setTimeout(() => setVeilGone(true), 700);
+      window.setTimeout(() => setVeilGone(true), 320);
     }, 9000);
     return () => window.clearTimeout(hard);
   }, [veilGone]);
 
-  const dealsQuery = useDeals(48);
+  const dealsQuery = useDeals(24);
   const activeDeals = useMemo(() => {
     const all = dealsQuery.data ?? EMPTY_DEALS;
     return myShopId ? all.filter((d) => d.shop_id !== myShopId) : all;
@@ -799,10 +801,10 @@ function HomeClient({
   /* Reset filter-local windowing is no longer needed — server pages accumulate. */
   const visibleShops = displayShops;
 
-  /* Feed rhythm: chunks of ~10 live shops with a compact rail woven in after
-     EVERY chunk — deals → products → sponsored → deals → … so the shopper hits
-     a surprise shelf roughly every 2 rows of stores (marketplace flow). */
-  const FEED_CHUNK_SIZE = 10;
+  /* Feed rhythm: page-sized shop windows (virtualized) with a compact rail
+     after each window — deals → products → sponsored → … Rails below the fold
+     lazy-mount so they don't tax scroll FPS. */
+  const FEED_CHUNK_SIZE = PUBLIC_SHOP_PAGE_SIZE;
   const shopChunks = useMemo(() => {
     const chunks: ShopWithDistance[][] = [];
     for (let i = 0; i < visibleShops.length; i += FEED_CHUNK_SIZE) {
@@ -1069,7 +1071,7 @@ function HomeClient({
       )}
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
-      <section aria-label="Live shops">
+      <section aria-label="Live shops" className="tm-feed-scroll-stable">
         <div className="tm-live-shops-heading mb-1">
           <div className="tm-live-shops-heading-main min-w-0">
             <h2 className="tm-live-shops-title">
@@ -1223,9 +1225,7 @@ function HomeClient({
         )}
 
         {/* Shop feed — 2 mobile / 3 tablet / 4 laptop / 5 wide desktop.
-            Shops arrive in chunks; after every chunk a compact rail (deals /
-            products / sponsored) is woven in so the page keeps a marketplace
-            rhythm instead of one endless grid. */}
+            Page-sized virtualized windows + lazy rails keep mobile scroll smooth. */}
         {!loading && !hardFail && displayShops.length > 0 && (
           <>
             {shopChunks.map((chunk, ci) => {
@@ -1234,8 +1234,10 @@ function HomeClient({
                   <VirtualizedGrid
                     items={chunk}
                     getKey={(shop) => shop.id}
+                    force={chunk.length > 8}
                     estimateRowHeight={260}
                     gapClassName="gap-2 sm:gap-4"
+                    overscan={3}
                     columnBreakpoints={{ base: 2, md: 3, lg: 4, xl: 5 }}
                     renderItem={(shop, index) => {
                       const withDistance = shop as ShopWithDistance;
@@ -1255,25 +1257,26 @@ function HomeClient({
                       );
                     }}
                   />
-                  {/* Compact rail — one after every shop chunk, cycling
-                      deals → products → sponsored. Each occurrence rotates
-                      fresh items so shelves never repeat on the same page. */}
-                  {renderFeedRail(ci)}
+                  <LazyMount
+                    eager={ci === 0}
+                    minHeight={ci % 3 === 2 ? 120 : 200}
+                    rootMargin="800px 0px"
+                  >
+                    {renderFeedRail(ci)}
+                  </LazyMount>
                 </div>
               );
             })}
 
-            {/* Infinite-scroll sentinel — pulls the next 24 shops automatically.
-                The button below doubles as a manual fallback. */}
+            {/* Infinite-scroll sentinel — next page + skeleton while fetching. */}
             <div
               ref={feedSentinelRef}
-              className="mt-6 flex min-h-[3rem] items-center justify-center"
+              className="mt-6 flex min-h-[3rem] flex-col items-center justify-center gap-3"
             >
               {loadingMoreShops ? (
-                <span className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-                  Loading more shops…
-                </span>
+                <div className="w-full" aria-busy="true" aria-label="Loading more shops">
+                  <ShopCardGridSkeleton count={4} />
+                </div>
               ) : hasMoreShops ? (
                 <button
                   type="button"

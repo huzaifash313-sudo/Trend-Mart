@@ -24,7 +24,7 @@ import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMarketplaceProductsInfinite, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { type Coupon } from "@/services/couponService";
-import { MAX_MOUNTED_PRODUCTS } from "@/lib/mobilePerf";
+import { ProductGridSkeleton } from "@/components/Skeletons";
 import {
   isDealActiveOnDate,
   toPkDateKey,
@@ -166,7 +166,7 @@ function ProductsPageInner() {
     productsRef.current = products;
   }, [products]);
 
-  const dealsQuery = useDeals(80);
+  const dealsQuery = useDeals(48);
   const activeDeals = dealsQuery.data ?? EMPTY_DEALS;
 
   const shopIds = useMemo(
@@ -468,12 +468,9 @@ function ProductsPageInner() {
     return suggestSearchCorrections(qParam, 4);
   }, [qParam, displayProducts.length]);
 
-  // All accumulated + filtered products — cap mounted DOM for mobile scroll.
-  // VirtualizedGrid in ProductGrid windows further; this prevents unbounded growth.
-  const visibleProducts = useMemo(() => {
-    if (displayProducts.length <= MAX_MOUNTED_PRODUCTS) return displayProducts;
-    return displayProducts.slice(displayProducts.length - MAX_MOUNTED_PRODUCTS);
-  }, [displayProducts]);
+  // Full accumulated list — VirtualizedGrid windows the DOM; do NOT tail-slice
+  // (that shrinks scroll height and jumps the viewport mid-scroll).
+  const visibleProducts = displayProducts;
 
   const handleCategoryChange = useCallback(
     (category: ShopCategory) => {
@@ -726,7 +723,7 @@ function ProductsPageInner() {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-4 md:pb-8">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack tm-feed-scroll-stable px-3 py-2 pb-3 md:px-4 md:py-4 md:pb-8">
       {/* Search — products only; no deal-match chrome */}
       <SearchInput
         value={query}
@@ -908,12 +905,14 @@ function ProductsPageInner() {
       {/* Infinite-scroll sentinel + status — auto-loads the next page when it
           scrolls into view (or via the manual button as a fallback). */}
       {!loading && (
-        <div ref={loadMoreRef} className="mt-6 flex min-h-[3rem] items-center justify-center">
+        <div
+          ref={loadMoreRef}
+          className="mt-6 flex min-h-[3rem] flex-col items-center justify-center gap-3"
+        >
           {isFetchingNextPage ? (
-            <span className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-              Loading more products…
-            </span>
+            <div className="w-full" aria-busy="true" aria-label="Loading more products">
+              <ProductGridSkeleton count={4} />
+            </div>
           ) : hasNextPage ? (
             <button
               type="button"
