@@ -1861,43 +1861,48 @@ html.dark .trend-card:hover {
 }
 .tm-navbar-wordmark {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: baseline;
   flex-shrink: 0;
   overflow: visible;
   white-space: nowrap;
-  color: #fff;
-  -webkit-text-fill-color: #fff;
 }
 
-@media (min-width: 768px) {
-  .tm-navbar-wordmark {
-    flex-shrink: 0;
-    background: linear-gradient(
-      105deg,
-      #ffffff 0%,
-      #ffffff 38%,
-      rgba(255, 255, 255, 0.72) 50%,
-      #ffffff 62%,
-      #ffffff 100%
-    );
-    background-size: 220% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-    animation: tm-wordmark-sheen 5.5s ease-in-out infinite;
-  }
+.tm-navbar-wordmark-letter {
+  display: inline-block;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  will-change: color, text-shadow, transform;
+  animation: tm-wordmark-sparkle 3.6s ease-in-out infinite;
+  animation-delay: calc(var(--letter-i, 0) * 0.14s);
 }
 
-@keyframes tm-wordmark-sheen {
+@keyframes tm-wordmark-sparkle {
   0%,
-  55%,
   100% {
-    background-position: 100% 0;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    transform: translateY(0);
   }
-  70%,
-  85% {
-    background-position: 0% 0;
+  28% {
+    color: #ffffff;
+    text-shadow:
+      0 0 8px rgba(255, 255, 255, 0.95),
+      0 0 16px rgba(255, 255, 255, 0.45),
+      0 1px 2px rgba(0, 0, 0, 0.12);
+    transform: translateY(-0.5px);
+  }
+  42% {
+    color: #ecfdf5;
+    text-shadow:
+      0 0 10px rgba(255, 255, 255, 0.9),
+      0 0 20px rgba(167, 243, 208, 0.55);
+    transform: translateY(-1px);
+  }
+  58% {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    transform: translateY(0);
   }
 }
 
@@ -1945,7 +1950,7 @@ html.dark .trend-card:hover {
   }
 }
 
-/* Right actions — tight black filled icons */
+/* Right actions — tight black outline icons */
 .tm-navbar-actions {
   display: flex;
   flex-shrink: 0;
@@ -1985,54 +1990,52 @@ html.dark .trend-card:hover {
   padding: 0;
   border: none;
   border-radius: 999px;
-  color: #0a0a0a;
+  color: #111111;
   background: transparent;
   box-shadow: none;
   transition:
     background-color 0.18s ease,
     transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease;
+    color 0.18s ease;
 }
 .tm-navbar-icon-btn:hover {
   background: rgba(255, 255, 255, 0.16);
-  transform: none;
+  color: #000;
 }
 .tm-navbar-icon-btn:active {
   transform: scale(0.92);
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* Black filled icons — no plates, no colored strokes */
 .tm-navbar-actions .tm-navbar-icon-btn {
   background: transparent !important;
   box-shadow: none !important;
   padding: 0 !important;
-  color: #0a0a0a !important;
+  color: #111111 !important;
 }
 .tm-navbar-actions .tm-navbar-icon-btn:hover {
   background: rgba(255, 255, 255, 0.16) !important;
-  box-shadow: none !important;
   color: #000 !important;
 }
 .tm-nav-ic-search,
 .tm-nav-ic-cart,
 .tm-nav-ic-bell,
 .tm-nav-ic-heart {
-  color: #0a0a0a !important;
+  color: #111111 !important;
 }
 .tm-navbar-actions .tm-navbar-icon-btn svg {
   display: block;
   flex-shrink: 0;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12));
 }
 
 .tm-navbar-menu-btn {
-  color: #0a0a0a;
+  color: #111111;
   background: transparent;
   box-shadow: none;
 }
 .tm-navbar-menu-btn:hover {
   background: rgba(255, 255, 255, 0.16);
+  color: #000;
 }
 
 @media (min-width: 640px) {
@@ -2136,15 +2139,16 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   .tm-navbar-trend-line,
   .tm-navbar-trend-arrow,
   .tm-navbar-wordmark,
+  .tm-navbar-wordmark-letter,
   .tm-navbar-inner,
   .tm-navbar-badge {
     animation: none !important;
     transition: none !important;
   }
-  .tm-navbar-wordmark {
+  .tm-navbar-wordmark-letter {
     color: #fff;
-    -webkit-text-fill-color: #fff;
-    background: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    transform: none;
   }
 }
 
@@ -2157,8 +2161,7 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   /* replaced by the tappable pill; selector retained for back-compat */
 }
 
-/* Mobile perf: kill infinite navbar animations + expensive backdrop blur.
-   Mid/low Android phones hang when blur + sheen run during scroll. */
+/* Mobile perf: kill heavy backdrop FX; keep light TrendsMart letter sparkle. */
 @media (max-width: 767px) {
   .tm-navbar-wrap {
     backdrop-filter: none;
@@ -2174,16 +2177,13 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   .tm-navbar-bg-shift {
     animation: none !important;
   }
-  .tm-navbar-wordmark {
-    animation: none !important;
-    color: #fff;
-    -webkit-text-fill-color: #fff;
-    background: none;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
-  }
   .tm-navbar-trend-line {
     stroke-dasharray: none;
     stroke-dashoffset: 0;
+  }
+  .tm-navbar-wordmark-letter {
+    /* Slightly lighter sparkle on phones */
+    animation-duration: 4.2s;
   }
 }
 

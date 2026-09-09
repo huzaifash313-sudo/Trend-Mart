@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -17,7 +17,7 @@ import { getFavoriteCount } from "@/services/wishlistService";
 
 function HamburgerIcon() {
   return (
-    <svg className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
+    <svg className="h-5 w-5 sm:h-[1.35rem] sm:w-[1.35rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" aria-hidden="true">
       <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
     </svg>
   );
@@ -25,28 +25,27 @@ function HamburgerIcon() {
 
 function SearchNavIcon() {
   return (
-    <svg className="h-[15px] w-[15px] sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path
-        fillRule="evenodd"
-        d="M10.5 3a7.5 7.5 0 015.927 12.134l3.72 3.72a1 1 0 01-1.414 1.414l-3.72-3.72A7.5 7.5 0 1110.5 3zm0 2a5.5 5.5 0 100 11 5.5 5.5 0 000-11z"
-        clipRule="evenodd"
-      />
+    <svg className="h-[1.05rem] w-[1.05rem] sm:h-[1.125rem] sm:w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.5-3.5" />
     </svg>
   );
 }
 
 function CartNavIcon() {
   return (
-    <svg className="h-[15px] w-[15px] sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM7.16 14h9.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0021.08 5H6.21l-.94-2H1v2h2l3.6 7.59-1.35 2.44A2 2 0 007.16 18H19v-2H7.42l.74-1.35z" />
+    <svg className="h-[1.05rem] w-[1.05rem] sm:h-[1.125rem] sm:w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="20" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="20" r="1.15" fill="currentColor" stroke="none" />
+      <path d="M3 4h2l2.4 11.2a1.5 1.5 0 001.5 1.2h8.6a1.5 1.5 0 001.5-1.15L21 8H6.2" />
     </svg>
   );
 }
 
 function WishlistNavIcon() {
   return (
-    <svg className="h-[15px] w-[15px] sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    <svg className="h-[1.05rem] w-[1.05rem] sm:h-[1.125rem] sm:w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
     </svg>
   );
 }
@@ -314,7 +313,17 @@ export default function Navbar() {
 
             <Link href="/" className="tm-navbar-brand" aria-label="TrendsMart home">
               <BrandMark />
-              <span className="tm-navbar-wordmark">TrendsMart</span>
+              <span className="tm-navbar-wordmark" aria-hidden="true">
+                {"TrendsMart".split("").map((ch, i) => (
+                  <span
+                    key={`${ch}-${i}`}
+                    className="tm-navbar-wordmark-letter"
+                    style={{ "--letter-i": i } as CSSProperties}
+                  >
+                    {ch}
+                  </span>
+                ))}
+              </span>
             </Link>
           </div>
 
