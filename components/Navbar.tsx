@@ -414,7 +414,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="tm-navbar-icon-btn tm-nav-ic-search lg:hidden"
+              className="tm-navbar-icon-btn tm-nav-ic-search tm-navbar-search-mobile-btn"
               aria-label="Search"
             >
               <SearchNavIcon />

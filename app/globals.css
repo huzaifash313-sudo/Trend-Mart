@@ -2155,10 +2155,15 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
 /* Hamburger stays visible on desktop too (toggles persistent sidebar).
    `tm-navbar-menu-btn` is only a style hook — do not hide it at lg. */
 
-/* Mobile search pill is rendered via React (lg:hidden Tailwind class) so
-   no extra CSS rule needed here — selector kept as a no-op for history. */
+/* Mobile-only search icon — unlayered `.tm-navbar-icon-btn { display:inline-flex }`
+   beats Tailwind `lg:hidden`, so hide explicitly at desktop breakpoint. */
 .tm-navbar-search-mobile-btn {
-  /* replaced by the tappable pill; selector retained for back-compat */
+  display: inline-flex;
+}
+@media (min-width: 1024px) {
+  .tm-navbar-search-mobile-btn {
+    display: none !important;
+  }
 }
 
 /* Mobile perf: kill heavy backdrop FX; keep light TrendsMart letter sparkle. */
