@@ -234,9 +234,9 @@ export default function Navbar() {
   }, [searchOpen]);
 
   // Standalone flows — these pages bring their own chrome (no navbar/sidebar).
+  // Login keeps the normal storefront header so users can browse home/cart easily.
   const isStandalone =
     pathname === "/offline" ||
-    pathname === "/login" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/t/");
 

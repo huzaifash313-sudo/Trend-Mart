@@ -219,7 +219,7 @@ function LoginPageInner() {
   }, [addToast, finishLogin, otpEmail, pendingPassword]);
 
   return (
-    <div className="relative flex min-h-screen overflow-y-auto">
+    <div className="relative flex min-h-full overflow-y-auto">
       {/* ─── Left Panel: Branding & Animations ────────────────────────── */}
       <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-12 lg:flex">
         {/* Gradient Orbs */}
@@ -300,25 +300,15 @@ function LoginPageInner() {
       </div>
 
       {/* ─── Right Panel: Auth Form ───────────────────────────────────── */}
-      <div className="flex w-full items-start justify-center bg-zinc-50 px-4 py-8 pb-28 dark:bg-[color:var(--tm-surface)] lg:w-1/2 lg:items-center lg:py-12">
+      <div className="flex w-full items-start justify-center bg-zinc-50 px-4 py-6 pb-10 dark:bg-[color:var(--tm-surface)] lg:w-1/2 lg:items-center lg:py-12">
         <motion.div
           className="w-full max-w-md"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3, duration: 0.5 }}
         >
-          {/* Mobile logo (visible only on small screens) */}
-          <div className="mb-8 text-center lg:hidden">
-            <Link href="/">
-              <h1 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                TrendsMart
-              </h1>
-            </Link>
-          </div>
-
           {/* Glassmorphic card */}
-          <div className="rounded-2xl border border-zinc-200/60 bg-white/80 backdrop-blur-xl p-8 shadow-xl shadow-zinc-200/20 dark:border-zinc-700/40 dark:bg-zinc-900/80 dark:shadow-zinc-900/30">
-            {/* Header */}
+          <div className="rounded-2xl border border-zinc-200/60 bg-white/80 p-8 shadow-xl shadow-zinc-200/20 backdrop-blur-xl dark:border-zinc-700/40 dark:bg-zinc-900/80 dark:shadow-zinc-900/30">            {/* Header */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
