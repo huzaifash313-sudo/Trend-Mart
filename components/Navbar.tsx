@@ -28,6 +28,48 @@ function HamburgerIcon() {
   );
 }
 
+function SidebarExpandIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="9" y1="4" x2="9" y2="20" />
+      <polyline points="13 9 16 12 13 15" />
+    </svg>
+  );
+}
+
+const DESKTOP_SIDEBAR_KEY = "tm_desktop_sidebar";
+
+function readDesktopSidebarOpen(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const v = localStorage.getItem(DESKTOP_SIDEBAR_KEY);
+    if (v === "0") return false;
+    if (v === "1") return true;
+  } catch {
+    /* ignore */
+  }
+  return true;
+}
+
+function writeDesktopSidebarOpen(open: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DESKTOP_SIDEBAR_KEY, open ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+function isDesktopViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia("(min-width: 1024px)").matches;
+  } catch {
+    return false;
+  }
+}
+
 function SearchNavIcon() {
   return (
     <svg className="h-[1.05rem] w-[1.05rem] sm:h-[1.125rem] sm:w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -141,6 +183,7 @@ export default function Navbar() {
   const { totalItems } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarHydrated, setSidebarHydrated] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const [cartDockActive, setCartDockActive] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -288,20 +331,77 @@ export default function Navbar() {
   }, [searchOpen]);
 
   // Standalone flows — these pages bring their own chrome (no navbar/sidebar).
-  // Login keeps the normal storefront header so users can browse home/cart easily.
   const isStandalone =
     pathname === "/offline" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/t/");
 
+  // Auth pages keep the top navbar but never mount the sidebar / reopen chip.
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/auth");
+
+  const showSidebarChrome = !isStandalone && !isAuthPage;
+
   useEffect(() => {
     setPortalReady(true);
   }, []);
 
+  // Restore desktop sidebar preference after mount (avoids SSR mismatch).
+  useEffect(() => {
+    setSidebarOpen(readDesktopSidebarOpen());
+    setSidebarHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarHydrated) return;
+    writeDesktopSidebarOpen(sidebarOpen);
+  }, [sidebarOpen, sidebarHydrated]);
+
+  // Desktop must never keep the mobile drawer open (that locks body scroll).
+  useEffect(() => {
+    const unlockBody = () => {
+      const body = document.body;
+      body.style.overflow = "";
+      body.style.position = "";
+      body.style.top = "";
+      body.style.width = "";
+    };
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => {
+      if (mq.matches) {
+        setDrawerOpen(false);
+        unlockBody();
+      }
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  // Auth / standalone: never leave a stale scroll lock behind.
+  useEffect(() => {
+    if (showSidebarChrome) return;
+    setDrawerOpen(false);
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.width = "";
+  }, [showSidebarChrome]);
+
   // Drive the page offset so the whole storefront shifts for the pinned sidebar.
   useLayoutEffect(() => {
-    if (isStandalone) return;
     const root = document.documentElement;
+    if (!showSidebarChrome) {
+      root.classList.remove("tm-sidebar-open");
+      root.classList.remove("tm-sidebar-collapsed");
+      return () => {
+        root.classList.remove("tm-sidebar-open");
+        root.classList.remove("tm-sidebar-collapsed");
+      };
+    }
     if (sidebarOpen) {
       root.classList.add("tm-sidebar-open");
       root.classList.remove("tm-sidebar-collapsed");
@@ -313,11 +413,14 @@ export default function Navbar() {
       root.classList.remove("tm-sidebar-open");
       root.classList.remove("tm-sidebar-collapsed");
     };
-  }, [isStandalone, sidebarOpen]);
+  }, [showSidebarChrome, sidebarOpen]);
 
   if (isStandalone) {
     return null;
   }
+
+  const openDesktopSidebar = () => setSidebarOpen(true);
+  const closeDesktopSidebar = () => setSidebarOpen(false);
 
   return (
     <header className="tm-navbar-wrap">
@@ -327,17 +430,25 @@ export default function Navbar() {
 
         <div className="tm-navbar-inner">
           <div className="tm-navbar-start">
-            <button
-              type="button"
-              onClick={() => {
-                setDrawerOpen(true);
-                setSidebarOpen((prev) => !prev);
-              }}
-              className="tm-navbar-icon-btn tm-navbar-menu-btn"
-              aria-label="Toggle navigation menu"
-            >
-              <HamburgerIcon />
-            </button>
+            {!isAuthPage && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Mobile/tablet only — desktop hamburger is CSS-hidden.
+                  // Never open the overlay drawer on large screens (scroll lock).
+                  if (isDesktopViewport()) {
+                    setSidebarOpen((prev) => !prev);
+                    setDrawerOpen(false);
+                    return;
+                  }
+                  setDrawerOpen(true);
+                }}
+                className="tm-navbar-icon-btn tm-navbar-menu-btn"
+                aria-label="Open navigation menu"
+              >
+                <HamburgerIcon />
+              </button>
+            )}
 
             <Link href="/" className="tm-navbar-brand" aria-label="TrendsMart home">
               <BrandMark />
@@ -517,7 +628,7 @@ export default function Navbar() {
         </div>
       )}
 
-      {portalReady
+      {portalReady && showSidebarChrome
         ? createPortal(
             <>
               <SidebarDrawer
@@ -528,8 +639,17 @@ export default function Navbar() {
               <SidebarDrawer
                 variant="persistent"
                 isOpen={sidebarOpen}
-                onClose={() => setSidebarOpen(false)}
+                onClose={closeDesktopSidebar}
               />
+              <button
+                type="button"
+                className="tm-sidebar-reopen"
+                onClick={openDesktopSidebar}
+                aria-label="Open sidebar"
+                title="Open sidebar"
+              >
+                <SidebarExpandIcon />
+              </button>
             </>,
             document.body,
           )

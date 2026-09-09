@@ -23,9 +23,10 @@ function CloseIcon() {
 
 function SidebarCollapseIcon() {
   return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="15 18 9 12 15 6" />
-      <line x1="4" y1="6" x2="4" y2="18" />
+    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="9" y1="4" x2="9" y2="20" />
+      <polyline points="15 9 12 12 15 15" />
     </svg>
   );
 }
@@ -303,9 +304,10 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
     };
   }, []);
 
-  /* ── Body Scroll Lock with iOS Safe Handling ─────────────────────────── */
+  /* ── Body Scroll Lock with iOS Safe Handling (mobile drawer ONLY) ─────── */
   useEffect(() => {
-    if (!isOpen || isPersistent) return;
+    if (isPersistent) return;
+    if (!isOpen) return;
 
     // Save current scroll position and active element
     const scrollY = window.scrollY;

@@ -2152,8 +2152,53 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   }
 }
 
-/* Hamburger stays visible on desktop too (toggles persistent sidebar).
-   `tm-navbar-menu-btn` is only a style hook — do not hide it at lg. */
+/* Hamburger — mobile / tablet only. Desktop uses the persistent sidebar
+   collapse control + floating reopen chip (unlayered CSS beats Tailwind). */
+.tm-navbar-menu-btn {
+  display: inline-flex;
+}
+@media (min-width: 1024px) {
+  .tm-navbar-menu-btn {
+    display: none !important;
+  }
+}
+
+/* Floating chip to reopen the desktop sidebar when collapsed */
+.tm-sidebar-reopen {
+  position: fixed;
+  top: calc(var(--tm-navbar-sticky-offset, 62px) + 0.65rem);
+  left: calc(0.55rem + var(--safe-area-inset-left, 0px));
+  z-index: 45;
+  display: none;
+  height: 2.35rem;
+  width: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid var(--tm-border, #e4e4e7);
+  background: var(--tm-surface, #ffffff);
+  color: var(--tm-text, #27272a);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.tm-sidebar-reopen:hover {
+  background: color-mix(in srgb, var(--tm-brand-500, #10b981) 10%, var(--tm-surface, #fff));
+  color: var(--tm-brand-700, #047857);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+.tm-sidebar-reopen:active {
+  transform: scale(0.96);
+}
+@media (min-width: 1024px) {
+  html.tm-sidebar-collapsed .tm-sidebar-reopen {
+    display: inline-flex;
+  }
+}
+@media (max-width: 1023px) {
+  .tm-sidebar-reopen {
+    display: none !important;
+  }
+}
 
 /* Mobile-only search icon — unlayered `.tm-navbar-icon-btn { display:inline-flex }`
    beats Tailwind `lg:hidden`, so hide explicitly at desktop breakpoint. */
