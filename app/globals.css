@@ -1744,34 +1744,45 @@ html.dark .trend-card:hover {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
   height: var(--tm-navbar-content-height);
   min-height: var(--tm-navbar-content-height);
   max-height: var(--tm-navbar-content-height);
   max-width: 72rem;
   margin-inline: auto;
-  padding: 0 8px;
-  padding-left: calc(8px + var(--safe-area-inset-left, 0px));
-  padding-right: calc(8px + var(--safe-area-inset-right, 0px));
+  padding: 0 10px;
+  padding-left: calc(10px + var(--safe-area-inset-left, 0px));
+  padding-right: calc(10px + var(--safe-area-inset-right, 0px));
+  box-sizing: border-box;
   animation: tm-navbar-inner-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (min-width: 640px) {
   .tm-navbar-inner {
-    gap: 10px;
-    padding: 0 14px;
-    padding-left: calc(14px + var(--safe-area-inset-left, 0px));
-    padding-right: calc(14px + var(--safe-area-inset-right, 0px));
+    gap: 12px;
+    padding: 0 16px;
+    padding-left: calc(16px + var(--safe-area-inset-left, 0px));
+    padding-right: calc(16px + var(--safe-area-inset-right, 0px));
   }
 }
 
 @media (min-width: 1024px) {
   .tm-navbar-inner {
-    gap: 14px;
+    gap: 16px;
     padding: 0 20px;
     padding-left: calc(20px + var(--safe-area-inset-left, 0px));
     padding-right: calc(20px + var(--safe-area-inset-right, 0px));
   }
+}
+
+/* Left cluster: hamburger flush-left + brand glued beside it */
+.tm-navbar-start {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 @keyframes tm-navbar-inner-in {
@@ -1802,11 +1813,11 @@ html.dark .trend-card:hover {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  min-width: max-content;
+  min-width: 0;
   font-family: var(--font-display, var(--font-sans));
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   color: #fff;
   text-decoration: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
@@ -1820,13 +1831,13 @@ html.dark .trend-card:hover {
 }
 .tm-navbar-logo {
   display: inline-flex;
-  height: 30px;
-  width: 30px;
+  height: 28px;
+  width: 28px;
   aspect-ratio: 1 / 1;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #ffffff;
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.12),
@@ -1852,22 +1863,30 @@ html.dark .trend-card:hover {
   position: relative;
   display: inline-block;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible;
   white-space: nowrap;
-  background: linear-gradient(
-    105deg,
-    #ffffff 0%,
-    #ffffff 38%,
-    rgba(255, 255, 255, 0.72) 50%,
-    #ffffff 62%,
-    #ffffff 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: tm-wordmark-sheen 5.5s ease-in-out infinite;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+}
+
+@media (min-width: 768px) {
+  .tm-navbar-wordmark {
+    flex-shrink: 0;
+    background: linear-gradient(
+      105deg,
+      #ffffff 0%,
+      #ffffff 38%,
+      rgba(255, 255, 255, 0.72) 50%,
+      #ffffff 62%,
+      #ffffff 100%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: tm-wordmark-sheen 5.5s ease-in-out infinite;
+  }
 }
 
 @keyframes tm-wordmark-sheen {
@@ -1893,14 +1912,25 @@ html.dark .trend-card:hover {
 }
 @media (min-width: 640px) {
   .tm-navbar-brand {
-    font-size: 18px;
+    font-size: 17px;
     gap: 8px;
+    flex-shrink: 0;
+  }
+  .tm-navbar-logo {
+    height: 32px;
+    width: 32px;
+    border-radius: 9px;
+    padding: 3px;
+  }
+}
+
+@media (min-width: 768px) {
+  .tm-navbar-brand {
+    font-size: 18px;
   }
   .tm-navbar-logo {
     height: 34px;
     width: 34px;
-    border-radius: 10px;
-    padding: 3px;
   }
 }
 
@@ -1911,60 +1941,113 @@ html.dark .trend-card:hover {
   .tm-navbar-logo {
     height: 36px;
     width: 36px;
+    border-radius: 10px;
   }
 }
 
-/* Soft frosted tray — icons feel grouped, not scattered */
+/* Right actions — no overflow pill; spaced colored chips */
 .tm-navbar-actions {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 1px;
+  justify-content: flex-end;
+  gap: 6px;
   margin-left: auto;
-  padding: 3px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 1px 3px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  padding: 0;
+  max-width: none;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (min-width: 640px) {
+  .tm-navbar-actions {
+    gap: 8px;
+  }
 }
 
 @media (min-width: 1024px) {
   .tm-navbar-actions {
     margin-left: 0;
-    gap: 2px;
-    padding: 4px;
+    gap: 10px;
   }
 }
 
 .tm-navbar-icon-btn {
   position: relative;
   display: inline-flex;
-  height: 34px;
-  width: 34px;
+  height: 32px;
+  width: 32px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   padding: 0;
+  border: none;
   border-radius: 999px;
   color: #fff;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition:
     background-color 0.2s ease,
     transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    color 0.2s ease;
 }
 .tm-navbar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
 }
 .tm-navbar-icon-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.94);
+}
+
+/* Colored “life” chips — white plate + real icon colors */
+.tm-navbar-actions .tm-navbar-icon-btn {
+  background: #ffffff;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.tm-navbar-actions .tm-navbar-icon-btn:hover {
+  background: #ffffff;
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+.tm-nav-ic-search {
+  color: #0284c7 !important;
+}
+.tm-nav-ic-cart {
+  color: #d97706 !important;
+}
+.tm-nav-ic-bell {
+  color: #7c3aed !important;
+}
+.tm-nav-ic-heart {
+  color: #e11d48 !important;
+}
+.tm-navbar-actions .tm-navbar-icon-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.tm-navbar-menu-btn {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.tm-navbar-menu-btn:hover {
   background: rgba(255, 255, 255, 0.28);
 }
+
 @media (min-width: 640px) {
+  .tm-navbar-icon-btn {
+    height: 36px;
+    width: 36px;
+  }
+}
+@media (min-width: 768px) {
   .tm-navbar-icon-btn {
     height: 38px;
     width: 38px;
@@ -1977,18 +2060,34 @@ html.dark .trend-card:hover {
   }
 }
 
-/* Menu button — soft chip so it matches the actions tray */
-.tm-navbar-inner > .tm-navbar-icon-btn:first-of-type {
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-.tm-navbar-inner > .tm-navbar-icon-btn:first-of-type:hover {
-  background: rgba(255, 255, 255, 0.22);
+/* Very small phones — keep everything on-screen */
+@media (max-width: 360px) {
+  .tm-navbar-inner {
+    gap: 6px;
+    padding: 0 8px;
+    padding-left: calc(8px + var(--safe-area-inset-left, 0px));
+    padding-right: calc(8px + var(--safe-area-inset-right, 0px));
+  }
+  .tm-navbar-start {
+    gap: 4px;
+  }
+  .tm-navbar-brand {
+    font-size: 13.5px;
+  }
+  .tm-navbar-logo {
+    height: 26px;
+    width: 26px;
+  }
+  .tm-navbar-actions {
+    gap: 4px;
+  }
+  .tm-navbar-icon-btn {
+    height: 30px;
+    width: 30px;
+  }
 }
 
-/* Navbar theme toggle — icon mirrors `html.dark` (set before first paint by the
-   boot script + ThemeProvider), so the markup never depends on client state and
-   there is zero risk of a hydration mismatch. */
+/* Navbar theme toggle — icon mirrors `html.dark` */
 .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   display: none;
 }
@@ -2002,24 +2101,24 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
 /* Shared cart / wishlist / notification badge */
 .tm-navbar-badge {
   position: absolute;
-  right: -1px;
-  top: -1px;
+  right: -3px;
+  top: -3px;
   z-index: 2;
   display: flex;
-  height: 1.05rem;
-  min-width: 1.05rem;
+  height: 1rem;
+  min-width: 1rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #f43f5e;
-  padding: 0 0.28rem;
+  background: #e11d48;
+  padding: 0 0.25rem;
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
   color: #fff;
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--tm-sea-700) 88%, #fff),
-    0 2px 6px rgba(244, 63, 94, 0.35);
+    0 0 0 2px #fff,
+    0 2px 6px rgba(225, 29, 72, 0.4);
   animation: tm-navbar-badge-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes tm-navbar-badge-pop {
@@ -2055,15 +2154,8 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   }
 }
 
-/* Hamburger menu button — visible ONLY below the desktop breakpoint.
-   Uses a custom media query (not a Tailwind utility) because
-   `.tm-navbar-icon-btn { display:inline-flex }` is unlayered CSS and would
-   override `lg:hidden` inside Tailwind's utility layer. */
-@media (min-width: 1024px) {
-  .tm-navbar-menu-btn {
-    display: none !important;
-  }
-}
+/* Hamburger stays visible on desktop too (toggles persistent sidebar).
+   `tm-navbar-menu-btn` is only a style hook — do not hide it at lg. */
 
 /* Mobile search pill is rendered via React (lg:hidden Tailwind class) so
    no extra CSS rule needed here — selector kept as a no-op for history. */

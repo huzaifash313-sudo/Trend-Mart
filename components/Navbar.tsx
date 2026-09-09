@@ -25,7 +25,7 @@ function HamburgerIcon() {
 
 function SearchNavIcon() {
   return (
-    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4 sm:h-[1.125rem] sm:w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
@@ -34,7 +34,7 @@ function SearchNavIcon() {
 
 function CartNavIcon() {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4 w-4 sm:h-[1.125rem] sm:w-[1.125rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
     </svg>
@@ -43,7 +43,7 @@ function CartNavIcon() {
 
 function WishlistNavIcon() {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
@@ -297,32 +297,33 @@ export default function Navbar() {
         <TrendBackdrop />
 
         <div className="tm-navbar-inner">
-          {/* Hamburger — mobile: opens drawer; desktop: toggles persistent sidebar */}
-          <button
-            type="button"
-            onClick={() => {
-              setDrawerOpen(true);             // mobile drawer (hidden on desktop by CSS)
-              setSidebarOpen((prev) => !prev); // desktop persistent sidebar toggle
-            }}
-            className="tm-navbar-icon-btn"
-            aria-label="Toggle navigation menu"
-          >
-            <HamburgerIcon />
-          </button>
+          <div className="tm-navbar-start">
+            <button
+              type="button"
+              onClick={() => {
+                setDrawerOpen(true);
+                setSidebarOpen((prev) => !prev);
+              }}
+              className="tm-navbar-icon-btn tm-navbar-menu-btn"
+              aria-label="Toggle navigation menu"
+            >
+              <HamburgerIcon />
+            </button>
 
-          <Link href="/" className="tm-navbar-brand" aria-label="TrendsMart home">
-            <BrandMark />
-            <span className="tm-navbar-wordmark">TrendsMart</span>
-          </Link>
+            <Link href="/" className="tm-navbar-brand" aria-label="TrendsMart home">
+              <BrandMark />
+              <span className="tm-navbar-wordmark">TrendsMart</span>
+            </Link>
+          </div>
 
-          {/* ── Desktop search bar (lg+) — solid white pill, clearly visible on teal ── */}
+          {/* ── Desktop search bar (lg+) ── */}
           <form
             onSubmit={handleSearchSubmit}
             className="relative mx-2 hidden min-w-0 flex-1 lg:flex xl:mx-3"
             role="search"
           >
             <label className="relative flex w-full items-center">
-              <span className="pointer-events-none absolute left-3.5 text-zinc-400">
+              <span className="pointer-events-none absolute left-3.5 text-sky-500">
                 <SearchNavIcon />
               </span>
               <input
@@ -369,12 +370,12 @@ export default function Navbar() {
             ) : null}
           </form>
 
-          {/* ── Right-side actions (search + cart + alerts + wishlist) ── */}
+          {/* ── Right actions: spaced + colored chips ── */}
           <div className="tm-navbar-actions">
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="tm-navbar-icon-btn lg:hidden"
+              className="tm-navbar-icon-btn tm-nav-ic-search lg:hidden"
               aria-label="Search"
             >
               <SearchNavIcon />
@@ -382,7 +383,7 @@ export default function Navbar() {
 
             <Link
               href="/cart"
-              className="tm-navbar-icon-btn relative"
+              className="tm-navbar-icon-btn tm-nav-ic-cart relative"
               aria-label={`Cart${totalItems > 0 ? `, ${totalItems} items` : ""}`}
             >
               <CartNavIcon />
@@ -397,7 +398,7 @@ export default function Navbar() {
 
             <Link
               href="/wishlist"
-              className="tm-navbar-icon-btn relative"
+              className="tm-navbar-icon-btn tm-nav-ic-heart relative"
               aria-label={`Wishlist${wishlistCount > 0 ? `, ${wishlistCount} saved` : ""}`}
             >
               <WishlistNavIcon />

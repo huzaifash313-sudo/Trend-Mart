@@ -13,7 +13,7 @@ export default function NavbarNotificationButton() {
   return (
     <NotificationBell
       onClick={togglePanel}
-      className="tm-navbar-icon-btn text-white"
+      className="tm-navbar-icon-btn tm-nav-ic-bell"
     />
   );
 }
