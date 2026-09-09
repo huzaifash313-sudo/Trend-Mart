@@ -3475,6 +3475,49 @@ html.dark .tm-story-skel-label {
   margin-top: 0.2rem;
 }
 
+/* ── Mobile: edge-to-edge, taller stage, cover fill (no side letterbox) ── */
+@media (max-width: 640px) {
+  .tm-home-hero-compact .tm-brand-showcase {
+    /* Break out of HomeClient `px-3` so the reel hits phone edges */
+    margin-inline: -0.75rem;
+    width: calc(100% + 1.5rem);
+    max-width: none;
+  }
+
+  .tm-home-hero-compact .tm-brand-video,
+  .tm-brand-video {
+    width: 100%;
+    margin-inline: 0;
+    aspect-ratio: 16 / 11;
+    min-height: clamp(200px, 48vw, 280px);
+    max-height: min(46dvh, 320px);
+    border-radius: 0 0 1.1rem 1.1rem;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    box-shadow:
+      0 12px 28px rgba(5, 10, 20, 0.35),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .tm-brand-video-el {
+    width: 100%;
+    height: 100%;
+    /* cover applied in later mobile block after base contain */
+  }
+
+  .tm-brand-video-glow {
+    background:
+      radial-gradient(
+        ellipse 70% 55% at 50% 42%,
+        color-mix(in srgb, var(--tm-sea-400) 18%, transparent),
+        transparent 68%
+      ),
+      linear-gradient(to top, rgba(5, 10, 20, 0.28) 0%, transparent 45%);
+  }
+}
+
+/* Tablet / laptop — keep banner height; contain so full bag stays visible */
 @media (min-width: 641px) {
   .tm-home-hero-compact .tm-brand-video {
     width: 100%;
@@ -3515,8 +3558,17 @@ html.dark .tm-story-skel-label {
     linear-gradient(to top, rgba(5, 10, 20, 0.35) 0%, transparent 40%);
 }
 
-/* Tablet / laptop: full-width banner with a comfortable fixed height.
-   Mobile keeps full-width 16:9 — unchanged below 641px. */
+/* Mobile cover must come AFTER the base contain rule */
+@media (max-width: 640px) {
+  .tm-brand-video-el {
+    object-fit: cover;
+    object-position: center center;
+    transform: scale(1.08);
+    transform-origin: center center;
+  }
+}
+
+/* Tablet / laptop: full-width banner with a comfortable fixed height. */
 @media (min-width: 641px) {
   .tm-brand-showcase {
     align-items: stretch;
@@ -3527,6 +3579,10 @@ html.dark .tm-story-skel-label {
     height: clamp(280px, 38dvh, 400px);
     max-height: clamp(280px, 38dvh, 400px);
     margin-inline: 0;
+  }
+  .tm-brand-video-el {
+    object-fit: contain;
+    transform: none;
   }
 }
 @media (min-width: 1024px) {

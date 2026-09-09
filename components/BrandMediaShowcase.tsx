@@ -81,7 +81,7 @@ function BrandVideo() {
         muted
         loop
         playsInline
-        preload="none"
+        preload="metadata"
         aria-label="TrendsMart brand promo"
         onError={() => setFailed(true)}
       />
