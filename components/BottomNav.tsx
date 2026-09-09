@@ -350,20 +350,16 @@ export default function BottomNav() {
   const isProductsActive =
     pathname === "/products" ||
     pathname.startsWith("/products/");
-  // Shoppers: 4th tab opens Wishlist; merchants keep Products catalog.
-  const isWishlistHighlight =
-    !isMerchant &&
-    (pathname === "/wishlist" || pathname.startsWith("/wishlist/"));
-  const productsTabHref = isMerchant || authPending ? "/products" : "/wishlist";
-  const productsTabActive = isMerchant || authPending ? isProductsActive : isWishlistHighlight;
-  const productsTabLabel = isMerchant || authPending ? "Products" : "Wishlist";
-  const productsTabAria = isMerchant || authPending ? "Products" : "Wishlist";
+  // 4th tab is always Products (signed in or guest). Wishlist lives in the navbar.
+  const productsTabHref = "/products";
+  const productsTabActive = isProductsActive;
+  const productsTabLabel = "Products";
+  const productsTabAria = "Products";
   // When auth is still resolving (authPending), never mark any tab as active
   // for the account position — avoids the "…" appearing active on the homepage
   // because authHref temporarily falls back to "/" (which always matches pathname).
   const isAccountActive =
     !authPending &&
-    !isWishlistHighlight &&
     (pathname === accountHref ||
       pathname.startsWith("/dashboard") ||
       pathname.startsWith("/account") ||
