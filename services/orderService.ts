@@ -629,6 +629,37 @@ export async function fetchOrdersByPhone(
 }
 
 /**
+ * Fetch orders for the signed-in customer (`customer_user_id = auth.uid()`).
+ * Relies on RLS `orders_customer_select` — no phone entry required.
+ */
+export async function fetchOrdersForCurrentUser(): Promise<ServiceResult<Order[]>> {
+  const supabase = createClient();
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Please sign in to see your orders." };
+    }
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("customer_user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+    const orders = ((data as Record<string, unknown>[]) ?? []).map(parseOrder);
+    return { success: true, data: orders };
+  } catch (err) {
+    logError(err, { module: "orderService.fetchOrdersForCurrentUser" });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
  * Update order status (merchant action).
  */
 export async function updateOrderStatus(

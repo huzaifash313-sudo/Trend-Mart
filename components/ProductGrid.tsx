@@ -359,6 +359,10 @@ export const ProductCard = memo(function ProductCard({
               Sold Out
             </span>
           </div>
+        ) : product.accepts_delivery === false ? (
+          <span className="absolute bottom-1.5 left-1.5 z-10 rounded-md bg-sky-600/95 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+            Pickup only
+          </span>
         ) : null}
       </div>
 

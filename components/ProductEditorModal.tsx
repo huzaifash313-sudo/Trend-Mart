@@ -58,6 +58,8 @@ export default function ProductEditorModal({
   const [originalPrice, setOriginalPrice] = useState("");
   const [gallery, setGallery] = useState<string[]>([]);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [acceptsDelivery, setAcceptsDelivery] = useState(true);
+  const [acceptsPickup, setAcceptsPickup] = useState(true);
   const [subCategoryId, setSubCategoryId] = useState("");
   const [subs, setSubs] = useState<SubCategoryWithMeta[]>([]);
   const [variants, setVariants] = useState<VariantGroup[]>([]);
@@ -76,6 +78,8 @@ export default function ProductEditorModal({
       );
       setGallery(images);
       setIsAvailable(product.is_available !== false);
+      setAcceptsDelivery(product.accepts_delivery !== false);
+      setAcceptsPickup(product.accepts_pickup !== false);
       setSubCategoryId(product.sub_category_id ?? "");
       setVariants((product.variants as VariantGroup[] | null) ?? []);
       setPriceTiers((product.price_tiers as PriceTier[] | null) ?? []);
@@ -86,6 +90,8 @@ export default function ProductEditorModal({
       setOriginalPrice("");
       setGallery([]);
       setIsAvailable(true);
+      setAcceptsDelivery(true);
+      setAcceptsPickup(true);
       setSubCategoryId("");
       setVariants([]);
       setPriceTiers([]);
@@ -145,6 +151,8 @@ export default function ProductEditorModal({
         image_url: normalized.image_url,
         images: normalized.images,
         is_available: isAvailable,
+        accepts_delivery: acceptsDelivery,
+        accepts_pickup: acceptsPickup,
         stock_status: isAvailable ? "in_stock" : "out_of_stock",
         category_id: shopCategory || null,
         sub_category_id: subId || null,
@@ -173,6 +181,8 @@ export default function ProductEditorModal({
       originalPrice,
       gallery,
       isAvailable,
+      acceptsDelivery,
+      acceptsPickup,
       subCategoryId,
       variants,
       priceTiers,
@@ -314,6 +324,24 @@ export default function ProductEditorModal({
             onChange={setIsAvailable}
             label="Toggle product availability"
             visibleLabel={isAvailable ? "In stock — available for ordering" : "Out of stock"}
+          />
+
+          <ToggleSwitch
+            checked={acceptsDelivery}
+            onChange={setAcceptsDelivery}
+            label="Accept delivery for this product"
+            visibleLabel={
+              acceptsDelivery ? "Delivery on — home orders allowed" : "Delivery paused — pickup only"
+            }
+          />
+
+          <ToggleSwitch
+            checked={acceptsPickup}
+            onChange={setAcceptsPickup}
+            label="Accept pickup for this product"
+            visibleLabel={
+              acceptsPickup ? "Pickup on — customers can collect" : "Pickup paused"
+            }
           />
 
           <div className="flex gap-2 pt-1">

@@ -911,26 +911,28 @@ function HomeClient({
                 </div>
               ))}
             </>
-          ) : !globalCoords ? (
-            <button
-              type="button"
-              onClick={handleDetectForStories}
-              disabled={geoDetecting}
-              className="tm-story-item"
-              aria-label="Detect location to see nearby store stories"
-            >
-              <div className="tm-story-ring tm-story-ring--nearby">
-                <svg className="tm-story-nearby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
-                  <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
-                </svg>
-              </div>
-              <span className="tm-story-ring-label">
-                {geoDetecting ? "Detecting…" : "Nearby"}
-              </span>
-            </button>
           ) : storyGroups.length > 0 ? (
-            storyGroups.map((group, gIdx) => {
+            <>
+              {!globalCoords ? (
+                <button
+                  type="button"
+                  onClick={handleDetectForStories}
+                  disabled={geoDetecting}
+                  className="tm-story-item"
+                  aria-label="Detect location to prioritize nearby store stories"
+                >
+                  <div className="tm-story-ring tm-story-ring--nearby">
+                    <svg className="tm-story-nearby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
+                      <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
+                    </svg>
+                  </div>
+                  <span className="tm-story-ring-label">
+                    {geoDetecting ? "Detecting…" : "Nearby"}
+                  </span>
+                </button>
+              ) : null}
+              {storyGroups.map((group, gIdx) => {
               const first = group[0];
               const seenCount = group.filter((s) => viewedStoryIds.has(s.id)).length;
               const allSeen = seenCount >= group.length;
@@ -981,7 +983,26 @@ function HomeClient({
                   <span className="tm-story-ring-label">{label}</span>
                 </button>
               );
-            })
+            })}
+            </>
+          ) : !globalCoords ? (
+            <button
+              type="button"
+              onClick={handleDetectForStories}
+              disabled={geoDetecting}
+              className="tm-story-item"
+              aria-label="Detect location to see nearby store stories"
+            >
+              <div className="tm-story-ring tm-story-ring--nearby">
+                <svg className="tm-story-nearby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
+                  <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
+                </svg>
+              </div>
+              <span className="tm-story-ring-label">
+                {geoDetecting ? "Detecting…" : "Nearby"}
+              </span>
+            </button>
           ) : !myShop ? (
             /* Viewer-only empty state — customers/guests never get an "add
                story" affordance, just a quiet "nothing to watch yet" hint. */
@@ -1038,7 +1059,7 @@ function HomeClient({
       </div>
 
       {/* ── Colourful category tiles (icons + gradients, under the video) ── */}
-      {!loading && displayShops.length > 0 && (
+      {!loading && (
         <HomeCategories
           categories={orderedCategories}
           counts={categoryCountsMap}

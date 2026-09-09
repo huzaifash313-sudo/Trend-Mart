@@ -128,6 +128,8 @@ export default function CartBar() {
   const [expanded, setExpanded] = useState(false);
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
   const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
+  /** True once fetchShopById finishes (success or fallback) — avoid stub race. */
+  const [shopReady, setShopReady] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const shopGroups = useMemo(() => groupItemsByShop(items), [items]);
@@ -161,15 +163,17 @@ export default function CartBar() {
     }
   }, [totalItems, shopGroups]);
 
-  // Load full shop row for radius / hours / delivery rules
+  // Load full shop row for radius / hours / delivery rules — don't open
+  // checkout until this resolves so pickup-only shops don't get stuck.
   useEffect(() => {
     if (!checkoutShop) {
       setResolvedShop(null);
+      setShopReady(false);
       return;
     }
     let cancelled = false;
+    setShopReady(false);
     const fallback = stubShopFromGroup(checkoutShop);
-    setResolvedShop(fallback);
     void fetchShopById(checkoutShop.shopId).then((res) => {
       if (cancelled) return;
       if (res.success && res.data.shop) {
@@ -178,7 +182,10 @@ export default function CartBar() {
           whatsapp_number: res.data.shop.whatsapp_number || checkoutShop.shopWhatsapp,
           name: res.data.shop.name || checkoutShop.shopName,
         });
+      } else {
+        setResolvedShop(fallback);
       }
+      setShopReady(true);
     });
     return () => {
       cancelled = true;
@@ -187,6 +194,7 @@ export default function CartBar() {
 
   const suppressCartBar =
     pathname === "/offline" ||
+    pathname === "/cart" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/t/") ||
     pathname === "/login" ||
@@ -390,7 +398,7 @@ export default function CartBar() {
       </div>
       )}
 
-      {checkoutShop && resolvedShop && (
+      {checkoutShop && resolvedShop && shopReady && (
         <WhatsAppCheckoutModal
           items={checkoutItems}
           shop={resolvedShop}

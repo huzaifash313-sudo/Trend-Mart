@@ -45,6 +45,17 @@ function VerifyNoticeInner() {
   const redirectParam = searchParams.get("redirect");
   const { addToast } = useToast();
 
+  /** Only allow same-origin relative paths — block open redirects. */
+  const safeRedirect = (() => {
+    if (!redirectParam) return null;
+    const trimmed = redirectParam.trim();
+    if (!trimmed.startsWith("/")) return null;
+    if (trimmed.startsWith("//")) return null;
+    if (/[\x00-\x1f\x7f]/.test(trimmed)) return null;
+    if (trimmed.includes("://")) return null;
+    return trimmed;
+  })();
+
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [resending, setResending] = useState(false);
@@ -116,8 +127,8 @@ function VerifyNoticeInner() {
         const role = await detectUserRole(confirmedUser);
         const fallback = getDashboardPath(role);
         const target =
-          redirectParam && redirectParam !== "/"
-            ? redirectParam
+          safeRedirect && safeRedirect !== "/"
+            ? safeRedirect
             : fallback;
         setTimeout(() => {
           router.replace(target);
@@ -129,7 +140,7 @@ function VerifyNoticeInner() {
       addToast("Could not check verification status.", "error");
     }
     setChecking(false);
-  }, [redirectParam, router, addToast]);
+  }, [safeRedirect, router, addToast]);
 
   const handleSignOut = useCallback(async () => {
     await signOut({ redirectTo: "/login" });

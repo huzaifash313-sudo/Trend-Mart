@@ -21,6 +21,7 @@ import { getSafeImageUrl } from "@/services/storageService";
 import { getDealImages, getProductImages, normalizeDealGallery, MAX_DEAL_IMAGES } from "@/lib/productImages";
 import type { Product } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+import { useToast } from "@/components/Toast";
 
 interface DealManagerProps {
   shopId: string;
@@ -45,6 +46,7 @@ const EMPTY = {
 };
 
 export default function DealManager({ shopId, compact = false, onChanged }: DealManagerProps) {
+  const { addToast } = useToast();
   const [deals, setDeals] = useState<ShopDeal[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -456,6 +458,11 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                     {!deal.is_active ? (
                       <span className="text-[0.65rem] font-semibold text-amber-600">Paused</span>
                     ) : null}
+                    {deal.accepts_delivery === false ? (
+                      <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                        Pickup only
+                      </span>
+                    ) : null}
                     {deal.is_featured ? (
                       <span className="text-[0.65rem] font-semibold text-emerald-600">Featured</span>
                     ) : null}
@@ -468,7 +475,11 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                   <button
                     type="button"
                     onClick={async () => {
-                      await updateShopDeal(deal.id, { is_featured: !deal.is_featured });
+                      const res = await updateShopDeal(deal.id, { is_featured: !deal.is_featured });
+                      if (!res.success) {
+                        addToast(res.error ?? "Could not update deal.", "error");
+                        return;
+                      }
                       await load();
                       notify();
                     }}
@@ -479,7 +490,11 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                   <button
                     type="button"
                     onClick={async () => {
-                      await updateShopDealStatus(deal.id, !deal.is_active);
+                      const res = await updateShopDealStatus(deal.id, !deal.is_active);
+                      if (!res.success) {
+                        addToast(res.error ?? "Could not update deal.", "error");
+                        return;
+                      }
                       await load();
                       notify();
                     }}
@@ -491,7 +506,15 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                     type="button"
                     onClick={async () => {
                       const next = deal.accepts_delivery === false;
-                      await updateShopDeal(deal.id, { accepts_delivery: next });
+                      const res = await updateShopDeal(deal.id, { accepts_delivery: next });
+                      if (!res.success) {
+                        addToast(res.error ?? "Could not update delivery.", "error");
+                        return;
+                      }
+                      addToast(
+                        next ? "Delivery enabled for this deal." : "Delivery paused — pickup only.",
+                        "success",
+                      );
                       await load();
                       notify();
                     }}
@@ -502,7 +525,11 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                   <button
                     type="button"
                     onClick={async () => {
-                      await deleteShopDeal(deal.id);
+                      const res = await deleteShopDeal(deal.id);
+                      if (!res.success) {
+                        addToast(res.error ?? "Could not delete deal.", "error");
+                        return;
+                      }
                       await load();
                       notify();
                     }}

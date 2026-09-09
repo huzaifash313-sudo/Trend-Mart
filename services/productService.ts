@@ -327,6 +327,8 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     image_url: (row.image_url as string | null) ?? null,
     images,
     is_available: row.is_available !== false,
+    accepts_delivery: row.accepts_delivery !== false,
+    accepts_pickup: row.accepts_pickup !== false,
     stock_status: (row.stock_status as string | undefined) ?? undefined,
     variants: (row.variants as Product["variants"]) ?? null,
     price_tiers: (row.price_tiers as Product["price_tiers"]) ?? null,
@@ -392,6 +394,7 @@ function sortMarketplaceProducts(
 const MARKETPLACE_SELECT = `
   id, shop_id, name, title, price, original_price, compare_at_price,
   deal_expires_at, currency, image_url, images, is_available, stock_status,
+  accepts_delivery, accepts_pickup,
   category_id, sub_category_id, created_at, short_code, variants, price_tiers,
   orders_count, click_count, avg_rating, review_count,
   shops!inner (
@@ -420,7 +423,7 @@ function isMissingRatingColumnError(err: unknown): boolean {
   const msg = err && typeof err === "object" && "message" in err
     ? String((err as { message?: string }).message || "")
     : String(err || "");
-  return /avg_rating|review_count|free_delivery_threshold|announcement|column .* does not exist/i.test(msg);
+  return /avg_rating|review_count|free_delivery_threshold|announcement|accepts_delivery|accepts_pickup|column .* does not exist/i.test(msg);
 }
 
 /**

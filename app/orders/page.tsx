@@ -6,7 +6,7 @@ import Link from "next/link";
 import CustomerOrderActions from "@/components/CustomerOrderActions";
 import { createClient } from "@/lib/supabase/client";
 import type { Order, OrderItem } from "@/types";
-import { fetchOrdersByPhone } from "@/services/orderService";
+import { fetchOrdersByPhone, fetchOrdersForCurrentUser } from "@/services/orderService";
 import { fetchShops } from "@/services/shopService";
 import { getOrderHistory } from "@/services/orderHistoryService";
 import type { Shop } from "@/types";
@@ -137,13 +137,20 @@ function OrderCard({
             {items.map((item, i) => (
               <div key={i} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.name}</p>
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    {item.name}
+                    {(item.quantity ?? 1) > 1 ? (
+                      <span className="ml-1 text-xs font-normal text-zinc-500">
+                        ×{item.quantity}
+                      </span>
+                    ) : null}
+                  </p>
                   {item.variant && (
                     <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.variant}</p>
                   )}
                 </div>
                 <span className="ml-3 shrink-0 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                  Rs. {item.price.toLocaleString()}
+                  Rs. {((item.price || 0) * Math.max(1, item.quantity ?? 1)).toLocaleString()}
                 </span>
               </div>
             ))}
@@ -247,6 +254,29 @@ function OrdersInner() {
     });
   }, []);
 
+  // Signed-in: auto-load this account's orders (no phone re-entry needed).
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    setSearching(true);
+    setError(null);
+    void fetchOrdersForCurrentUser().then((result) => {
+      if (cancelled) return;
+      if (result.success) {
+        setDbOrders(result.data);
+        if (result.data.length === 0 && !initialPhone) {
+          setError(null);
+        }
+      } else {
+        setError(result.error);
+      }
+      setSearching(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, initialPhone]);
+
   // Load shops for shop name display.
   // Public-only: the tracking page is customer-facing and only needs shop
   // names — fetching unapproved/offline shops (which carry owner_id + contact
@@ -331,15 +361,21 @@ function OrdersInner() {
               Track Your Orders
             </h2>
             <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
-              Enter the phone number you used when placing orders. For the best
-              results,{" "}
-              <a
-                href="/login"
-                className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
-              >
-                sign in
-              </a>{" "}
-              with the same account you checked out with.
+              {userId
+                ? "Your account orders load automatically below. You can also search by the phone used at checkout."
+                : (
+                  <>
+                    Enter the phone number you used when placing orders. For the best
+                    results,{" "}
+                    <a
+                      href="/login"
+                      className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                    >
+                      sign in
+                    </a>{" "}
+                    with the same account you checked out with.
+                  </>
+                )}
             </p>
             <div className="flex gap-2">
               <div className="relative flex-1">

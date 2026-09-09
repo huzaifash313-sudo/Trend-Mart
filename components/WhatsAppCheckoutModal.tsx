@@ -459,7 +459,7 @@ export default function WhatsAppCheckoutModal({
   shop,
   onClose,
   onOrderPlaced,
-  accentColor = "emerald",
+  accentColor: _accentColor = "emerald",
 }: WhatsAppCheckoutModalProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -481,6 +481,10 @@ export default function WhatsAppCheckoutModal({
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderRef, setOrderRef] = useState("");
   const [pendingWhatsAppUrl, setPendingWhatsAppUrl] = useState<string | null>(null);
+  /** Product IDs that are currently sold out (live check on open). */
+  const [unavailableProductIds, setUnavailableProductIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [autofilledFromAccount, setAutofilledFromAccount] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<
@@ -612,8 +616,30 @@ export default function WhatsAppCheckoutModal({
   const isPickup = orderType === "pickup";
   const noFulfillment = !canDeliver && !canPickup;
 
+  // Keep fulfilment channel in sync when the real shop hydrates (stub shops
+  // often omit accepts_* and default to delivery-only UI that then dead-ends).
+  useEffect(() => {
+    if (!canDeliver && canPickup && orderType !== "pickup") {
+      setOrderType("pickup");
+    } else if (canDeliver && !canPickup && orderType !== "delivery") {
+      setOrderType("delivery");
+    }
+  }, [canDeliver, canPickup, orderType]);
+
   const minOrderAmount = shop.min_order_amount ?? 0;
   const belowMinimumOrder = minOrderAmount > 0 && subtotal > 0 && subtotal < minOrderAmount;
+  const hasUnavailableItems = useMemo(
+    () => items.some((i) => unavailableProductIds.has(i.productId)),
+    [items, unavailableProductIds],
+  );
+  const unavailableNames = useMemo(
+    () =>
+      items
+        .filter((i) => unavailableProductIds.has(i.productId))
+        .map((i) => i.name)
+        .filter(Boolean),
+    [items, unavailableProductIds],
+  );
 
   const qualifiesForFreeDelivery =
     !isPickup &&
@@ -702,12 +728,13 @@ export default function WhatsAppCheckoutModal({
 
   const phone = toWhatsAppDigits(shop.whatsapp_number ?? "");
 
-  // Accent class names
-  const accentBg = `bg-${accentColor}-600`;
-  const accentBgHover = `hover:bg-${accentColor}-700`;
-  const accentRing = `focus:ring-${accentColor}-500`;
-  const accentLight = `bg-${accentColor}-50`;
-  const accentText = `text-${accentColor}-700`;
+  // Static emerald tokens — dynamic `bg-${accent}-600` classes get purged by
+  // Tailwind and leave checkout buttons unstyled for non-emerald accents.
+  const accentBg = "bg-emerald-600";
+  const accentBgHover = "hover:bg-emerald-700";
+  const accentRing = "focus:ring-emerald-500";
+  const accentLight = "bg-emerald-50";
+  const accentText = "text-emerald-700";
 
   // ── Quantity Handlers ───────────────────────────────────────────────────
   const updateQuantity = useCallback((itemId: string, delta: number) => {
@@ -753,6 +780,41 @@ export default function WhatsAppCheckoutModal({
       setCouponValidating(false);
     }, 500);
   }, [shop.id, subtotal]);
+
+  // Re-validate an applied coupon whenever the cart subtotal changes
+  // (qty edits) so the discount never looks valid while being stale.
+  useEffect(() => {
+    const code = couponCode.trim();
+    if (!code || !shop.id || !couponResult?.valid) return;
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      try {
+        const result = await validateCoupon(shop.id!, code, subtotal);
+        if (cancelled) return;
+        setCouponResult({
+          valid: result.valid,
+          discountAmount: result.discountAmount ?? 0,
+          message: result.message ?? "",
+          code,
+        });
+      } catch {
+        if (!cancelled) {
+          setCouponResult({
+            valid: false,
+            discountAmount: 0,
+            message: "Failed to validate coupon. Please try again.",
+            code,
+          });
+        }
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+    // Intentionally depend on subtotal + code, not couponResult (avoids loops).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal, couponCode, shop.id]);
 
   const handleClearCoupon = useCallback(() => {
     setCouponCode("");
@@ -804,9 +866,7 @@ export default function WhatsAppCheckoutModal({
     setPortalReady(true);
   }, []);
 
-  // Fetch variant metadata (base price + option groups) for plain cart
-  // products so the review step can let the shopper confirm/change options
-  // before ordering. Deal items (viewKind set) are variant-less and skipped.
+  // Fetch variant metadata + live availability for cart products.
   useEffect(() => {
     let cancelled = false;
     const productIds = [
@@ -814,15 +874,21 @@ export default function WhatsAppCheckoutModal({
         items.filter((i) => i.viewKind === undefined).map((i) => i.productId).filter(Boolean),
       ),
     ];
-    if (productIds.length === 0) return;
+    if (productIds.length === 0) {
+      setUnavailableProductIds(new Set());
+      return;
+    }
     (async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, price, original_price, compare_at_price, variants")
+        .select("id, price, original_price, compare_at_price, variants, is_available")
         .in("id", productIds);
       if (cancelled || error || !data) return;
       const map: Record<string, CartVariantData> = {};
+      const soldOut = new Set<string>();
       for (const row of data as Record<string, unknown>[]) {
+        const id = String(row.id);
+        if (row.is_available === false) soldOut.add(id);
         const variants = Array.isArray(row.variants)
           ? (row.variants as VariantGroup[])
           : [];
@@ -833,13 +899,14 @@ export default function WhatsAppCheckoutModal({
             : typeof row.compare_at_price === "number"
               ? row.compare_at_price
               : null;
-        map[String(row.id)] = {
+        map[id] = {
           price: Number(row.price) || 0,
           originalPrice: original != null && original > 0 ? original : null,
           variants,
         };
       }
       setVariantData(map);
+      setUnavailableProductIds(soldOut);
     })();
     return () => {
       cancelled = true;
@@ -1114,8 +1181,9 @@ export default function WhatsAppCheckoutModal({
 
   // ── Step Handlers ───────────────────────────────────────────────────────
   const handleGoToShipping = useCallback(() => {
+    if (hasUnavailableItems) return;
     setStep("shipping");
-  }, []);
+  }, [hasUnavailableItems]);
 
   const handleGoBackToReview = useCallback(() => {
     setStep("review");
@@ -1638,7 +1706,7 @@ export default function WhatsAppCheckoutModal({
                       /* ignore */
                     }
                     onClose();
-                    router.push("/auth/verify-notice?redirect=/");
+                    router.push("/auth/verify-notice?redirect=/cart");
                   }}
                   className={`rounded-full ${accentBg} px-5 py-2.5 text-sm font-semibold text-white ${accentBgHover}`}
                 >
@@ -1916,6 +1984,16 @@ export default function WhatsAppCheckoutModal({
                 </div>
               )}
 
+              {hasUnavailableItems && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs dark:bg-red-900/20">
+                  <InfoIcon />
+                  <span className="text-red-700 dark:text-red-400">
+                    Out of stock: <strong>{unavailableNames.join(", ")}</strong>. Remove
+                    {unavailableNames.length === 1 ? " it" : " them"} from your cart to continue.
+                  </span>
+                </div>
+              )}
+
               {/* Distance-based delivery needs GPS — delivery only */}
               {!isPickup && missingDistanceForFee && (
                 <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs dark:bg-amber-900/20">
@@ -1991,8 +2069,8 @@ export default function WhatsAppCheckoutModal({
               <button
                 type="button"
                 onClick={handleGoToShipping}
-                disabled={items.length === 0 || itemsNeedingVariant.length > 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment}
-                className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
+                disabled={items.length === 0 || itemsNeedingVariant.length > 0 || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment || hasUnavailableItems}
+                className={`w-full rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {noFulfillment
                   ? "Orders Paused — Try Later"
@@ -2000,7 +2078,9 @@ export default function WhatsAppCheckoutModal({
                     ? "Shop Closed — Come Back Later"
                     : outsideServiceRadius
                       ? "Outside Delivery Area"
-                      : itemsNeedingVariant.length > 0
+                      : hasUnavailableItems
+                        ? "Remove Out-of-Stock Items"
+                        : itemsNeedingVariant.length > 0
                         ? "Select Options to Continue"
                         : belowMinimumOrder
                           ? "Add More Items to Continue"
@@ -2042,7 +2122,7 @@ export default function WhatsAppCheckoutModal({
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerName
                       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                      : `border-zinc-200 focus:border-${accentColor}-500 ${accentRing}/20`
+                      : `border-zinc-200 focus:border-emerald-500 focus:ring-emerald-500/20`
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
                 {errors.customerName && <p className="mt-1 text-xs text-red-500">{errors.customerName}</p>}
@@ -2069,7 +2149,7 @@ export default function WhatsAppCheckoutModal({
                   className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                     errors.customerPhone
                       ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                      : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                      : `border-zinc-200 focus:border-emerald-500 focus:ring-emerald-500/20`
                   } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
                 {errors.customerPhone && <p className="mt-1 text-xs text-red-500">{errors.customerPhone}</p>}
@@ -2169,7 +2249,7 @@ export default function WhatsAppCheckoutModal({
                       className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                         errors.shippingAddress
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                          : `border-zinc-200 focus:border-emerald-500 focus:ring-emerald-500/20`
                       } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                     />
                     <p className="mt-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
@@ -2193,7 +2273,7 @@ export default function WhatsAppCheckoutModal({
                       className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                         errors.shippingAddress
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
-                          : `border-zinc-200 focus:border-${accentColor}-500 focus:ring-${accentColor}-500/20`
+                          : `border-zinc-200 focus:border-emerald-500 focus:ring-emerald-500/20`
                       } dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                     />
                     {errors.shippingAddress && <p className="mt-1 text-xs text-red-500">{errors.shippingAddress}</p>}
@@ -2225,7 +2305,7 @@ export default function WhatsAppCheckoutModal({
                   value={shipping.deliveryNotes}
                   onChange={(e) => setShipping(s => ({ ...s, deliveryNotes: e.target.value }))}
                   placeholder={isPickup ? "E.g. I'll call when I arrive" : "Delivery instructions"}
-                  className={`w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-${accentColor}-500 focus:outline-none focus:ring-2 focus:ring-${accentColor}-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
+                  className={`w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100`}
                 />
               </div>
             </div>
@@ -2241,7 +2321,7 @@ export default function WhatsAppCheckoutModal({
               </button>
               <button
                 type="submit"
-                className={`flex-1 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover}`}
+                className={`flex-1 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all ${accentBgHover}`}
               >
                 Continue →
               </button>
@@ -2367,7 +2447,7 @@ export default function WhatsAppCheckoutModal({
                 type="button"
                 onClick={handlePlaceOrder}
                 disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-${accentColor}-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting ? (
                   <><SpinnerIcon /> Placing Order...</>

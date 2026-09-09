@@ -10,6 +10,8 @@ import {
 } from "@/services/wishlistService";
 import { logError } from "@/services/errorService";
 import { fetchShopById } from "@/services/shopService";
+import { fetchMarketplaceProductById } from "@/services/productService";
+import { useCart } from "@/store/cartStore";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { ErrorState } from "@/components/ErrorState";
@@ -25,6 +27,17 @@ function TrashIcon() {
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       <line x1="10" y1="11" x2="10" y2="17" />
       <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+function CartPlusIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+      <path d="M12 9v6M9 12h6" />
     </svg>
   );
 }
@@ -116,7 +129,9 @@ function WishlistCard({
   onRemove: (id: string) => void;
 }) {
   const { addToast } = useToast();
+  const { addItem, items } = useCart();
   const [waBusy, setWaBusy] = useState(false);
+  const [cartBusy, setCartBusy] = useState(false);
   const href =
     item.type === "shop"
       ? `/shop/${item.id}`
@@ -149,6 +164,38 @@ function WishlistCard({
     }
   };
 
+  const handleAddToCart = async () => {
+    if (cartBusy || item.type !== "product") return;
+    setCartBusy(true);
+    try {
+      const res = await fetchMarketplaceProductById(item.id);
+      const product = res.success ? res.data : null;
+      if (!product || !product.is_available) {
+        addToast(
+          product ? "This item is out of stock — open the store for options." : "Could not load this product.",
+          product ? "info" : "error",
+        );
+        if (item.shopId) window.location.href = `/shop/${item.shopId}`;
+        return;
+      }
+      const otherShop = items.find((i) => i.shopId && i.shopId !== product.shop_id);
+      addItem(product, {
+        id: product.shop_id,
+        name: product.shop_name,
+        whatsapp_number: product.shop_whatsapp ?? "",
+      });
+      if (otherShop) {
+        addToast(`Added from ${product.shop_name}. Checkout each shop separately.`, "info");
+      } else {
+        addToast(`Added ${product.name} to cart.`, "success");
+      }
+    } catch {
+      addToast("Could not add to cart. Try opening the store.", "error");
+    } finally {
+      setCartBusy(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-800 dark:to-emerald-700">
@@ -177,16 +224,28 @@ function WishlistCard({
 
       <div className="flex shrink-0 items-center gap-1">
         {item.type === "product" && (
-          <button
-            type="button"
-            onClick={() => void handleWhatsApp()}
-            disabled={waBusy}
-            className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-50 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
-            aria-label={`Ask about ${item.name} on WhatsApp`}
-            title="Ask about this item on WhatsApp"
-          >
-            <WhatsAppIcon />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => void handleAddToCart()}
+              disabled={cartBusy}
+              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-50 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+              aria-label={`Add ${item.name} to cart`}
+              title="Add to cart"
+            >
+              <CartPlusIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleWhatsApp()}
+              disabled={waBusy}
+              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-50 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+              aria-label={`Ask about ${item.name} on WhatsApp`}
+              title="Ask about this item on WhatsApp"
+            >
+              <WhatsAppIcon />
+            </button>
+          </>
         )}
         <button
           type="button"
@@ -439,7 +498,7 @@ export default function WishlistPage() {
                   {" "}
                   —{" "}
                   <span className="text-emerald-600 dark:text-emerald-400">
-                    heart products in a shop; cart is separate
+                    tap the cart icon to add instantly
                   </span>
                 </>
               ) : null}

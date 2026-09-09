@@ -593,6 +593,11 @@ export default function ProductDetailClient({ code }: { code: string }) {
               This item is currently out of stock.
             </p>
           )}
+          {product.is_available && product.accepts_delivery === false ? (
+            <p className="text-center text-xs font-semibold text-sky-600 dark:text-sky-400">
+              Pickup only — home delivery is paused for this item.
+            </p>
+          ) : null}
 
           <p className="text-center text-[0.65rem] text-zinc-400 dark:text-zinc-500">
             From <span className="font-medium text-zinc-500 dark:text-zinc-400">{shop?.name ?? product.shop_name}</span>

@@ -1321,6 +1321,16 @@ export default function ProductsDashboardPage() {
                         >
                           {product.is_available ? "Available" : "Sold Out"}
                         </button>
+                        {product.accepts_delivery === false ? (
+                          <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                            Pickup only
+                          </span>
+                        ) : null}
+                        {product.accepts_pickup === false ? (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            No pickup
+                          </span>
+                        ) : null}
                         {product.variants && product.variants.length > 0 && (
                           <span className="text-zinc-400">
                             {product.variants

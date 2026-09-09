@@ -350,15 +350,26 @@ export default function BottomNav() {
   const isProductsActive =
     pathname === "/products" ||
     pathname.startsWith("/products/");
+  // Shoppers: 4th tab opens Wishlist; merchants keep Products catalog.
+  const isWishlistHighlight =
+    !isMerchant &&
+    (pathname === "/wishlist" || pathname.startsWith("/wishlist/"));
+  const productsTabHref = isMerchant || authPending ? "/products" : "/wishlist";
+  const productsTabActive = isMerchant || authPending ? isProductsActive : isWishlistHighlight;
+  const productsTabLabel = isMerchant || authPending ? "Products" : "Wishlist";
+  const productsTabAria = isMerchant || authPending ? "Products" : "Wishlist";
   // When auth is still resolving (authPending), never mark any tab as active
   // for the account position — avoids the "…" appearing active on the homepage
   // because authHref temporarily falls back to "/" (which always matches pathname).
   const isAccountActive =
     !authPending &&
+    !isWishlistHighlight &&
     (pathname === accountHref ||
       pathname.startsWith("/dashboard") ||
       pathname.startsWith("/account") ||
       pathname.startsWith("/admin") ||
+      pathname.startsWith("/orders") ||
+      pathname === "/cart" ||
       pathname === "/login" ||
       pathname === "/signup");
 
@@ -447,13 +458,13 @@ export default function BottomNav() {
         </div>
 
         <Link
-          href="/products"
-          className={sideTabClass(isProductsActive)}
-          aria-label="Products"
-          aria-current={isProductsActive ? "page" : undefined}
+          href={productsTabHref}
+          className={sideTabClass(productsTabActive)}
+          aria-label={productsTabAria}
+          aria-current={productsTabActive ? "page" : undefined}
         >
-          <ProductsTabIcon active={isProductsActive} />
-          <span>Products</span>
+          <ProductsTabIcon active={productsTabActive} />
+          <span>{productsTabLabel}</span>
         </Link>
 
         {isGuest ? (

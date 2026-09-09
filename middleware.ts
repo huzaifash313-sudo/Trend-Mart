@@ -416,6 +416,7 @@ const VERIFY_EXEMPT_PATHS = [
   "/search",
   "/products",
   "/wishlist", // guest local wishlist; purchase still gated at checkout
+  "/cart", // browse cart freely; purchase still gated inside checkout modal
   "/banned",
   // Merchant onboarding is intentionally direct (no email-verification gate).
   // Verification is still enforced at checkout/order time, not for store setup.
@@ -441,6 +442,8 @@ function isPublicBrowsePath(pathname: string): boolean {
   if (pathname === "/products" || pathname.startsWith("/products/")) return true;
   if (pathname === "/deals" || pathname.startsWith("/deals/")) return true;
   if (pathname === "/search" || pathname.startsWith("/search/")) return true;
+  if (pathname === "/cart" || pathname.startsWith("/cart/")) return true;
+  if (pathname === "/wishlist" || pathname.startsWith("/wishlist/")) return true;
   if (pathname === "/faq" || pathname.startsWith("/faq/")) return true;
   if (pathname.startsWith("/legal")) return true;
   if (pathname === "/support" || pathname.startsWith("/support/")) return true;

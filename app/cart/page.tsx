@@ -177,6 +177,7 @@ export default function CartPage() {
 
   const [checkoutShop, setCheckoutShop] = useState<ShopGroup | null>(null);
   const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
+  const [shopReady, setShopReady] = useState(false);
   const [variantData, setVariantData] = useState<Record<string, CartVariantData>>({});
   const [variantOpenId, setVariantOpenId] = useState<string | null>(null);
 
@@ -224,10 +225,12 @@ export default function CartPage() {
   useEffect(() => {
     if (!checkoutShop) {
       setResolvedShop(null);
+      setShopReady(false);
       return;
     }
     let cancelled = false;
-    setResolvedShop(stubShopFromGroup(checkoutShop));
+    setShopReady(false);
+    const fallback = stubShopFromGroup(checkoutShop);
     void fetchShopById(checkoutShop.shopId).then((res) => {
       if (cancelled) return;
       if (res.success && res.data.shop) {
@@ -236,7 +239,10 @@ export default function CartPage() {
           whatsapp_number: res.data.shop.whatsapp_number || checkoutShop.shopWhatsapp,
           name: res.data.shop.name || checkoutShop.shopName,
         });
+      } else {
+        setResolvedShop(fallback);
       }
+      setShopReady(true);
     });
     return () => {
       cancelled = true;
@@ -247,6 +253,16 @@ export default function CartPage() {
     if (!(await confirm("Clear your entire cart?"))) return;
     clearCart();
   }, [confirm, clearCart]);
+
+  const handleClearShop = useCallback(
+    async (shopId: string, shopName: string) => {
+      if (!(await confirm(`Remove all items from ${shopName || "this shop"}?`))) return;
+      items
+        .filter((i) => i.shopId === shopId)
+        .forEach((i) => removeItem(i.id));
+    },
+    [confirm, items, removeItem],
+  );
 
   const checkoutItems: WhatsAppCartItem[] = (checkoutShop?.items ?? []).map((i) => ({
     id: i.id,
@@ -340,6 +356,15 @@ export default function CartPage() {
                   <span className="ml-auto text-sm font-bold text-emerald-600 dark:text-emerald-400">
                     {formatRupees(group.subtotal)}
                   </span>
+                  {shopGroups.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleClearShop(group.shopId, group.shopName)}
+                      className="shrink-0 rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-zinc-500 hover:bg-zinc-200 hover:text-red-600 dark:hover:bg-zinc-700 dark:hover:text-red-400"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
                 </div>
 
                 {/* Items */}
@@ -514,7 +539,7 @@ export default function CartPage() {
         )}
       </main>
 
-      {checkoutShop && resolvedShop && (
+      {checkoutShop && resolvedShop && shopReady && (
         <WhatsAppCheckoutModal
           items={checkoutItems}
           shop={resolvedShop}

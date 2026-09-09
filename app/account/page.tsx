@@ -4,6 +4,9 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { detectUserRole } from "@/services/authService";
 import { getOrderHistory } from "@/services/orderHistoryService";
+import { fetchOrdersForCurrentUser } from "@/services/orderService";
+import { getFavoriteCount } from "@/services/wishlistService";
+import type { Order } from "@/types";
 import ProfileReviewsCard from "@/components/ProfileReviewsCard";
 
 function StatCard({
@@ -41,6 +44,8 @@ export default function CustomerAccountPage() {
     location_label?: string | null;
     city?: string | null;
   } | null>(null);
+  const [liveOrders, setLiveOrders] = useState<Order[] | null>(null);
+  const [wishlistCount, setWishlistCount] = useState<number | null>(null);
 
   const profileIncomplete = useMemo(() => {
     return !profile?.full_name || !profile?.phone || (!profile?.location_label && !profile?.city);
@@ -54,14 +59,22 @@ export default function CustomerAccountPage() {
     }
   }, []);
 
+  const orderCount = liveOrders?.length ?? localOrders.length;
+
   const pendingCount = useMemo(() => {
+    if (liveOrders) {
+      return liveOrders.filter((o) => {
+        const s = String(o.status ?? "").toLowerCase();
+        return s === "pending" || s === "processing" || s === "dispatched";
+      }).length;
+    }
     const now = Date.now();
     return localOrders.filter((o) => {
       // Local history has no live status — treat recent (7d) as "active"
       const age = now - new Date(o.timestamp).getTime();
       return age < 7 * 24 * 60 * 60 * 1000;
     }).length;
-  }, [localOrders]);
+  }, [liveOrders, localOrders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +126,14 @@ export default function CustomerAccountPage() {
         } catch {
           /* profile optional — keep portal usable without it */
         }
+
+        void Promise.all([fetchOrdersForCurrentUser(), getFavoriteCount()]).then(
+          ([ordersRes, favCount]) => {
+            if (cancelled) return;
+            if (ordersRes.success) setLiveOrders(ordersRes.data);
+            setWishlistCount(favCount);
+          },
+        );
       } catch {
         if (!cancelled) {
           window.location.replace("/login?redirect=/account");
@@ -271,20 +292,20 @@ export default function CustomerAccountPage() {
         {/* Quick stats */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard
-            label="Recent orders"
-            value={localOrders.length}
+            label="Orders"
+            value={orderCount}
             href="/orders"
-            hint="Order history"
+            hint={liveOrders ? "From your account" : "Local + synced"}
           />
           <StatCard
-            label="Active (7 days)"
+            label="In progress"
             value={pendingCount}
             href="/orders/tracking"
-            hint="Track live status"
+            hint={liveOrders ? "Pending → delivered" : "Recent (7 days)"}
           />
           <StatCard
             label="Wishlist"
-            value="→"
+            value={wishlistCount ?? "…"}
             href="/wishlist"
             hint="Shops & products"
           />
