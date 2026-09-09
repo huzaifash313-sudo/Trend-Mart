@@ -119,7 +119,27 @@ function parseOrder(row: Record<string, unknown>): Order {
       typeof row.whatsapp_message === "string" && row.whatsapp_message.trim()
         ? row.whatsapp_message.trim()
         : null,
+    customer_lat: toFiniteOrNull(row.customer_lat),
+    customer_lng: toFiniteOrNull(row.customer_lng),
+    customer_location_accuracy_m: toFiniteOrNull(row.customer_location_accuracy_m),
+    customer_location_source:
+      row.customer_location_source === "gps" || row.customer_location_source === "pin"
+        ? row.customer_location_source
+        : null,
+    customer_city:
+      typeof row.customer_city === "string" && row.customer_city.trim()
+        ? row.customer_city.trim()
+        : null,
+    customer_area:
+      typeof row.customer_area === "string" && row.customer_area.trim()
+        ? row.customer_area.trim()
+        : null,
   };
+}
+
+function toFiniteOrNull(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** True when merchant set an explicit numeric stock (null/undefined = untracked). */
@@ -874,6 +894,8 @@ async function placeOrderOnServer(params: {
   orderType?: "delivery" | "pickup";
   customerLat?: number | null;
   customerLng?: number | null;
+  customerLocationAccuracyM?: number | null;
+  customerLocationSource?: string | null;
   customerCity?: string | null;
   customerArea?: string | null;
   idempotencyKey?: string | null;
@@ -916,6 +938,8 @@ export async function createOrder(params: {
   orderType?: "delivery" | "pickup";
   customerLat?: number | null;
   customerLng?: number | null;
+  customerLocationAccuracyM?: number | null;
+  customerLocationSource?: string | null;
   customerCity?: string | null;
   customerArea?: string | null;
   idempotencyKey?: string | null;
@@ -929,6 +953,8 @@ export async function createOrder(params: {
     orderType: params.orderType,
     customerLat: params.customerLat,
     customerLng: params.customerLng,
+    customerLocationAccuracyM: params.customerLocationAccuracyM,
+    customerLocationSource: params.customerLocationSource,
     customerCity: params.customerCity,
     customerArea: params.customerArea,
     idempotencyKey: params.idempotencyKey,

@@ -72,7 +72,10 @@ export default function PwaRegister() {
         reg.addEventListener("updatefound", activateWaiting);
         if (reg.waiting) activateWaiting();
 
-        // New SW took control → reload once so this tab uses the new caches.
+        // New SW took control → this tab should pick up the new caches. Never
+        // reload while the user is looking at the page: that is exactly the
+        // "click kiya aur sab refresh ho gaya" glitch. Wait until the tab is
+        // backgrounded, so the refresh lands invisibly.
         onControllerChange = () => {
           try {
             if (sessionStorage.getItem(SW_RELOAD_KEY)) return;
@@ -80,7 +83,18 @@ export default function PwaRegister() {
           } catch {
             /* ignore */
           }
-          window.location.reload();
+
+          if (document.visibilityState === "hidden") {
+            window.location.reload();
+            return;
+          }
+
+          const reloadWhenHidden = () => {
+            if (document.visibilityState !== "hidden") return;
+            document.removeEventListener("visibilitychange", reloadWhenHidden);
+            window.location.reload();
+          };
+          document.addEventListener("visibilitychange", reloadWhenHidden);
         };
         navigator.serviceWorker.addEventListener(
           "controllerchange",

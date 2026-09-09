@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import {
   requestUserLocation,
   reverseGeocode,
@@ -11,6 +12,14 @@ import {
 } from "@/services/geoRadiusService";
 import { SUPPORTED_CITIES } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+
+// Leaflet touches `window` on import, so it must stay out of the server bundle.
+const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-56 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+  ),
+});
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -109,6 +118,7 @@ export default function ShopLocationRadiusPicker({
 }: ShopLocationRadiusPickerProps) {
   const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
 
   const coverage = useMemo(
     () => parseCoverageFromZones(value.delivery_zones),
@@ -189,7 +199,24 @@ export default function ShopLocationRadiusPicker({
     setDetecting(false);
   }, [mode, onChange]);
 
+  const handlePinAdjust = useCallback(
+    (lat: number, lng: number) => {
+      onChange({ latitude: lat, longitude: lng });
+      void (async () => {
+        try {
+          const geocode = await reverseGeocode(lat, lng);
+          const address = geocode.address?.trim() || geocode.displayName?.trim() || "";
+          if (address) onChange({ address_display: address });
+        } catch {
+          /* keep the previous label — the pin itself is what matters */
+        }
+      })();
+    },
+    [onChange],
+  );
+
   const handleClear = useCallback(() => {
+    setMapOpen(false);
     onChange({ latitude: null, longitude: null, address_display: "" });
   }, [onChange]);
 
@@ -224,6 +251,13 @@ export default function ShopLocationRadiusPicker({
             <p className="mt-1 text-[0.6rem] text-emerald-600/90 dark:text-emerald-400/90">
               Lat: {value.latitude?.toFixed(5)} · Lng: {value.longitude?.toFixed(5)}
             </p>
+            <button
+              type="button"
+              onClick={() => setMapOpen((v) => !v)}
+              className="mt-1.5 text-[0.65rem] font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-300"
+            >
+              {mapOpen ? "Map band karein" : "Map par pin adjust karein"}
+            </button>
           </div>
           <button
             type="button"
@@ -261,6 +295,25 @@ export default function ShopLocationRadiusPicker({
         </button>
       )}
       {error && <p className="text-[0.65rem] text-red-500">{error}</p>}
+
+      {/* Manual pin adjust — a GPS reading taken inside a shop can sit on the
+          wrong side of the street, and every distance/radius rule keys off it. */}
+      {hasPin && mapOpen && (
+        <div className="space-y-1.5">
+          <LocationMiniMap
+            latitude={value.latitude!}
+            longitude={value.longitude!}
+            onPick={handlePinAdjust}
+            mode="compact"
+            heightClassName="h-56"
+            resizeKey={mapOpen}
+          />
+          <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+            Pin ko drag karein ya map par tap karein — customers ka distance isi
+            point se naapa jata hai, is liye ise apni dukan ke darwazay par rakhein.
+          </p>
+        </div>
+      )}
 
       {/* Coverage mode */}
       <div>

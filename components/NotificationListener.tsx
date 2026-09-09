@@ -25,6 +25,7 @@ import {
   useContext,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { subscribeToNotifications } from "@/lib/supabase/realtime";
 import type { NotificationPayload } from "@/lib/supabase/realtime";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
@@ -96,6 +97,9 @@ function prefsAllow(type: Notification["type"]): boolean {
     if (type === "sale" || type === "inquiry") {
       return prefs.merchant_alerts !== false;
     }
+    // Chat has its own switch — muting merchant alerts must not silence a
+    // customer's live conversation.
+    if (type === "message") return prefs.chat_messages !== false;
     return true; // support & system always alert
   } catch {
     return true;
@@ -314,7 +318,7 @@ export function NotificationListenerProvider({
         return;
       }
 
-      if (prefsAllow("inquiry") && !isMutedRef.current) {
+      if (prefsAllow("message") && !isMutedRef.current) {
         playChimeSound();
       }
 
@@ -631,6 +635,7 @@ export function NotificationPanel({
     isMuted,
     toggleMute,
   } = useNotifications();
+  const router = useRouter();
 
   if (!isOpen) return null;
 
@@ -724,9 +729,9 @@ export function NotificationPanel({
                     markAsRead(notif.id);
                     if (notif.linkUrl) {
                       onClose();
-                      if (typeof window !== "undefined") {
-                        window.location.assign(notif.linkUrl);
-                      }
+                      // Client-side route: a full document load here made every
+                      // bell tap feel like the app had reloaded.
+                      router.push(notif.linkUrl);
                     }
                   }}
                   className={`block w-full px-4 py-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${

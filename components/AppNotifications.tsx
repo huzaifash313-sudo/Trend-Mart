@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   NotificationListenerProvider,
   NotificationPanel,
@@ -23,6 +24,31 @@ function BrowserNotifyBridge() {
   // as OS notifications. Only brand-new live rows may ping when tab is hidden.
   const primed = useRef(false);
   const seenIds = useRef<Set<string>>(new Set());
+  // When web push is active the service worker already shows the OS toast, so
+  // this bridge must stay silent or the user gets the same alert twice.
+  const pushHandlesIt = useRef(false);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    let cancelled = false;
+
+    const refresh = async () => {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (!cancelled) pushHandlesIt.current = Boolean(subscription);
+      } catch {
+        if (!cancelled) pushHandlesIt.current = false;
+      }
+    };
+
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 5 * 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -37,6 +63,11 @@ function BrowserNotifyBridge() {
 
     // Foreground: in-app toast/chime is enough. OS ping only if tab not visible.
     if (document.visibilityState !== "hidden") {
+      for (const n of notifications) seenIds.current.add(n.id);
+      return;
+    }
+
+    if (pushHandlesIt.current) {
       for (const n of notifications) seenIds.current.add(n.id);
       return;
     }
@@ -191,6 +222,7 @@ function AutoSubscribeWebPush() {
 
 function NotificationChrome() {
   const { isPanelOpen, closePanel } = useNotifications();
+  const router = useRouter();
 
   // Let the service worker ask whether this tab is viewing a chat (suppress push).
   useEffect(() => {
@@ -200,6 +232,19 @@ function NotificationChrome() {
         | { type?: string; conversationId?: string; title?: string; body?: string; url?: string }
         | undefined;
       if (!data?.type) return;
+
+      // Notification tapped while a tab is already open — route in-app instead
+      // of a full document load.
+      if (data.type === "tm-notification-navigate" && data.url) {
+        try {
+          const target = new URL(data.url, window.location.origin);
+          if (target.origin !== window.location.origin) return;
+          router.push(`${target.pathname}${target.search}${target.hash}`);
+        } catch {
+          /* ignore malformed url */
+        }
+        return;
+      }
 
       if (data.type === "tm-active-chat-query") {
         const viewing =
@@ -227,7 +272,7 @@ function NotificationChrome() {
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, []);
+  }, [router]);
 
   return (
     <>

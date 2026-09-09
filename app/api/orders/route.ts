@@ -27,6 +27,7 @@ import { applyPooledTierPrices } from "@/lib/priceTiers";
 import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { sendPushToUser } from "@/lib/webPush";
+import { buildMerchantOrderPush } from "@/lib/orderPushCopy";
 import type { Order, OrderItem, PriceTier, VariantGroup } from "@/types";
 
 export const runtime = "nodejs";
@@ -54,6 +55,10 @@ interface OrderRequestBody {
   orderType?: string | null;
   customerLat?: number | null;
   customerLng?: number | null;
+  /** Device-reported GPS accuracy for the pin, in metres. */
+  customerLocationAccuracyM?: number | null;
+  /** How the pin was obtained: 'gps' or 'pin'. */
+  customerLocationSource?: string | null;
   customerCity?: string | null;
   /** Customer's selected area / mohalla / colony (used for area-based free delivery). */
   customerArea?: string | null;
@@ -679,6 +684,16 @@ export async function POST(request: Request) {
     typeof body.customerArea === "string" ? body.customerArea.trim().slice(0, 80) : "";
   const custLat = typeof body.customerLat === "number" ? body.customerLat : null;
   const custLng = typeof body.customerLng === "number" ? body.customerLng : null;
+  const custAccuracy =
+    typeof body.customerLocationAccuracyM === "number" &&
+    Number.isFinite(body.customerLocationAccuracyM) &&
+    body.customerLocationAccuracyM >= 0
+      ? Math.round(Math.min(body.customerLocationAccuracyM, 100_000))
+      : null;
+  const custLocationSource =
+    body.customerLocationSource === "gps" || body.customerLocationSource === "pin"
+      ? body.customerLocationSource
+      : null;
   const hasCustomerCoords =
     custLat != null &&
     custLng != null &&
@@ -1041,6 +1056,16 @@ export async function POST(request: Request) {
   if (notes) orderPayload.notes = notes;
   if (appliedCoupon) orderPayload.coupon_code = appliedCoupon;
   if (idempotencyKey) orderPayload.client_token = idempotencyKey;
+  // Persist the delivery pin so the merchant can reopen it in Maps days later
+  // instead of scrolling back through WhatsApp for the link.
+  if (hasCustomerCoords) {
+    orderPayload.customer_lat = custLat;
+    orderPayload.customer_lng = custLng;
+    if (custAccuracy != null) orderPayload.customer_location_accuracy_m = custAccuracy;
+    if (custLocationSource) orderPayload.customer_location_source = custLocationSource;
+  }
+  if (customerCity) orderPayload.customer_city = customerCity;
+  if (customerArea) orderPayload.customer_area = customerArea;
 
   let { data: inserted, error: insertErr } = await admin
     .from("orders")
@@ -1147,20 +1172,27 @@ export async function POST(request: Request) {
   const amountLabel = `Rs. ${Math.round(total).toLocaleString()}`;
   const shopName = (shopRow.name ?? "your shop").trim() || "your shop";
   void (async () => {
-    const waHint = " WhatsApp not sent yet — verify with customer before preparing.";
     if (shopRow.owner_id) {
-      await sendPushToUser(shopRow.owner_id, {
-        title: "New TrendsMart order",
-        body: `${customerName} placed an order — ${amountLabel} at ${shopName}.${waHint}`,
-        url: "/dashboard/orders",
-        tag: `order-${order.id}`,
-      });
+      await sendPushToUser(
+        shopRow.owner_id,
+        buildMerchantOrderPush({
+          event: "new",
+          status: "Pending",
+          amount: amountLabel,
+          orderId: order.id,
+          customerName,
+          shopName,
+          awaitingWhatsApp: true,
+        }),
+      );
     }
     await sendPushToUser(user.id, {
-      title: "Order saved on TrendsMart",
-      body: `Send it on WhatsApp so ${shopName} can confirm (${amountLabel}). You can cancel from My Orders if you changed your mind.`,
+      title: "📩 Order save ho gaya",
+      body: `${shopName} ko WhatsApp par bhej dein taake wo confirm kar sakein (${amountLabel}). Iraada badal jaye to My Orders se cancel kar sakte hain.`,
       url: `/orders/tracking?orderId=${encodeURIComponent(order.id)}`,
-      tag: `order-${order.id}-customer`,
+      tag: `order-${order.id}-customer-new`,
+      kind: "order",
+      renotify: true,
     });
   })().catch(() => undefined);
 

@@ -20,15 +20,29 @@ import {
   useMemo,
   type FormEvent,
 } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useLocation } from "@/context/LocationContext";
+import {
+  isValidCoordinate,
+  reverseGeocode,
+  requestUserLocationDetailed,
+} from "@/services/geoRadiusService";
 import {
   formatPkPhoneInput,
   isValidPkMobile,
   PK_PHONE_PLACEHOLDER,
 } from "@/lib/phoneFormat";
+
+const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-56 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+  ),
+});
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
 
@@ -44,6 +58,8 @@ interface CustomerAddress {
   postal_code?: string;
   delivery_notes?: string;
   is_default: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -51,6 +67,9 @@ interface CustomerAddress {
 type AddressLabel = "Home" | "Office" | "Other";
 
 const ADDRESS_LABELS: AddressLabel[] = ["Home", "Office", "Other"];
+
+/** Sensible default for the map when the customer has never shared GPS. */
+const DEFAULT_MAP_CENTER = { latitude: 32.1877, longitude: 74.1945 }; // Gujranwala
 
 const INITIAL_ADDRESS_FORM: Omit<CustomerAddress, "id" | "user_id" | "created_at" | "updated_at"> = {
   label: "Home",
@@ -62,7 +81,17 @@ const INITIAL_ADDRESS_FORM: Omit<CustomerAddress, "id" | "user_id" | "created_at
   postal_code: "",
   delivery_notes: "",
   is_default: false,
+  latitude: null,
+  longitude: null,
 };
+
+function hasPin(a: { latitude?: number | null; longitude?: number | null }): boolean {
+  return (
+    typeof a.latitude === "number" &&
+    typeof a.longitude === "number" &&
+    isValidCoordinate(a.latitude, a.longitude)
+  );
+}
 
 /* ─── Icons ────────────────────────────────────────────────────────────────── */
 
@@ -146,6 +175,7 @@ export default function AddressesPage() {
   const supabase = useMemo(() => createClient(), []);
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { location, coordinates, detectLocationDetailed, isDetecting } = useLocation();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -159,6 +189,104 @@ export default function AddressesPage() {
   const [form, setForm] = useState(INITIAL_ADDRESS_FORM);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pinBusy, setPinBusy] = useState(false);
+
+  const mapCenter = useMemo(() => {
+    if (hasPin(form)) {
+      return { latitude: form.latitude!, longitude: form.longitude! };
+    }
+    if (
+      coordinates &&
+      isValidCoordinate(coordinates.latitude, coordinates.longitude)
+    ) {
+      return {
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      };
+    }
+    return DEFAULT_MAP_CENTER;
+  }, [form, coordinates]);
+
+  const applyPin = useCallback(
+    async (lat: number, lng: number, fillText: boolean) => {
+      if (!isValidCoordinate(lat, lng)) return;
+      setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
+      if (!fillText) return;
+      setPinBusy(true);
+      try {
+        const geocode = await reverseGeocode(lat, lng);
+        const line1 =
+          geocode.address?.split(",")[0]?.trim() ||
+          geocode.neighbourhood ||
+          geocode.landmark ||
+          "";
+        const city = geocode.city?.trim() || "";
+        setForm((f) => ({
+          ...f,
+          latitude: lat,
+          longitude: lng,
+          address_line1: f.address_line1.trim() || line1 || f.address_line1,
+          city: f.city.trim() || city || f.city,
+        }));
+      } catch {
+        /* pin itself is what matters — text can stay manual */
+      } finally {
+        setPinBusy(false);
+      }
+    },
+    [],
+  );
+
+  const handleUseCurrentLocation = useCallback(async () => {
+    setPinBusy(true);
+    try {
+      // Prefer a live device fix; fall back to whatever LocationContext already holds.
+      const fresh = await detectLocationDetailed();
+      const c = fresh.location?.coordinates;
+      if (c && isValidCoordinate(c.latitude, c.longitude)) {
+        await applyPin(c.latitude, c.longitude, true);
+        addToast("Current location pin lag gaya.", "success");
+        return;
+      }
+      // One more direct attempt if context detect failed (e.g. timeout mid-flight).
+      const direct = await requestUserLocationDetailed({ timeout: 12_000 });
+      if (
+        direct.coordinates &&
+        isValidCoordinate(direct.coordinates.latitude, direct.coordinates.longitude)
+      ) {
+        await applyPin(direct.coordinates.latitude, direct.coordinates.longitude, true);
+        addToast("Current location pin lag gaya.", "success");
+        return;
+      }
+      if (coordinates && isValidCoordinate(coordinates.latitude, coordinates.longitude)) {
+        await applyPin(coordinates.latitude, coordinates.longitude, true);
+        addToast("Saved location se pin lagaya.", "info");
+        return;
+      }
+      addToast(
+        "Location nahi mili. Map par pin drag karein ya GPS allow karein.",
+        "error",
+      );
+    } finally {
+      setPinBusy(false);
+    }
+  }, [addToast, applyPin, coordinates, detectLocationDetailed]);
+
+  // When opening a blank form, seed the map from the live location so the pin
+  // isn't sitting on a random city centre.
+  useEffect(() => {
+    if (!showForm || editingId) return;
+    const lat = location?.coordinates?.latitude;
+    const lng = location?.coordinates?.longitude;
+    if (
+      typeof lat !== "number" ||
+      typeof lng !== "number" ||
+      !isValidCoordinate(lat, lng)
+    ) {
+      return;
+    }
+    setForm((f) => (hasPin(f) ? f : { ...f, latitude: lat, longitude: lng }));
+  }, [showForm, editingId, location]);
 
   // Auth check
   useEffect(() => {
@@ -222,6 +350,10 @@ export default function AddressesPage() {
       addToast("Enter a valid Pakistani mobile (e.g. 03001234567).", "error");
       return;
     }
+    if (!hasPin(form)) {
+      addToast("Map par delivery pin lagayein — rider isi se aapko dhundhega.", "error");
+      return;
+    }
     setSaving(true);
 
     const payload = {
@@ -235,6 +367,8 @@ export default function AddressesPage() {
       postal_code: form.postal_code?.trim() || null,
       delivery_notes: form.delivery_notes?.trim() || null,
       is_default: form.is_default,
+      latitude: form.latitude,
+      longitude: form.longitude,
     };
 
     let result;
@@ -298,6 +432,8 @@ export default function AddressesPage() {
       postal_code: address.postal_code || "",
       delivery_notes: address.delivery_notes || "",
       is_default: address.is_default,
+      latitude: address.latitude ?? null,
+      longitude: address.longitude ?? null,
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -528,6 +664,35 @@ export default function AddressesPage() {
                 />
               </div>
 
+              <div>
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    Delivery pin on map *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleUseCurrentLocation()}
+                    disabled={pinBusy || isDetecting}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400"
+                  >
+                    {pinBusy || isDetecting ? "Detecting…" : "Use my current location"}
+                  </button>
+                </div>
+                <LocationMiniMap
+                  latitude={mapCenter.latitude}
+                  longitude={mapCenter.longitude}
+                  onPick={(lat, lng) => void applyPin(lat, lng, true)}
+                  mode="compact"
+                  heightClassName="h-56"
+                  resizeKey={showForm ? `${editingId ?? "new"}-${mapCenter.latitude}` : "closed"}
+                />
+                <p className="mt-1.5 text-[0.65rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  {hasPin(form)
+                    ? "✅ Pin set — checkout pe isi location se rider aayega. Drag karke adjust kar sakte hain."
+                    : "⚠️ Pin lagayein — sirf text address se rider aapko nahi dhundh sakta."}
+                </p>
+              </div>
+
               <label className="flex cursor-pointer items-center gap-3">
                 <input
                   type="checkbox"
@@ -543,7 +708,13 @@ export default function AddressesPage() {
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  disabled={saving || !form.full_name.trim() || !form.address_line1.trim() || !form.city.trim()}
+                  disabled={
+                    saving ||
+                    !form.full_name.trim() ||
+                    !form.address_line1.trim() ||
+                    !form.city.trim() ||
+                    !hasPin(form)
+                  }
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"
                 >
                   <PlusIcon />
@@ -633,6 +804,15 @@ export default function AddressesPage() {
                       {address.city}{address.postal_code ? ` — ${address.postal_code}` : ""}
                     </p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-500">{address.phone_number}</p>
+                    {hasPin(address) ? (
+                      <p className="text-[0.65rem] font-medium text-emerald-700 dark:text-emerald-400">
+                        📍 Map pin saved — checkout pe exact location lagegi
+                      </p>
+                    ) : (
+                      <p className="text-[0.65rem] font-medium text-amber-700 dark:text-amber-400">
+                        ⚠️ Map pin missing — Edit karke pin lagayein
+                      </p>
+                    )}
                     {address.delivery_notes && (
                       <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                         📝 {address.delivery_notes}

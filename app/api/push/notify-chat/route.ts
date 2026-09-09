@@ -121,9 +121,13 @@ export async function POST(request: NextRequest) {
       title,
       body: preview || "New message",
       url,
+      // One tag per thread so a burst of messages collapses into a single
+      // WhatsApp-style toast instead of stacking the tray.
       tag: `tm-chat-${conversationId}`,
       renotify: true,
       conversationId,
+      kind: "chat",
+      actions: [{ action: "open", title: "Reply" }],
     });
 
     return NextResponse.json({ success: true, sent: result.sent });

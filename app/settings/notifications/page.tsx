@@ -44,10 +44,10 @@ const DEFAULT_TOGGLES: NotificationToggle[] = [
     enabled: true,
   },
   {
-    key: "promotions",
-    label: "Promotions & Offers",
-    description: "Special deals (local preference only)",
-    enabled: false,
+    key: "chat_messages",
+    label: "Chat Messages",
+    description: "Sound and banner when someone replies in chat",
+    enabled: true,
   },
 ];
 

@@ -11,7 +11,28 @@ export interface PushPayload {
   renotify?: boolean;
   /** Chat conversation — SW can suppress if user is viewing that thread. */
   conversationId?: string;
+  /** Groups notifications in the in-app UI and drives SW icon choice. */
+  kind?: "order" | "chat" | "support" | "system";
+  /** Keeps the OS toast on screen until the user acts (new orders). */
+  requireInteraction?: boolean;
+  /** Inline OS notification buttons. */
+  actions?: { action: string; title: string }[];
 }
+
+/**
+ * Push urgency. `high` asks the push service to wake the device promptly even
+ * when the browser is backgrounded or the phone is dozing.
+ */
+export type PushUrgency = "very-low" | "low" | "normal" | "high";
+
+export interface SendPushOptions {
+  urgency?: PushUrgency;
+  /** Seconds the push service should retry delivery for an offline device. */
+  ttlSeconds?: number;
+}
+
+/** Order/chat alerts must survive an offline device for a full day. */
+const DEFAULT_TTL_SECONDS = 60 * 60 * 24;
 
 type PushSubscriptionRow = {
   id: string;
@@ -29,6 +50,7 @@ const PUSH_SEND_TIMEOUT_MS = 10_000;
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
+  options: SendPushOptions = {},
 ): Promise<{ sent: number; failed: number }> {
   if (!isWebPushConfigured()) return { sent: 0, failed: 0 };
 
@@ -66,6 +88,10 @@ export async function sendPushToUser(
               },
             },
             body,
+            {
+              TTL: options.ttlSeconds ?? DEFAULT_TTL_SECONDS,
+              urgency: options.urgency ?? "high",
+            },
           ),
           new Promise<never>((_, reject) =>
             setTimeout(

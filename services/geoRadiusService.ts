@@ -262,11 +262,70 @@ export function requestUserLocation(
   return requestUserLocationDetailed(options).then((r) => r.coordinates);
 }
 
+/* ─── Accuracy grading ──────────────────────────────────────────────────────
+ *
+ * A phone's first GPS reply is almost always a coarse network/wifi fix (often
+ * 500–3000 m — sometimes the wrong town entirely). The real satellite fix
+ * arrives a few seconds later. Accepting that first reply was the single
+ * biggest source of "meri location ghalat aa rahi hai".
+ */
+
+/** Stop refining once we are this precise — street-level, good enough to deliver to. */
+export const ACCURACY_TARGET_METERS = 40;
+/** Below this we still call the pin trustworthy for delivery. */
+export const ACCURACY_GOOD_METERS = 150;
+/** Beyond this the fix is a city-level guess and must be flagged to the user. */
+export const ACCURACY_WEAK_METERS = 1_000;
+
+export type AccuracyGrade = "exact" | "good" | "approx" | "weak" | "unknown";
+
+export function gradeAccuracy(accuracyMeters?: number | null): AccuracyGrade {
+  if (typeof accuracyMeters !== "number" || !Number.isFinite(accuracyMeters)) {
+    return "unknown";
+  }
+  if (accuracyMeters <= ACCURACY_TARGET_METERS) return "exact";
+  if (accuracyMeters <= ACCURACY_GOOD_METERS) return "good";
+  if (accuracyMeters <= ACCURACY_WEAK_METERS) return "approx";
+  return "weak";
+}
+
+export function accuracyLabel(accuracyMeters?: number | null): string {
+  const grade = gradeAccuracy(accuracyMeters);
+  const rounded =
+    typeof accuracyMeters === "number" && Number.isFinite(accuracyMeters)
+      ? Math.round(accuracyMeters)
+      : null;
+  switch (grade) {
+    case "exact":
+      return `Exact location (±${rounded} m)`;
+    case "good":
+      return `Accurate location (±${rounded} m)`;
+    case "approx":
+      return `Approximate (±${rounded} m) — pin adjust karein`;
+    case "weak":
+      return `Sirf andaza (±${rounded} m) — map par pin lagayein`;
+    default:
+      return "Accuracy unknown";
+  }
+}
+
+export interface PreciseLocationOptions extends PositionOptions {
+  /** Stop early once a fix this precise arrives. Defaults to 40 m. */
+  targetAccuracyMeters?: number;
+  /** Called on every improved fix so UI can show live refinement. */
+  onProgress?: (coordinates: GeoCoordinates) => void;
+}
+
 /**
  * High-accuracy GPS request with typed error codes for UI messaging.
+ *
+ * Uses `watchPosition` to keep refining until the fix reaches the target
+ * accuracy or the timeout expires, then returns the best reading seen. A
+ * single `getCurrentPosition` call would return whichever coarse fix arrived
+ * first.
  */
 export function requestUserLocationDetailed(
-  options?: PositionOptions,
+  options?: PreciseLocationOptions,
 ): Promise<LocationDetectResult> {
   return new Promise((resolve) => {
     if (typeof window === "undefined" || !navigator.geolocation) {
@@ -275,48 +334,130 @@ export function requestUserLocationDetailed(
     }
 
     const timeoutMs = options?.timeout ?? 15_000;
-    const hardTimeout = setTimeout(
-      () => resolve({ coordinates: null, error: "timeout" }),
-      timeoutMs + 1500,
-    );
+    const target = options?.targetAccuracyMeters ?? ACCURACY_TARGET_METERS;
+    const onProgress = options?.onProgress;
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        clearTimeout(hardTimeout);
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-        if (!isValidCoordinate(latitude, longitude)) {
-          resolve({ coordinates: null, error: "unavailable", accuracyMeters: null });
-          return;
-        }
-        const accuracy =
-          typeof position.coords.accuracy === "number" &&
-          Number.isFinite(position.coords.accuracy)
-            ? position.coords.accuracy
-            : null;
-        resolve({
-          coordinates: { latitude, longitude, accuracyMeters: accuracy },
+    let best: GeoCoordinates | null = null;
+    let bestAccuracy = Number.POSITIVE_INFINITY;
+    let settled = false;
+    let watchId: number | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const finish = (result: LocationDetectResult) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const finishWithBest = (fallbackError: LocationDetectErrorCode) => {
+      if (best) {
+        finish({
+          coordinates: best,
           error: null,
-          accuracyMeters: accuracy,
+          accuracyMeters: best.accuracyMeters ?? null,
         });
-      },
-      (err) => {
-        clearTimeout(hardTimeout);
-        if (err.code === 1)
-          resolve({ coordinates: null, error: "denied", accuracyMeters: null });
-        else if (err.code === 3)
-          resolve({ coordinates: null, error: "timeout", accuracyMeters: null });
-        else
-          resolve({ coordinates: null, error: "unavailable", accuracyMeters: null });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: timeoutMs,
-        maximumAge: 30_000,
-        ...options,
-      },
-    );
+      } else {
+        finish({ coordinates: null, error: fallbackError, accuracyMeters: null });
+      }
+    };
+
+    timer = setTimeout(() => finishWithBest("timeout"), timeoutMs);
+
+    const onPosition = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+      if (!isValidCoordinate(latitude, longitude)) return;
+
+      const accuracy =
+        typeof position.coords.accuracy === "number" &&
+        Number.isFinite(position.coords.accuracy)
+          ? position.coords.accuracy
+          : null;
+      // An unknown accuracy must not beat a measured one.
+      const score = accuracy ?? Number.MAX_SAFE_INTEGER;
+      if (best && score >= bestAccuracy) return;
+
+      bestAccuracy = score;
+      best = { latitude, longitude, accuracyMeters: accuracy };
+      onProgress?.(best);
+
+      if (score <= target) finishWithBest("unavailable");
+    };
+
+    const onError = (err: GeolocationPositionError) => {
+      // A late error must not discard a good fix we already have.
+      if (best) {
+        finishWithBest("unavailable");
+        return;
+      }
+      if (err.code === 1) finish({ coordinates: null, error: "denied", accuracyMeters: null });
+      else if (err.code === 3) finish({ coordinates: null, error: "timeout", accuracyMeters: null });
+      else finish({ coordinates: null, error: "unavailable", accuracyMeters: null });
+    };
+
+    const positionOptions: PositionOptions = {
+      enableHighAccuracy: options?.enableHighAccuracy ?? true,
+      timeout: timeoutMs,
+      // Default to a live fix. A cached reading is exactly what strands a
+      // customer on the address they were at an hour ago.
+      maximumAge: options?.maximumAge ?? 0,
+    };
+
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        onPosition,
+        onError,
+        positionOptions,
+      );
+    } catch {
+      navigator.geolocation.getCurrentPosition(onPosition, onError, positionOptions);
+    }
   });
+}
+
+/**
+ * Is this pin exact enough to deliver to?
+ *
+ * A device fix or a pin the user dropped themselves both point at a real
+ * doorstep. A city/area choice is a centroid that can be kilometres out, and a
+ * `cached` profile pin was never verified in this session.
+ */
+export function isPreciseLocation(
+  location: Pick<UserLocation, "source" | "coordinates"> | null | undefined,
+): boolean {
+  if (!location?.coordinates) return false;
+  if (
+    !isValidCoordinate(
+      location.coordinates.latitude,
+      location.coordinates.longitude,
+    )
+  ) {
+    return false;
+  }
+  if (location.source !== "gps" && location.source !== "pin") return false;
+
+  // A device fix wider than a city block is a network guess, not a doorstep.
+  const accuracy = location.coordinates.accuracyMeters;
+  if (
+    location.source === "gps" &&
+    typeof accuracy === "number" &&
+    Number.isFinite(accuracy) &&
+    accuracy > ACCURACY_WEAK_METERS
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function locationErrorMessage(code: LocationDetectErrorCode): string {
@@ -1161,22 +1302,18 @@ export async function reverseGeocode(
   lat: number,
   lng: number,
 ): Promise<ReverseGeocodeResult> {
-  // Attempt OSM Nominatim reverse geocoding (zoom 18 = building/street detail)
+  // Reverse geocode through our own proxy: it caches results and sends the
+  // identifying User-Agent that a browser fetch is not allowed to set.
   try {
     const url =
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
-      `&lat=${encodeURIComponent(String(lat))}` +
-      `&lon=${encodeURIComponent(String(lng))}` +
-      `&zoom=18&addressdetails=1&namedetails=1&extratags=1&accept-language=en`;
+      `/api/places/reverse?lat=${encodeURIComponent(String(lat))}` +
+      `&lng=${encodeURIComponent(String(lng))}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
 
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": `TrendsMart/1.0 (${getPublicAppUrl()})`,
-      },
+      headers: { Accept: "application/json" },
     });
     clearTimeout(timeout);
 
@@ -1288,7 +1425,7 @@ export async function reverseGeocode(
  */
 export async function buildLocationFromCoords(
   coords: GeoCoordinates,
-  source: "gps" | "manual",
+  source: "gps" | "pin" | "manual",
 ): Promise<UserLocation> {
   const geocode = await reverseGeocode(coords.latitude, coords.longitude);
 

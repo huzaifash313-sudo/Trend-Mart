@@ -82,10 +82,23 @@ export default function NavigationRecovery() {
       let loadingChecks = 0;
 
       const check = () => {
+        // The handler ran and cancelled the navigation on purpose (a link that
+        // opens a modal, a guard that shows a sheet). Nothing is wedged.
+        if (e.defaultPrevented) {
+          clearTimer();
+          return;
+        }
+
         // The router is alive whenever the URL moved at all — either it reached
         // the target or middleware redirected it (auth guards, etc.). In both
         // cases the watchdog has nothing to do.
         if (currentLocation() !== startLocation) {
+          clearTimer();
+          return;
+        }
+
+        // A dialog/sheet opened instead of navigating — the app responded.
+        if (document.querySelector("[role='dialog'], [aria-modal='true']")) {
           clearTimer();
           return;
         }
@@ -97,12 +110,14 @@ export default function NavigationRecovery() {
         );
         if (loadingUi) {
           loadingChecks += 1;
-          if (loadingChecks <= 6) {
+          if (loadingChecks <= 8) {
             timer = window.setTimeout(check, 1500);
             return;
           }
-        } else if (stalled < 2) {
-          // No skeleton and no URL move yet — check once more before forcing.
+        } else if (stalled < 6) {
+          // No skeleton and no URL move yet. Slow devices and cold route chunks
+          // routinely take several seconds, so stay patient — a wrong guess here
+          // costs the user a full page reload.
           stalled += 1;
           timer = window.setTimeout(check, 1000);
           return;
@@ -118,7 +133,7 @@ export default function NavigationRecovery() {
       };
 
       // Give the router a beat to start, then begin polling.
-      timer = window.setTimeout(check, 1200);
+      timer = window.setTimeout(check, 2000);
     };
 
     const onPopState = () => clearTimer();

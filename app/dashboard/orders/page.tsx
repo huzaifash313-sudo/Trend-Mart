@@ -17,8 +17,17 @@ import { useToast } from "@/components/Toast";
 import CustomSelect from "@/components/CustomSelect";
 import OrderBillModal from "@/components/OrderBillModal";
 import type { Order, OrderStatus, Shop } from "@/types";
-import { toPkWhatsAppDigits } from "@/lib/phoneFormat";
-import { buildCustomerVerifyWhatsAppUrl, isAwaitingWhatsApp } from "@/lib/orderWhatsApp";
+import { useConfirm } from "@/components/ConfirmProvider";
+import {
+  buildCustomerStatusWhatsAppUrl,
+  buildCustomerVerifyWhatsAppUrl,
+  buildOrderMapsUrl,
+  isAwaitingWhatsApp,
+  orderPinAccuracyNote as pinNoteFor,
+  VERIFY_BADGE_LABEL,
+  VERIFY_NOTICE_LONG,
+  VERIFY_NOTICE_TEXT,
+} from "@/lib/orderWhatsApp";
 
 type StatusFilter = "all" | OrderStatus;
 
@@ -47,6 +56,7 @@ function statusTone(status: OrderStatus): string {
 
 export default function MerchantOrdersPage() {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [shop, setShop] = useState<Shop | null>(null);
@@ -100,8 +110,8 @@ export default function MerchantOrdersPage() {
             }
             addToast(
               row.whatsapp_sent_at
-                ? "New order received"
-                : "New order — WhatsApp not sent yet (verify with customer)",
+                ? "Naya order aa gaya"
+                : "Naya order — pack karne se pehle customer se confirm karein",
               row.whatsapp_sent_at ? "success" : "info",
             );
           },
@@ -145,6 +155,11 @@ export default function MerchantOrdersPage() {
     setPage(1);
   }, [filter, query]);
 
+  const awaitingCount = useMemo(
+    () => orders.filter((o) => isAwaitingWhatsApp(o)).length,
+    [orders],
+  );
+
   const counts = useMemo(() => {
     const base: Record<string, number> = { all: orders.length };
     for (const o of orders) {
@@ -154,36 +169,42 @@ export default function MerchantOrdersPage() {
   }, [orders]);
 
   const handleUpdateStatus = useCallback(
-    async (orderId: string, status: OrderStatus) => {
-      const result = await transitionOrderStatus(orderId, status);
+    async (order: Order, status: OrderStatus) => {
+      // Guard: never let an unverified order silently move into fulfilment.
+      if (isAwaitingWhatsApp(order) && status !== "Cancelled") {
+        const proceed = await confirm({
+          title: "Order abhi confirm nahi hua",
+          message: `${VERIFY_NOTICE_LONG}\n\nKya aap ne customer se baat kar li hai?`,
+          confirmLabel: "Haan, confirm ho chuka",
+          cancelLabel: "Pehle confirm karta hoon",
+          variant: "warning",
+        });
+        if (!proceed) return;
+      }
+      const result = await transitionOrderStatus(order.id, status);
       if (result.success) {
-        setOrders((prev) => prev.map((o) => (o.id === orderId ? result.data : o)));
-        addToast(`Order marked as "${getStatusLabel(status)}".`, "success");
+        setOrders((prev) => prev.map((o) => (o.id === order.id ? result.data : o)));
+        addToast(`Order "${getStatusLabel(status)}" mark ho gaya.`, "success");
       } else {
-        addToast(result.error ?? "Could not update status.", "error");
+        addToast(result.error ?? "Status update nahi ho saka.", "error");
       }
     },
-    [addToast],
+    [addToast, confirm],
   );
 
   const openCustomerWhatsApp = (order: Order) => {
-    const awaiting = isAwaitingWhatsApp(order);
-    const url = awaiting
-      ? buildCustomerVerifyWhatsAppUrl(
-          order.customer_phone ?? "",
+    const phone = order.customer_phone ?? "";
+    const url = isAwaitingWhatsApp(order)
+      ? buildCustomerVerifyWhatsAppUrl(phone, order.id, order.customer_name, shop?.name)
+      : buildCustomerStatusWhatsAppUrl(
+          phone,
           order.id,
+          getStatusLabel(order.status),
           order.customer_name,
-        )
-      : (() => {
-          const digits = toPkWhatsAppDigits(order.customer_phone ?? "");
-          if (!digits) return null;
-          const msg = encodeURIComponent(
-            `Salam ${order.customer_name || ""}! Your TrendsMart order (${order.id.slice(0, 8)}) is ${order.status}.`,
-          );
-          return `https://wa.me/${digits}?text=${msg}`;
-        })();
+          shop?.name,
+        );
     if (!url) {
-      addToast("No valid customer phone on this order.", "error");
+      addToast("Is order par customer ka valid phone number nahi hai.", "error");
       return;
     }
     window.open(url, "_blank", "noopener,noreferrer");
@@ -244,6 +265,34 @@ export default function MerchantOrdersPage() {
           ← Dashboard
         </Link>
       </div>
+
+      {awaitingCount > 0 && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border border-orange-300 bg-orange-50 p-4 dark:border-orange-900/60 dark:bg-orange-950/30"
+        >
+          <span aria-hidden="true" className="text-lg leading-none">
+            ⚠️
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-orange-900 dark:text-orange-200">
+              {awaitingCount} order {awaitingCount === 1 ? "abhi" : "abhi tak"} confirm nahi hua
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-orange-800 dark:text-orange-300">
+              {VERIFY_NOTICE_LONG}
+            </p>
+            {filter !== "Pending" && (
+              <button
+                type="button"
+                onClick={() => setFilter("Pending")}
+                className="mt-2 rounded-full bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+              >
+                Pending orders dekhein
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
@@ -315,7 +364,7 @@ export default function MerchantOrdersPage() {
                       </span>
                       {isAwaitingWhatsApp(order) && (
                         <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[0.65rem] font-bold text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-                          ⚠️ WhatsApp not sent
+                          ⚠️ {VERIFY_BADGE_LABEL}
                         </span>
                       )}
                     </div>
@@ -325,9 +374,14 @@ export default function MerchantOrdersPage() {
                     </p>
                     {isAwaitingWhatsApp(order) && (
                       <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">
-                        Customer has not sent the WhatsApp message yet — verify before preparing.
+                        {VERIFY_NOTICE_TEXT}
                       </p>
                     )}
+                    {pinNoteFor(order) ? (
+                      <p className="mt-1 text-[0.65rem] text-amber-700 dark:text-amber-400">
+                        📍 {pinNoteFor(order)}
+                      </p>
+                    ) : null}
                     {order.notes ? (
                       <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
                         Note: {order.notes}
@@ -349,6 +403,18 @@ export default function MerchantOrdersPage() {
                     <p className="mt-0.5 font-mono text-[0.65rem] text-zinc-400">#{order.id.slice(0, 8)}</p>
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+                    {buildOrderMapsUrl(order) ? (
+                      <a
+                        href={buildOrderMapsUrl(order)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50 dark:border-sky-900/50 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                        title="Customer ki delivery location Maps par kholein"
+                      >
+                        <span aria-hidden="true">📍</span>
+                        Location
+                      </a>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => setBillOrder(order)}
@@ -370,10 +436,10 @@ export default function MerchantOrdersPage() {
                       type="button"
                       onClick={() => openCustomerWhatsApp(order)}
                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                      title={isAwaitingWhatsApp(order) ? "Verify order with customer on WhatsApp" : "Message customer on WhatsApp"}
+                      title={isAwaitingWhatsApp(order) ? "Customer se WhatsApp par order confirm karein" : "Customer ko WhatsApp par message karein"}
                     >
                       <span aria-hidden="true">💬</span>
-                      {isAwaitingWhatsApp(order) ? "Verify on WhatsApp" : "WhatsApp"}
+                      {isAwaitingWhatsApp(order) ? "Confirm karein" : "WhatsApp"}
                     </button>
                     {isAwaitingWhatsApp(order) && order.status === "Pending" && (
                       <button
@@ -386,7 +452,7 @@ export default function MerchantOrdersPage() {
                     )}
                     <CustomSelect
                       value={order.status}
-                      onChange={(val) => handleUpdateStatus(order.id, val as OrderStatus)}
+                      onChange={(val) => void handleUpdateStatus(order, val as OrderStatus)}
                       disabled={getValidTransitions(order.status).length === 0}
                       options={[
                         { value: order.status, label: getStatusLabel(order.status) },

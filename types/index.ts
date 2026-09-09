@@ -658,6 +658,18 @@ export interface Order {
   whatsapp_sent_at?: string | null;
   /** Stored checkout WhatsApp text for "Send again" (includes Maps pin). */
   whatsapp_message?: string | null;
+  /** Delivery pin latitude captured at checkout (null for pickup / dine-in). */
+  customer_lat?: number | null;
+  /** Delivery pin longitude captured at checkout. */
+  customer_lng?: number | null;
+  /** Device-reported accuracy of the pin, in metres. */
+  customer_location_accuracy_m?: number | null;
+  /** How the pin was obtained: device fix, or placed by the user on the map. */
+  customer_location_source?: "gps" | "pin" | null;
+  /** City resolved at checkout. */
+  customer_city?: string | null;
+  /** Area / mohalla resolved at checkout. */
+  customer_area?: string | null;
 }
 
 // ─── Merchant Analytics Summary (dashboard cards) ───────────────────────────
@@ -829,8 +841,14 @@ export interface UserLocation {
   address?: string | null;
   /** When this location was last updated (epoch ms). */
   updatedAt: number;
-  /** Source of the location data: 'gps', 'manual', 'cached'. */
-  source: "gps" | "manual" | "cached";
+  /**
+   * How this location was obtained:
+   * - `gps`    — device satellite/network fix
+   * - `pin`    — user placed the pin themselves on the map (precise, but not GPS)
+   * - `manual` — city or area chosen from a list (centroid, kilometres coarse)
+   * - `cached` — restored from the saved profile, not re-verified this session
+   */
+  source: "gps" | "pin" | "manual" | "cached";
 }
 
 /** Cities supported for manual selection / delivery zone matching. */

@@ -99,6 +99,10 @@ export default function ChatInbox({
     if (role === "customer" && userId) {
       return subscribeToMyConversations(userId, (payload) => {
         const row = payload.new as Conversation | undefined;
+        if (payload.eventType === "DELETE") {
+          setConversations((prev) => prev.filter((c) => c.id !== (payload.old as Conversation).id));
+          return;
+        }
         if (!row?.id) return;
         setConversations((prev) => {
           const filtered = prev.filter((c) => c.id !== row.id);
@@ -123,6 +127,15 @@ export default function ChatInbox({
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
 
   const selectConversation = (id: string) => {
+    // Clear the badge immediately; the realtime UPDATE that follows
+    // `markConversationRead` can lag, which left a stale count on the list.
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? { ...c, merchant_unread_count: 0, customer_unread_count: 0 }
+          : c,
+      ),
+    );
     const params = new URLSearchParams(searchParams.toString());
     params.set("c", id);
     router.push(`?${params.toString()}`, { scroll: false });

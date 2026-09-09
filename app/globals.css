@@ -995,8 +995,11 @@ label {
 
 /* ── Smooth Scrolling ───────────────────────────────────────────────────────── */
 
+/* Smooth scrolling is opt-in per element. Setting it on `html` made every
+   route change animate a long scroll to the top, which read as jank and fought
+   the instant restore in ScrollToTop. */
 @media (prefers-reduced-motion: no-preference) {
-  html {
+  .tm-smooth-scroll {
     scroll-behavior: smooth;
   }
 }

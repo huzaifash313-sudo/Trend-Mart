@@ -355,20 +355,29 @@ self.addEventListener("push", (event) => {
 
   const title = (data && data.title) || "TrendsMart";
   const conversationId = data && data.conversationId;
+  const targetUrl = (data && data.url) || "/";
+  const actions = Array.isArray(data && data.actions) ? data.actions.slice(0, 2) : [];
 
   const options = {
     body: (data && data.body) || "",
     icon: (data && data.icon) || "/trendsmart-mark.png?v=16",
     badge: (data && data.badge) || "/trendsmart-mark.png?v=16",
-    tag: (data && data.tag) || "trendsmart-order",
+    // A stable tag per conversation/order keeps the tray tidy instead of
+    // stacking one toast per message.
+    tag: (data && data.tag) || (conversationId ? `chat-${conversationId}` : "trendsmart-order"),
+    // Newest-first ordering in the OS tray.
+    timestamp: Date.now(),
     data: {
-      url: (data && data.url) || "/",
+      url: targetUrl,
       conversationId: conversationId || null,
+      kind: (data && data.kind) || (conversationId ? "chat" : "order"),
     },
     // Only renotify when server asks (real order / chat events). Default quiet replace.
     renotify: Boolean(data && data.renotify),
-    requireInteraction: false,
+    // New orders stay on screen until the merchant acts on them.
+    requireInteraction: Boolean(data && data.requireInteraction),
     vibrate: data && data.renotify ? [120, 60, 120] : undefined,
+    actions: actions.map((a) => ({ action: String(a.action), title: String(a.title) })),
   };
 
   event.waitUntil(
@@ -438,6 +447,8 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
+  if (event.action === "dismiss") return;
+
   const targetUrl =
     (event.notification.data && event.notification.data.url) || "/";
 
@@ -449,15 +460,32 @@ self.addEventListener("notificationclick", (event) => {
         type: "window",
         includeUncontrolled: true,
       });
-      for (const client of windowClients) {
-        if ("focus" in client) {
-          await client.focus();
-          if ("navigate" in client) {
-            await client.navigate(url);
-          }
-          return;
-        }
+
+      // Prefer a tab already sitting on the target page — just focus it.
+      const exact = windowClients.find((client) => client.url === url);
+      if (exact && "focus" in exact) {
+        await exact.focus();
+        return;
       }
+
+      // Otherwise reuse an open tab and let the app router handle it, which
+      // avoids a full document reload on every notification tap.
+      const reusable = windowClients.find((client) => "focus" in client);
+      if (reusable) {
+        await reusable.focus();
+        let routed = false;
+        try {
+          reusable.postMessage({ type: "tm-notification-navigate", url });
+          routed = true;
+        } catch {
+          routed = false;
+        }
+        if (!routed && "navigate" in reusable) {
+          await reusable.navigate(url).catch(() => {});
+        }
+        return;
+      }
+
       if (self.clients.openWindow) {
         await self.clients.openWindow(url);
       }

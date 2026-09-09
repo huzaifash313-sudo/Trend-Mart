@@ -85,7 +85,7 @@ export default function KebabMenu({
     const onScroll = () => setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     window.addEventListener("resize", onScroll);
     return () => {
       document.removeEventListener("mousedown", onDown);

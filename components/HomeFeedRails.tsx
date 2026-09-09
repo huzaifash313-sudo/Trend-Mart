@@ -214,12 +214,16 @@ function useMiniRailAutoLoop(limit: number) {
 
     let raf = 0;
     let paused = false;
+    let onScreen = false;
+    let resumeAt = 0;
     let last = performance.now();
     const SPEED_PX_PER_SEC = 34;
+    /** Grace period after a swipe so the rail never fights the user's finger. */
+    const RESUME_DELAY_MS = 2500;
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      if (paused || document.hidden) {
+      if (paused || !onScreen || document.hidden || now < resumeAt) {
         last = now;
         return;
       }
@@ -237,7 +241,18 @@ function useMiniRailAutoLoop(limit: number) {
     const resume = () => {
       paused = false;
       last = performance.now();
+      resumeAt = last + RESUME_DELAY_MS;
     };
+
+    // Rails far below the fold must not burn a rAF frame budget every tick.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        onScreen = entry.isIntersecting;
+        last = performance.now();
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
 
     el.addEventListener("pointerenter", pause);
     el.addEventListener("pointerleave", resume);
@@ -249,6 +264,7 @@ function useMiniRailAutoLoop(limit: number) {
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
+      observer.disconnect();
       el.removeEventListener("pointerenter", pause);
       el.removeEventListener("pointerleave", resume);
       el.removeEventListener("touchstart", pause);

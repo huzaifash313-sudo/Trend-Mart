@@ -77,7 +77,10 @@ export default function CustomerOrderActions({
           whatsapp_sent_at: result.data.whatsappSentAt,
           whatsapp_message: result.data.whatsappMessage,
         });
-        addToast("WhatsApp opened — send the message to confirm your order.", "success");
+        addToast(
+          "WhatsApp khul gaya — message bhej dein taake shop aap ka order confirm kar sake.",
+          "success",
+        );
       }
     } finally {
       setBusy(null);
@@ -134,7 +137,7 @@ export default function CustomerOrderActions({
     <div className={`flex flex-wrap gap-2 ${compact ? "" : "mt-3"}`}>
       {awaiting && (
         <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-          WhatsApp not sent yet
+          Shop tak nahi pahuncha — WhatsApp par bhejein
         </span>
       )}
 

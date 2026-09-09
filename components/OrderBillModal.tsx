@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Order, OrderItem, Shop } from "@/types";
+import { isAwaitingWhatsApp, VERIFY_NOTICE_LONG } from "@/lib/orderWhatsApp";
 
 interface OrderBillModalProps {
   order: Order;
@@ -237,6 +238,19 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
               </button>
             </div>
           </div>
+
+          {/* Verify-before-packing warning — @media print hides all but the receipt */}
+          {isAwaitingWhatsApp(order) && (
+            <div
+              role="status"
+              className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-[0.7rem] leading-relaxed text-orange-900 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-200"
+            >
+              <span aria-hidden="true">⚠️</span>
+              <span>
+                <strong>Pack karne se pehle confirm karein.</strong> {VERIFY_NOTICE_LONG}
+              </span>
+            </div>
+          )}
 
           {/* Printer tip */}
           <div className="mx-3 mb-2 rounded-xl bg-emerald-50 px-3 py-2 text-[0.65rem] leading-relaxed text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">

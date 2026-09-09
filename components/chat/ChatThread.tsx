@@ -113,9 +113,13 @@ export default function ChatThread({
     void loadMessages();
   }, [loadMessages]);
 
+  // Scroll only when the thread actually grows. Read-receipt UPDATEs mutate
+  // `messages` too, and scrolling on those yanked the view mid-read.
+  const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
+    if (!lastMessageId) return;
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [lastMessageId, scrollToBottom]);
 
   useEffect(() => {
     const unsub = subscribeToConversationMessages(
@@ -127,7 +131,11 @@ export default function ChatThread({
           if (prev.some((m) => m.id === row.id)) return prev;
           return [...prev, row];
         });
-        void markConversationRead(conversationId, viewerRole);
+        // Only the other party's messages need clearing — echoing our own send
+        // back into a read-receipt write was a pointless round trip.
+        if (row.sender_role !== viewerRole) {
+          void markConversationRead(conversationId, viewerRole);
+        }
       },
       (payload) => {
         const row = payload.new as ChatMessage | undefined;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/webPush";
+import { buildCustomerOrderPush, buildMerchantOrderPush } from "@/lib/orderPushCopy";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitHeaders } from "@/lib/rateLimiter";
 
@@ -18,6 +19,7 @@ type OrderRow = {
   status: string | null;
   total_amount: number | null;
   created_at: string | null;
+  whatsapp_sent_at: string | null;
 };
 
 export async function POST(request: NextRequest) {
@@ -51,7 +53,9 @@ export async function POST(request: NextRequest) {
 
     const { data: orderRaw } = await admin
       .from("orders")
-      .select("id, shop_id, customer_user_id, customer_name, status, total_amount, created_at")
+      .select(
+        "id, shop_id, customer_user_id, customer_name, status, total_amount, created_at, whatsapp_sent_at",
+      )
       .eq("id", body.orderId)
       .eq("shop_id", body.shopId)
       .maybeSingle();
@@ -95,45 +99,37 @@ export async function POST(request: NextRequest) {
         ? `Rs. ${Math.round(order.total_amount).toLocaleString()}`
         : "";
 
-    if (shop?.owner_id) {
-      await sendPushToUser(shop.owner_id, {
-        title: event === "new" ? "New TrendsMart order" : `Order ${status}`,
-        body:
-          event === "new"
-            ? `${order.customer_name || "Customer"} placed an order${amount ? ` — ${amount}` : ""} at ${shop.name || "your shop"}.`
-            : `${order.customer_name || "Customer"} — ${shop.name || "Shop"} is now ${status}.`,
-        url: "/dashboard/orders",
-        tag: `order-${body.orderId}-${event === "new" ? "new" : status}`,
-        renotify: true,
+    let sent = 0;
+
+    // Skip pushing back to whoever performed the action — a merchant who just
+    // changed the status does not need their own phone to buzz.
+    if (shop?.owner_id && !(isOwner && event === "status")) {
+      const push = buildMerchantOrderPush({
+        event,
+        status,
+        amount,
+        orderId: order.id,
+        customerName: order.customer_name,
+        shopName: shop.name,
+        awaitingWhatsApp: !order.whatsapp_sent_at,
       });
+      const result = await sendPushToUser(shop.owner_id, push);
+      sent += result.sent;
     }
 
-    if (order.customer_user_id) {
-      if (status === "Delivered") {
-        // REVIEW REMINDER: a delivered order earns a review — point the customer
-        // straight at the review popup/card instead of the generic status update.
-        await sendPushToUser(order.customer_user_id, {
-          title: "Order delivered — rate your experience!",
-          body: `Your order at ${shop?.name || "the shop"} was delivered. Tap to rate the shop.`,
-          url: "/account",
-          tag: `order-${body.orderId}-review`,
-          renotify: true,
-        });
-      } else {
-        await sendPushToUser(order.customer_user_id, {
-          title: event === "new" ? "Order placed on TrendsMart" : `Order update: ${status}`,
-          body:
-            event === "new"
-              ? `Your order at ${shop?.name || "the shop"} was received${amount ? ` (${amount})` : ""}.`
-              : `Your order at ${shop?.name || "the shop"} is now ${status}.`,
-          url: `/orders/tracking?orderId=${encodeURIComponent(body.orderId)}`,
-          tag: `order-${body.orderId}-customer-${event === "new" ? "new" : status}`,
-          renotify: true,
-        });
-      }
+    if (order.customer_user_id && !isCustomer) {
+      const push = buildCustomerOrderPush({
+        event,
+        status,
+        amount,
+        orderId: order.id,
+        shopName: shop?.name,
+      });
+      const result = await sendPushToUser(order.customer_user_id, push);
+      sent += result.sent;
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, sent });
   } catch {
     return NextResponse.json(buildSafeErrorResponse(500, "Failed to send notification."), {
       status: 500,

@@ -42,6 +42,7 @@ import {
   locationErrorMessage,
   parseCoverageFromZones,
   isCustomerWithinCoverage,
+  isPreciseLocation,
 } from "@/services/geoRadiusService";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { requireVerifiedEmailSession } from "@/services/authService";
@@ -275,7 +276,9 @@ function buildWhatsAppMessage(
   grandTotal: number,
   couponCode: string,
   orderRef: string,
-  customerCoords?: { latitude: number; longitude: number } | null,
+  customerCoords?:
+    | { latitude: number; longitude: number; accuracyMeters?: number | null }
+    | null,
   orderType: "delivery" | "pickup" = "delivery",
 ): string {
   const isPickup = orderType === "pickup";
@@ -315,19 +318,17 @@ function buildWhatsAppMessage(
   const siteOrigin = getPublicAppUrl().replace(/\/$/, "");
 
   const lines: string[] = [
-    `🛒 *New Order via TrendsMart*`,
+    `*NEW ORDER · TrendsMart*`,
+    `Order No. ${safeOrderRef}`,
     ``,
-    `🏪 *Shop:* ${safeShopName}`,
-    `📍 *Shop area:* ${safeLocation}`,
-    isPickup ? `🛍️ *Order Type:* PICKUP — customer will collect` : `🚚 *Order Type:* Delivery`,
-    `🆔 *Order Ref:* ${safeOrderRef}`,
+    `🏪 ${safeShopName}${safeLocation ? ` — ${safeLocation}` : ""}`,
+    isPickup ? `🛍️ Pickup — customer will collect from shop` : `🚚 Home delivery`,
     ``,
-    `──────────────────────────`,
-    `📦 *Order Details*`,
-    `──────────────────────────`,
+    `*🧾 ITEMS*`,
   ];
 
   const waTotals = pooledTotalsFor(items, quantities);
+  let itemIndex = 0;
   for (const item of items) {
     const rawQty = quantities[item.id] ?? item.quantity;
     const qty = Math.max(1, Math.min(99, Math.round(sanitizePayloadNumber(rawQty, 1))));
@@ -338,17 +339,66 @@ function buildWhatsAppMessage(
     const safeItemNotes = item.notes ? sanitizePayloadString(item.notes, 200) : "";
     const safeOriginalPrice = item.originalPrice ? sanitizePayloadNumber(item.originalPrice) : 0;
 
-    const variantLabel = safeVariant ? ` (${safeVariant})` : "";
-    const originalPriceStr = safeOriginalPrice > safePrice
-      ? ` (Was ${formatRupees(safeOriginalPrice)})`
-      : "";
+    const variantLabel = safeVariant ? ` · ${safeVariant}` : "";
+    const offPct =
+      safeOriginalPrice > safePrice
+        ? Math.round(((safeOriginalPrice - safePrice) / safeOriginalPrice) * 100)
+        : 0;
+    const offLabel = offPct > 0 ? `  🔖 ${offPct}% off` : "";
 
-    lines.push(`• ${safeItemName}${variantLabel}`);
-    lines.push(`  ${qty} x ${formatRupees(safePrice)} = ${formatRupees(itemTotal)}${originalPriceStr}`);
+    itemIndex += 1;
+    lines.push(`${itemIndex}. ${safeItemName}${variantLabel}`);
+    lines.push(`    ${qty} × ${formatRupees(safePrice)} = ${formatRupees(itemTotal)}${offLabel}`);
 
     if (safeItemNotes) {
-      lines.push(`  📝 Note: ${safeItemNotes}`);
+      lines.push(`    📝 ${safeItemNotes}`);
     }
+  }
+
+  lines.push(``);
+  lines.push(`*💰 PAYMENT*`);
+  lines.push(`Subtotal: ${formatRupees(safeSubtotal)}`);
+
+  if (safeDiscount > 0 && safeCouponCode) {
+    lines.push(`Coupon (${safeCouponCode}): −${formatRupees(safeDiscount)}`);
+  }
+
+  lines.push(
+    isPickup
+      ? `Delivery: — (pickup)`
+      : safeDeliveryFee > 0
+        ? `Delivery: ${formatRupees(safeDeliveryFee)}`
+        : `Delivery: FREE`,
+  );
+
+  lines.push(`*Total to collect: ${formatRupees(safeGrandTotal)}*`);
+  lines.push(``);
+  lines.push(`*👤 CUSTOMER*`);
+  lines.push(`${safeCustomerName}`);
+  lines.push(`${safeCustomerPhone}`);
+
+  if (isPickup) {
+    lines.push(`Customer will collect from the shop.`);
+  } else {
+    if (safeAddress) {
+      lines.push(`${safeAddress}`);
+    }
+
+    if (mapsPinUrl) {
+      lines.push(`📍 Location pin: ${mapsPinUrl}`);
+      // Be honest about a weak fix rather than letting the rider trust a pin
+      // that could be a few streets off.
+      const accuracy = customerCoords?.accuracyMeters;
+      if (typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy > 150) {
+        lines.push(`   (pin ±${Math.round(accuracy)} m — pahunchte waqt call kar lein)`);
+      }
+    } else {
+      lines.push(`⚠️ Location pin missing — please ask the customer to share it.`);
+    }
+  }
+
+  if (safeNotes) {
+    lines.push(`📝 ${safeNotes}`);
   }
 
   // ONE grouped link for the whole order — no more a link per product.
@@ -357,60 +407,15 @@ function buildWhatsAppMessage(
   const safeSummaryUrl = sanitizePayloadUrl(`${siteOrigin}${summaryPath}`);
   if (safeSummaryUrl) {
     lines.push(``);
-    lines.push(`📋 *Full order:* ${safeSummaryUrl}`);
-    lines.push(`   (tap once to see all items together)`);
-  }
-
-  lines.push(``);
-  lines.push(`──────────────────────────`);
-  lines.push(`💵 *Subtotal:* ${formatRupees(safeSubtotal)}`);
-
-  if (safeDiscount > 0 && safeCouponCode) {
-    lines.push(`🏷️ *Coupon:* ${safeCouponCode}`);
-    lines.push(`💸 *Discount:* -${formatRupees(safeDiscount)}`);
-  }
-
-  lines.push(
-    isPickup
-      ? `🛍️ *Pickup* — no delivery fee`
-      : safeDeliveryFee > 0
-        ? `🚚 *Delivery Fee:* ${formatRupees(safeDeliveryFee)}`
-        : `🚚 *Delivery Fee:* FREE (threshold / shop offer)`,
-  );
-
-  lines.push(`✅ *Grand Total:* ${formatRupees(safeGrandTotal)}`);
-  lines.push(`──────────────────────────`);
-  lines.push(``);
-  lines.push(`👤 *Customer Details*`);
-  lines.push(`   Name: ${safeCustomerName}`);
-  lines.push(`   Phone: ${safeCustomerPhone}`);
-
-  if (isPickup) {
-    lines.push(`   🛍️ Collection: customer will pick up from the shop`);
-  } else {
-    if (safeAddress) {
-      lines.push(`   Address: ${safeAddress}`);
-    }
-
-    if (mapsPinUrl) {
-      lines.push(`   📌 Live pin (open in Maps):`);
-      lines.push(`   ${mapsPinUrl}`);
-    } else {
-      lines.push(`   ⚠️ Map pin missing — ask customer to resend location.`);
-    }
-  }
-
-  if (safeNotes) {
-    lines.push(`   📝 Notes: ${safeNotes}`);
+    lines.push(`📋 Full order details: ${safeSummaryUrl}`);
   }
 
   // Timestamp — safe since it's system-generated
-  const safeTimestamp = new Date().toLocaleString("en-PK", { dateStyle: "full", timeStyle: "short" });
+  const safeTimestamp = new Date().toLocaleString("en-PK", { dateStyle: "medium", timeStyle: "short" });
 
   lines.push(``);
-  lines.push(`──────────────────────────`);
-  lines.push(`_Sent via TrendsMart — Your Local Shopping Hub_`);
-  lines.push(`_🕐 ${safeTimestamp}_`);
+  lines.push(`✅ Please reply here to confirm this order.`);
+  lines.push(`_TrendsMart · ${safeTimestamp}_`);
 
   return lines.join("\n");
 }
@@ -478,6 +483,22 @@ export default function WhatsAppCheckoutModal({
   const [pendingWhatsAppUrl, setPendingWhatsAppUrl] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [autofilledFromAccount, setAutofilledFromAccount] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<
+    Array<{
+      id: string;
+      label: string;
+      full_name: string;
+      phone_number: string;
+      address_line1: string;
+      address_line2?: string | null;
+      city: string;
+      delivery_notes?: string | null;
+      is_default: boolean;
+      latitude?: number | null;
+      longitude?: number | null;
+    }>
+  >([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [locationFillError, setLocationFillError] = useState<string | null>(null);
   const [locationFillBusy, setLocationFillBusy] = useState(false);
   // Portal only after mount so fixed overlay escapes transform ancestors (deals carousel).
@@ -825,17 +846,28 @@ export default function WhatsAppCheckoutModal({
     };
   }, [items, supabase]);
 
-  // Refresh GPS as soon as checkout opens so the coverage / radius gate and the
-  // delivery-fee distance use the *current* position, never a stale saved pin.
+  // Refresh GPS only when we have no saved delivery pin. A Home/Office pin is
+  // the doorstep the customer wants the rider to reach — silently swapping it
+  // for "wherever the phone is right now" is how wrong deliveries start.
   useEffect(() => {
     if (shop.accepts_delivery === false) return;
+    if (!profileLoaded) return;
+    const defaultPinned = savedAddresses.some(
+      (a) =>
+        a.is_default &&
+        typeof a.latitude === "number" &&
+        typeof a.longitude === "number" &&
+        Number.isFinite(a.latitude) &&
+        Number.isFinite(a.longitude),
+    );
+    if (defaultPinned) return;
     void detectLocationDetailed()
       .then((r) => {
         if (r.location?.coordinates) hasFreshGpsRef.current = true;
       })
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profileLoaded, savedAddresses, shop.accepts_delivery]);
 
   // ── Auto-fill from saved delivery address + profile ────────────────────
   useEffect(() => {
@@ -850,7 +882,7 @@ export default function WhatsAppCheckoutModal({
           return;
         }
 
-        const [{ data: profile }, { data: savedAddr }] = await Promise.all([
+        const [{ data: profile }, { data: addressRows }] = await Promise.all([
           supabase
             .from("user_profiles")
             .select("full_name, phone, address, latitude, longitude, city, location_label")
@@ -858,14 +890,21 @@ export default function WhatsAppCheckoutModal({
             .maybeSingle(),
           supabase
             .from("customer_addresses")
-            .select("full_name, phone_number, address_line1, address_line2, city, delivery_notes, is_default")
+            .select(
+              "id, label, full_name, phone_number, address_line1, address_line2, city, delivery_notes, is_default, latitude, longitude",
+            )
             .eq("user_id", user.id)
             .order("is_default", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
+            .order("created_at", { ascending: false })
+            .limit(12),
         ]);
 
         if (cancelled) return;
+
+        const addresses = (addressRows ?? []) as typeof savedAddresses;
+        setSavedAddresses(addresses);
+        const savedAddr = addresses[0] ?? null;
+        if (savedAddr) setSelectedAddressId(savedAddr.id);
 
         const line = savedAddr
           ? [savedAddr.address_line1, savedAddr.address_line2, savedAddr.city]
@@ -873,6 +912,14 @@ export default function WhatsAppCheckoutModal({
               .join(", ")
           : "";
 
+        const addrLat =
+          typeof savedAddr?.latitude === "number" && Number.isFinite(savedAddr.latitude)
+            ? savedAddr.latitude
+            : null;
+        const addrLng =
+          typeof savedAddr?.longitude === "number" && Number.isFinite(savedAddr.longitude)
+            ? savedAddr.longitude
+            : null;
         const profileLat =
           typeof profile?.latitude === "number" && Number.isFinite(profile.latitude)
             ? profile.latitude
@@ -883,19 +930,29 @@ export default function WhatsAppCheckoutModal({
             : null;
         const profileLocLabel = (profile?.location_label as string | undefined)?.trim() || "";
 
-        // Seed the location context from the saved profile pin so distance +
-        // coverage checks run immediately without a fresh GPS prompt. Only as a
-        // fallback: a fresh GPS fix (current location) always wins over the
-        // saved address — the customer may have moved cities.
-        if (profileLat != null && profileLng != null && !hasFreshGpsRef.current) {
-          seedLocation({
-            coordinates: { latitude: profileLat, longitude: profileLng },
-            city: (profile?.city as string | undefined) ?? null,
-            deliveryZone: (profile?.city as string | undefined) ?? null,
-            address: profileLocLabel || profile?.address || null,
-            updatedAt: Date.now(),
-            source: "cached",
-          });
+        // Prefer a saved-address pin (exact doorstep) over the coarse profile
+        // pin. Never overwrite a fresh GPS fix from this checkout session —
+        // the customer may have opened the cart while already elsewhere.
+        if (!hasFreshGpsRef.current) {
+          if (addrLat != null && addrLng != null) {
+            seedLocation({
+              coordinates: { latitude: addrLat, longitude: addrLng },
+              city: savedAddr?.city ?? null,
+              deliveryZone: savedAddr?.city ?? null,
+              address: line || null,
+              updatedAt: Date.now(),
+              source: "pin",
+            });
+          } else if (profileLat != null && profileLng != null) {
+            seedLocation({
+              coordinates: { latitude: profileLat, longitude: profileLng },
+              city: (profile?.city as string | undefined) ?? null,
+              deliveryZone: (profile?.city as string | undefined) ?? null,
+              address: profileLocLabel || profile?.address || null,
+              updatedAt: Date.now(),
+              source: "cached",
+            });
+          }
         }
 
         const nextName =
@@ -933,6 +990,49 @@ export default function WhatsAppCheckoutModal({
     return () => { cancelled = true; };
   }, [supabase, authGate, seedLocation]);
 
+  const applySavedAddress = useCallback(
+    (addressId: string) => {
+      const addr = savedAddresses.find((a) => a.id === addressId);
+      if (!addr) return;
+      setSelectedAddressId(addr.id);
+      const line = [addr.address_line1, addr.address_line2, addr.city]
+        .filter(Boolean)
+        .join(", ");
+      setShipping((prev) => ({
+        ...prev,
+        customerName: addr.full_name || prev.customerName,
+        customerPhone: addr.phone_number
+          ? formatPkPhoneDisplay(addr.phone_number)
+          : prev.customerPhone,
+        shippingAddress: line,
+        deliveryNotes: addr.delivery_notes || "",
+      }));
+      setAutofilledFromAccount(true);
+
+      const lat = addr.latitude;
+      const lng = addr.longitude;
+      if (
+        typeof lat === "number" &&
+        typeof lng === "number" &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lng)
+      ) {
+        // Selecting a saved address is an explicit choice — it outranks a
+        // silent GPS refresh from when the modal opened.
+        hasFreshGpsRef.current = false;
+        seedLocation({
+          coordinates: { latitude: lat, longitude: lng },
+          city: addr.city || null,
+          deliveryZone: addr.city || null,
+          address: line,
+          updatedAt: Date.now(),
+          source: "pin",
+        });
+      }
+    },
+    [savedAddresses, seedLocation],
+  );
+
   // If account had no saved address, fall back to header map location (still editable).
   useEffect(() => {
     if (!profileLoaded) return;
@@ -944,7 +1044,37 @@ export default function WhatsAppCheckoutModal({
     });
   }, [profileLoaded, location, formatLocationAddress]);
 
-  // ── Use my precise location (GPS → reverse-geocode → fill address) ────
+  /**
+   * Tell the customer, in plain words, whether the pin we hold is good enough
+   * for a rider to find them. Silence here would leave them assuming a
+   * city-level guess is their doorstep.
+   */
+  const locationAccuracyHint = useMemo((): { ok: boolean; text: string } | null => {
+    if (!location?.coordinates) return null;
+    if (location.source === "pin") {
+      return {
+        ok: true,
+        text: selectedAddressId
+          ? "Saved address ka map pin use ho raha hai."
+          : "Aap ka lagaya hua map pin use ho raha hai.",
+      };
+    }
+    if (location.source !== "gps") {
+      return {
+        ok: false,
+        text: "Abhi sirf sheher ka andaza hai — rider ke liye exact location dein.",
+      };
+    }
+    const accuracy = location.coordinates.accuracyMeters;
+    if (typeof accuracy !== "number" || !Number.isFinite(accuracy)) return null;
+    if (accuracy <= 150) {
+      return { ok: true, text: `Exact location mil gayi (±${Math.round(accuracy)} m).` };
+    }
+    return {
+      ok: false,
+      text: `Location sirf ±${Math.round(accuracy)} m tak sahi hai. Khuli jagah par jaa kar dobara try karein.`,
+    };
+  }, [location, selectedAddressId]);
   const handleUsePreciseLocation = useCallback(async () => {
     setLocationFillError(null);
     setLocationFillBusy(true);
@@ -955,6 +1085,8 @@ export default function WhatsAppCheckoutModal({
         return;
       }
 
+      hasFreshGpsRef.current = true;
+      setSelectedAddressId(null);
       const line = formatLocationAddress(result.location);
       if (!line) {
         setLocationFillError("Location found, but no address text. Please type your street / area.");
@@ -1002,11 +1134,7 @@ export default function WhatsAppCheckoutModal({
         // Live map pin is required so the rider can find the customer. A manually
         // selected city resolves to a city centroid (not the customer's street),
         // so it doesn't count as an exact pin — force a fresh high-accuracy read.
-        let hasPin =
-          !!location?.coordinates &&
-          location.source === "gps" &&
-          Number.isFinite(location.coordinates.latitude) &&
-          Number.isFinite(location.coordinates.longitude);
+        let hasPin = isPreciseLocation(location);
         if (!hasPin) {
           setLocationFillBusy(true);
           setLocationFillError(null);
@@ -1149,13 +1277,16 @@ export default function WhatsAppCheckoutModal({
       // Pickup needs no GPS pin — the customer is collecting from the shop.
       let pinLat: number | null = null;
       let pinLng: number | null = null;
+      let pinAccuracy: number | null = null;
+      let pinSource: string | null = null;
       if (!isPickup) {
-        // Prefer an exact GPS pin from checkout (never a city centroid); fall back
+        // Prefer an exact pin from checkout (never a city centroid); fall back
         // to a fresh high-accuracy detect — the rider needs the real location.
-        pinLat =
-          location?.source === "gps" ? location?.coordinates?.latitude ?? null : null;
-        pinLng =
-          location?.source === "gps" ? location?.coordinates?.longitude ?? null : null;
+        const precise = isPreciseLocation(location);
+        pinLat = precise ? location?.coordinates?.latitude ?? null : null;
+        pinLng = precise ? location?.coordinates?.longitude ?? null : null;
+        pinAccuracy = precise ? location?.coordinates?.accuracyMeters ?? null : null;
+        pinSource = precise ? location?.source ?? null : null;
         if (pinLat == null || pinLng == null) {
           try {
             const fresh = await detectLocationDetailed();
@@ -1163,6 +1294,8 @@ export default function WhatsAppCheckoutModal({
             if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) {
               pinLat = c.latitude;
               pinLng = c.longitude;
+              pinAccuracy = c.accuracyMeters ?? null;
+              pinSource = fresh.location?.source ?? "gps";
             }
           } catch {
             /* handled below */
@@ -1195,6 +1328,8 @@ export default function WhatsAppCheckoutModal({
           orderType: isPickup ? "pickup" : "delivery",
           customerLat: pinLat,
           customerLng: pinLng,
+          customerLocationAccuracyM: pinAccuracy,
+          customerLocationSource: pinSource,
           customerCity: location?.city ?? undefined,
           customerArea: customerAreaText || location?.deliveryZone || undefined,
           idempotencyKey,
@@ -1942,6 +2077,42 @@ export default function WhatsAppCheckoutModal({
 
               {/* Address — required for delivery, optional/hidden emphasis for pickup */}
               <div>
+                {savedAddresses.length > 0 && !isPickup && (
+                  <div className="mb-3">
+                    <p className="mb-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                      Saved addresses
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {savedAddresses.map((addr) => {
+                        const pinned =
+                          typeof addr.latitude === "number" &&
+                          typeof addr.longitude === "number" &&
+                          Number.isFinite(addr.latitude) &&
+                          Number.isFinite(addr.longitude);
+                        const active = selectedAddressId === addr.id;
+                        return (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => applySavedAddress(addr.id)}
+                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[0.7rem] font-semibold transition ${
+                              active
+                                ? "bg-emerald-600 text-white"
+                                : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                            }`}
+                          >
+                            {addr.label}
+                            {addr.is_default ? " · Default" : ""}
+                            {pinned ? " · 📍" : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1 text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+                      Address select karte hi uska map pin lag jata hai — GPS ka wait nahi.
+                    </p>
+                  </div>
+                )}
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <label htmlFor="wc-shipping-address" className="flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
                     <MapPinIcon /> {isPickup ? "Pickup note" : "Delivery Address"}{" "}
@@ -1970,6 +2141,17 @@ export default function WhatsAppCheckoutModal({
                     </button>
                   )}
                 </div>
+                {!isPickup && locationAccuracyHint && (
+                  <p
+                    className={`mb-1.5 text-[0.65rem] font-medium ${
+                      locationAccuracyHint.ok
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : "text-amber-700 dark:text-amber-400"
+                    }`}
+                  >
+                    {locationAccuracyHint.ok ? "✅" : "⚠️"} {locationAccuracyHint.text}
+                  </p>
+                )}
                 {isPickup ? (
                   <>
                     <input
