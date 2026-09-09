@@ -104,7 +104,11 @@ async function checkRateLimit(request: NextRequest): Promise<boolean> {
     const failClosed =
       pathname.startsWith("/api/auth") ||
       pathname.startsWith("/api/billing") ||
-      pathname.startsWith("/api/orders");
+      pathname.startsWith("/api/orders") ||
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/signup") ||
+      pathname.startsWith("/auth") ||
+      pathname.startsWith("/forgot-password");
     console.warn(
       `[TrendsMart MW] Rate limiter error — ${failClosed ? "blocking" : "allowing"} ${pathname}`,
     );

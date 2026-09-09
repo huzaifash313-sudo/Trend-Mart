@@ -28,6 +28,7 @@ import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 import { isDealOrderableToday, type ShopDeal } from "@/lib/dealSchedule";
 import { sendPushToUser } from "@/lib/webPush";
 import { buildMerchantOrderPush } from "@/lib/orderPushCopy";
+import { refundCouponUsage } from "@/lib/couponUsage";
 import type { Order, OrderItem, PriceTier, VariantGroup } from "@/types";
 
 export const runtime = "nodejs";
@@ -848,12 +849,17 @@ export async function POST(request: Request) {
             coverageError = `This shop only delivers in ${target}. Your pin looks outside that city.`;
           }
         } else if (distanceKm != null) {
-          // Geocoder down — use distance to shop pin (friendly, not client-city trust).
-          if (distanceKm > 35) {
+          // Geocoder down — only soft-allow when customer is clearly near the shop
+          // OR their stated city matches AND they are within a reasonable range.
+          const cityOk = customerCity ? cityMatch(target, customerCity) : false;
+          if (distanceKm <= 12) {
+            // Very close to shop pin → almost certainly same delivery city.
+          } else if (cityOk && distanceKm <= 28) {
+            // City text + mid range — soft allow while maps recovers.
+          } else {
             coverageError =
-              "Could not confirm your city right now, and you look too far from this shop. Try again or drop a clearer map pin.";
+              "Could not confirm your city right now. Wait a moment and try again, or drop a clearer map pin.";
           }
-          // else: within ~35km of shop pin → allow (merchant still confirms on WhatsApp)
         } else {
           coverageError =
             "Could not verify city coverage — please share a clear map pin and try again.";
@@ -1083,9 +1089,16 @@ export async function POST(request: Request) {
         .from("coupons")
         .update({ usage_count: current + 1 } as never)
         .eq("shop_id", shopId)
-        .eq("code", appliedCoupon);
+        .eq("code", appliedCoupon)
+        .eq("usage_count", current);
       if (limit > 0) updater = updater.lt("usage_count", limit);
-      await updater;
+      const { data: bumped, error: bumpErr } = await updater.select("usage_count").maybeSingle();
+      if (bumpErr || !bumped) {
+        return NextResponse.json(
+          { success: false, error: "This coupon has reached its usage limit." },
+          { status: 409 },
+        );
+      }
     }
   }
 
@@ -1132,7 +1145,10 @@ export async function POST(request: Request) {
         } else {
           await admin
             .from("products")
-            .update({ is_available: false } as never)
+            .update({
+              is_available: false,
+              stock_status: "out_of_stock",
+            } as never)
             .eq("id", item.productId);
         }
       }
@@ -1205,6 +1221,10 @@ export async function POST(request: Request) {
       .eq("customer_user_id", user.id)
       .maybeSingle();
     if (existing) {
+      // Loser of the race already burned a coupon increment — refund it.
+      if (appliedCoupon) {
+        await refundCouponUsage(admin as never, shopId, appliedCoupon);
+      }
       const prior = existing as Record<string, unknown>;
       const priorOrderType = String(prior.order_type ?? "delivery");
       const order: Order = {
@@ -1261,34 +1281,7 @@ export async function POST(request: Request) {
   if (insertErr || !inserted) {
     // Best-effort: undo coupon burn so a failed insert doesn't eat a use.
     if (appliedCoupon) {
-      try {
-        await adminRpc("decrement_coupon_usage", {
-          p_shop_id: shopId,
-          p_code: appliedCoupon,
-        });
-      } catch {
-        try {
-          const { data: cur } = await admin
-            .from("coupons")
-            .select("usage_count")
-            .eq("shop_id", shopId)
-            .eq("code", appliedCoupon)
-            .maybeSingle();
-          const current = toNumber(
-            (cur as { usage_count?: number | null } | null)?.usage_count,
-            0,
-          );
-          if (current > 0) {
-            await admin
-              .from("coupons")
-              .update({ usage_count: current - 1 } as never)
-              .eq("shop_id", shopId)
-              .eq("code", appliedCoupon);
-          }
-        } catch {
-          /* soft-launch: merchant can still honour coupon manually */
-        }
-      }
+      await refundCouponUsage(admin as never, shopId, appliedCoupon);
     }
     return NextResponse.json(
       { success: false, error: "Could not place your order. Please try again." },
