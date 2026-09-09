@@ -663,8 +663,6 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  animation: tm-badge-silver-shine 4s ease-in-out infinite;
-  will-change: background-position, filter;
 }
 html.dark .tm-badge-deal {
   color: #e4e4e7;
@@ -683,7 +681,6 @@ html.dark .tm-badge-deal {
   box-shadow:
     0 1px 4px rgba(0, 0, 0, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  animation-name: tm-badge-silver-shine-dark;
 }
 
 /* Animation-only hook for one-off promo chips (hero slides, custom tags) */
@@ -818,7 +815,6 @@ h6 {
   font-family: var(--font-shop), var(--font-display), Georgia, "Times New Roman", serif;
   font-weight: 700;
   letter-spacing: -0.02em;
-  animation: tm-shop-name-glow 3.4s ease-in-out infinite;
 }
 
 /* Hero / dashboard shop titles — optical serif + soft teal breath */
@@ -828,7 +824,6 @@ h6 {
   letter-spacing: -0.03em;
   line-height: 1.15;
   color: var(--tm-sea-900);
-  animation: tm-shop-title-breathe 3.6s ease-in-out infinite;
 }
 html.dark .tm-shop-title {
   color: var(--tm-sea-300);
@@ -846,13 +841,10 @@ html.dark .tm-shop-title.tm-shop-title-merchant {
   display: inline-block;
   color: #18181b;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
-  animation: tm-shop-title-silver-chase 4.6s ease-in-out infinite;
-  animation-delay: calc(var(--letter-i, 0) * 0.2s);
 }
 html.dark .tm-shop-title-merchant-letter {
   color: #fafafa;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  animation-name: tm-shop-title-silver-chase-dark;
 }
 
 /* Compact inline shop name (deal cards, product rows) */
@@ -860,7 +852,6 @@ html.dark .tm-shop-title-merchant-letter {
   font-family: var(--font-shop), var(--font-display), Georgia, "Times New Roman", serif;
   font-weight: 700;
   letter-spacing: -0.015em;
-  animation: tm-shop-name-glow 3.4s ease-in-out infinite;
 }
 
 /* Ensure pre/code blocks are scrollable on mobile instead of overflowing. */
@@ -1872,38 +1863,6 @@ html.dark .trend-card:hover {
   display: inline-block;
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-  will-change: color, text-shadow, transform;
-  animation: tm-wordmark-sparkle 3.6s ease-in-out infinite;
-  animation-delay: calc(var(--letter-i, 0) * 0.14s);
-}
-
-@keyframes tm-wordmark-sparkle {
-  0%,
-  100% {
-    color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-    transform: translateY(0);
-  }
-  28% {
-    color: #ffffff;
-    text-shadow:
-      0 0 8px rgba(255, 255, 255, 0.95),
-      0 0 16px rgba(255, 255, 255, 0.45),
-      0 1px 2px rgba(0, 0, 0, 0.12);
-    transform: translateY(-0.5px);
-  }
-  42% {
-    color: #ecfdf5;
-    text-shadow:
-      0 0 10px rgba(255, 255, 255, 0.9),
-      0 0 20px rgba(167, 243, 208, 0.55);
-    transform: translateY(-1px);
-  }
-  58% {
-    color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-    transform: translateY(0);
-  }
 }
 
 .tm-navbar-brand:hover .tm-navbar-logo {
@@ -2639,8 +2598,6 @@ html.dark .tm-home-deal-media-fallback {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  animation: tm-badge-silver-shine 4s ease-in-out infinite;
-  will-change: background-position, filter;
 }
 html.dark .tm-home-deal-badge-deal {
   color: #e4e4e7;
@@ -2659,7 +2616,6 @@ html.dark .tm-home-deal-badge-deal {
   box-shadow:
     0 1px 4px rgba(0, 0, 0, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  animation-name: tm-badge-silver-shine-dark;
 }
 .tm-home-deal-badge-off {
   border-radius: var(--tm-radius-pill);
@@ -2671,9 +2627,6 @@ html.dark .tm-home-deal-badge-deal {
   background: color-mix(in srgb, var(--tm-text-strong) 82%, transparent);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: tm-badge-blink 1.65s ease-in-out infinite;
-  transform-origin: center;
-  will-change: transform, opacity, filter;
 }
 
 .tm-home-deal-name {
@@ -2978,8 +2931,6 @@ html.dark .tm-sponsored-media-fallback {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  animation: tm-badge-silver-shine 4s ease-in-out infinite;
-  will-change: background-position, filter;
 }
 html.dark .tm-sponsored-badge {
   color: #e4e4e7;
@@ -2998,7 +2949,6 @@ html.dark .tm-sponsored-badge {
   box-shadow:
     0 1px 4px rgba(0, 0, 0, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  animation-name: tm-badge-silver-shine-dark;
 }
 
 .tm-sponsored-body {
@@ -4697,7 +4647,6 @@ html.dark .tm-product-title {
   background: var(--tm-brand-400);
   box-shadow: 0 0 6px color-mix(in srgb, var(--tm-brand-400) 70%, transparent);
   flex-shrink: 0;
-  animation: tm-offer-pulse 1.8s ease-in-out infinite;
 }
 @keyframes tm-product-offer-marquee {
   from {
@@ -5430,7 +5379,6 @@ html.dark .tm-offer-ticker--delivery {
   background: currentColor;
   opacity: 0.75;
   flex-shrink: 0;
-  animation: tm-offer-pulse 1.8s ease-in-out infinite;
 }
 .tm-offer-ticker__label {
   flex: 1;
@@ -5713,7 +5661,6 @@ html.dark .tm-cat-tab.is-active {
 .tm-cat-tab.is-active .tm-cat-tab-line {
   transform: scaleX(1);
   opacity: 1;
-  animation: tm-cat-line-shine 2.8s ease-in-out infinite;
 }
 .tm-cat-tab:focus-visible {
   outline: 2px solid var(--tm-sea-500);

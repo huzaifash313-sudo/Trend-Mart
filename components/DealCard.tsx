@@ -311,6 +311,7 @@ function DealCard({
                 priority={priority}
                 loading={priority ? "eager" : "lazy"}
                 quality={PRODUCT_CARD_IMAGE_QUALITY}
+                unoptimized
                 onError={() => setImgError(true)}
               />
             ) : (
@@ -454,6 +455,7 @@ function DealCard({
               priority={priority}
               loading={priority ? "eager" : "lazy"}
               quality={PRODUCT_CARD_IMAGE_QUALITY}
+              unoptimized
               onError={() => setImgError(true)}
             />
           ) : (

@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import DealCard from "@/components/DealCard";
 import SearchInput from "@/components/SearchInput";
@@ -52,27 +52,33 @@ const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), 
 
 type FilterMode = "today" | "featured" | "upcoming" | "all";
 
+export type DealsUrlState = {
+  q: string;
+  filter: FilterMode;
+  day: string | null;
+  category: ShopCategory;
+  sub: string | null;
+};
+
 /* Stable empty fallbacks so derived memos don't change identity every render. */
 const EMPTY_DEALS: ShopDeal[] = [];
 const EMPTY_COUPONS: Record<string, Coupon[]> = {};
 const EMPTY_DELIVERY: Record<string, ShopDeliveryMeta> = {};
 const EMPTY_SHOPS: Shop[] = [];
 
-function DealsInner() {
+function DealsInner({
+  initialDeals,
+  urlState,
+}: {
+  initialDeals?: ShopDeal[];
+  urlState: DealsUrlState;
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const qParam = searchParams.get("q") ?? "";
-  // Text search must not hide matches behind the default "today" schedule filter.
-  const filterParamRaw = searchParams.get("filter") as FilterMode | null;
-  const filterParam: FilterMode =
-    filterParamRaw && ["today", "featured", "upcoming", "all"].includes(filterParamRaw)
-      ? filterParamRaw
-      : qParam.trim()
-        ? "all"
-        : "today";
-  const dayParam = searchParams.get("day");
-  const categoryParam = (searchParams.get("category") as ShopCategory | null) ?? "All";
-  const subParam = searchParams.get("sub");
+  const qParam = urlState.q;
+  const filterParam = urlState.filter;
+  const dayParam = urlState.day;
+  const categoryParam = urlState.category;
+  const subParam = urlState.sub;
 
   const [query, setQuery] = useState(qParam);
   const [filter, setFilter] = useState<FilterMode>(filterParam);
@@ -108,7 +114,9 @@ function DealsInner() {
   });
   const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
 
-  const dealsQuery = useDealsInfinite();
+  const dealsQuery = useDealsInfinite(
+    initialDeals && initialDeals.length > 0 ? { initialData: initialDeals } : undefined,
+  );
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Trigger next page when sentinel enters viewport.
@@ -827,14 +835,12 @@ function DealsInner() {
   );
 }
 
-export default function DealsPageClient() {
-  return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-6xl px-3 py-8 text-sm text-zinc-400">Loading deals…</div>
-      }
-    >
-      <DealsInner />
-    </Suspense>
-  );
+export default function DealsPageClient({
+  initialDeals = EMPTY_DEALS,
+  urlState,
+}: {
+  initialDeals?: ShopDeal[];
+  urlState: DealsUrlState;
+}) {
+  return <DealsInner initialDeals={initialDeals} urlState={urlState} />;
 }

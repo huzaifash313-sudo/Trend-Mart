@@ -139,7 +139,7 @@ export function useDeals(limit = 48) {
 /** Paginated deals for the /deals page — infinite scroll, 24 per page. */
 export const DEALS_PAGE_SIZE = 24;
 
-export function useDealsInfinite() {
+export function useDealsInfinite(options?: { initialData?: ShopDeal[] }) {
   return useInfiniteQuery({
     queryKey: ["deals", "infinite"] as const,
     queryFn: ({ pageParam }) =>
@@ -151,6 +151,16 @@ export function useDealsInfinite() {
     },
     staleTime: 2 * 60_000,
     placeholderData: keepPreviousData,
+    ...(options?.initialData !== undefined
+      ? {
+          initialData: {
+            pages: [options.initialData],
+            pageParams: [0],
+          },
+          // Treat SSR seed as fresh so mount doesn't refetch before first paint.
+          initialDataUpdatedAt: Date.now(),
+        }
+      : {}),
   });
 }
 

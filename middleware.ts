@@ -879,6 +879,13 @@ export async function middleware(request: NextRequest) {
     });
     applySecurityHeaders(response);
     stripSensitiveHeaders(response);
+    // Allow CDN / bfcache for anonymous catalog GETs (matches next.config /deals headers).
+    if (isBrowseGet && !authenticated) {
+      response.headers.set(
+        "Cache-Control",
+        "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
+      );
+    }
     return response;
   }
 

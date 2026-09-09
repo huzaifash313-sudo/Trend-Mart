@@ -26,7 +26,6 @@ import AppNotifications from "@/components/AppNotifications";
 import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
 import PolicyNotice from "@/components/PolicyNotice";
 import ScrollToTop from "@/components/ScrollToTop";
-import TurnstileScript from "@/components/TurnstileScript";
 import DeferredAppChrome from "@/components/DeferredAppChrome";
 import { ScrollToTopSuspense } from "@/components/PageLoadingShell";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
@@ -207,7 +206,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <PolicyNotice />
               <ConnectionStatus />
               <PwaRegister />
-              <TurnstileScript />
               </AppNotifications>
               </ShopReviewsProvider>
               </MerchantQuickAddProvider>
