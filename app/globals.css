@@ -1743,29 +1743,29 @@ html.dark .trend-card:hover {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px;  /* tighter on mobile so the search pill has more room */
+  gap: 4px;
   height: var(--tm-navbar-content-height);
   min-height: var(--tm-navbar-content-height);
   max-height: var(--tm-navbar-content-height);
   max-width: 72rem;
   margin-inline: auto;
-  padding: 0 10px;
-  padding-left: calc(10px + var(--safe-area-inset-left, 0px));
-  padding-right: calc(10px + var(--safe-area-inset-right, 0px));
+  padding: 0 6px;
+  padding-left: calc(6px + var(--safe-area-inset-left, 0px));
+  padding-right: calc(6px + var(--safe-area-inset-right, 0px));
 }
 
 @media (min-width: 640px) {
   .tm-navbar-inner {
-    gap: 12px;
-    padding: 0 16px;
-    padding-left: calc(16px + var(--safe-area-inset-left, 0px));
-    padding-right: calc(16px + var(--safe-area-inset-right, 0px));
+    gap: 10px;
+    padding: 0 14px;
+    padding-left: calc(14px + var(--safe-area-inset-left, 0px));
+    padding-right: calc(14px + var(--safe-area-inset-right, 0px));
   }
 }
 
 @media (min-width: 1024px) {
   .tm-navbar-inner {
-    gap: 16px;
+    gap: 14px;
     padding: 0 20px;
     padding-left: calc(20px + var(--safe-area-inset-left, 0px));
     padding-right: calc(20px + var(--safe-area-inset-right, 0px));
@@ -1775,10 +1775,11 @@ html.dark .trend-card:hover {
 .tm-navbar-brand {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 5px;
+  flex-shrink: 0;
+  min-width: max-content;
   font-family: var(--font-display, var(--font-sans));
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #fff;
@@ -1787,18 +1788,18 @@ html.dark .trend-card:hover {
 }
 .tm-navbar-logo {
   display: inline-flex;
-  height: 34px;
-  width: 34px;
+  height: 30px;
+  width: 30px;
   aspect-ratio: 1 / 1;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  border-radius: 8px;
   /* White plate so teal mark stays visible on green header */
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   overflow: hidden;
-  padding: 3px;
+  padding: 2px;
 }
 .tm-navbar-logo-img,
 .tm-brand-mark-img {
@@ -1817,8 +1818,8 @@ html.dark .trend-card:hover {
 .tm-navbar-wordmark {
   display: inline-flex;
   align-items: baseline;
-  min-width: 0;
-  overflow: hidden;
+  flex-shrink: 0;
+  overflow: visible;
   white-space: nowrap;
 }
 
@@ -1868,8 +1869,20 @@ html.dark .trend-card:hover {
 }
 @media (min-width: 640px) {
   .tm-navbar-brand {
-    font-size: 20px;
+    font-size: 19px;
     gap: 7px;
+  }
+  .tm-navbar-logo {
+    height: 36px;
+    width: 36px;
+    border-radius: 9px;
+    padding: 3px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tm-navbar-brand {
+    font-size: 20px;
   }
   .tm-navbar-logo {
     height: 38px;
@@ -1877,15 +1890,30 @@ html.dark .trend-card:hover {
   }
 }
 
+.tm-navbar-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+}
+
+/* Desktop: search flexes between brand and icons — keep brand from shrinking */
+@media (min-width: 1024px) {
+  .tm-navbar-actions {
+    margin-left: 0;
+  }
+}
+
 .tm-navbar-icon-btn {
   position: relative;
   display: inline-flex;
-  height: 40px;
-  width: 40px;
+  height: 36px;
+  width: 36px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 9px;
   color: #fff;
   transition: background-color 0.15s ease, transform 0.12s ease;
 }
@@ -1897,6 +1925,13 @@ html.dark .trend-card:hover {
   transform: scale(0.97);
 }
 @media (min-width: 640px) {
+  .tm-navbar-icon-btn {
+    height: 40px;
+    width: 40px;
+    border-radius: 10px;
+  }
+}
+@media (min-width: 1024px) {
   .tm-navbar-icon-btn {
     height: 42px;
     width: 42px;

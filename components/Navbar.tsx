@@ -17,7 +17,7 @@ import { getFavoriteCount } from "@/services/wishlistService";
 
 function HamburgerIcon() {
   return (
-    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
+    <svg className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
       <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
     </svg>
   );
@@ -328,7 +328,7 @@ export default function Navbar() {
           {/* ── Desktop search bar (lg+) — solid white pill, clearly visible on teal ── */}
           <form
             onSubmit={handleSearchSubmit}
-            className="relative mx-3 hidden flex-1 lg:flex"
+            className="relative mx-2 hidden min-w-0 flex-1 lg:flex xl:mx-3"
             role="search"
           >
             <label className="relative flex w-full items-center">
@@ -379,19 +379,17 @@ export default function Navbar() {
             ) : null}
           </form>
 
-          {/* ── Mobile search icon (< lg) — taps open the full overlay ── */}
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className="tm-navbar-icon-btn lg:hidden"
-            aria-label="Search"
-          >
-            <SearchNavIcon />
-          </button>
+          {/* ── Right-side actions (search + cart + alerts + wishlist) ── */}
+          <div className="tm-navbar-actions">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="tm-navbar-icon-btn lg:hidden"
+              aria-label="Search"
+            >
+              <SearchNavIcon />
+            </button>
 
-          {/* ── Right-side action icons ── */}
-          <div className="flex shrink-0 items-center gap-0.5">
-            {/* Cart icon with item-count badge */}
             <Link
               href="/cart"
               className="tm-navbar-icon-btn relative"
