@@ -11,6 +11,11 @@ import {
 } from "@/lib/dealSchedule";
 import { getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
+import {
+  HOME_DEAL_IMAGE_SIZES,
+  PRODUCT_CARD_IMAGE_QUALITY,
+  PRODUCT_CARD_IMAGE_SIZES,
+} from "@/lib/imageSizes";
 import { getShopPath } from "@/lib/shopSlug";
 import { getDealSeoPath } from "@/lib/seo/dealSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
@@ -117,7 +122,7 @@ function DealCard({
 
   const activeUrl = gallery[Math.min(imgIndex, Math.max(gallery.length - 1, 0))] ?? null;
   const safeSrc =
-    activeUrl && !imgError ? getSafeImageUrl(activeUrl, "product") : null;
+    activeUrl && !imgError ? getSafeImageUrl(activeUrl, "product", "card") : null;
   const showPhoto = Boolean(safeSrc && !isFallbackUrl(safeSrc));
 
   const shopHref = getShopPath({
@@ -302,10 +307,10 @@ function DealCard({
                 alt={dealImageAlt}
                 fill
                 className="object-contain transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                sizes="(max-width: 640px) 52vw, (max-width: 1024px) 30vw, 20vw"
+                sizes={HOME_DEAL_IMAGE_SIZES}
                 priority={priority}
                 loading={priority ? "eager" : "lazy"}
-                quality={85}
+                quality={PRODUCT_CARD_IMAGE_QUALITY}
                 onError={() => setImgError(true)}
               />
             ) : (
@@ -341,8 +346,12 @@ function DealCard({
                 {deal.shop_logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={getSafeImageUrl(deal.shop_logo_url, "shop")}
+                    src={getSafeImageUrl(deal.shop_logo_url, "shop", "avatar")}
                     alt=""
+                    width={20}
+                    height={20}
+                    loading="lazy"
+                    decoding="async"
                     className="h-5 w-5 shrink-0 rounded-full object-cover"
                   />
                 ) : (
@@ -441,10 +450,10 @@ function DealCard({
               alt={dealImageAlt}
               fill
               className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              sizes={PRODUCT_CARD_IMAGE_SIZES}
               priority={priority}
               loading={priority ? "eager" : "lazy"}
-              quality={75}
+              quality={PRODUCT_CARD_IMAGE_QUALITY}
               onError={() => setImgError(true)}
             />
           ) : (
@@ -512,8 +521,12 @@ function DealCard({
             {deal.shop_logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={getSafeImageUrl(deal.shop_logo_url, "shop")}
+                src={getSafeImageUrl(deal.shop_logo_url, "shop", "avatar")}
                 alt=""
+                width={12}
+                height={12}
+                loading="lazy"
+                decoding="async"
                 className="h-3 w-3 shrink-0 rounded-full object-cover"
               />
             ) : (

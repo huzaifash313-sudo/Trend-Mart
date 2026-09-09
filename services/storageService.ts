@@ -546,20 +546,22 @@ export function extractPathFromUrl(url: string): string | null {
 }
 
 /** Delivery presets for list cards — keeps mobile payloads tiny on Cloudinary. */
-export type ImageDeliveryRole = "card" | "banner" | "logo" | "thumb" | "full";
+export type ImageDeliveryRole = "card" | "banner" | "logo" | "thumb" | "avatar" | "full";
 
 const DELIVERY_BY_ROLE: Record<
   ImageDeliveryRole,
   { width?: number; height?: number; crop?: "limit" | "fill" | "fit" | "thumb"; quality?: "auto" | "eco" | "good" }
 > = {
-  /** Product / deal grid tiles */
-  card: { width: 400, height: 400, crop: "limit", quality: "eco" },
+  /** Product / deal grid tiles (~160–220 CSS px) */
+  card: { width: 320, height: 320, crop: "limit", quality: "eco" },
   /** Shop / promo banners on cards — fit full art, no hard crop */
   banner: { width: 960, height: 540, crop: "fit", quality: "eco" },
-  /** Avatars / shop logos — keep whole mark visible */
-  logo: { width: 256, height: 256, crop: "fit", quality: "eco" },
-  /** Story rings & tiny thumbs */
-  thumb: { width: 96, height: 96, crop: "fill", quality: "eco" },
+  /** Mid shop logos in headers */
+  logo: { width: 128, height: 128, crop: "fit", quality: "eco" },
+  /** Story rings & small thumbs */
+  thumb: { width: 64, height: 64, crop: "fill", quality: "eco" },
+  /** Tiny card shop chips (h-3 / 12–16px) */
+  avatar: { width: 48, height: 48, crop: "fill", quality: "eco" },
   /** Detail / lightbox / upload preview — full image, still capped */
   full: { width: 1400, height: 1400, crop: "limit", quality: "good" },
 };
@@ -570,6 +572,44 @@ function defaultRoleForFallback(
   if (fallbackType === "product") return "card";
   if (fallbackType === "shop") return "logo";
   return "card";
+}
+
+/**
+ * Resize Unsplash / similar query-param CDNs for card roles.
+ * Cloudinary is handled separately; this stops demo/seed URLs from pulling w=400+.
+ */
+function withQueryParamDelivery(
+  url: string,
+  preset: (typeof DELIVERY_BY_ROLE)[ImageDeliveryRole],
+): string {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    const w = preset.width ?? 320;
+    const q =
+      preset.quality === "eco" ? 60 : preset.quality === "good" ? 75 : 70;
+
+    if (host === "images.unsplash.com" || host.endsWith(".unsplash.com")) {
+      parsed.searchParams.set("auto", "format");
+      parsed.searchParams.set("fit", "crop");
+      parsed.searchParams.set("w", String(w));
+      parsed.searchParams.set("q", String(q));
+      return parsed.toString();
+    }
+
+    // Generic w=/q= query CDNs (some stock hosts)
+    if (parsed.searchParams.has("w") || parsed.searchParams.has("width")) {
+      if (parsed.searchParams.has("w")) parsed.searchParams.set("w", String(w));
+      if (parsed.searchParams.has("width")) {
+        parsed.searchParams.set("width", String(w));
+      }
+      if (parsed.searchParams.has("q")) parsed.searchParams.set("q", String(q));
+      return parsed.toString();
+    }
+  } catch {
+    /* ignore */
+  }
+  return url;
 }
 
 /**
@@ -595,7 +635,9 @@ export function getSafeImageUrl(
   }
   if (url.startsWith("data:")) return url;
   const preset = DELIVERY_BY_ROLE[role ?? defaultRoleForFallback(fallbackType)];
-  return withCloudinaryDelivery(url, preset);
+  const cloudinary = withCloudinaryDelivery(url, preset);
+  if (cloudinary !== url) return cloudinary;
+  return withQueryParamDelivery(url, preset);
 }
 
 /**

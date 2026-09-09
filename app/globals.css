@@ -4461,6 +4461,18 @@ html.dark .tm-geo-reset:hover {
   padding-bottom: 68%;
 }
 
+/* Touch / mobile: skip hover zoom (non-composited paint + CLS noise) */
+@media (hover: none), (max-width: 767px) {
+  .tm-product-card img,
+  .tm-product-media img,
+  .tm-home-deal-media img,
+  .tm-sponsored-media img,
+  .tm-mini-tile-media img {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
 /* Compact cards (marketplace /products feed, store catalog) — shorter image + tighter body */
 .tm-product-card--compact .tm-product-media::before {
   padding-bottom: 58%;

@@ -516,8 +516,12 @@ export default function StoriesViewer({
                 {current.shop_logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={getSafeImageUrl(current.shop_logo_url, "shop")}
+                    src={getSafeImageUrl(current.shop_logo_url, "shop", "thumb")}
                     alt=""
+                    width={36}
+                    height={36}
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover"
                   />
                 ) : (

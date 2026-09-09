@@ -30,6 +30,7 @@ import { fetchActiveAds, pingAdImpression, pingAdClick } from "@/services/adsSer
 import { demoAdsEnabled, getDemoAdsForPlacement } from "@/lib/demoPromoAds";
 import { useMyShop } from "@/lib/queries";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
+import { PROMO_CARD_IMAGE_SIZES } from "@/lib/imageSizes";
 import type { PromotionalAd, PromoAdPlacement } from "@/types";
 
 interface PromoAdsCarouselProps {
@@ -134,10 +135,10 @@ function SponsoredCard({
             alt={ad.title}
             fill
             className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-            sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 24vw"
+            sizes={PROMO_CARD_IMAGE_SIZES}
             priority={priority}
             loading={priority ? "eager" : "lazy"}
-            quality={90}
+            quality={75}
             onError={() => setImgError(true)}
           />
         ) : null}

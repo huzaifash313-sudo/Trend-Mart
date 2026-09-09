@@ -10,6 +10,10 @@ import { getSafeImageUrl } from "@/services/storageService";
 import type { Product } from "@/types";
 import { formatPrice, formatRupees, getProductDiscount } from "@/lib/formatters";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
+import {
+  PRODUCT_CARD_IMAGE_QUALITY,
+  PRODUCT_CARD_IMAGE_SIZES,
+} from "@/lib/imageSizes";
 import CompactRating from "@/components/CompactRating";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import KebabMenu, { type KebabMenuItem } from "@/components/KebabMenu";
@@ -302,10 +306,10 @@ export const ProductCard = memo(function ProductCard({
             alt={imageAlt}
             fill
             className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            sizes={PRODUCT_CARD_IMAGE_SIZES}
             priority={priority}
             loading={priority ? "eager" : "lazy"}
-            quality={60}
+            quality={PRODUCT_CARD_IMAGE_QUALITY}
             onError={() => setImgError(true)}
           />
         ) : (
@@ -390,8 +394,12 @@ export const ProductCard = memo(function ProductCard({
               {product.shop_logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={getSafeImageUrl(product.shop_logo_url, "shop")}
+                  src={getSafeImageUrl(product.shop_logo_url, "shop", "avatar")}
                   alt=""
+                  width={12}
+                  height={12}
+                  loading="lazy"
+                  decoding="async"
                   className="h-3 w-3 shrink-0 rounded-full object-cover"
                 />
               ) : (

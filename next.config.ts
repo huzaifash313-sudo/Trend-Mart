@@ -151,13 +151,13 @@ const nextConfig: NextConfig = {
     ],
     // Aggressive caching for optimized images
     formats: ["image/avif", "image/webp"],
-    // Quality levels used across the app (DealCard 85, ads 90, thumbnails 60/75)
-    qualities: [60, 75, 85, 90],
+    // Leaner breakpoints = fewer / smaller variants for card grids
+    deviceSizes: [384, 640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 24, 32, 48, 64, 96, 128, 160, 256],
+    // Quality levels used across the app
+    qualities: [50, 60, 75, 85, 90],
     // Minimum cache TTL for optimized images (1 hour in production)
     minimumCacheTTL: isProd ? 3600 : 60,
-    // Leaner breakpoints = fewer image variants generated / cached
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
-    imageSizes: [32, 48, 64, 96, 128, 256],
     // Content disposition for SEO-friendly image URLs
     contentDispositionType: "inline",
   },

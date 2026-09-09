@@ -22,6 +22,10 @@ import { isDealActiveOnDate, toPkDateKey, type ShopDeal } from "@/lib/dealSchedu
 import { dealCommerceId } from "@/lib/dealCommerce";
 import { getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
+import {
+  PRODUCT_CARD_IMAGE_QUALITY,
+  PRODUCT_CARD_IMAGE_SIZES,
+} from "@/lib/imageSizes";
 import { formatPrice, getProductDiscount } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
 import { useCart } from "@/context/CartContext";
@@ -141,9 +145,9 @@ function MiniTile({
             src={safeSrc}
             alt=""
             fill
-            sizes="(max-width: 640px) 50vw, 20vw"
+            sizes={PRODUCT_CARD_IMAGE_SIZES}
             loading="lazy"
-            quality={70}
+            quality={PRODUCT_CARD_IMAGE_QUALITY}
             onError={() => setImgError(true)}
           />
         ) : (

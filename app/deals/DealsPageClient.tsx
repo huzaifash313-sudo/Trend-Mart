@@ -784,7 +784,7 @@ function DealsInner() {
             renderItem={(deal, i) => (
               <DealCard
                 deal={deal}
-                priority={i < 4}
+                priority={i < 2}
                 offerTags={getOfferTags(deal.shop_id)}
                 onOpen={() => {
                   setQuickViewDeal(deal);
