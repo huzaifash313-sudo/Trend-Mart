@@ -1706,10 +1706,11 @@ html.dark .trend-card:hover {
   height: 180%;
   background: radial-gradient(
     ellipse at 30% 45%,
-    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.22) 0%,
     transparent 58%
   );
-  opacity: 0.7;
+  opacity: 0.65;
+  animation: tm-navbar-glow-breathe 6.5s ease-in-out infinite;
 }
 
 .tm-navbar-trend-svg {
@@ -1717,25 +1718,25 @@ html.dark .trend-card:hover {
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.55;
+  opacity: 0.45;
 }
 
 .tm-navbar-trend-area {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .tm-navbar-trend-line {
   stroke-dasharray: 420;
   stroke-dashoffset: 0;
-  opacity: 0.95;
-  animation: tm-navbar-line-draw 7.5s ease-in-out infinite;
+  opacity: 0.9;
+  animation: tm-navbar-line-draw 9s ease-in-out infinite;
 }
 
 .tm-navbar-trend-arrow {
-  opacity: 0.55;
+  opacity: 0.45;
   transform-box: fill-box;
   transform-origin: center;
-  animation: tm-navbar-arrow-pulse 3.2s ease-in-out infinite;
+  animation: tm-navbar-arrow-pulse 4s ease-in-out infinite;
 }
 
 .tm-navbar-inner {
@@ -1743,15 +1744,16 @@ html.dark .trend-card:hover {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: var(--tm-navbar-content-height);
   min-height: var(--tm-navbar-content-height);
   max-height: var(--tm-navbar-content-height);
   max-width: 72rem;
   margin-inline: auto;
-  padding: 0 6px;
-  padding-left: calc(6px + var(--safe-area-inset-left, 0px));
-  padding-right: calc(6px + var(--safe-area-inset-right, 0px));
+  padding: 0 8px;
+  padding-left: calc(8px + var(--safe-area-inset-left, 0px));
+  padding-right: calc(8px + var(--safe-area-inset-right, 0px));
+  animation: tm-navbar-inner-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (min-width: 640px) {
@@ -1772,19 +1774,49 @@ html.dark .trend-card:hover {
   }
 }
 
+@keyframes tm-navbar-inner-in {
+  from {
+    opacity: 0.65;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tm-navbar-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(4%);
+  }
+}
+
 .tm-navbar-brand {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex-shrink: 0;
   min-width: max-content;
   font-family: var(--font-display, var(--font-sans));
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   color: #fff;
   text-decoration: none;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.tm-navbar-brand:hover {
+  opacity: 0.96;
+}
+.tm-navbar-brand:active {
+  transform: scale(0.985);
 }
 .tm-navbar-logo {
   display: inline-flex;
@@ -1794,12 +1826,14 @@ html.dark .trend-card:hover {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  /* White plate so teal mark stays visible on green header */
+  border-radius: 9px;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.35);
   overflow: hidden;
   padding: 2px;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
 }
 .tm-navbar-logo-img,
 .tm-brand-mark-img {
@@ -1812,70 +1846,60 @@ html.dark .trend-card:hover {
   object-position: center;
   background: transparent;
   filter: none;
-  /* Never stretch the mark */
   flex-shrink: 0;
 }
 .tm-navbar-wordmark {
-  display: inline-flex;
-  align-items: baseline;
-  flex-shrink: 0;
-  overflow: visible;
-  white-space: nowrap;
-}
-
-/* Premium letter wave — each letter lights up one-by-one then cleans back to
-   white (chase effect). Colors use the *lightest* brand scale (brand-100) with
-   a brand-tinted glow so the shimmer stays readable on EVERY admin brand theme
-   (blue/purple/red/maroon…) and in dark mode — never brand-300/400 which wash
-   out against saturated navbar bands on non-green themes. */
-.tm-navbar-wordmark-letter {
+  position: relative;
   display: inline-block;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-  animation: tm-letter-chase 4.2s ease-in-out infinite;
-  animation-delay: calc(var(--letter-i, 0) * 0.22s);
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  background: linear-gradient(
+    105deg,
+    #ffffff 0%,
+    #ffffff 38%,
+    rgba(255, 255, 255, 0.72) 50%,
+    #ffffff 62%,
+    #ffffff 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: tm-wordmark-sheen 5.5s ease-in-out infinite;
 }
 
-@keyframes tm-letter-chase {
+@keyframes tm-wordmark-sheen {
   0%,
+  55%,
   100% {
-    color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+    background-position: 100% 0;
   }
-  35% {
-    color: var(--tm-brand-100);
-    text-shadow: 0 0 12px color-mix(in srgb, var(--tm-brand-300) 70%, transparent);
-  }
-  55% {
-    color: var(--tm-brand-100);
-    text-shadow: 0 0 16px color-mix(in srgb, var(--tm-brand-400) 65%, transparent);
-  }
-  78% {
-    color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  70%,
+  85% {
+    background-position: 0% 0;
   }
 }
 
-/* Logo plate — subtle lift on brand hover, no rotation */
-.tm-navbar-logo {
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
 .tm-navbar-brand:hover .tm-navbar-logo {
-  transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+  transform: scale(1.06);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.45);
 }
 .tm-navbar-brand:active .tm-navbar-logo {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 @media (min-width: 640px) {
   .tm-navbar-brand {
-    font-size: 19px;
-    gap: 7px;
+    font-size: 18px;
+    gap: 8px;
   }
   .tm-navbar-logo {
-    height: 36px;
-    width: 36px;
-    border-radius: 9px;
+    height: 34px;
+    width: 34px;
+    border-radius: 10px;
     padding: 3px;
   }
 }
@@ -1885,57 +1909,81 @@ html.dark .trend-card:hover {
     font-size: 20px;
   }
   .tm-navbar-logo {
-    height: 38px;
-    width: 38px;
+    height: 36px;
+    width: 36px;
   }
 }
 
+/* Soft frosted tray — icons feel grouped, not scattered */
 .tm-navbar-actions {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 0;
+  gap: 1px;
   margin-left: auto;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-/* Desktop: search flexes between brand and icons — keep brand from shrinking */
 @media (min-width: 1024px) {
   .tm-navbar-actions {
     margin-left: 0;
+    gap: 2px;
+    padding: 4px;
   }
 }
 
 .tm-navbar-icon-btn {
   position: relative;
   display: inline-flex;
-  height: 36px;
-  width: 36px;
+  height: 34px;
+  width: 34px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  padding: 0;
+  border-radius: 999px;
   color: #fff;
-  transition: background-color 0.15s ease, transform 0.12s ease;
+  background: transparent;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease;
 }
-/* Clean, subtle button — no idle animation, just hover/press feedback */
 .tm-navbar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 .tm-navbar-icon-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.28);
 }
 @media (min-width: 640px) {
   .tm-navbar-icon-btn {
-    height: 40px;
-    width: 40px;
-    border-radius: 10px;
+    height: 38px;
+    width: 38px;
   }
 }
 @media (min-width: 1024px) {
   .tm-navbar-icon-btn {
-    height: 42px;
-    width: 42px;
+    height: 40px;
+    width: 40px;
   }
+}
+
+/* Menu button — soft chip so it matches the actions tray */
+.tm-navbar-inner > .tm-navbar-icon-btn:first-of-type {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.tm-navbar-inner > .tm-navbar-icon-btn:first-of-type:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* Navbar theme toggle — icon mirrors `html.dark` (set before first paint by the
@@ -1951,6 +1999,40 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   display: inline-block;
 }
 
+/* Shared cart / wishlist / notification badge */
+.tm-navbar-badge {
+  position: absolute;
+  right: -1px;
+  top: -1px;
+  z-index: 2;
+  display: flex;
+  height: 1.05rem;
+  min-width: 1.05rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f43f5e;
+  padding: 0 0.28rem;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--tm-sea-700) 88%, #fff),
+    0 2px 6px rgba(244, 63, 94, 0.35);
+  animation: tm-navbar-badge-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tm-navbar-badge-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tm-navbar-icon-btn {
     transition: none;
@@ -1960,9 +2042,16 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
   .tm-navbar-soft-glow,
   .tm-navbar-trend-line,
   .tm-navbar-trend-arrow,
-  .tm-navbar-wordmark-letter {
+  .tm-navbar-wordmark,
+  .tm-navbar-inner,
+  .tm-navbar-badge {
     animation: none !important;
     transition: none !important;
+  }
+  .tm-navbar-wordmark {
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+    background: none;
   }
 }
 
@@ -1983,18 +2072,28 @@ html.dark .tm-navbar-icon-btn.tm-theme-toggle .tm-ic-sun {
 }
 
 /* Mobile perf: kill infinite navbar animations + expensive backdrop blur.
-   Mid/low Android phones hang when blur + letter-chase run during scroll. */
+   Mid/low Android phones hang when blur + sheen run during scroll. */
 @media (max-width: 767px) {
   .tm-navbar-wrap {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+  .tm-navbar-actions {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
   .tm-navbar-trend-line,
   .tm-navbar-trend-arrow,
-  .tm-navbar-wordmark-letter,
-  .tm-navbar-bg-shift,
-  .tm-navbar-soft-glow {
+  .tm-navbar-soft-glow,
+  .tm-navbar-bg-shift {
     animation: none !important;
+  }
+  .tm-navbar-wordmark {
+    animation: none !important;
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+    background: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
   }
   .tm-navbar-trend-line {
     stroke-dasharray: none;

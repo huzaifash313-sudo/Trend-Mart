@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties, type FormEvent } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -312,17 +312,7 @@ export default function Navbar() {
 
           <Link href="/" className="tm-navbar-brand" aria-label="TrendsMart home">
             <BrandMark />
-            <span className="tm-navbar-wordmark">
-              {"TrendsMart".split("").map((ch, i) => (
-                <span
-                  key={i}
-                  className="tm-navbar-wordmark-letter"
-                  style={{ "--letter-i": i } as CSSProperties}
-                >
-                  {ch}
-                </span>
-              ))}
-            </span>
+            <span className="tm-navbar-wordmark">TrendsMart</span>
           </Link>
 
           {/* ── Desktop search bar (lg+) — solid white pill, clearly visible on teal ── */}
@@ -397,10 +387,7 @@ export default function Navbar() {
             >
               <CartNavIcon />
               {totalItems > 0 && cartDockActive && (
-                <span
-                  className="absolute -right-0.5 -top-0.5 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-[color:var(--tm-surface)]"
-                  aria-hidden="true"
-                >
+                <span className="tm-navbar-badge" aria-hidden="true">
                   {totalItems > 99 ? "99+" : totalItems}
                 </span>
               )}
@@ -415,10 +402,7 @@ export default function Navbar() {
             >
               <WishlistNavIcon />
               {wishlistCount > 0 && (
-                <span
-                  className="absolute -right-0.5 -top-0.5 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-[color:var(--tm-surface)]"
-                  aria-hidden="true"
-                >
+                <span className="tm-navbar-badge" aria-hidden="true">
                   {wishlistCount > 99 ? "99+" : wishlistCount}
                 </span>
               )}
