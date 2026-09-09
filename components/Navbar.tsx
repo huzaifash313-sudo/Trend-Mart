@@ -9,6 +9,7 @@ import NavbarNotificationButton from "@/components/NavbarNotificationButton";
 import { useCart } from "@/context/CartContext";
 import { getShopPath } from "@/lib/shopSlug";
 import { isCartDockActive } from "@/lib/cartDockSession";
+import { getFavoriteCount } from "@/services/wishlistService";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -36,6 +37,14 @@ function CartNavIcon() {
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
       <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+    </svg>
+  );
+}
+
+function WishlistNavIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
 }
@@ -128,6 +137,7 @@ export default function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [portalReady, setPortalReady] = useState(false);
   const [cartDockActive, setCartDockActive] = useState(false);
+  const [wishlistCount, setWishlistCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [suggestItems, setSuggestItems] = useState<
@@ -155,6 +165,21 @@ export default function Navbar() {
     window.addEventListener("tm:cart-dock", onDock);
     return () => window.removeEventListener("tm:cart-dock", onDock);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      void getFavoriteCount().then((n) => {
+        if (!cancelled) setWishlistCount(Math.max(0, Number(n) || 0));
+      });
+    };
+    refresh();
+    window.addEventListener("favoritesUpdated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("favoritesUpdated", refresh);
+    };
+  }, [pathname]);
 
   // Live navbar suggestions (products / shops / deals) — debounce 280ms
   useEffect(() => {
@@ -384,6 +409,22 @@ export default function Navbar() {
             </Link>
 
             <NavbarNotificationButton />
+
+            <Link
+              href="/wishlist"
+              className="tm-navbar-icon-btn relative"
+              aria-label={`Wishlist${wishlistCount > 0 ? `, ${wishlistCount} saved` : ""}`}
+            >
+              <WishlistNavIcon />
+              {wishlistCount > 0 && (
+                <span
+                  className="absolute -right-0.5 -top-0.5 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-[color:var(--tm-surface)]"
+                  aria-hidden="true"
+                >
+                  {wishlistCount > 99 ? "99+" : wishlistCount}
+                </span>
+              )}
+            </Link>
           </div>
         </div>
       </div>
