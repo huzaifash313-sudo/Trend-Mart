@@ -449,6 +449,12 @@ export function NotificationListenerProvider({
     void markAllNotificationsRead();
   }, []);
 
+  // Opening the panel clears the navbar badge (list stays; unread → read).
+  useEffect(() => {
+    if (!isPanelOpen) return;
+    markAllAsRead();
+  }, [isPanelOpen, markAllAsRead]);
+
   const clearNotifications = useCallback(() => {
     setNotifications([]);
     const uid = currentUserIdRef.current;

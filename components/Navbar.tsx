@@ -8,7 +8,12 @@ import SidebarDrawer from "@/components/SidebarDrawer";
 import NavbarNotificationButton from "@/components/NavbarNotificationButton";
 import { useCart } from "@/context/CartContext";
 import { getShopPath } from "@/lib/shopSlug";
-import { isCartDockActive } from "@/lib/cartDockSession";
+import { isCartDockActive, deactivateCartDock } from "@/lib/cartDockSession";
+import {
+  syncWishlistBadgeDelta,
+  markWishlistBadgeSeen,
+  WISHLIST_BADGE_EVENT,
+} from "@/lib/wishlistBadgeSession";
 import { getFavoriteCount } from "@/services/wishlistService";
 
 /* -------------------------------------------------------------------------- */
@@ -139,6 +144,7 @@ export default function Navbar() {
   const [portalReady, setPortalReady] = useState(false);
   const [cartDockActive, setCartDockActive] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [wishlistBadge, setWishlistBadge] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [suggestItems, setSuggestItems] = useState<
@@ -169,17 +175,39 @@ export default function Navbar() {
 
   useEffect(() => {
     let cancelled = false;
+    const applyCount = (n: number) => {
+      const count = Math.max(0, Number(n) || 0);
+      if (cancelled) return;
+      setWishlistCount(count);
+      setWishlistBadge(syncWishlistBadgeDelta(count));
+    };
     const refresh = () => {
-      void getFavoriteCount().then((n) => {
-        if (!cancelled) setWishlistCount(Math.max(0, Number(n) || 0));
-      });
+      void getFavoriteCount().then(applyCount);
     };
     refresh();
     window.addEventListener("favoritesUpdated", refresh);
+    window.addEventListener(WISHLIST_BADGE_EVENT, refresh);
     return () => {
       cancelled = true;
       window.removeEventListener("favoritesUpdated", refresh);
+      window.removeEventListener(WISHLIST_BADGE_EVENT, refresh);
     };
+  }, [pathname]);
+
+  // Visiting cart / wishlist clears the icon badge (items stay saved).
+  useEffect(() => {
+    if (pathname === "/cart" || pathname.startsWith("/cart/")) {
+      deactivateCartDock();
+      setCartDockActive(false);
+    }
+    if (pathname === "/wishlist" || pathname.startsWith("/wishlist/")) {
+      void getFavoriteCount().then((n) => {
+        const count = Math.max(0, Number(n) || 0);
+        markWishlistBadgeSeen(count);
+        setWishlistCount(count);
+        setWishlistBadge(0);
+      });
+    }
   }, [pathname]);
 
   // Live navbar suggestions (products / shops / deals) — debounce 280ms
@@ -396,6 +424,10 @@ export default function Navbar() {
               href="/cart"
               className="tm-navbar-icon-btn tm-nav-ic-cart relative"
               aria-label={`Cart${totalItems > 0 ? `, ${totalItems} items` : ""}`}
+              onClick={() => {
+                deactivateCartDock();
+                setCartDockActive(false);
+              }}
             >
               <CartNavIcon />
               {totalItems > 0 && cartDockActive && (
@@ -411,11 +443,15 @@ export default function Navbar() {
               href="/wishlist"
               className="tm-navbar-icon-btn tm-nav-ic-heart relative"
               aria-label={`Wishlist${wishlistCount > 0 ? `, ${wishlistCount} saved` : ""}`}
+              onClick={() => {
+                markWishlistBadgeSeen(wishlistCount);
+                setWishlistBadge(0);
+              }}
             >
               <WishlistNavIcon />
-              {wishlistCount > 0 && (
+              {wishlistBadge > 0 && (
                 <span className="tm-navbar-badge" aria-hidden="true">
-                  {wishlistCount > 99 ? "99+" : wishlistCount}
+                  {wishlistBadge > 99 ? "99+" : wishlistBadge}
                 </span>
               )}
             </Link>
