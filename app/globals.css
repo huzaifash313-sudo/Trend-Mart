@@ -1811,13 +1811,13 @@ html.dark .trend-card:hover {
 .tm-navbar-brand {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   flex-shrink: 0;
   min-width: 0;
   font-family: var(--font-display, var(--font-sans));
-  font-size: 16px;
+  font-size: 16.5px;
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   color: #fff;
   text-decoration: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
@@ -1912,7 +1912,7 @@ html.dark .trend-card:hover {
 }
 @media (min-width: 640px) {
   .tm-navbar-brand {
-    font-size: 17px;
+    font-size: 18px;
     gap: 8px;
     flex-shrink: 0;
   }
@@ -1945,13 +1945,13 @@ html.dark .trend-card:hover {
   }
 }
 
-/* Right actions — compact colored icons only (no white plates) */
+/* Right actions — tight black filled icons */
 .tm-navbar-actions {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: 0;
   margin-left: auto;
   padding: 0;
   max-width: none;
@@ -1963,29 +1963,29 @@ html.dark .trend-card:hover {
 
 @media (min-width: 640px) {
   .tm-navbar-actions {
-    gap: 4px;
+    gap: 1px;
   }
 }
 
 @media (min-width: 1024px) {
   .tm-navbar-actions {
     margin-left: 0;
-    gap: 6px;
+    gap: 2px;
   }
 }
 
 .tm-navbar-icon-btn {
   position: relative;
   display: inline-flex;
-  height: 30px;
-  width: 30px;
+  height: 28px;
+  width: 28px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: none;
   border-radius: 999px;
-  color: #fff;
+  color: #0a0a0a;
   background: transparent;
   box-shadow: none;
   transition:
@@ -1994,73 +1994,70 @@ html.dark .trend-card:hover {
     opacity 0.18s ease;
 }
 .tm-navbar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.16);
   transform: none;
 }
 .tm-navbar-icon-btn:active {
   transform: scale(0.92);
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
 }
 
-/* Colored icons on transparent hit-area — no white circles */
+/* Black filled icons — no plates, no colored strokes */
 .tm-navbar-actions .tm-navbar-icon-btn {
   background: transparent !important;
   box-shadow: none !important;
   padding: 0 !important;
+  color: #0a0a0a !important;
 }
 .tm-navbar-actions .tm-navbar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.16) !important;
   box-shadow: none !important;
+  color: #000 !important;
 }
-.tm-nav-ic-search {
-  color: #7dd3fc !important;
-}
-.tm-nav-ic-cart {
-  color: #fbbf24 !important;
-}
-.tm-nav-ic-bell {
-  color: #c4b5fd !important;
-}
+.tm-nav-ic-search,
+.tm-nav-ic-cart,
+.tm-nav-ic-bell,
 .tm-nav-ic-heart {
-  color: #fb7185 !important;
+  color: #0a0a0a !important;
 }
 .tm-navbar-actions .tm-navbar-icon-btn svg {
   display: block;
   flex-shrink: 0;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12));
 }
 
 .tm-navbar-menu-btn {
-  color: #fff;
+  color: #0a0a0a;
   background: transparent;
   box-shadow: none;
 }
 .tm-navbar-menu-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 @media (min-width: 640px) {
+  .tm-navbar-icon-btn {
+    height: 32px;
+    width: 32px;
+  }
+}
+@media (min-width: 768px) {
   .tm-navbar-icon-btn {
     height: 34px;
     width: 34px;
   }
 }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .tm-navbar-icon-btn {
     height: 36px;
     width: 36px;
-  }
-}
-@media (min-width: 1024px) {
-  .tm-navbar-icon-btn {
-    height: 38px;
-    width: 38px;
   }
 }
 
 /* Very small phones — keep everything on-screen */
 @media (max-width: 360px) {
   .tm-navbar-inner {
-    gap: 6px;
+    gap: 5px;
     padding: 0 8px;
     padding-left: calc(8px + var(--safe-area-inset-left, 0px));
     padding-right: calc(8px + var(--safe-area-inset-right, 0px));
@@ -2069,7 +2066,7 @@ html.dark .trend-card:hover {
     gap: 4px;
   }
   .tm-navbar-brand {
-    font-size: 15px;
+    font-size: 15.5px;
   }
   .tm-navbar-logo {
     height: 28px;
@@ -2079,8 +2076,8 @@ html.dark .trend-card:hover {
     gap: 0;
   }
   .tm-navbar-icon-btn {
-    height: 28px;
-    width: 28px;
+    height: 26px;
+    width: 26px;
   }
 }
 
