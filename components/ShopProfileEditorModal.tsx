@@ -99,6 +99,7 @@ function shopToFormData(source: Shop): ShopFormData {
     free_delivery_areas: source.free_delivery_areas ?? [],
     accepts_delivery: source.accepts_delivery ?? true,
     accepts_pickup: source.accepts_pickup ?? true,
+    accepts_dine_in: source.accepts_dine_in ?? true,
   };
 }
 

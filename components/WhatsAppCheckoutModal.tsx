@@ -1426,14 +1426,17 @@ export default function WhatsAppCheckoutModal({
       }
 
       setIsSubmitting(false);
-      addToast("Order placed — WhatsApp chat opened.", "success");
-
       if (opened) {
+        addToast("Order placed — WhatsApp chat opened.", "success");
         void updateOrderWhatsApp(ref, { message: whatsappText, sent: true }).catch(
           () => undefined,
         );
         onOrderPlaced();
       } else {
+        addToast(
+          "Order saved. WhatsApp was blocked — tap Open WhatsApp to send your order.",
+          "info",
+        );
         setStep("success");
       }
     } catch (err) {

@@ -176,6 +176,7 @@ const INITIAL_FORM: ShopFormData = {
   free_delivery_areas: [],
   accepts_delivery: true,
   accepts_pickup: true,
+  accepts_dine_in: true,
 };
 
 function shopToForm(source: Shop): ShopFormData {
@@ -230,6 +231,7 @@ function shopToForm(source: Shop): ShopFormData {
     free_delivery_areas: source.free_delivery_areas ?? [],
     accepts_delivery: source.accepts_delivery ?? true,
     accepts_pickup: source.accepts_pickup ?? true,
+    accepts_dine_in: source.accepts_dine_in ?? true,
   };
 }
 
@@ -527,6 +529,7 @@ export default function DashboardSettingsPage() {
         free_delivery_areas: form.free_delivery_areas,
         accepts_delivery: form.accepts_delivery,
         accepts_pickup: form.accepts_pickup,
+        accepts_dine_in: form.accepts_dine_in,
       };
 
       const result = await updateShop(shop.id, shopFormFields);
@@ -1061,6 +1064,23 @@ export default function DashboardSettingsPage() {
                 checked={form.accepts_pickup}
                 onChange={(v) => setForm((current) => ({ ...current, accepts_pickup: v }))}
                 label="Accept pickup orders"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-800 sm:col-span-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  QR dine-in 🍽️
+                </p>
+                <p className="text-[0.65rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  {form.accepts_dine_in
+                    ? "On — customers can order from table QR codes"
+                    : "Off — all table QR ordering paused (tables stay listed)"}
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={form.accepts_dine_in}
+                onChange={(v) => setForm((current) => ({ ...current, accepts_dine_in: v }))}
+                label="Accept dine-in orders"
               />
             </div>
           </div>

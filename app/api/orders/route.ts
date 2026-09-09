@@ -376,20 +376,36 @@ export async function POST(request: Request) {
 
   // 5. Resolve authoritative prices from products, standalone shop deals, and/or service_packages.
   const ids = [...new Set(items.map((i) => i.productId))];
-  const [productRes, packageRes, dealRes] = await Promise.all([
-    admin
+  let productRes = await admin
+    .from("products")
+    .select(
+      "id, shop_id, name, price, original_price, compare_at_price, is_available, variants, price_tiers, updated_at, accepts_delivery, accepts_pickup",
+    )
+    .in("id", ids);
+  if (productRes.error && /accepts_delivery|accepts_pickup|column/i.test(productRes.error.message || "")) {
+    productRes = await admin
       .from("products")
       .select(
         "id, shop_id, name, price, original_price, compare_at_price, is_available, variants, price_tiers, updated_at",
       )
-      .in("id", ids),
-    admin.from("service_packages").select("id, shop_id, name, price").in("id", ids),
-    admin
+      .in("id", ids);
+  }
+  let dealRes = await admin
+    .from("shop_deals")
+    .select(
+      "id, shop_id, title, price, original_price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month, product_id, accepts_delivery, accepts_pickup",
+    )
+    .in("id", ids);
+  if (dealRes.error && /accepts_delivery|accepts_pickup|column/i.test(dealRes.error.message || "")) {
+    dealRes = await admin
       .from("shop_deals")
       .select(
         "id, shop_id, title, price, original_price, is_active, schedule_type, weekdays, starts_on, ends_on, day_of_month, product_id",
       )
-      .in("id", ids),
+      .in("id", ids);
+  }
+  const [packageRes] = await Promise.all([
+    admin.from("service_packages").select("id, shop_id, name, price").in("id", ids),
   ]);
 
   const productMap = new Map<
@@ -401,6 +417,8 @@ export async function POST(request: Request) {
       price: number | null;
       original_price: number | null;
       is_available: boolean;
+      accepts_delivery: boolean;
+      accepts_pickup: boolean;
       variants: VariantGroup[];
       price_tiers: PriceTier[] | null;
       updated_at?: string;
@@ -415,6 +433,8 @@ export async function POST(request: Request) {
       price: toMoney(row.price),
       original_price: original,
       is_available: row.is_available !== false,
+      accepts_delivery: row.accepts_delivery !== false,
+      accepts_pickup: row.accepts_pickup !== false,
       variants: (row.variants as VariantGroup[]) ?? [],
       price_tiers: Array.isArray(row.price_tiers)
         ? (row.price_tiers as PriceTier[])
@@ -440,6 +460,8 @@ export async function POST(request: Request) {
       title: string;
       price: number;
       original_price: number | null;
+      accepts_delivery: boolean;
+      accepts_pickup: boolean;
       deal: ShopDeal;
     }
   >();
@@ -454,6 +476,8 @@ export async function POST(request: Request) {
       title: string;
       price: number;
       original_price: number | null;
+      accepts_delivery: boolean;
+      accepts_pickup: boolean;
       deal: ShopDeal;
     }
   >();
@@ -472,6 +496,8 @@ export async function POST(request: Request) {
       day_of_month: row.day_of_month != null ? Number(row.day_of_month) : null,
       is_active: row.is_active !== false,
       product_id: row.product_id ? String(row.product_id) : null,
+      accepts_delivery: row.accepts_delivery !== false,
+      accepts_pickup: row.accepts_pickup !== false,
       created_at: "",
     };
     const entry = {
@@ -480,6 +506,8 @@ export async function POST(request: Request) {
       title: deal.title,
       price: toNumber(row.price),
       original_price: toMoney(row.original_price),
+      accepts_delivery: row.accepts_delivery !== false,
+      accepts_pickup: row.accepts_pickup !== false,
       deal,
     };
     dealMap.set(deal.id, entry);
@@ -516,6 +544,24 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
+      if (orderType === "delivery" && !product.accepts_delivery) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `"${product.name}" is pickup-only right now. Switch to pickup or remove it from your cart.`,
+          },
+          { status: 409 },
+        );
+      }
+      if (orderType === "pickup" && !product.accepts_pickup) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `"${product.name}" is not available for pickup. Switch to delivery or remove it from your cart.`,
+          },
+          { status: 409 },
+        );
+      }
 
       // A deal linked to this product (active + orderable today) sells at the
       // DEAL price, not the catalog base price. Linked deals are variant-less,
@@ -528,6 +574,24 @@ export async function POST(request: Request) {
         linkedDeal.deal.is_active &&
         isDealOrderableToday(linkedDeal.deal)
       ) {
+        if (orderType === "delivery" && !linkedDeal.accepts_delivery) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `"${linkedDeal.title}" is pickup-only right now. Switch to pickup or remove it.`,
+            },
+            { status: 409 },
+          );
+        }
+        if (orderType === "pickup" && !linkedDeal.accepts_pickup) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `"${linkedDeal.title}" is not available for pickup. Switch to delivery or remove it.`,
+            },
+            { status: 409 },
+          );
+        }
         if (!(linkedDeal.price > 0)) {
           return NextResponse.json(
             { success: false, error: `"${linkedDeal.title}" needs a price. Ask the shop to set one.` },
@@ -601,6 +665,24 @@ export async function POST(request: Request) {
       if (!deal.deal.is_active || !isDealOrderableToday(deal.deal)) {
         return NextResponse.json(
           { success: false, error: `"${deal.title}" is not available to order today.` },
+          { status: 409 },
+        );
+      }
+      if (orderType === "delivery" && !deal.accepts_delivery) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `"${deal.title}" is pickup-only right now. Switch to pickup or remove it.`,
+          },
+          { status: 409 },
+        );
+      }
+      if (orderType === "pickup" && !deal.accepts_pickup) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `"${deal.title}" is not available for pickup. Switch to delivery or remove it.`,
+          },
           { status: 409 },
         );
       }

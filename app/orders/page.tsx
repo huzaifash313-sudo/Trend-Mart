@@ -273,6 +273,11 @@ function OrdersInner() {
     const result = await fetchOrdersByPhone(trimmed);
     if (result.success) {
       setDbOrders(result.data);
+      if (result.data.length === 0) {
+        setError(
+          "No orders found for this number. If you ordered while signed in, log in to see them.",
+        );
+      }
     } else {
       setError(result.error);
     }
@@ -326,7 +331,15 @@ function OrdersInner() {
               Track Your Orders
             </h2>
             <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
-              Enter the phone number you used when placing orders to view their current status.
+              Enter the phone number you used when placing orders. For the best
+              results,{" "}
+              <a
+                href="/login"
+                className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+              >
+                sign in
+              </a>{" "}
+              with the same account you checked out with.
             </p>
             <div className="flex gap-2">
               <div className="relative flex-1">

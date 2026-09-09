@@ -136,6 +136,7 @@ export default function AnalyticsDashboard() {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -197,13 +198,25 @@ export default function AnalyticsDashboard() {
           dailyMap.set(d, entry);
         }
 
-        const productRevMap = new Map<string, { name: string; revenue: number; orders: number }>();
+        const productRevMap = new Map<
+          string,
+          { name: string; revenue: number; orders: number; units: number }
+        >();
         for (const o of orderList) {
-          for (const item of (o.items_json ?? [])) {
+          if (String(o.status ?? "").toLowerCase() === "cancelled") continue;
+          for (const item of o.items_json ?? []) {
             const pid = item.product_id ?? item.name;
-            const existing = productRevMap.get(pid) ?? { name: item.name, revenue: 0, orders: 0 };
-            existing.revenue += item.price;
+            const qty = Math.max(1, Math.round(Number(item.quantity) || 1));
+            const unit = Number(item.price) || 0;
+            const existing = productRevMap.get(pid) ?? {
+              name: item.name,
+              revenue: 0,
+              orders: 0,
+              units: 0,
+            };
+            existing.revenue += unit * qty;
             existing.orders += 1;
+            existing.units += qty;
             productRevMap.set(pid, existing);
           }
         }
@@ -221,7 +234,7 @@ export default function AnalyticsDashboard() {
             name: rev.name,
             clicks: clickMap.get(pid) ?? 0,
             revenue: rev.revenue,
-            orders: rev.orders,
+            orders: rev.units, // units sold (qty-aware), not line count
           });
         }
         /* Also surface click-only products that had no orders in the window. */
@@ -280,7 +293,26 @@ export default function AnalyticsDashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [timeRange]);
+  }, [timeRange, refreshKey]);
+
+  // Live refresh when new orders arrive or status changes.
+  useEffect(() => {
+    if (!shop?.id) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    void import("@/lib/supabase/realtime").then(({ subscribeToOrders }) => {
+      if (cancelled) return;
+      unsub = subscribeToOrders(shop.id, () => {
+        setRefreshKey((k) => k + 1);
+      }, () => {
+        setRefreshKey((k) => k + 1);
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [shop?.id]);
 
   const handleExportOrdersCSV = useCallback(() => {
     if (allOrders.length === 0) return;
@@ -602,7 +634,7 @@ export default function AnalyticsDashboard() {
                       <th className="px-4 py-2.5 text-xs font-semibold text-zinc-500">Product</th>
                       <th className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-500">Clicks</th>
                       <th className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-500">Revenue</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-500">Orders</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-zinc-500">Units sold</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -143,6 +143,40 @@ export default function MerchantAdsPage() {
     if (shopId) loadAds(shopId);
   }, [shopId, loadAds]);
 
+  // Live counters — views/clicks update without refresh.
+  useEffect(() => {
+    if (!shopId) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    void import("@/lib/supabase/realtime").then(({ subscribeToShopAds }) => {
+      if (cancelled) return;
+      unsub = subscribeToShopAds(shopId, (payload) => {
+        const row = (payload.new ?? null) as PromotionalAd | null;
+        if (!row?.id) {
+          void loadAds(shopId);
+          return;
+        }
+        setAds((prev) => {
+          const idx = prev.findIndex((a) => a.id === row.id);
+          if (payload.eventType === "DELETE") {
+            return prev.filter((a) => a.id !== row.id);
+          }
+          if (idx === -1) {
+            void loadAds(shopId);
+            return prev;
+          }
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...row };
+          return next;
+        });
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [shopId, loadAds]);
+
   // ── Form handlers ────────────────────────────────────────────────────────
   const handleEdit = useCallback((ad: PromotionalAd) => {
     setEditingId(ad.id);
@@ -609,8 +643,17 @@ export default function MerchantAdsPage() {
                           Rs. {ad.price_paid.toLocaleString("en-PK")} plan
                         </span>
                       )}
-                      <span className="inline-flex items-center gap-1"><EyeIcon /> {ad.impression_count.toLocaleString()} views</span>
-                      <span className="inline-flex items-center gap-1"><CursorClickIcon /> {ad.click_count.toLocaleString()} clicks</span>
+                      <span className="inline-flex items-center gap-1 tabular-nums">
+                        <EyeIcon /> {(ad.impression_count ?? 0).toLocaleString()} views
+                      </span>
+                      <span className="inline-flex items-center gap-1 tabular-nums">
+                        <CursorClickIcon /> {(ad.click_count ?? 0).toLocaleString()} clicks
+                      </span>
+                      {(ad.impression_count ?? 0) > 0 ? (
+                        <span className="tabular-nums text-emerald-600 dark:text-emerald-400">
+                          {(((ad.click_count ?? 0) / (ad.impression_count || 1)) * 100).toFixed(1)}% CTR
+                        </span>
+                      ) : null}
                       {ad.status === "approved" && (
                         <span className="inline-flex items-center gap-1.5">
                           <ToggleSwitch

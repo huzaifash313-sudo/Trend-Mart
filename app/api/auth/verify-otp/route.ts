@@ -17,6 +17,7 @@ import {
   verifyOtpHash,
   OTP_MAX_ATTEMPTS,
 } from "@/lib/otp";
+import { getOtpHmacSecret } from "@/lib/authOtpServer";
 
 export const runtime = "nodejs";
 
@@ -63,7 +64,12 @@ export async function POST(request: NextRequest) {
     return json(503, { success: false, error: "Verification is temporarily unavailable." });
   }
 
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  let secret: string;
+  try {
+    secret = getOtpHmacSecret();
+  } catch {
+    return json(503, { success: false, error: "Verification is temporarily unavailable." });
+  }
 
   const { data, error } = await admin
     .from("email_verification_otps")

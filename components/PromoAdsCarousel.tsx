@@ -449,6 +449,7 @@ function SponsoredShelf({
               <div
                 key={`${ad.id}-${i}`}
                 data-sponsored-slot
+                data-ad-id={ad.id}
                 className="shrink-0"
                 style={{ flex: `0 0 ${slotBasis}`, width: slotBasis, maxWidth: slotBasis }}
                 aria-hidden={canSlide ? i < activeDot || i >= activeDot + perView : false}
@@ -459,7 +460,7 @@ function SponsoredShelf({
                     e.stopPropagation();
                     return;
                   }
-                  if (!isDemoAdId(ad.id)) pingAdClick(ad.id);
+                  if (!isDemoAdId(ad.id)) void pingAdClick(ad.id);
                 }}
               >
                 <SponsoredCard ad={ad} priority={i < perView} />
@@ -533,15 +534,62 @@ export default function PromoAdsCarousel({
     };
   }, [placement, shopId, myShopId]);
 
-  // Fire one impression ping per ad, the first time it's loaded on this page view.
+  // Fire one impression only when an ad card is actually visible (≥50%, ≥750ms).
   useEffect(() => {
-    for (const ad of ads) {
-      if (isDemoAdId(ad.id)) continue;
-      if (!pingedRef.current.has(ad.id)) {
+    if (ads.length === 0) return;
+    if (typeof IntersectionObserver === "undefined") {
+      for (const ad of ads) {
+        if (isDemoAdId(ad.id) || pingedRef.current.has(ad.id)) continue;
         pingedRef.current.add(ad.id);
-        pingAdImpression(ad.id);
+        void pingAdImpression(ad.id);
       }
+      return;
     }
+
+    const timers = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).dataset.adId;
+          if (!id || isDemoAdId(id) || pingedRef.current.has(id)) continue;
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            if (timers.has(id)) continue;
+            const t = window.setTimeout(() => {
+              timers.delete(id);
+              if (pingedRef.current.has(id)) return;
+              pingedRef.current.add(id);
+              void pingAdImpression(id);
+            }, 750);
+            timers.set(id, t);
+          } else {
+            const t = timers.get(id);
+            if (t != null) {
+              window.clearTimeout(t);
+              timers.delete(id);
+            }
+          }
+        }
+      },
+      { threshold: [0.5] },
+    );
+
+    // Observe slots after paint — SponsoredShelf mounts the nodes.
+    const observeAll = () => {
+      document.querySelectorAll<HTMLElement>(`[data-ad-id]`).forEach((el) => {
+        const id = el.dataset.adId;
+        if (!id || isDemoAdId(id) || pingedRef.current.has(id)) return;
+        // Only observe ads that belong to this carousel load.
+        if (!ads.some((a) => a.id === id)) return;
+        observer.observe(el);
+      });
+    };
+    const raf = requestAnimationFrame(observeAll);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const t of timers.values()) window.clearTimeout(t);
+      observer.disconnect();
+    };
   }, [ads]);
 
   if (!loading && ads.length === 0) return null;

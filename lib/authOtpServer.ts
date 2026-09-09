@@ -12,10 +12,22 @@ import { generateOtpCode, hashOtp, otpExpiryIso, otpEmailBody } from "@/lib/otp"
 
 type AdminClient = NonNullable<ReturnType<typeof getSupabaseAdminClient>>;
 
-/** HMAC key for hashing codes — the service-role key is server-only + always
- *  present when these routes run (they require the admin client). */
+/**
+ * HMAC key for hashing OTP codes.
+ * Prefer a dedicated `OTP_HMAC_SECRET` so a service-role leak cannot forge codes.
+ * Falls back to the service-role key only when the dedicated secret is unset
+ * (local/dev). Never uses a hardcoded fallback string.
+ */
+export function getOtpHmacSecret(): string {
+  const dedicated = process.env.OTP_HMAC_SECRET?.trim();
+  if (dedicated) return dedicated;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (serviceRole) return serviceRole;
+  throw new Error("OTP HMAC secret is not configured (set OTP_HMAC_SECRET).");
+}
+
 function otpSecret(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  return getOtpHmacSecret();
 }
 
 /**

@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidCoordinate } from "@/lib/geoCoords";
 import { getPublicAppUrl } from "@/lib/appUrl";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 
 export const runtime = "edge";
 
@@ -49,6 +50,12 @@ function writeCache(key: string, body: unknown): void {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = checkRateLimit(request, { ...RATE_LIMITS.PLACES, name: "places-reverse" });
+  if (!limited.allowed) {
+    const res = buildRateLimitResponse(limited);
+    return NextResponse.json(res.body, { status: res.status, headers: res.headers });
+  }
+
   const { searchParams } = new URL(request.url);
   const lat = Number(searchParams.get("lat"));
   const lng = Number(searchParams.get("lng"));

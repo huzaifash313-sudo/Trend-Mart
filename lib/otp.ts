@@ -40,8 +40,12 @@ export function isValidOtpFormat(code: string): boolean {
  * code issued for one address can never validate against another.
  */
 export function hashOtp(code: string, email: string, secret: string): string {
+  const key = secret.trim();
+  if (!key) {
+    throw new Error("OTP HMAC secret is not configured.");
+  }
   const normalizedEmail = email.trim().toLowerCase();
-  return createHmac("sha256", secret || "trendsmart-otp-fallback-secret")
+  return createHmac("sha256", key)
     .update(`${normalizedEmail}:${code}`)
     .digest("hex");
 }

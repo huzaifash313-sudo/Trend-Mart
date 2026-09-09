@@ -106,6 +106,24 @@ export const RATE_LIMITS = {
     windowMs: 120_000, // 10 uploads per 2 minutes
   } as const,
 
+  /** Places / geocoding proxy — billable when Google key is set. */
+  PLACES: {
+    maxRequests: 30,
+    windowMs: 60_000,
+  } as const,
+
+  /** AI assistant / chat — generative cost + spam control. */
+  AI: {
+    maxRequests: 20,
+    windowMs: 60_000,
+  } as const,
+
+  /** OTP resend — tighter than general auth to limit email bombing. */
+  OTP_RESEND: {
+    maxRequests: 5,
+    windowMs: 15 * 60_000, // 5 per 15 minutes
+  } as const,
+
   /** Export/pagination endpoints — prevent data exfiltration. */
   EXPORTS: {
     maxRequests: 5,

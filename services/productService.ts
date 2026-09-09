@@ -129,6 +129,12 @@ function buildProductRow(
   if (!opts?.coreOnly) {
     row.title = sanitized.title?.trim() || sanitized.name?.trim() || null;
     row.original_price = sanitized.original_price ?? null;
+    if ("accepts_delivery" in sanitized) {
+      row.accepts_delivery = sanitized.accepts_delivery !== false;
+    }
+    if ("accepts_pickup" in sanitized) {
+      row.accepts_pickup = sanitized.accepts_pickup !== false;
+    }
     if ("deal_expires_at" in sanitized) {
       const raw = sanitized.deal_expires_at;
       if (raw == null || raw === "") {
@@ -1212,6 +1218,46 @@ export async function bulkUpdateAvailability(
     logError(err, {
       module: "productService.bulkUpdateAvailability",
       meta: { productIds, isAvailable },
+    });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
+ * Bulk pause/resume delivery or pickup for many products at once.
+ * Does not change `is_available` — the item stays sellable on other channels.
+ */
+export async function bulkUpdateFulfillment(
+  productIds: string[],
+  patch: { accepts_delivery?: boolean; accepts_pickup?: boolean },
+): Promise<ServiceResult<null>> {
+  const supabase = createClient();
+  if (productIds.length === 0) {
+    return { success: false, error: "No products selected." };
+  }
+  const update: Record<string, boolean> = {};
+  if (typeof patch.accepts_delivery === "boolean") {
+    update.accepts_delivery = patch.accepts_delivery;
+  }
+  if (typeof patch.accepts_pickup === "boolean") {
+    update.accepts_pickup = patch.accepts_pickup;
+  }
+  if (Object.keys(update).length === 0) {
+    return { success: false, error: "Nothing to update." };
+  }
+
+  try {
+    const { error } = await supabase
+      .from("products")
+      .update(update)
+      .in("id", productIds);
+
+    if (error) throw error;
+    return { success: true, data: null };
+  } catch (err) {
+    logError(err, {
+      module: "productService.bulkUpdateFulfillment",
+      meta: { productIds, patch },
     });
     return { success: false, error: toError(err) };
   }

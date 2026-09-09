@@ -490,6 +490,18 @@ export default function DealManager({ shopId, compact = false, onChanged }: Deal
                   <button
                     type="button"
                     onClick={async () => {
+                      const next = deal.accepts_delivery === false;
+                      await updateShopDeal(deal.id, { accepts_delivery: next });
+                      await load();
+                      notify();
+                    }}
+                    className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-950/40"
+                  >
+                    {deal.accepts_delivery === false ? "Enable delivery" : "Pause delivery"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
                       await deleteShopDeal(deal.id);
                       await load();
                       notify();

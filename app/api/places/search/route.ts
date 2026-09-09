@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidCoordinate } from "@/lib/geoCoords";
 import { getPublicAppUrl } from "@/lib/appUrl";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 
 export const runtime = "edge";
 
@@ -306,6 +307,12 @@ async function searchNominatim(
 }
 
 export async function GET(req: NextRequest) {
+  const limited = checkRateLimit(req, { ...RATE_LIMITS.PLACES, name: "places-search" });
+  if (!limited.allowed) {
+    const res = buildRateLimitResponse(limited);
+    return NextResponse.json(res.body, { status: res.status, headers: res.headers });
+  }
+
   const q = (req.nextUrl.searchParams.get("q") || "").trim();
   if (q.length < 2) {
     return NextResponse.json({ results: [], provider: null });

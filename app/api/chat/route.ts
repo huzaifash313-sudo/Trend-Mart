@@ -1,11 +1,27 @@
 /* Legacy alias — storefront ChatWidget may still call POST /api/chat */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isPromptInjection, sanitizeChatString, sanitizeUserMessage } from "@/lib/ai/sanitize";
 import { runAssistant } from "@/lib/ai/assistantEngine";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = checkRateLimit(request, { ...RATE_LIMITS.AI, name: "chat" });
+  if (!limited.allowed) {
+    const res = buildRateLimitResponse(limited);
+    return NextResponse.json(
+      {
+        reply:
+          typeof res.body.message === "string"
+            ? res.body.message
+            : "Too many requests. Please wait a moment.",
+        error: "rate_limited",
+      },
+      { status: res.status, headers: res.headers },
+    );
+  }
+
   let body: { message?: string; shopId?: string; sessionId?: string };
 
   try {

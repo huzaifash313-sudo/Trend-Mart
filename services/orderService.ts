@@ -6,8 +6,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
-import { getShopHoursSummary } from "@/lib/shopHours";
-import { getDistanceToShop } from "@/services/geoRadiusService";
 import type { Order, OrderItem, OrderType, ProductVariant, VariantGroup } from "@/types";
 
 type ServiceResult<T> =
@@ -390,474 +388,48 @@ export async function verifyVariantStock(
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Atomic Order Placement with Stock Deduction                                 */
+/*  Atomic Order Placement (server-authoritative)                               */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Place an order with atomic stock deduction.
+ * Place an order with stock deduction via POST /api/orders.
  *
- * This function performs the following steps within a logical transaction:
- *
- *  1. **Verify stock** — re-checks all variant stock levels against
- *     requested quantities (prevents TOCTOU race conditions).
- *  2. **Deduct stock** — decrements variant stock counts on the product
- *     record. Uses optimistic concurrency via `updated_at` version check.
- *  3. **Create order** — inserts the order record with complete metadata
- *     (items, customer info, coupon, discount, notes).
- *  4. **Rollback on failure** — if any step fails, restores stock levels
- *     and returns a descriptive error.
- *
- * Race condition prevention:
- *  - Sequential re-verification of stock before deduction
- *  - Optimistic concurrency: stock deduction only proceeds if the product
- *    hasn't been modified since we read it
- *  - Retry up to 3 times on version mismatch
+ * SECURITY: Client-side inserts into `orders` are disabled. This wrapper
+ * keeps any legacy callers on the secure server path (re-priced totals,
+ * service-role insert, email verification gate).
  */
 export async function placeOrderAtomic(
   params: PlaceOrderParams,
 ): Promise<ServiceResult<OrderResult>> {
-  const supabase = createClient();
-  const MAX_RETRIES = 3;
+  const result = await placeOrderOnServer({
+    shopId: params.shopId,
+    customerName: params.customerName,
+    customerPhone: params.customerPhone,
+    couponCode: params.couponCode,
+    notes: params.notes,
+    customerLat: params.customerLat,
+    customerLng: params.customerLng,
+    items: params.items.map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      price: item.price,
+      quantity: Math.max(1, Math.min(99, Math.round(item.quantity ?? 1))),
+      variant: item.variant,
+      notes: item.notes,
+    })),
+  });
 
-  // Soft server-side shop rules (live, hours, radius, min order) before stock work.
-  try {
-    const { data: shopRow, error: shopErr } = await supabase
-      .from("shops")
-      .select(
-        "id, name, is_live, min_order_amount, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, business_hours, operating_status",
-      )
-      .eq("id", params.shopId)
-      .maybeSingle();
-
-    if (shopErr) throw shopErr;
-    if (!shopRow) {
-      return { success: false, error: "Shop not found." };
-    }
-    if (shopRow.is_live === false) {
-      return {
-        success: false,
-        error: "This shop is currently offline and cannot accept orders.",
-      };
-    }
-
-    const hours = getShopHoursSummary({
-      business_hours: shopRow.business_hours as string | null,
-      operating_status: shopRow.operating_status as string | null,
-    });
-    if (hours.state === "closed") {
-      return {
-        success: false,
-        error: `This shop is closed right now (${hours.hoursText}). Try again during open hours.`,
-      };
-    }
-
-    const radiusKm = Number(shopRow.service_radius_km ?? 0);
-    const zones = Array.isArray(shopRow.delivery_zones)
-      ? (shopRow.delivery_zones as string[])
-      : [];
-    const isNationwide = zones.some((z) => /pakistan|nationwide|all/i.test(String(z)));
-    if (
-      !isNationwide &&
-      radiusKm > 0 &&
-      params.customerLat != null &&
-      params.customerLng != null &&
-      Number.isFinite(params.customerLat) &&
-      Number.isFinite(params.customerLng)
-    ) {
-      const dist = getDistanceToShop(
-        {
-          id: String(shopRow.id),
-          name: String(shopRow.name ?? ""),
-          category: "",
-          location: "",
-          whatsapp_number: "",
-          is_live: true,
-          latitude: shopRow.latitude as number | null,
-          longitude: shopRow.longitude as number | null,
-          service_radius_km: radiusKm,
-        },
-        params.customerLat,
-        params.customerLng,
-      );
-      if (dist != null && dist > radiusKm) {
-        return {
-          success: false,
-          error: `You are about ${dist.toFixed(1)} km away — this shop only delivers within ${radiusKm} km.`,
-        };
-      }
-    }
-
-    const lineSubtotal = params.items.reduce(
-      (sum, item) => sum + item.price * Math.max(1, item.quantity ?? 1),
-      0,
-    );
-    const discountedSubtotal = Math.max(
-      0,
-      lineSubtotal - Math.max(0, params.discountAmount ?? 0),
-    );
-    const minOrder = Number(shopRow.min_order_amount ?? 0);
-    if (minOrder > 0 && discountedSubtotal < minOrder) {
-      return {
-        success: false,
-        error: `Minimum order for this shop is Rs. ${minOrder.toLocaleString()}. Current subtotal is Rs. ${Math.round(discountedSubtotal).toLocaleString()}.`,
-      };
-    }
-  } catch (err) {
-    logError(err, {
-      module: "orderService.placeOrderAtomic.shopGate",
-      meta: { shopId: params.shopId },
-    });
-    // Continue — stock checks still protect inventory; do not soft-fail checkout on gate read errors.
-  }
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      // ── Phase 1: Re-verify stock for all items ─────────────────────────
-      const stockVerification = await verifyVariantStock(
-        params.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity ?? 1,
-          variant: item.variant,
-          variantGroup: item.variantGroup,
-        })),
-      );
-
-      if (!stockVerification.success) {
-        return { success: false, error: stockVerification.error };
-      }
-
-      const outOfStock = stockVerification.data.filter((c) => !c.inStock);
-      if (outOfStock.length > 0) {
-        const names = outOfStock
-          .map(
-            (c) =>
-              `${c.productName}${c.variantLabel !== "default" ? ` (${c.variantLabel})` : ""}`,
-          )
-          .join(", ");
-        return {
-          success: false,
-          error: `Insufficient stock for: ${names}. Please adjust quantities.`,
-        };
-      }
-
-      // ── Phase 2: Deduct stock atomically per product ───────────────────
-      const stockDeductions: VariantStockCheck[] = [];
-      const productUpdates: Array<{
-        id: string;
-        variants: VariantGroup[];
-        /** Pre-deduction snapshot for rollback if order insert fails. */
-        previousVariants: VariantGroup[];
-        currentVersion?: string;
-      }> = [];
-
-      // Group items by product ID
-      const productGroups = new Map<
-        string,
-        Array<{
-          variant?: string;
-          variantGroup?: string;
-          quantity: number;
-        }>
-      >();
-
-      for (const item of params.items) {
-        const qty = item.quantity ?? 1;
-        const existing = productGroups.get(item.productId) ?? [];
-        existing.push({
-          variant: item.variant,
-          variantGroup: item.variantGroup,
-          quantity: qty,
-        });
-        productGroups.set(item.productId, existing);
-      }
-
-      // Fetch current product data to get latest variants and updated_at
-      for (const [productId, deductions] of productGroups.entries()) {
-        if (!productId) continue;
-
-        const { data: product, error } = await supabase
-          .from("products")
-          .select("id, variants, updated_at")
-          .eq("id", productId)
-          .single();
-
-        if (error || !product) {
-          return {
-            success: false,
-            error: `Product ${productId} not found during stock deduction.`,
-          };
-        }
-
-        const currentVariants: VariantGroup[] =
-          (product.variants as VariantGroup[]) ?? [];
-        const previousVariants = cloneVariants(currentVariants);
-        const updatedVariants = cloneVariants(currentVariants);
-
-        let deductionFailed = false;
-        let didChangeStock = false;
-
-        for (const ded of deductions) {
-          if (ded.variant && currentVariants.length > 0) {
-            const matched = resolveVariantsForItem(
-              updatedVariants,
-              ded.variant,
-              ded.variantGroup,
-            );
-            // Unmapped / untracked options — nothing to deduct.
-            const tracked = matched.filter((v) => isTrackedStock(v.stock));
-            if (tracked.length === 0) continue;
-
-            for (const variant of tracked) {
-              if ((variant.stock as number) < ded.quantity) {
-                deductionFailed = true;
-                break;
-              }
-              variant.stock = (variant.stock as number) - ded.quantity;
-              didChangeStock = true;
-              const threshold = variant.low_stock_threshold ?? 5;
-              if (variant.stock <= threshold) {
-                stockDeductions.push({
-                  productId,
-                  productName: "",
-                  variantLabel: ded.variant,
-                  requested: ded.quantity,
-                  available: variant.stock,
-                  inStock: true,
-                });
-              }
-            }
-            if (deductionFailed) break;
-          } else if (currentVariants.length > 0) {
-            // Deduct only when some option tracks stock; otherwise unlimited.
-            const anyTracked = updatedVariants.some((g) =>
-              g.options.some((o) => isTrackedStock(o.stock)),
-            );
-            if (!anyTracked) continue;
-
-            let deducted = false;
-            for (const group of updatedVariants) {
-              for (const opt of group.options) {
-                if (opt.is_available === false) continue;
-                if (!isTrackedStock(opt.stock)) continue;
-                if (opt.stock >= ded.quantity) {
-                  opt.stock = opt.stock - ded.quantity;
-                  didChangeStock = true;
-                  const threshold = opt.low_stock_threshold ?? 5;
-                  if (opt.stock <= threshold) {
-                    stockDeductions.push({
-                      productId,
-                      productName: "",
-                      variantLabel: opt.label,
-                      requested: ded.quantity,
-                      available: opt.stock,
-                      inStock: true,
-                    });
-                  }
-                  deducted = true;
-                  break;
-                }
-              }
-              if (deducted) break;
-            }
-            if (!deducted) {
-              deductionFailed = true;
-              break;
-            }
-          }
-        }
-
-        if (deductionFailed) {
-          return {
-            success: false,
-            error:
-              "Stock changed during checkout. Please review and try again.",
-          };
-        }
-
-        if (didChangeStock) {
-          productUpdates.push({
-            id: productId,
-            variants: updatedVariants,
-            previousVariants,
-            currentVersion: (product as Record<string, unknown>)
-              .updated_at as string | undefined,
-          });
-        }
-      }
-
-      // ── Phase 3: Best-effort stock write
-      // Customers are blocked by products_owner_update RLS — never fail the order for that.
-      for (const update of productUpdates) {
-        const updatePayload: Record<string, unknown> = {
-          variants: update.variants,
-        };
-
-        let query = supabase.from("products").update(updatePayload).eq(
-          "id",
-          update.id,
-        );
-        if (update.currentVersion) {
-          query = query.eq("updated_at", update.currentVersion);
-        }
-
-        let { data: updatedRows, error: updateError } = await query.select("id");
-
-        if (updateError) {
-          console.warn(
-            "[placeOrderAtomic] Stock update skipped:",
-            update.id,
-            updateError.message,
-          );
-          continue;
-        }
-
-        // Version drift: one loose retry, then give up on stock (order still proceeds).
-        if ((!updatedRows || updatedRows.length === 0) && update.currentVersion) {
-          ({ data: updatedRows, error: updateError } = await supabase
-            .from("products")
-            .update(updatePayload)
-            .eq("id", update.id)
-            .select("id"));
-
-          if (updateError || !updatedRows?.length) {
-            console.warn(
-              "[placeOrderAtomic] Stock write skipped (RLS or race); placing order anyway:",
-              update.id,
-            );
-          }
-        }
-      }
-
-      // ── Phase 4: Create the order record ───────────────────────────────
-      const totalAmount = params.items.reduce(
-        (sum, i) => sum + (i.price * (i.quantity ?? 1)),
-        0,
-      );
-      const discount = params.discountAmount ?? 0;
-      const deliveryFee = params.deliveryFee ?? 0;
-      const finalAmount = Math.max(0, totalAmount - discount + deliveryFee);
-
-      const orderItems: OrderItem[] = params.items.map((item) => ({
-        product_id: item.productId,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity ?? 1,
-        variant: item.variant,
-        ...(item.notes ? { notes: item.notes } : {}),
-      }));
-
-      const customerPhone =
-        normalizePkPhoneDigits(params.customerPhone) ||
-        params.customerPhone.replace(/\D/g, "");
-
-      const {
-        data: { user: buyer },
-      } = await supabase.auth.getUser();
-
-      const orderPayload: Record<string, unknown> = {
-        shop_id: params.shopId,
-        customer_name: params.customerName.trim(),
-        customer_phone: customerPhone,
-        items_json: orderItems,
-        total_amount: finalAmount,
-        subtotal_amount: totalAmount,
-        discount_amount: discount,
-        delivery_fee: deliveryFee,
-        order_type: "delivery",
-        status: "Pending",
-      };
-
-      if (buyer?.id) {
-        orderPayload.customer_user_id = buyer.id;
-      }
-
-      if (params.notes?.trim()) {
-        orderPayload.notes = params.notes.trim().slice(0, 500);
-      }
-
-      let { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .insert(orderPayload)
-        .select()
-        .single();
-
-      // Older DBs may lack optional columns — strip and retry.
-      if (orderError && /customer_user_id/i.test(orderError.message || "")) {
-        delete orderPayload.customer_user_id;
-        ({ data: orderData, error: orderError } = await supabase
-          .from("orders")
-          .insert(orderPayload)
-          .select()
-          .single());
-      }
-      if (orderError && /\bnotes\b/i.test(orderError.message || "")) {
-        delete orderPayload.notes;
-        ({ data: orderData, error: orderError } = await supabase
-          .from("orders")
-          .insert(orderPayload)
-          .select()
-          .single());
-      }
-
-      if (orderError) {
-        // ── Phase 5: Rollback stock using pre-deduction snapshots ───────
-        for (const snap of productUpdates) {
-          await supabase
-            .from("products")
-            .update({ variants: snap.previousVariants })
-            .eq("id", snap.id);
-        }
-
-        throw new Error(
-          `Order creation failed: ${orderError.message}. Stock has been restored.`,
-        );
-      }
-
-      // ── Phase 6: Collect low-stock alerts ──────────────────────────────
-      const lowStockAlerts = stockDeductions.filter(
-        (d) => d.available <= 5,
-      );
-
-      const order = parseOrder(orderData as Record<string, unknown>);
-
-      // Best-effort: notify merchant (and customer if linked) via web push.
-      if (typeof window !== "undefined") {
-        void import("@/lib/pushClient")
-          .then(({ notifyOrderPush }) =>
-            notifyOrderPush({
-              orderId: order.id,
-              shopId: params.shopId,
-              status: order.status || "Pending",
-              event: "new",
-            }),
-          )
-          .catch(() => undefined);
-      }
-
-      return {
-        success: true,
-        data: {
-          order,
-          stockDeductions,
-          lowStockAlerts,
-        },
-      };
-    } catch (err) {
-      const msg = toError(err);
-      // If it's a retry signal, continue to next attempt
-      if (msg === "RETRY_VERSION_MISMATCH") continue;
-
-      logError(err, {
-        module: "orderService.placeOrderAtomic",
-        meta: { params, attempt },
-      });
-      return { success: false, error: msg };
-    }
+  if (!result.success) {
+    return { success: false, error: result.error };
   }
 
   return {
-    success: false,
-    error: "Failed to complete order after multiple attempts. Please try again.",
+    success: true,
+    data: {
+      order: result.data,
+      stockDeductions: [],
+      lowStockAlerts: [],
+    },
   };
 }
 

@@ -27,6 +27,10 @@ export interface ShopDeal {
   price?: number | null;
   /** Strike-through original price when higher than `price`. */
   original_price?: number | null;
+  /** When false, deal cannot be ordered for home delivery. Default true. */
+  accepts_delivery?: boolean | null;
+  /** When false, deal cannot be ordered for self-pickup. Default true. */
+  accepts_pickup?: boolean | null;
   /** Linked product's sub-category id (drives category drill-down on /deals). */
   sub_category_id?: string | null;
   created_at: string;

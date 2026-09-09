@@ -88,6 +88,11 @@ export interface Shop {
   accepts_delivery?: boolean | null;
   accepts_pickup?: boolean | null;
   /**
+   * Restaurant QR dine-in kill switch. When false, `/api/dinein/orders`
+   * rejects new table orders even if individual tables stay listed.
+   */
+  accepts_dine_in?: boolean | null;
+  /**
    * Monetization tier. `'free'` (default) allows effectively-unlimited active
    * stories; `'pro'` raises the ceiling higher. No payments are wired yet —
    * an admin flips this flag (future: set automatically by the payment gateway).
@@ -173,6 +178,8 @@ export interface ShopFormData {
   accepts_delivery: boolean;
   /** Accept self-pickup orders at checkout (false hides Pickup). Default true. */
   accepts_pickup: boolean;
+  /** Restaurant QR dine-in. When false, table ordering is paused shop-wide. */
+  accepts_dine_in: boolean;
 }
 
 // ─── Order Status Lifecycle (Prompt 4) ───────────────────────────────────────
@@ -379,6 +386,16 @@ export interface Product {
   /** JSON array of image URLs for product gallery */
   images?: string[] | null;
   is_available: boolean;
+  /**
+   * When false, this SKU cannot be ordered for home delivery
+   * (pickup / dine-in may still work). Defaults to true.
+   */
+  accepts_delivery?: boolean | null;
+  /**
+   * When false, this SKU cannot be ordered for self-pickup.
+   * Defaults to true.
+   */
+  accepts_pickup?: boolean | null;
   /** Stock status: in_stock, low_stock, out_of_stock, pre_order */
   stock_status?: string;
   /** Merchant pin-to-top flag — pinned items sort first in the storefront. */
@@ -466,6 +483,10 @@ export interface ProductFormData {
   image_url: string;
   images?: string[] | null;
   is_available: boolean;
+  /** When false, product cannot be ordered for home delivery. Default true. */
+  accepts_delivery?: boolean;
+  /** When false, product cannot be ordered for self-pickup. Default true. */
+  accepts_pickup?: boolean;
   stock_status?: string;
   /** FK to main category string */
   category_id?: string | null;
@@ -1081,7 +1102,8 @@ export type PromoAdPlacement =
 export type AdPlacementChoice = PromoAdPlacement | "all_pages";
 
 export const AD_PLACEMENT_OPTIONS: { value: AdPlacementChoice; label: string }[] = [
-  { value: "homepage_top", label: "Home page" },
+  { value: "homepage_top", label: "Home page (top)" },
+  { value: "homepage_feed", label: "Home page (feed)" },
   { value: "store_top", label: "Store page" },
   { value: "deals_top", label: "Deals page" },
   { value: "products_top", label: "Products page" },

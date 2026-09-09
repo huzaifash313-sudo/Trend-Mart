@@ -121,10 +121,17 @@ export async function POST(request: Request) {
 
   const { data: shopRaw, error: shopErr } = await admin
     .from("shops")
-    .select("id, owner_id, name, is_live, verification_status")
+    .select("id, owner_id, name, is_live, verification_status, accepts_dine_in")
     .eq("id", table.shop_id)
     .maybeSingle();
-  const shop = shopRaw as { id: string; owner_id: string | null; name: string | null; is_live: boolean; verification_status: string | null } | null;
+  const shop = shopRaw as {
+    id: string;
+    owner_id: string | null;
+    name: string | null;
+    is_live: boolean;
+    verification_status: string | null;
+    accepts_dine_in?: boolean | null;
+  } | null;
   if (shopErr || !shop) {
     return NextResponse.json({ success: false, error: "Shop not found." }, { status: 404 });
   }
@@ -133,6 +140,12 @@ export async function POST(request: Request) {
   }
   if ((shop.verification_status ?? "approved") !== "approved") {
     return NextResponse.json({ success: false, error: "This shop is not accepting orders yet." }, { status: 409 });
+  }
+  if (shop.accepts_dine_in === false) {
+    return NextResponse.json(
+      { success: false, error: "Dine-in ordering is paused right now. Please ask staff for help." },
+      { status: 409 },
+    );
   }
 
   // ── Staff security: "staff" orders must be placed by the shop owner or a

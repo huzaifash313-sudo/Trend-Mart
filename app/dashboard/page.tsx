@@ -251,6 +251,27 @@ export default function DashboardOverviewPage() {
     return () => {
       cancelled = true;
     };
+      }, [activeShopId]);
+
+  /* Live order board on the overview — pending count updates without refresh. */
+  useEffect(() => {
+    if (!activeShopId) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    void import("@/lib/supabase/realtime").then(({ subscribeToOrders }) => {
+      if (cancelled) return;
+      unsub = subscribeToOrders(activeShopId, async () => {
+        const orderResult = await fetchOrdersByShopId(activeShopId);
+        if (!cancelled && orderResult.success) setOrders(orderResult.data);
+      }, async () => {
+        const orderResult = await fetchOrdersByShopId(activeShopId);
+        if (!cancelled && orderResult.success) setOrders(orderResult.data);
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, [activeShopId]);
 
   const selectShop = useCallback((id: string) => {

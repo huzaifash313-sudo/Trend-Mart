@@ -45,19 +45,28 @@ function authDebug(message: string, data?: Record<string, unknown>): void {
 
 // ─── Rate Limiting (Edge-Safe Distributed with In-Memory Fallback) ───────────
 
-const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_MAX = 80;
 const RATE_LIMIT_WINDOW_MS = 15_000;
 
+/** Auth / admin entry points — tighter than general API browse. */
 const SENSITIVE_PATH_PATTERNS = [
-  "/api/",
+  "/api/auth/",
   "/auth/",
-  "/dashboard/",
   "/admin/",
   "/login",
   "/signup",
 ] as const;
 
-const SENSITIVE_RATE_LIMIT_MAX = 10;
+const SENSITIVE_RATE_LIMIT_MAX = 20;
+
+/** Billable / generative API paths — separate mid-tier cap. */
+const COSTLY_API_PATTERNS = [
+  "/api/places/",
+  "/api/ai-assistant",
+  "/api/chat",
+] as const;
+
+const COSTLY_API_RATE_LIMIT_MAX = 25;
 
 /**
  * Edge-safe rate limit check.
@@ -71,17 +80,23 @@ const SENSITIVE_RATE_LIMIT_MAX = 10;
  */
 async function checkRateLimit(request: NextRequest): Promise<boolean> {
   const limiter = getDistributedRateLimiter();
-  // Sensitive paths (auth/admin/dashboard/api) get a tighter cap than the
-  // general browse default. Previously the 10-cap was computed for the header
-  // but never actually enforced — every path silently used 30.
   const pathname = request.nextUrl.pathname;
   const isSensitive = SENSITIVE_PATH_PATTERNS.some((p) => pathname.startsWith(p));
-  const maxRequests = isSensitive ? SENSITIVE_RATE_LIMIT_MAX : RATE_LIMIT_MAX;
+  const isCostly = COSTLY_API_PATTERNS.some((p) => pathname.startsWith(p));
+  const maxRequests = isSensitive
+    ? SENSITIVE_RATE_LIMIT_MAX
+    : isCostly
+      ? COSTLY_API_RATE_LIMIT_MAX
+      : RATE_LIMIT_MAX;
   try {
     const result = await limiter.checkRateLimit(request, {
       maxRequests,
       windowMs: RATE_LIMIT_WINDOW_MS,
-      name: isSensitive ? "middleware-sensitive" : "middleware-global",
+      name: isSensitive
+        ? "middleware-sensitive"
+        : isCostly
+          ? "middleware-costly"
+          : "middleware-global",
     });
     return result.allowed;
   } catch {
@@ -791,7 +806,9 @@ export async function middleware(request: NextRequest) {
             "X-RateLimit-Limit": String(
               SENSITIVE_PATH_PATTERNS.some((p) => pathname.startsWith(p))
                 ? SENSITIVE_RATE_LIMIT_MAX
-                : RATE_LIMIT_MAX,
+                : COSTLY_API_PATTERNS.some((p) => pathname.startsWith(p))
+                  ? COSTLY_API_RATE_LIMIT_MAX
+                  : RATE_LIMIT_MAX,
             ),
           },
         },

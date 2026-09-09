@@ -92,11 +92,6 @@ export async function signInWithEmail(
       needsVerification?: boolean;
       role?: AuthRole | "admin";
       user?: User;
-      session?: {
-        access_token: string;
-        refresh_token: string;
-        expires_at?: number;
-      };
       lockout?: AuthLockoutInfo;
     };
 
@@ -109,27 +104,31 @@ export async function signInWithEmail(
       };
     }
 
-    // Sync browser client with tokens from the server (cookies alone can lag).
-    if (jsonBody.session?.access_token && jsonBody.session?.refresh_token) {
-      const { error: sessionError } = await withTimeout(
-        supabase.auth.setSession({
-          access_token: jsonBody.session.access_token,
-          refresh_token: jsonBody.session.refresh_token,
-        }),
-        SESSION_SYNC_TIMEOUT_MS,
-        () => ({
-          data: { user: null, session: null },
-          error: {
-            message: "Session sync timed out. Please try again.",
-          } as AuthError,
-        }),
-      );
-      if (sessionError) {
-        return {
-          success: false,
-          error: mapSupabaseError(sessionError.message),
-        };
-      }
+    // Session cookies from the API are for middleware/SSR. The browser
+    // Supabase client needs its own session — establish it with the same
+    // credentials (already validated + lockout-checked by the server). Never
+    // accept JWTs from the JSON body (XSS / proxy / log leak).
+    const { data: synced, error: sessionError } = await withTimeout(
+      supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      }),
+      SESSION_SYNC_TIMEOUT_MS,
+      () => ({
+        data: { user: null, session: null },
+        error: {
+          message: "Session sync timed out. Please try again.",
+        } as AuthError,
+      }),
+    );
+    if (sessionError || !synced.user) {
+      return {
+        success: false,
+        error: mapSupabaseError(
+          sessionError?.message ??
+            "Signed in on the server, but the browser session could not sync. Please try again.",
+        ),
+      };
     }
 
     // Server is authoritative for verification — don't block a verified sign-in

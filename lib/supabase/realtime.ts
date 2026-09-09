@@ -730,6 +730,41 @@ export function subscribeToAnalytics(
   return () => unsubscribe(channelKey);
 }
 
+/**
+ * Live ad stats for the merchant ads dashboard — updates when
+ * impression_count / click_count / status change on their rows.
+ */
+export function subscribeToShopAds(
+  shopId: string,
+  onChange: RealtimeCallback<Record<string, unknown>>,
+): () => void {
+  const supabase = createClient();
+  const channelKey = uniqueKey(`shop-ads-${shopId}`);
+
+  const channel = supabase
+    .channel(channelKey)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "promotional_ads",
+        filter: `shop_id=eq.${shopId}`,
+      },
+      (payload) => {
+        onChange(payload as RealtimePostgresChangesPayload<Record<string, unknown>>);
+      },
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        notifyStateChange("connected", channelKey);
+      }
+    });
+
+  activeChannels.set(channelKey, channel);
+  return () => unsubscribe(channelKey);
+}
+
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
 /** Unsubscribe and remove a specific channel. */

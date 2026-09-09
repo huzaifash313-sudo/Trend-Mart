@@ -13,6 +13,7 @@ import { findAuthUserByEmail, issueAndSendOtp } from "@/lib/authOtpServer";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 import { resendCooldownRemainingMs } from "@/lib/otp";
+import { clientIpFromHeaders } from "@/lib/loginLockout";
 
 export const runtime = "nodejs";
 
@@ -27,9 +28,23 @@ function json(status: number, body: Record<string, unknown>) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = checkRateLimit(request, { ...RATE_LIMITS.AUTH, name: "auth-resend-otp" });
+  const limited = checkRateLimit(request, {
+    ...RATE_LIMITS.OTP_RESEND,
+    name: "auth-resend-otp",
+  });
   if (!limited.allowed) {
     const res = buildRateLimitResponse(limited);
+    return NextResponse.json(res.body, { status: res.status, headers: res.headers });
+  }
+
+  // Secondary IP bucket — stops one IP hammering many emails.
+  const ipLimited = checkRateLimit(request, {
+    maxRequests: 10,
+    windowMs: 15 * 60_000,
+    name: `auth-resend-otp-ip:${clientIpFromHeaders(request.headers)}`,
+  });
+  if (!ipLimited.allowed) {
+    const res = buildRateLimitResponse(ipLimited);
     return NextResponse.json(res.body, { status: res.status, headers: res.headers });
   }
 
@@ -73,10 +88,8 @@ export async function POST(request: NextRequest) {
   if (!userId) {
     const user = await findAuthUserByEmail(admin, email);
     if (!user) {
-      return json(400, {
-        success: false,
-        error: "No account found for this email. Please sign up first.",
-      });
+      // Anti-enumeration: same shape as success so attackers cannot probe inboxes.
+      return json(200, { success: true });
     }
     if (user.email_confirmed_at) {
       return json(400, {

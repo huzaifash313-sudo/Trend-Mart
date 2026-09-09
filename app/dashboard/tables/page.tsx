@@ -25,6 +25,7 @@ import {
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import OrderBillModal from "@/components/OrderBillModal";
+import ToggleSwitch from "@/components/ToggleSwitch";
 import { isDineInCategory } from "@/types";
 import type { DineInTable, Order, Shop } from "@/types";
 
@@ -481,11 +482,47 @@ export default function MerchantTablesPage() {
             </Link>
             <Link
               href="/dashboard/kitchen"
-              className="min-h-11 flex-1 rounded-xl bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white sm:flex-none"
+              className="min-h-11 flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-emerald-700 sm:flex-none"
             >
-              Kitchen board
+              Open kitchen
             </Link>
           </div>
+        </div>
+
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+              Accept dine-in orders
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {shop.accepts_dine_in === false
+                ? "Paused — all table QR codes reject new orders"
+                : "Live — customers can order from any active table QR"}
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={shop.accepts_dine_in !== false}
+            onChange={async (v) => {
+              const prev = shop.accepts_dine_in;
+              setShop({ ...shop, accepts_dine_in: v });
+              try {
+                const supabase = createClient();
+                const { error } = await supabase
+                  .from("shops")
+                  .update({ accepts_dine_in: v })
+                  .eq("id", shop.id);
+                if (error) throw error;
+                addToast(v ? "Dine-in orders are live." : "Dine-in ordering paused.", "success");
+              } catch (err) {
+                setShop({ ...shop, accepts_dine_in: prev });
+                addToast(
+                  err instanceof Error ? err.message : "Could not update dine-in setting.",
+                  "error",
+                );
+              }
+            }}
+            label="Accept dine-in orders"
+          />
         </div>
 
         {/* Today's stats strip */}

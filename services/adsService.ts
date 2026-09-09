@@ -46,7 +46,7 @@ function sanitizeAdForm(form: PromotionalAdFormData) {
     link_url: sanitizeAdLink(form.link_url) || "/",
     badge_label: form.badge_label ? sanitizeText(form.badge_label).slice(0, 24) : null,
     placement: (
-      ["homepage_feed", "store_top", "deals_top", "products_top"].includes(form.placement)
+      ["homepage_feed", "store_top", "deals_top", "products_top", "homepage_top"].includes(form.placement)
         ? form.placement
         : "homepage_top"
     ) as PromoAdPlacement,
@@ -58,6 +58,7 @@ function sanitizeAdForm(form: PromotionalAdFormData) {
 /** All merchant-facing storefront pages (used by "All pages" bulk request). */
 export const PAGE_AD_PLACEMENTS: PromoAdPlacement[] = [
   "homepage_top",
+  "homepage_feed",
   "store_top",
   "deals_top",
   "products_top",
@@ -111,20 +112,27 @@ export async function fetchActiveAds(
   }
 }
 
-/** Best-effort impression ping — never throws, safe to fire on render. */
+/** Best-effort impression ping — never throws, safe to fire on view. */
 export async function pingAdImpression(adId: string): Promise<void> {
+  if (!adId || adId.startsWith("f0000001-")) return;
   try {
     const supabase = createClient();
     await supabase.rpc("increment_ad_impression", { p_ad_id: adId });
-  } catch { /* analytics only — never block the UI */ }
+  } catch {
+    /* analytics only — never block the UI */
+  }
 }
 
-/** Best-effort click ping — never throws, safe to fire before navigation. */
+/** Best-effort click ping — uses keepalive fetch when possible so navigation doesn't drop it. */
 export async function pingAdClick(adId: string): Promise<void> {
+  if (!adId || adId.startsWith("f0000001-")) return;
   try {
     const supabase = createClient();
-    await supabase.rpc("increment_ad_click", { p_ad_id: adId });
-  } catch { /* analytics only — never block the UI */ }
+    // Fire-and-forget; do not await navigation blockers.
+    void supabase.rpc("increment_ad_click", { p_ad_id: adId });
+  } catch {
+    /* analytics only */
+  }
 }
 
 /* -------------------------------------------------------------------------- */

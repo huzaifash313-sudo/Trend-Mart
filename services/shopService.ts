@@ -819,6 +819,7 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     free_delivery_areas: sanitizeFreeDeliveryAreas(form.free_delivery_areas),
     accepts_delivery: sanitizeDbBoolean(form.accepts_delivery ?? true),
     accepts_pickup: sanitizeDbBoolean(form.accepts_pickup ?? true),
+    accepts_dine_in: sanitizeDbBoolean(form.accepts_dine_in ?? true),
   };
 }
 

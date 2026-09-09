@@ -86,6 +86,8 @@ export interface UpdateShopDealInput {
   product_id?: string | null;
   price?: number | null;
   original_price?: number | null;
+  accepts_delivery?: boolean;
+  accepts_pickup?: boolean;
 }
 
 function parseImages(raw: unknown): string[] | null {
@@ -137,6 +139,8 @@ function parseDeal(row: Record<string, unknown>): ShopDeal {
     price: parseMoney(row.price) ?? (product ? parseMoney(product.price) : null),
     original_price:
       parseMoney(row.original_price) ?? (product ? parseMoney(product.original_price) : null),
+    accepts_delivery: row.accepts_delivery !== false,
+    accepts_pickup: row.accepts_pickup !== false,
     sub_category_id:
       product && product.sub_category_id ? String(product.sub_category_id) : null,
     created_at: String(row.created_at ?? ""),
@@ -164,7 +168,13 @@ function applyGalleryFields(
 
 function applyCommerceFields(
   payload: Record<string, unknown>,
-  input: { product_id?: string | null; price?: number | null; original_price?: number | null },
+  input: {
+    product_id?: string | null;
+    price?: number | null;
+    original_price?: number | null;
+    accepts_delivery?: boolean;
+    accepts_pickup?: boolean;
+  },
 ) {
   if (input.product_id !== undefined) {
     payload.product_id = input.product_id?.trim() || null;
@@ -176,6 +186,12 @@ function applyCommerceFields(
   if (input.original_price !== undefined) {
     const o = input.original_price == null ? null : Number(input.original_price);
     payload.original_price = o != null && Number.isFinite(o) && o >= 0 ? o : null;
+  }
+  if (input.accepts_delivery !== undefined) {
+    payload.accepts_delivery = input.accepts_delivery !== false;
+  }
+  if (input.accepts_pickup !== undefined) {
+    payload.accepts_pickup = input.accepts_pickup !== false;
   }
 }
 
@@ -530,8 +546,21 @@ export async function updateShopDeal(
 
     const stripLadder = [
       payload,
-      stripOptionalColumns(payload, ["product_id", "price", "original_price"]),
-      stripOptionalColumns(payload, ["product_id", "price", "original_price", "images"]),
+      stripOptionalColumns(payload, [
+        "product_id",
+        "price",
+        "original_price",
+        "accepts_delivery",
+        "accepts_pickup",
+      ]),
+      stripOptionalColumns(payload, [
+        "product_id",
+        "price",
+        "original_price",
+        "images",
+        "accepts_delivery",
+        "accepts_pickup",
+      ]),
       stripOptionalColumns(payload, [
         "product_id",
         "price",
@@ -539,6 +568,8 @@ export async function updateShopDeal(
         "images",
         "image_url",
         "badge_text",
+        "accepts_delivery",
+        "accepts_pickup",
       ]),
       // Last resort: only is_active / title / description / updated_at
       stripOptionalColumns(payload, [
@@ -549,6 +580,8 @@ export async function updateShopDeal(
         "image_url",
         "badge_text",
         "is_featured",
+        "accepts_delivery",
+        "accepts_pickup",
       ]),
     ];
 

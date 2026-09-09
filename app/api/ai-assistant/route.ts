@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   isPromptInjection,
@@ -9,6 +9,7 @@ import {
   runAssistant,
   type AssistantRole,
 } from "@/lib/ai/assistantEngine";
+import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 
 interface AiAssistantBody {
   message: string;
@@ -24,7 +25,22 @@ interface AiAssistantBody {
   location?: { lat: number; lng: number; label?: string };
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = checkRateLimit(request, { ...RATE_LIMITS.AI, name: "ai-assistant" });
+  if (!limited.allowed) {
+    const res = buildRateLimitResponse(limited);
+    return NextResponse.json(
+      {
+        reply:
+          typeof res.body.message === "string"
+            ? res.body.message
+            : "Too many requests. Please wait a moment.",
+        error: "rate_limited",
+      },
+      { status: res.status, headers: res.headers },
+    );
+  }
+
   let body: AiAssistantBody;
 
   try {

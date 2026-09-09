@@ -38,6 +38,7 @@ import {
   updateProduct,
   deleteProduct,
   bulkUpdateAvailability,
+  bulkUpdateFulfillment,
 } from "@/services/productService";
 import { fetchShops } from "@/services/shopService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
@@ -82,6 +83,10 @@ interface ProductFormState {
   dealExpiresAt: string;
   imageUrl: string;
   isAvailable: boolean;
+  /** When false, product is pickup/dine-in only (no home delivery). */
+  acceptsDelivery: boolean;
+  /** When false, product cannot be ordered for self-pickup. */
+  acceptsPickup: boolean;
   /** SKU prefix auto-generated from product name */
   skuPrefix: string;
   /** Multi-attribute variants */
@@ -106,6 +111,8 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   dealExpiresAt: "",
   imageUrl: "",
   isAvailable: true,
+  acceptsDelivery: true,
+  acceptsPickup: true,
   skuPrefix: "",
   variantGroups: [],
   priceTiers: [],
@@ -367,6 +374,8 @@ export default function ProductsDashboardPage() {
       image_url: gallery.image_url,
       images: gallery.images,
       is_available: form.isAvailable,
+      accepts_delivery: form.acceptsDelivery,
+      accepts_pickup: form.acceptsPickup,
       stock_status: form.isAvailable ? "in_stock" : "out_of_stock",
       // Availability toggle only — no numeric stock counts.
       variants: sanitizeVariantGroups(form.variantGroups),
@@ -419,6 +428,8 @@ export default function ProductsDashboardPage() {
       dealExpiresAt: product.deal_expires_at ?? "",
       imageUrl: gallery[0] ?? "",
       isAvailable: product.is_available,
+      acceptsDelivery: product.accepts_delivery !== false,
+      acceptsPickup: product.accepts_pickup !== false,
       skuPrefix: generateSkuPrefix(product.name),
       variantGroups: product.variants ?? [],
       priceTiers: product.price_tiers ?? [],
@@ -492,6 +503,39 @@ export default function ProductsDashboardPage() {
       setSelectedProductIds(new Set());
     } else {
       addToast(result.error ?? "Bulk update failed.", "error");
+    }
+    setBulkActionLoading(false);
+  }, [selectedProductIds, activeShopId, addToast]);
+
+  const handleBulkPauseDelivery = useCallback(async () => {
+    if (selectedProductIds.size === 0) return;
+    if (!(await confirm(`Pause delivery for ${selectedProductIds.size} product(s)? They stay sellable via pickup.`))) return;
+    setBulkActionLoading(true);
+    const result = await bulkUpdateFulfillment([...selectedProductIds], { accepts_delivery: false });
+    if (result.success) {
+      addToast(`Delivery paused for ${selectedProductIds.size} product(s).`, "success");
+      emitProductsChanged();
+      const refreshed = await fetchProductsByShopId(activeShopId!);
+      if (refreshed.success) setProducts(refreshed.data);
+      setSelectedProductIds(new Set());
+    } else {
+      addToast(result.error ?? "Could not update delivery settings.", "error");
+    }
+    setBulkActionLoading(false);
+  }, [selectedProductIds, activeShopId, addToast, confirm]);
+
+  const handleBulkEnableDelivery = useCallback(async () => {
+    if (selectedProductIds.size === 0) return;
+    setBulkActionLoading(true);
+    const result = await bulkUpdateFulfillment([...selectedProductIds], { accepts_delivery: true });
+    if (result.success) {
+      addToast(`Delivery enabled for ${selectedProductIds.size} product(s).`, "success");
+      emitProductsChanged();
+      const refreshed = await fetchProductsByShopId(activeShopId!);
+      if (refreshed.success) setProducts(refreshed.data);
+      setSelectedProductIds(new Set());
+    } else {
+      addToast(result.error ?? "Could not update delivery settings.", "error");
     }
     setBulkActionLoading(false);
   }, [selectedProductIds, activeShopId, addToast]);
@@ -973,13 +1017,33 @@ export default function ProductsDashboardPage() {
               )}
 
               {/* Availability Toggle & Save */}
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <ToggleSwitch
                   checked={form.isAvailable}
                   onChange={() => setForm(f => ({ ...f, isAvailable: !f.isAvailable }))}
                   label="Toggle product availability"
                   visibleLabel="Available for ordering"
                 />
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={form.acceptsDelivery}
+                      onChange={() => setForm((f) => ({ ...f, acceptsDelivery: !f.acceptsDelivery }))}
+                      className="h-3.5 w-3.5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Delivery
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={form.acceptsPickup}
+                      onChange={() => setForm((f) => ({ ...f, acceptsPickup: !f.acceptsPickup }))}
+                      className="h-3.5 w-3.5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Pickup
+                  </label>
+                </div>
                 <div className="ml-auto flex gap-2">
                   {(editingProductId || showProductForm) && (
                     <button
@@ -1075,6 +1139,22 @@ export default function ProductsDashboardPage() {
                     className="rounded-lg bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200 disabled:opacity-50 dark:bg-amber-900/30 dark:text-amber-400"
                   >
                     Mark Out of Stock
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkPauseDelivery}
+                    disabled={bulkActionLoading}
+                    className="rounded-lg bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700 hover:bg-sky-200 disabled:opacity-50 dark:bg-sky-900/30 dark:text-sky-400"
+                  >
+                    Pause Delivery
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkEnableDelivery}
+                    disabled={bulkActionLoading}
+                    className="rounded-lg bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800 hover:bg-sky-200 disabled:opacity-50 dark:bg-sky-900/30 dark:text-sky-300"
+                  >
+                    Enable Delivery
                   </button>
                   <div className="flex items-center gap-1">
                     <input

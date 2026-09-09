@@ -84,6 +84,8 @@ function buildSignInSuccessResponse(
   const role = resolveRole(data.user);
   const needsVerification = !data.user.email_confirmed_at;
 
+  // SECURITY: never return access/refresh tokens in JSON — session lives in
+  // httpOnly cookies set below. Tokens in response bodies leak via XSS/logs.
   const response = NextResponse.json({
     success: true,
     needsVerification,
@@ -94,11 +96,6 @@ function buildSignInSuccessResponse(
       email_confirmed_at: data.user.email_confirmed_at,
       app_metadata: data.user.app_metadata,
       user_metadata: data.user.user_metadata,
-    },
-    session: {
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_at: data.session.expires_at,
     },
   });
 

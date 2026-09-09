@@ -56,6 +56,7 @@ function emptyShopForm(): ShopFormData {
     free_delivery_areas: [],
     accepts_delivery: true,
     accepts_pickup: true,
+    accepts_dine_in: true,
   };
 }
 

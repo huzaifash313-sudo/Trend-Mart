@@ -27,8 +27,17 @@ function clientIp(request: NextRequest): string {
 }
 
 function hashIp(ip: string): string {
-  const salt = process.env.REVIEW_IP_SALT || "trendsmart-review-ip";
-  return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
+  const salt =
+    process.env.REVIEW_IP_SALT?.trim() ||
+    process.env.OTP_HMAC_SECRET?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    "";
+  if (!salt && process.env.NODE_ENV === "production") {
+    console.warn("[reviews] REVIEW_IP_SALT is not configured");
+  }
+  return createHash("sha256")
+    .update(`${salt || "unconfigured-review-salt"}:${ip}`)
+    .digest("hex");
 }
 
 function sanitizeComment(comment: unknown): string {
