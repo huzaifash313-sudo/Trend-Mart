@@ -99,16 +99,40 @@ export async function reverseGeocodeServer(
   }
 }
 
-/** Loose city match: substring either way, case-insensitive. */
-export function citiesMatchLoose(a: string, b: string): boolean {
-  const x = a.trim().toLowerCase();
-  const y = b.trim().toLowerCase();
-  if (!x || !y) return false;
-  return x === y || x.includes(y) || y.includes(x);
+/** Normalize city for comparison (lowercase, strip punctuation / extra spaces). */
+function normalizeCityToken(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06ff\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
- * True when any reverse-geocode candidate matches the shop's target city.
+ * Strict-enough city match: exact, or one name is a whole-word prefix of the
+ * other (e.g. "Lahore" ↔ "Lahore City"). Avoids Gujrat ↔ Gujranwala substring bugs.
+ */
+export function citiesMatchLoose(a: string, b: string): boolean {
+  const x = normalizeCityToken(a);
+  const y = normalizeCityToken(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const xParts = x.split(" ");
+  const yParts = y.split(" ");
+  // Shared primary token of length >= 4 (e.g. "lahore" in "lahore cantt")
+  const primaryX = xParts[0] ?? "";
+  const primaryY = yParts[0] ?? "";
+  if (primaryX.length >= 4 && primaryX === primaryY) return true;
+  // Whole-word containment only (not character substring)
+  if (xParts.length === 1 && yParts.includes(x)) return true;
+  if (yParts.length === 1 && xParts.includes(y)) return true;
+  return false;
+}
+
+/**
+ * True when any reverse-geocode *city candidate* matches the shop's target city.
+ * Does not scan full displayName (too loose — streets/areas pollute the match).
  */
 export function pinMatchesCity(
   geo: ReverseGeocodeResult,
@@ -116,7 +140,5 @@ export function pinMatchesCity(
 ): boolean {
   const target = targetCity.trim();
   if (!target) return false;
-  if (geo.rawCityCandidates.some((c) => citiesMatchLoose(c, target))) return true;
-  if (geo.displayName && citiesMatchLoose(geo.displayName, target)) return true;
-  return false;
+  return geo.rawCityCandidates.some((c) => citiesMatchLoose(c, target));
 }

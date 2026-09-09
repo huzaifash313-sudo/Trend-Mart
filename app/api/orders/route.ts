@@ -802,7 +802,6 @@ export async function POST(request: Request) {
   const flatFee = toNumber(shopRow.delivery_fee_flat, 0);
 
   // Very coarse GPS is not street-level enough for coverage decisions.
-  const GPS_ACCURACY_SOFT_M = 250;
   const GPS_ACCURACY_HARD_M = 1500;
 
   if (orderType !== "pickup") {
@@ -847,25 +846,17 @@ export async function POST(request: Request) {
         if (geo) {
           if (!pinMatchesCity(geo, target)) {
             coverageError = `This shop only delivers in ${target}. Your pin looks outside that city.`;
-          } else if (customerCity && !cityMatch(target, customerCity)) {
-            // Client city disagrees with shop target — pin already matched, so
-            // ignore spoofed city text (pin wins).
           }
-        } else if (customerCity && !cityMatch(target, customerCity)) {
-          coverageError = `This shop only delivers in ${target}.`;
-        } else if (!customerCity && distanceKm != null && distanceKm > 35) {
-          coverageError = "You appear to be outside this shop's delivery city.";
-        } else if (!customerCity && distanceKm == null) {
+        } else if (distanceKm != null) {
+          // Geocoder down — use distance to shop pin (friendly, not client-city trust).
+          if (distanceKm > 35) {
+            coverageError =
+              "Could not confirm your city right now, and you look too far from this shop. Try again or drop a clearer map pin.";
+          }
+          // else: within ~35km of shop pin → allow (merchant still confirms on WhatsApp)
+        } else {
           coverageError =
-            "Could not verify city coverage — shop location or your pin is missing.";
-        }
-        if (
-          !coverageError &&
-          custLocationSource === "gps" &&
-          custAccuracy != null &&
-          custAccuracy > GPS_ACCURACY_SOFT_M
-        ) {
-          // Soft warn stored via accuracy field; still allow pin-matched city.
+            "Could not verify city coverage — please share a clear map pin and try again.";
         }
       }
     } else if (coverage.mode === "radius") {
@@ -1268,6 +1259,37 @@ export async function POST(request: Request) {
   }
 
   if (insertErr || !inserted) {
+    // Best-effort: undo coupon burn so a failed insert doesn't eat a use.
+    if (appliedCoupon) {
+      try {
+        await adminRpc("decrement_coupon_usage", {
+          p_shop_id: shopId,
+          p_code: appliedCoupon,
+        });
+      } catch {
+        try {
+          const { data: cur } = await admin
+            .from("coupons")
+            .select("usage_count")
+            .eq("shop_id", shopId)
+            .eq("code", appliedCoupon)
+            .maybeSingle();
+          const current = toNumber(
+            (cur as { usage_count?: number | null } | null)?.usage_count,
+            0,
+          );
+          if (current > 0) {
+            await admin
+              .from("coupons")
+              .update({ usage_count: current - 1 } as never)
+              .eq("shop_id", shopId)
+              .eq("code", appliedCoupon);
+          }
+        } catch {
+          /* soft-launch: merchant can still honour coupon manually */
+        }
+      }
+    }
     return NextResponse.json(
       { success: false, error: "Could not place your order. Please try again." },
       { status: 500 },

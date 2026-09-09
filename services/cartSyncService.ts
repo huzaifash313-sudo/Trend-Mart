@@ -54,11 +54,9 @@ function mergeCartItems(local: CartItem[], remote: CartItem[]): CartItem[] {
       map.set(item.id, item);
       continue;
     }
-    map.set(item.id, {
-      ...existing,
-      ...item,
-      quantity: Math.min(99, Math.max(existing.quantity, item.quantity)),
-    });
+    // Prefer the newer-looking line: same id → keep local (this device's last edit)
+    // without inflating quantity via Math.max across devices.
+    map.set(item.id, { ...existing, ...item });
   }
   return Array.from(map.values()).slice(0, MAX_ITEMS);
 }

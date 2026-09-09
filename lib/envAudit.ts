@@ -94,6 +94,9 @@ const REQUIRED_SERVER_VARS = [
   // Transactional email — checkout / signup OTP cannot work without this.
   "RESEND_API_KEY",
   "EMAIL_FROM",
+
+  // OTP code hashing — required in production (no service-role fallback).
+  "OTP_HMAC_SECRET",
 ] as const;
 
 /**
@@ -106,11 +109,9 @@ const RECOMMENDED_SERVER_VARS = [
   "SENTRY_ORG",
   "SENTRY_PROJECT",
   "SENTRY_AUTH_TOKEN",
-  "UPSTASH_REDIS_URL",
-  "UPSTASH_REDIS_TOKEN",
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
   "NEXT_PUBLIC_SITE_NAME",
-  "NEXTAUTH_URL",
-  "NEXTAUTH_SECRET",
   "SUPPORT_TEAM_EMAIL",
   "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
   "VAPID_PRIVATE_KEY",
@@ -143,6 +144,7 @@ const FORBIDDEN_PUBLIC_PREFIXES = [
   "GROQ_API_KEY",
   "GEMINI_API_KEY",
   "GOOGLE_AI_API_KEY",
+  "OTP_HMAC_SECRET",
 ] as const;
 
 // ─── Audit Implementation ────────────────────────────────────────────────────

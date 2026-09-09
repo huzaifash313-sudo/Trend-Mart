@@ -1,5 +1,6 @@
 /* -------------------------------------------------------------------------- */
-/*  POST /api/orders/[id]/whatsapp — store message + mark WhatsApp sent        */
+/*  POST /api/orders/[id]/whatsapp — customer may store message only           */
+/*  Merchant confirms receipt via /confirm-whatsapp (or status change).        */
 /* -------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
@@ -45,7 +46,21 @@ export async function POST(
   }
 
   const message = body.message !== undefined ? sanitizeMessage(body.message) : undefined;
-  const markSent = body.sent === true;
+
+  // Customers cannot mark WhatsApp as "sent/confirmed" — only merchants can
+  // via /confirm-whatsapp. Ignore `sent` quietly so old clients don't break.
+  if (message === undefined) {
+    return NextResponse.json(
+      { success: false, error: "Nothing to update." },
+      { status: 400 },
+    );
+  }
+  if (message.length === 0) {
+    return NextResponse.json(
+      { success: false, error: "Message is empty." },
+      { status: 400 },
+    );
+  }
 
   const admin = getSupabaseAdminClient();
   if (!admin) {
@@ -63,21 +78,9 @@ export async function POST(
     return NextResponse.json({ success: false, error: "This order was cancelled." }, { status: 409 });
   }
 
-  const patch: Record<string, unknown> = {};
-  if (message !== undefined && message.length > 0) {
-    patch.whatsapp_message = message;
-  }
-  if (markSent) {
-    patch.whatsapp_sent_at = new Date().toISOString();
-  }
-
-  if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ success: false, error: "Nothing to update." }, { status: 400 });
-  }
-
   const { data: updatedRaw, error: updateErr } = await admin
     .from("orders")
-    .update(patch as never)
+    .update({ whatsapp_message: message } as never)
     .eq("id", orderId)
     .select("id, whatsapp_sent_at, whatsapp_message")
     .maybeSingle();

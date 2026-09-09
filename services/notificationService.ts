@@ -130,6 +130,10 @@ export async function transitionOrderStatus(
     const customerPhone = (currentOrder as Record<string, unknown>).customer_phone as string;
     const customerUserId = (currentOrder as Record<string, unknown>).customer_user_id as string | null | undefined;
     const totalAmount = Number((currentOrder as Record<string, unknown>).total_amount) || 0;
+    const whatsappSentAt = (currentOrder as Record<string, unknown>).whatsapp_sent_at as
+      | string
+      | null
+      | undefined;
 
     // 2. Validate the transition
     if (!isValidOrderTransition(previousStatus, newStatus)) {
@@ -139,11 +143,17 @@ export async function transitionOrderStatus(
       );
     }
 
-    // 3. Update the order in Supabase
+    // 3. Update the order in Supabase.
+    // Merchant moving an order forward (not Cancel) counts as WhatsApp/handoff
+    // confirm — one tap, no extra friction. Cancel always allowed without stamp.
     const updatePayload: Record<string, unknown> = {
       status: newStatus,
       updated_at: new Date().toISOString(),
     };
+
+    if (newStatus !== "Cancelled" && !whatsappSentAt) {
+      updatePayload.whatsapp_sent_at = new Date().toISOString();
+    }
 
     if (trackingNumber && newStatus === "Dispatched") {
       updatePayload.tracking_number = trackingNumber;

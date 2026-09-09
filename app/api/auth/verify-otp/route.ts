@@ -106,12 +106,18 @@ export async function POST(request: NextRequest) {
   }
 
   if (!verifyOtpHash(code, email, row.code_hash, secret)) {
-    // Wrong code — burn an attempt.
-    await admin
+    // Optimistic lock: only bump if attempts still match (reduces concurrent races).
+    const { data: bumped } = await admin
       .from("email_verification_otps")
       .update({ attempts: row.attempts + 1 } as unknown as never)
-      .eq("email", email);
-    const remaining = Math.max(0, OTP_MAX_ATTEMPTS - (row.attempts + 1));
+      .eq("email", email)
+      .eq("attempts", row.attempts)
+      .lt("attempts", OTP_MAX_ATTEMPTS)
+      .select("attempts")
+      .maybeSingle();
+    const nextAttempts =
+      (bumped as { attempts?: number } | null)?.attempts ?? row.attempts + 1;
+    const remaining = Math.max(0, OTP_MAX_ATTEMPTS - nextAttempts);
     return json(400, {
       success: false,
       error:

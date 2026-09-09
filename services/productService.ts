@@ -145,7 +145,17 @@ function buildProductRow(
       }
     }
     row.images = gallery.length > 0 ? gallery : [];
-    row.stock_status = sanitized.stock_status || "in_stock";
+    // Keep badge + availability in sync (is_available is the merchant toggle).
+    const available = sanitized.is_available !== false;
+    row.is_available = available;
+    row.stock_status =
+      sanitized.stock_status &&
+      sanitized.stock_status !== "in_stock" &&
+      sanitized.stock_status !== "out_of_stock"
+        ? sanitized.stock_status
+        : available
+          ? "in_stock"
+          : "out_of_stock";
     row.currency = "PKR";
     row.price_tiers =
       Array.isArray(sanitized.price_tiers) && sanitized.price_tiers.length > 0

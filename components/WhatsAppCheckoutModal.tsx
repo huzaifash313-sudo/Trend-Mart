@@ -1573,9 +1573,9 @@ export default function WhatsAppCheckoutModal({
       const message = decodeURIComponent(
         pendingWhatsAppUrl.split("text=")[1] ?? "",
       );
+      // Message only — merchant confirms on Order Desk (no customer "sent" forge).
       void updateOrderWhatsApp(orderRef, {
         ...(message ? { message } : {}),
-        sent: true,
       }).catch(() => undefined);
     }
     finishOrder();

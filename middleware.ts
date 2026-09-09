@@ -100,8 +100,15 @@ async function checkRateLimit(request: NextRequest): Promise<boolean> {
     });
     return result.allowed;
   } catch {
-    console.warn("[TrendsMart MW] Rate limiter error — allowing as failsafe");
-    return true;
+    // Auth / billing: fail closed. Everything else: keep browsing working.
+    const failClosed =
+      pathname.startsWith("/api/auth") ||
+      pathname.startsWith("/api/billing") ||
+      pathname.startsWith("/api/orders");
+    console.warn(
+      `[TrendsMart MW] Rate limiter error — ${failClosed ? "blocking" : "allowing"} ${pathname}`,
+    );
+    return !failClosed;
   }
 }
 

@@ -71,21 +71,16 @@ export default function CustomerOrderActions({
     setBusy("send");
     try {
       window.open(url, "_blank", "noopener,noreferrer");
-      const result = await updateOrderWhatsApp(order.id, { message, sent: true });
-      if (result.success) {
-        onUpdated?.({
-          whatsapp_sent_at: result.data.whatsappSentAt,
-          whatsapp_message: result.data.whatsappMessage,
-        });
-        addToast(
-          "WhatsApp khul gaya — message bhej dein taake shop aap ka order confirm kar sake.",
-          "success",
-        );
-      }
+      // Only refresh the stored message — merchant confirms on their Order Desk.
+      void updateOrderWhatsApp(order.id, { message }).catch(() => undefined);
+      addToast(
+        "WhatsApp khul gaya — message bhej dein. Shop jab message dekhegi tab confirm karegi.",
+        "success",
+      );
     } finally {
       setBusy(null);
     }
-  }, [addToast, onUpdated, order.id, order.whatsapp_message, shopWhatsapp]);
+  }, [addToast, order.id, order.whatsapp_message, shopWhatsapp]);
 
   const handleCancel = useCallback(async () => {
     if (
@@ -137,7 +132,7 @@ export default function CustomerOrderActions({
     <div className={`flex flex-wrap gap-2 ${compact ? "" : "mt-3"}`}>
       {awaiting && (
         <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[0.65rem] font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-          Shop tak nahi pahuncha — WhatsApp par bhejein
+          WhatsApp bhejo — shop confirm karegi
         </span>
       )}
 

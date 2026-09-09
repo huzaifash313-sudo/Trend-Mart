@@ -187,13 +187,14 @@ function deriveStockStatus(
  * rather than just the binary is_available flag.
  */
 export function getInventoryBadge(product: Product): InventoryBadge {
-  // Check if product has explicit stock_status
-  if (product.stock_status && VALID_STOCK_STATUSES.includes(product.stock_status)) {
-    return product.stock_status as InventoryBadge;
-  }
-
+  // Merchant toggle wins — never show "in stock" when marked unavailable.
   if (!product.is_available) return "unavailable";
 
+  // Check if product has explicit stock_status
+  if (product.stock_status && VALID_STOCK_STATUSES.includes(product.stock_status)) {
+    if (product.stock_status === "out_of_stock") return "out_of_stock";
+    return product.stock_status as InventoryBadge;
+  }
   // If product has variants with stock tracking, check the total
   if (product.variants && product.variants.length > 0) {
     let totalStock = 0;
@@ -532,7 +533,10 @@ export async function toggleProductAvailability(
 
     const { error: updateError } = await supabase
       .from("products")
-      .update({ is_available: newState })
+      .update({
+        is_available: newState,
+        stock_status: newState ? "in_stock" : "out_of_stock",
+      })
       .eq("id", sanitizedProductId);
 
     if (updateError) throw updateError;
@@ -576,7 +580,10 @@ export async function bulkUpdateAvailability(
   try {
     const { error } = await supabase
       .from("products")
-      .update({ is_available: safeAvailability })
+      .update({
+        is_available: safeAvailability,
+        stock_status: safeAvailability ? "in_stock" : "out_of_stock",
+      })
       .in("id", sanitizedIds);
 
     if (error) throw error;

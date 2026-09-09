@@ -34,17 +34,35 @@ function otpSecret(): string {
 }
 
 /**
- * Find an auth user by email via the admin API. supabase-js has no server-side
- * email filter, so we page `listUsers` (capped) and match locally. Fine for
- * this app's scale; the cap prevents an unbounded scan.
+ * Find an auth user by email. Prefer indexed lookups (OTP row / getUserById)
+ * before paging listUsers — keeps sign-in OTP fast as the user base grows.
  */
 export async function findAuthUserByEmail(
   admin: AdminClient,
   email: string,
 ): Promise<User | null> {
   const target = email.trim().toLowerCase();
+  if (!target) return null;
+
+  // 1) Pending OTP row already stores user_id for this email.
+  try {
+    const { data: otp } = await admin
+      .from("email_verification_otps")
+      .select("user_id")
+      .eq("email", target)
+      .maybeSingle();
+    const otpUserId = (otp as { user_id?: string | null } | null)?.user_id;
+    if (otpUserId) {
+      const { data } = await admin.auth.admin.getUserById(otpUserId);
+      if (data?.user) return data.user;
+    }
+  } catch {
+    /* continue */
+  }
+
+  // 2) Page listUsers as a fallback (capped).
   const perPage = 200;
-  const maxPages = 25;
+  const maxPages = 50;
 
   for (let page = 1; page <= maxPages; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
@@ -52,7 +70,7 @@ export async function findAuthUserByEmail(
     const users = data?.users ?? [];
     const match = users.find((u) => (u.email ?? "").toLowerCase() === target);
     if (match) return match;
-    if (users.length < perPage) break; // reached the last page
+    if (users.length < perPage) break;
   }
   return null;
 }

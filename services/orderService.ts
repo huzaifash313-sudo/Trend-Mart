@@ -669,9 +669,25 @@ export async function updateOrderStatus(
   const supabase = createClient();
 
   try {
+    const { data: current, error: fetchErr } = await supabase
+      .from("orders")
+      .select("whatsapp_sent_at")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (fetchErr) throw fetchErr;
+
+    const patch: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    const wa = (current as { whatsapp_sent_at?: string | null } | null)?.whatsapp_sent_at;
+    if (status !== "Cancelled" && !wa) {
+      patch.whatsapp_sent_at = new Date().toISOString();
+    }
+
     const { data, error } = await supabase
       .from("orders")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(patch)
       .eq("id", orderId)
       .select()
       .single();
@@ -920,7 +936,7 @@ export async function bulkUpdateVariantStock(
 /*  Customer order lifecycle (WhatsApp hand-off + cancel)                      */
 /* -------------------------------------------------------------------------- */
 
-/** Persist the WhatsApp payload and optionally mark it as sent. */
+/** Persist the WhatsApp payload (message only). `sent` is ignored — merchants confirm. */
 export async function updateOrderWhatsApp(
   orderId: string,
   opts: { message?: string; sent?: boolean },
@@ -931,7 +947,6 @@ export async function updateOrderWhatsApp(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...(opts.message !== undefined ? { message: opts.message } : {}),
-        ...(opts.sent ? { sent: true } : {}),
       }),
     });
     const json = (await res.json()) as {
