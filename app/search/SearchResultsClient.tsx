@@ -34,6 +34,8 @@ interface ProductResult {
   shop_id: string;
   shop_name: string;
   shop_slug: string | null;
+  short_code?: string | null;
+  path?: string | null;
   score: number;
 }
 
@@ -62,6 +64,7 @@ interface DealResult {
   shop_id: string;
   shop_name: string;
   shop_slug: string | null;
+  path?: string | null;
   score: number;
 }
 
@@ -88,9 +91,12 @@ function DiscountBadge({ pct }: { pct: number }) {
 
 function ProductCard({ item }: { item: ProductResult }) {
   const img = getSafeImageUrl(item.image_url);
+  const href =
+    item.path?.trim() ||
+    `/products?product=${encodeURIComponent(item.id)}`;
   return (
     <Link
-      href={`/products?product=${item.id}`}
+      href={href}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm transition hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
     >
       <DiscountBadge pct={item.discount_pct} />
@@ -162,9 +168,12 @@ function ShopCard({ item }: { item: ShopResult }) {
 
 function DealCard({ item }: { item: DealResult }) {
   const img = getSafeImageUrl(item.image_url);
+  const href =
+    item.path?.trim() ||
+    `/deals?q=${encodeURIComponent(item.title)}&filter=all`;
   return (
     <Link
-      href={`/deals?q=${encodeURIComponent(item.title)}`}
+      href={href}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-sm transition hover:shadow-md dark:border-amber-900/30 dark:bg-zinc-900"
     >
       {item.is_featured && (
@@ -368,12 +377,36 @@ export default function SearchResultsClient() {
   const hasResults =
     data && (data.counts.products > 0 || data.counts.shops > 0 || data.counts.deals > 0);
 
-  // "Did you mean" suggestions — only shown on empty results
+  // "Did you mean" — empty results OR while typing a likely typo
   const suggestions = useMemo(
-    () => (!hasResults && (qParam || query.trim()) ? suggestSearchCorrections(qParam || query, 5) : []),
+    () => {
+      const source = (qParam || query).trim();
+      if (source.length < 2) return [];
+      if (hasResults) return [];
+      return suggestSearchCorrections(source, 5);
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [hasResults, qParam, query],
   );
+
+  // Keep local input in sync when navigating via suggestion chips / history
+  useEffect(() => {
+    setQuery(qParam);
+  }, [qParam]);
+
+  // Keep tab in sync with browser back/forward on ?type=
+  useEffect(() => {
+    if (TABS.some((t) => t.value === typeParam)) {
+      setActiveTab(typeParam);
+    }
+  }, [typeParam]);
+
+  // Live correction chips under the bar (before submit) when spelling looks off
+  const liveCorrections = useMemo(() => {
+    const source = query.trim();
+    if (source.length < 3 || loading || hasResults) return [];
+    return suggestSearchCorrections(source, 4);
+  }, [query, loading, hasResults]);
 
   // Display query — use live query if URL hasn't been updated yet
   const displayQ = qParam || query.trim();
@@ -388,8 +421,27 @@ export default function SearchResultsClient() {
         placeholder="Search products, shops, deals…"
         ariaLabel="Global search"
         showClearButton
-        className="mb-3"
+        className="mb-2"
       />
+
+      {liveCorrections.length > 0 && !data && query.trim().length >= 3 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5 px-0.5">
+          <span className="text-[11px] text-zinc-400">Try:</span>
+          {liveCorrections.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                setQuery(s);
+                router.push(`/search?q=${encodeURIComponent(s)}`);
+              }}
+              className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* Tab strip */}
       <div className="tm-cat-bar -mx-3 sm:-mx-4 mb-3">
@@ -497,7 +549,7 @@ export default function SearchResultsClient() {
       )}
 
       {/* No query yet */}
-      {!loading && !qParam && (
+      {!loading && !qParam && !query.trim() && (
         <div className="py-14 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 shadow-lg shadow-emerald-500/20">
             <span className="text-2xl">✨</span>
@@ -538,7 +590,7 @@ export default function SearchResultsClient() {
                 icon="🏪"
                 label="Shops"
                 count={data!.counts.shops}
-                href={`/?q=${encodeURIComponent(qParam)}`}
+                href={`/search?q=${encodeURIComponent(qParam)}&type=shops`}
               />
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {shops.map((s) => (
@@ -555,7 +607,7 @@ export default function SearchResultsClient() {
                 icon="🔥"
                 label="Deals"
                 count={data!.counts.deals}
-                href={`/deals?q=${encodeURIComponent(qParam)}`}
+                href={`/deals?q=${encodeURIComponent(qParam)}&filter=all`}
               />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                 {deals.map((d) => (

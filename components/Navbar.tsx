@@ -7,6 +7,8 @@ import { usePathname, useRouter } from "next/navigation";
 import SidebarDrawer from "@/components/SidebarDrawer";
 import NavbarNotificationButton from "@/components/NavbarNotificationButton";
 import { useCart } from "@/context/CartContext";
+import { getShopPath } from "@/lib/shopSlug";
+import { isCartDockActive } from "@/lib/cartDockSession";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -125,22 +127,104 @@ export default function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [portalReady, setPortalReady] = useState(false);
+  const [cartDockActive, setCartDockActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [suggestItems, setSuggestItems] = useState<
+    { type: string; id: string; label: string; href: string }[]
+  >([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const suggestAbort = useRef<AbortController | null>(null);
 
   const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
     setSearchOpen(false);
     setSearchQuery("");
+    setSuggestItems([]);
     if (q) {
-      // Unified search — shows products + shops + deals together
       router.push(`/search?q=${encodeURIComponent(q)}`);
     } else {
       router.push("/");
     }
   };
+
+  useEffect(() => {
+    setCartDockActive(isCartDockActive());
+    const onDock = () => setCartDockActive(isCartDockActive());
+    window.addEventListener("tm:cart-dock", onDock);
+    return () => window.removeEventListener("tm:cart-dock", onDock);
+  }, []);
+
+  // Live navbar suggestions (products / shops / deals) — debounce 280ms
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSuggestItems([]);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      suggestAbort.current?.abort();
+      const ctrl = new AbortController();
+      suggestAbort.current = ctrl;
+      try {
+        const res = await fetch(
+          `/api/search?q=${encodeURIComponent(q)}&limit=4`,
+          { signal: ctrl.signal },
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          results?: {
+            type: string;
+            id: string;
+            name?: string;
+            title?: string;
+            path?: string;
+            slug?: string | null;
+            shop_slug?: string | null;
+            shop_id?: string;
+          }[];
+        };
+        const items = (json.results ?? []).slice(0, 6).map((r) => {
+          if (r.type === "product") {
+            return {
+              type: "product",
+              id: r.id,
+              label: r.name ?? "Product",
+              href: r.path || `/products?product=${encodeURIComponent(r.id)}`,
+            };
+          }
+          if (r.type === "shop") {
+            return {
+              type: "shop",
+              id: r.id,
+              label: r.name ?? "Shop",
+              href: getShopPath({
+                id: r.id,
+                name: r.name ?? "Shop",
+                slug: r.slug ?? null,
+              }),
+            };
+          }
+          return {
+            type: "deal",
+            id: r.id,
+            label: r.title ?? r.name ?? "Deal",
+            href:
+              r.path ||
+              `/deals?q=${encodeURIComponent(r.title ?? q)}&filter=all`,
+          };
+        });
+        setSuggestItems(items);
+      } catch (err) {
+        if ((err as { name?: string }).name !== "AbortError") setSuggestItems([]);
+      }
+    }, 280);
+    return () => {
+      window.clearTimeout(timer);
+      suggestAbort.current?.abort();
+    };
+  }, [searchQuery]);
 
   // Auto-focus when mobile search opens
   useEffect(() => {
@@ -219,7 +303,7 @@ export default function Navbar() {
           {/* ── Desktop search bar (lg+) — solid white pill, clearly visible on teal ── */}
           <form
             onSubmit={handleSearchSubmit}
-            className="mx-3 hidden flex-1 lg:flex"
+            className="relative mx-3 hidden flex-1 lg:flex"
             role="search"
           >
             <label className="relative flex w-full items-center">
@@ -232,9 +316,42 @@ export default function Navbar() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search shops, products, deals…"
                 aria-label="Search shops and products"
+                aria-autocomplete="list"
                 className="w-full rounded-full border-0 bg-white py-[9px] pl-11 pr-5 text-sm text-zinc-800 placeholder:text-zinc-400 shadow-sm outline-none ring-0 transition-shadow focus:shadow-md focus:ring-2 focus:ring-white/60 dark:bg-white/15 dark:text-white dark:placeholder:text-white/50 dark:focus:ring-white/30"
               />
             </label>
+            {suggestItems.length > 0 ? (
+              <ul
+                className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-72 overflow-auto rounded-2xl border border-zinc-200 bg-white py-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+                role="listbox"
+              >
+                {suggestItems.map((item) => (
+                  <li key={`${item.type}-${item.id}`} role="option">
+                    <Link
+                      href={item.href}
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSuggestItems([]);
+                      }}
+                      className="flex items-center gap-2 px-3.5 py-2 text-sm text-zinc-800 hover:bg-emerald-50 dark:text-zinc-100 dark:hover:bg-emerald-950/40"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+                        {item.type}
+                      </span>
+                      <span className="truncate font-medium">{item.label}</span>
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <button
+                    type="submit"
+                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                  >
+                    See all results for &ldquo;{searchQuery.trim()}&rdquo;
+                  </button>
+                </li>
+              </ul>
+            ) : null}
           </form>
 
           {/* ── Mobile search icon (< lg) — taps open the full overlay ── */}
@@ -256,7 +373,7 @@ export default function Navbar() {
               aria-label={`Cart${totalItems > 0 ? `, ${totalItems} items` : ""}`}
             >
               <CartNavIcon />
-              {totalItems > 0 && (
+              {totalItems > 0 && cartDockActive && (
                 <span
                   className="absolute -right-0.5 -top-0.5 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-[color:var(--tm-surface)]"
                   aria-hidden="true"
@@ -303,6 +420,28 @@ export default function Navbar() {
                 Search
               </button>
             </label>
+            {suggestItems.length > 0 ? (
+              <ul className="mt-2 max-h-64 overflow-auto rounded-2xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+                {suggestItems.map((item) => (
+                  <li key={`m-${item.type}-${item.id}`}>
+                    <Link
+                      href={item.href}
+                      onClick={() => {
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                        setSuggestItems([]);
+                      }}
+                      className="flex items-center gap-2 px-3.5 py-2.5 text-sm text-zinc-800 hover:bg-emerald-50 dark:text-zinc-100 dark:hover:bg-emerald-950/40"
+                    >
+                      <span className="text-[10px] font-bold uppercase text-zinc-400">
+                        {item.type}
+                      </span>
+                      <span className="truncate font-medium">{item.label}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </form>
         </div>
       )}

@@ -757,6 +757,7 @@ export async function POST(request: Request) {
 
   // 7. Delivery-coverage enforcement (radius / city / nationwide).
   //    Skipped entirely for self-pickup — the customer is coming to the shop.
+  //    City / radius never trust client-only city text: pin + server reverse-geocode.
   const radiusKm = toNumber(shopRow.service_radius_km, 0);
   const coverage = parseCoverage(shopRow.delivery_zones);
   const customerCity = typeof body.customerCity === "string" ? body.customerCity.trim() : "";
@@ -780,7 +781,9 @@ export async function POST(request: Request) {
     custLat != null &&
     custLng != null &&
     Number.isFinite(custLat) &&
-    Number.isFinite(custLng);
+    Number.isFinite(custLng) &&
+    // Reject ocean / null-island spoof (0,0) — never a real PK delivery pin.
+    !(Math.abs(custLat) < 0.01 && Math.abs(custLng) < 0.01);
   const shopLat = toCoord(shopRow.latitude);
   const shopLng = toCoord(shopRow.longitude);
   const hasShopCoords =
@@ -798,6 +801,10 @@ export async function POST(request: Request) {
   const perKmFee = toNumber(shopRow.delivery_fee_per_km, 0);
   const flatFee = toNumber(shopRow.delivery_fee_flat, 0);
 
+  // Very coarse GPS is not street-level enough for coverage decisions.
+  const GPS_ACCURACY_SOFT_M = 250;
+  const GPS_ACCURACY_HARD_M = 1500;
+
   if (orderType !== "pickup") {
     // Delivery always needs a live customer pin (coverage + optional per-km).
     if (!hasCustomerCoords) {
@@ -810,19 +817,56 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      custLocationSource === "gps" &&
+      custAccuracy != null &&
+      custAccuracy > GPS_ACCURACY_HARD_M
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Your GPS pin is too inaccurate. Move outdoors, wait for a better fix, or drop a map pin on your street.",
+        },
+        { status: 409 },
+      );
+    }
+
     let coverageError: string | null = null;
     if (coverage.mode === "city") {
       const target = coverage.city || (shopRow.location ?? "");
       if (!target) {
         coverageError =
           "This shop's city coverage is incomplete — delivery cannot be confirmed.";
-      } else if (customerCity && !cityMatch(target, customerCity)) {
-        coverageError = `This shop only delivers in ${target}.`;
-      } else if (!customerCity && distanceKm != null && distanceKm > 35) {
-        coverageError = "You appear to be outside this shop's delivery city.";
-      } else if (!customerCity && distanceKm == null) {
-        coverageError =
-          "Could not verify city coverage — shop location or your pin is missing.";
+      } else {
+        // Prefer server reverse-geocode of the live pin over client city text.
+        const { pinMatchesCity, reverseGeocodeServer } = await import(
+          "@/lib/serverReverseGeocode"
+        );
+        const geo = await reverseGeocodeServer(custLat!, custLng!);
+        if (geo) {
+          if (!pinMatchesCity(geo, target)) {
+            coverageError = `This shop only delivers in ${target}. Your pin looks outside that city.`;
+          } else if (customerCity && !cityMatch(target, customerCity)) {
+            // Client city disagrees with shop target — pin already matched, so
+            // ignore spoofed city text (pin wins).
+          }
+        } else if (customerCity && !cityMatch(target, customerCity)) {
+          coverageError = `This shop only delivers in ${target}.`;
+        } else if (!customerCity && distanceKm != null && distanceKm > 35) {
+          coverageError = "You appear to be outside this shop's delivery city.";
+        } else if (!customerCity && distanceKm == null) {
+          coverageError =
+            "Could not verify city coverage — shop location or your pin is missing.";
+        }
+        if (
+          !coverageError &&
+          custLocationSource === "gps" &&
+          custAccuracy != null &&
+          custAccuracy > GPS_ACCURACY_SOFT_M
+        ) {
+          // Soft warn stored via accuracy field; still allow pin-matched city.
+        }
       }
     } else if (coverage.mode === "radius") {
       const radiusEnforced = radiusKm > 0;

@@ -18,6 +18,7 @@ import {
   searchProductsLoose,
 } from "@/lib/ai/productSearch";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
+import { getDealSeoPath } from "@/lib/seo/dealSlug";
 import { matchAppKnowledge } from "@/lib/ai/appKnowledge";
 import {
   fetchPlatformSnapshot,
@@ -198,7 +199,7 @@ interface CustomerContext {
   recentOrders: { id: string; status: string; total: number; shopName: string; createdAt: string }[];
   pendingOrderCount: number;
   wishlistCount: number;
-  topDeals: { title: string; shopName: string; discount: number; badge?: string }[];
+  topDeals: { id: string; title: string; shopName: string; discount: number; badge?: string; path: string }[];
   popularShops: { name: string; category: string; location: string; id: string }[];
 }
 
@@ -670,7 +671,7 @@ export async function buildCustomerContext(
       .eq("user_id", userId),
     supabase
       .from("shop_deals")
-      .select("title, price, original_price, badge_text, shops(name)")
+      .select("id, title, price, original_price, badge_text, shops(name)")
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(12),
@@ -702,11 +703,15 @@ export async function buildCustomerContext(
         original > price && original > 0
           ? Math.round(((original - price) / original) * 100)
           : 0;
+      const id = String(d.id ?? "");
+      const title = sanitizeChatString(d.title, 80);
       return {
-        title: sanitizeChatString(d.title, 80),
+        id,
+        title,
         shopName: sanitizeChatString(shops?.name, 80) || "Shop",
         discount,
         badge: sanitizeChatString(d.badge_text, 30),
+        path: id ? getDealSeoPath(title, id) : "/deals",
       };
     })
     .filter((d) => d.discount > 0 || d.badge)
@@ -1141,8 +1146,8 @@ export function generateCustomerResponse(
       const deals = ctx.topDeals
         .map((d) =>
           d.discount > 0
-            ? `• *${d.title}* at ${d.shopName} — *${d.discount}% OFF*`
-            : `• *${d.title}* at ${d.shopName}${d.badge ? ` — ${d.badge}` : ""}`,
+            ? `• *${d.title}* at ${d.shopName} — *${d.discount}% OFF*\n  👉 [Open deal](${d.path})`
+            : `• *${d.title}* at ${d.shopName}${d.badge ? ` — ${d.badge}` : ""}\n  👉 [Open deal](${d.path})`,
         )
         .join("\n");
       return {
@@ -1748,7 +1753,17 @@ async function runAssistantCore(
     }
   }
 
-  // Brand / owner / policies / how-it-works — FIRST (100% local, no API)
+  // Catalog / find intents must beat soft FAQ matching ("best mobile ka link do"
+  // used to score owner FAQ via stopword "ka").
+  const productish =
+    nlu.intent === "product_search" ||
+    nlu.intent === "shop_search" ||
+    nlu.intent === "category_browse" ||
+    nlu.intent === "deals" ||
+    looksLikeProductSearch(historyResolved) ||
+    looksLikeProductSearch(message);
+
+  // Brand / owner / policies / how-it-works — FIRST when clearly that intent
   if (
     nlu.intent === "brand_owner" ||
     nlu.intent === "policy" ||
@@ -1758,7 +1773,7 @@ async function runAssistantCore(
     const brandHit =
       matchBrandKnowledge(historyResolved, role) ?? matchBrandKnowledge(message, role);
     if (brandHit) return withThinking(brandHit, role);
-  } else {
+  } else if (!productish) {
     const brandHit =
       matchBrandKnowledge(historyResolved, role) ?? matchBrandKnowledge(message, role);
     if (brandHit && brandHit.confidence >= 0.75) {
@@ -1778,29 +1793,33 @@ async function runAssistantCore(
     if (pageRes) return withThinking(pageRes, role);
   }
 
-  // ── App knowledge (FAQs + features) ─────────────────────────────────────
-  const appHit = matchAppKnowledge(historyResolved, role) ?? matchAppKnowledge(message, role);
-  if (appHit && appHit.confidence >= MIN_KNOWLEDGE_CONFIDENCE) {
-    const hintBoost =
-      req.memoryHints?.length &&
-      req.memoryHints.some((h) => historyResolved.toLowerCase().includes(h.toLowerCase().slice(0, 12)));
-    return withThinking(
-      {
-        reply: appHit.reply,
-        intent: appHit.intent,
-        confidence: hintBoost ? Math.min(appHit.confidence + 0.05, 0.99) : appHit.confidence,
-        suggestions:
-          appHit.suggestions ??
-          (role === "merchant"
-            ? ["Meri shop ki live summary", "Best selling product?", "Growth strategy"]
-            : ["TrendsMart ka owner?", "Best mobile ka link do", "Order kaise karun?", "Refund policy?"]),
-        handoff:
-          role === "shop" && req.shopId
-            ? { type: "shop", href: `/shop/${req.shopId}`, label: "Message seller" }
-            : { type: "support", href: "/support", label: "Contact support" },
-      },
-      role,
-    );
+  // ── App knowledge (FAQs + features) — skip when user is shopping ────────
+  if (!productish) {
+    const appHit = matchAppKnowledge(historyResolved, role) ?? matchAppKnowledge(message, role);
+    if (appHit && appHit.confidence >= MIN_KNOWLEDGE_CONFIDENCE) {
+      const hintBoost =
+        req.memoryHints?.length &&
+        req.memoryHints.some((h) =>
+          historyResolved.toLowerCase().includes(h.toLowerCase().slice(0, 12)),
+        );
+      return withThinking(
+        {
+          reply: appHit.reply,
+          intent: appHit.intent,
+          confidence: hintBoost ? Math.min(appHit.confidence + 0.05, 0.99) : appHit.confidence,
+          suggestions:
+            appHit.suggestions ??
+            (role === "merchant"
+              ? ["Meri shop ki live summary", "Best selling product?", "Growth strategy"]
+              : ["TrendsMart ka owner?", "Best mobile ka link do", "Order kaise karun?", "Refund policy?"]),
+          handoff:
+            role === "shop" && req.shopId
+              ? { type: "shop", href: `/shop/${req.shopId}`, label: "Message seller" }
+              : { type: "support", href: "/support", label: "Contact support" },
+        },
+        role,
+      );
+    }
   }
 
   // ── Category browse + live products ─────────────────────────────────────
@@ -1863,7 +1882,11 @@ async function runAssistantCore(
   }
 
   // ── Product search (local NLU) ──────────────────────────────────────────
-  const searchMessage = searchQuery ? `${searchQuery} ${message}` : message;
+  // Prefer the cleaned extracted query — concatenating the raw message again
+  // re-introduces stopwords ("mobile do" + full sentence → garbage ranking).
+  const searchMessage =
+    (searchQuery && searchQuery.trim().length >= 2 ? searchQuery.trim() : null) ||
+    message;
   const productHit = await tryProductSearch(
     supabase,
     searchMessage,

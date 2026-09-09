@@ -955,6 +955,35 @@ export async function updateOrderWhatsApp(
   }
 }
 
+/**
+ * Merchant confirms the order actually arrived on WhatsApp (or phone).
+ * Clears the "Confirm baaqi hai" gate so fulfilment can continue.
+ */
+export async function confirmOrderWhatsAppAsMerchant(
+  orderId: string,
+): Promise<ServiceResult<{ whatsappSentAt: string | null }>> {
+  try {
+    const res = await fetch(
+      `/api/orders/${encodeURIComponent(orderId)}/confirm-whatsapp`,
+      { method: "POST" },
+    );
+    const json = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      whatsappSentAt?: string | null;
+    };
+    if (!res.ok || !json.success) {
+      return { success: false, error: json.error ?? "Could not confirm WhatsApp." };
+    }
+    return {
+      success: true,
+      data: { whatsappSentAt: json.whatsappSentAt ?? null },
+    };
+  } catch (err) {
+    return { success: false, error: toError(err) };
+  }
+}
+
 /** Customer cancels a Pending order before the shop starts processing. */
 export async function cancelOrderAsCustomer(
   orderId: string,

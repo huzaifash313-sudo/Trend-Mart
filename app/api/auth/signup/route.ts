@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findAuthUserByEmail, issueAndSendOtp } from "@/lib/authOtpServer";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
-import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
+import { checkRateLimitAsync, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { clientIpFromHeaders } from "@/lib/loginLockout";
 
@@ -38,7 +38,7 @@ function json(status: number, body: Record<string, unknown>) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = checkRateLimit(request, { ...RATE_LIMITS.AUTH, name: "auth-signup" });
+  const limited = await checkRateLimitAsync(request, { ...RATE_LIMITS.AUTH, name: "auth-signup" });
   if (!limited.allowed) {
     const res = buildRateLimitResponse(limited);
     return NextResponse.json(res.body, { status: res.status, headers: res.headers });

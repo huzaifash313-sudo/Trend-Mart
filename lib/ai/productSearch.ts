@@ -107,10 +107,11 @@ export async function searchProductsForAssistant(
   let dbQuery = supabase
     .from("products")
     .select(
-      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, avg_rating, review_count, shops!inner(id, name, location, is_live, latitude, longitude)",
+      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, avg_rating, review_count, shops!inner(id, name, location, is_live, verification_status, latitude, longitude)",
     )
     .eq("is_available", true)
-    .eq("shops.is_live", true);
+    .eq("shops.is_live", true)
+    .eq("shops.verification_status", "approved");
 
   if (options.shopId) {
     dbQuery = dbQuery.eq("shop_id", sanitizeChatString(options.shopId, 100));
@@ -125,10 +126,11 @@ export async function searchProductsForAssistant(
     let legacy = supabase
       .from("products")
       .select(
-        "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, latitude, longitude)",
+        "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, latitude, longitude, verification_status)",
       )
       .eq("is_available", true)
-      .eq("shops.is_live", true);
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved");
     if (options.shopId) {
       legacy = legacy.eq("shop_id", sanitizeChatString(options.shopId, 100));
     }
@@ -149,9 +151,15 @@ export async function searchProductsForAssistant(
     rows,
     query,
     (r) => [r.name, r.description, r.shops?.name, r.shops?.location],
-    { minScore: Math.max(FUZZY_MIN_SCORE - 12, 14), limit: 20 },
+    {
+      minScore: Math.max(FUZZY_MIN_SCORE - 12, 14),
+      limit: 40,
+      // Name >> description >> shop (avoid "Mobile Care" shop owning "mobile" queries)
+      weights: [1, 0.55, 0.25, 0.1],
+    },
   );
 
+  const qLower = query.toLowerCase().trim();
   const hits: ProductSearchHit[] = ranked.map(({ item, score }) => {
     const price = sanitizeChatNumber(item.price, 0);
     const original = item.original_price != null ? sanitizeChatNumber(item.original_price, 0) : null;
@@ -192,6 +200,13 @@ export async function searchProductsForAssistant(
       reviewCount: Number(item.review_count) || 0,
     };
     hit.score += rankBoost(query, hit, sortMode);
+    // Demote hits that only matched via shop name (e.g. Hair Dryer @ "Mobile Care")
+    const nameHit =
+      name.toLowerCase().includes(qLower) ||
+      qLower.split(/\s+/).some((t) => t.length >= 3 && name.toLowerCase().includes(t));
+    const shopOnly =
+      !nameHit && shopName.toLowerCase().includes(qLower);
+    if (shopOnly) hit.score -= 35;
     if (distanceKm != null && distanceKm < 5) hit.score += 6;
     else if (distanceKm != null && distanceKm < 10) hit.score += 3;
     return hit;
@@ -280,10 +295,11 @@ export async function searchProductsByCategory(
   let dbQuery = supabase
     .from("products")
     .select(
-      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, latitude, longitude, category)",
+      "id, name, price, original_price, short_code, description, image_url, images, shop_id, is_available, shops!inner(id, name, location, is_live, verification_status, latitude, longitude, category)",
     )
     .eq("is_available", true)
     .eq("shops.is_live", true)
+    .eq("shops.verification_status", "approved")
     .eq("shops.category", category)
     .order("created_at", { ascending: false })
     .limit(40);
@@ -426,7 +442,7 @@ export function formatProductSearchReply(
 
   const browseLink =
     role === "customer"
-      ? `\n\n🔎 [See all on marketplace](/products?q=${encodeURIComponent(query)})`
+      ? `\n\n🔎 [See all on marketplace](/search?q=${encodeURIComponent(query)})`
       : role === "merchant"
         ? `\n\n📦 [Edit products](/dashboard/products)`
         : "";
@@ -463,7 +479,7 @@ export function formatNoProductResults(
 ): { reply: string; intent: string; confidence: number; suggestions: string[] } {
   const searchLink =
     role === "customer"
-      ? `[Browse marketplace](/products?q=${encodeURIComponent(query)})`
+      ? `[Browse marketplace](/search?q=${encodeURIComponent(query)})`
       : role === "merchant"
         ? `[Add product](/dashboard/products/new)`
         : shopId

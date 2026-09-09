@@ -81,12 +81,13 @@ o	Legal & Security Policies: Dedicated pages for Terms & Conditions, Privacy Pol
 •	Hybrid wishlist sync mechanism.
 •	Dark/light mode theme variables framework.
 ❌ Remaining / To Be Fully Wired & Polished
-•	Super-Admin Panel: Complete admin approval queue, global category controls, and platform metrics.
-•	Precise GPS Proximity Engine: Exact street-level pin location and radius-based sorting.
-•	Smart Checkout Auto-Fill & Phone Verification: Strict mandatory phone validation at checkout.
+•	Super-Admin Panel: Complete admin approval queue (soft-launch: auto-approve for now; strict queue later), global category controls, and platform metrics.
+•	Precise GPS Proximity Engine: Street-level pin + server reverse-geocode (strengthened); keep polishing accuracy UX.
+•	Smart Checkout Auto-Fill: Wired; Phone SMS OTP at checkout deferred (email verification only for now — later when budget allows).
 •	Live Order Tracking Module: Real-time status milestone updates (Pending → Processing → Dispatched → Delivered).
-•	Ultra-Fast Minimalist Product Form: Clean 4-field entry (Name, Category, Price, Image) with out-of-stock toggle.
+•	Ultra-Fast Minimalist Product Form: Bulk + editor paths; In Stock / Out of Stock toggle on bulk rows.
 •	Custom SMTP Integration: Replacing default system emails with branded domain mail dispatchers.
 •	Support System & Legal Pages: FAQs, contact tickets, Terms & Conditions, and Privacy Policy views.
 •	Multi-Device Responsive Grid Tuning: Perfect spacing adjustments across mobile (2-col), tablet (3-col), and desktop (4/5-col).
 •	Advanced Merchant Controls & Monetization Integration: Geo-fencing radius enforcement, order slab calculation logic, Markdown pricing display with percentage badges, downloadable shop QR code generators, and sponsored ads carousel.
+•	Order payments: Customer ↔ merchant (WhatsApp/COD). Platform does not process product-order payments.

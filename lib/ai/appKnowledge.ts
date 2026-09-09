@@ -414,13 +414,18 @@ const APP_KNOWLEDGE: KnowledgeEntry[] = [
   },
 ];
 
+const SCORE_STOPWORDS = new Set([
+  "ka", "ki", "ke", "ko", "se", "par", "pe", "mein", "main", "the", "and", "aur",
+  "for", "with", "from", "that", "this", "yeh", "woh", "hai", "hain", "please",
+]);
+
 function tokenize(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
       .replace(/[^\w\s\u0600-\u06FF]/g, " ")
       .split(/\s+/)
-      .filter((w) => w.length > 2),
+      .filter((w) => w.length > 2 && !SCORE_STOPWORDS.has(w)),
   );
 }
 
@@ -431,7 +436,7 @@ function scoreEntry(message: string, entry: KnowledgeEntry): number {
     const keyLower = key.toLowerCase();
     if (message.toLowerCase().includes(keyLower)) score += 25;
     for (const t of keyLower.split(/\s+/)) {
-      if (msgTokens.has(t)) score += 8;
+      if (t.length > 2 && !SCORE_STOPWORDS.has(t) && msgTokens.has(t)) score += 8;
     }
   }
   for (const t of tokenize(entry.q)) {

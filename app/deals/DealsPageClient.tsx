@@ -62,15 +62,20 @@ function DealsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qParam = searchParams.get("q") ?? "";
-  const filterParam = (searchParams.get("filter") as FilterMode | null) ?? "today";
+  // Text search must not hide matches behind the default "today" schedule filter.
+  const filterParamRaw = searchParams.get("filter") as FilterMode | null;
+  const filterParam: FilterMode =
+    filterParamRaw && ["today", "featured", "upcoming", "all"].includes(filterParamRaw)
+      ? filterParamRaw
+      : qParam.trim()
+        ? "all"
+        : "today";
   const dayParam = searchParams.get("day");
   const categoryParam = (searchParams.get("category") as ShopCategory | null) ?? "All";
   const subParam = searchParams.get("sub");
 
   const [query, setQuery] = useState(qParam);
-  const [filter, setFilter] = useState<FilterMode>(
-    ["today", "featured", "upcoming", "all"].includes(filterParam) ? filterParam : "today",
-  );
+  const [filter, setFilter] = useState<FilterMode>(filterParam);
   const [dayKey, setDayKey] = useState<string | null>(
     dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null,
   );
@@ -316,9 +321,7 @@ function DealsInner() {
   // Re-sync local state when URL changes (back/forward).
   useEffect(() => {
     setQuery(qParam);
-    setFilter(
-      ["today", "featured", "upcoming", "all"].includes(filterParam) ? filterParam : "today",
-    );
+    setFilter(filterParam);
     setDayKey(dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null);
     setActiveCategory(SHOP_CATEGORIES.includes(categoryParam) ? categoryParam : "All");
     setActiveSubCategoryId(subParam && subParam.length <= 64 ? subParam : null);

@@ -28,18 +28,18 @@ export function buildMerchantOrderWhatsAppUrl(
 /* -------------------------------------------------------------------------- */
 
 /** Short badge shown next to an unverified order. */
-export const VERIFY_BADGE_LABEL = "Confirm baaqi hai";
+export const VERIFY_BADGE_LABEL = "WhatsApp confirm";
 
 /** One-line notice for merchants on an unverified order. */
 export const VERIFY_NOTICE_TEXT =
-  "Customer ne abhi WhatsApp par confirm nahi kiya. Pack ya deliver karne se pehle aik dafa call ya WhatsApp par order confirm zaroor karein.";
+  "Pehle WhatsApp (ya call) pe check karo ke order waqai aaya — phir ✓ Confirm dabao. Pack uske baad.";
 
 /** Longer, calmer version for modals / bills / banners. */
 export const VERIFY_NOTICE_LONG =
-  "Ye order abhi tak customer ki taraf se WhatsApp par confirm nahi hua. Saaman pack ya rider ko dene se pehle customer se aik dafa confirm kar lein — is se fake ya ghalti se lagne wale orders ka nuqsan bach jata hai.";
+  "Customer ne app se order place kiya hai, lekin WhatsApp message confirm nahi hua. Pehle WhatsApp icon se customer ko message karo / apna WhatsApp check karo. Jab order mil jaye to \"WhatsApp mil gaya\" dabao — phir pack / deliver karo.";
 
 /** Push / toast title used when a fresh unverified order lands. */
-export const VERIFY_PUSH_TITLE = "Naya order — confirm karna zaroori hai";
+export const VERIFY_PUSH_TITLE = "Naya order — pehle WhatsApp confirm karein";
 
 /** Build wa.me link for merchant to verify with the customer. */
 export function buildCustomerVerifyWhatsAppUrl(

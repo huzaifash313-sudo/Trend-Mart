@@ -169,15 +169,43 @@ export function runLocalNlu(rawMessage: string): LocalNluResult {
     return { intent: "merchant_help", searchQuery: "", sortMode, confidence: 0.9, normalizedMessage: text };
   }
 
-  // ── 14. Deals (only when no specific product keyword present) ─────────
-  if (DEALS.test(rawLower) && !/(specific product|mobile model|laptop model|brand name)/i.test(rawLower)) {
+  // ── 14. Deals — pure deal browsing (not "sasta mobile" / "cheap shoes")
+  const dealBrowseOnly =
+    /\b(deals?|flash\s*sale|%\s*off|best\s+deals?|aaj\s+(ke\s+|ki\s+)?(deal|offer)s?|limited\s+offer)\b/i.test(
+      rawLower,
+    ) && !looksLikeProductSearch(rawLower);
+
+  if (dealBrowseOnly || (DEALS.test(rawLower) && !looksLikeProductSearch(rawLower) && !looksLikeProductSearch(text))) {
     const q = extractProductQuery(text) ?? "";
+    if (q && looksLikeProductSearch(q)) {
+      return {
+        intent: "product_search",
+        searchQuery: q,
+        categoryHint,
+        sortMode: sortMode === "relevance" ? "best_deal" : sortMode,
+        confidence: 0.9,
+        normalizedMessage: text,
+      };
+    }
     return {
       intent: "deals",
       searchQuery: q,
       categoryHint,
       sortMode: sortMode === "relevance" ? "best_deal" : sortMode,
       confidence: 0.88,
+      normalizedMessage: text,
+    };
+  }
+
+  // ── 14b. Product search early (before category "dikhao" false positives) ─
+  if (looksLikeProductSearch(text) || looksLikeProductSearch(rawMessage)) {
+    const q = extractProductQuery(text) ?? extractProductQuery(rawMessage) ?? text.slice(0, 50);
+    return {
+      intent: "product_search",
+      searchQuery: q,
+      categoryHint,
+      sortMode,
+      confidence: 0.91,
       normalizedMessage: text,
     };
   }
@@ -200,7 +228,7 @@ export function runLocalNlu(rawMessage: string): LocalNluResult {
     };
   }
 
-  // ── 17. Product search ────────────────────────────────────────────────
+  // ── 17. Product search (fallback — early path covers most cases) ────────
   if (looksLikeProductSearch(text) || looksLikeProductSearch(rawMessage)) {
     const q = extractProductQuery(text) ?? extractProductQuery(rawMessage) ?? text.slice(0, 50);
     return { intent: "product_search", searchQuery: q, categoryHint, sortMode, confidence: 0.91, normalizedMessage: text };

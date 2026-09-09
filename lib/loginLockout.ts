@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Progressive login lockout + forgot-password send caps         */
+/*  TrendsMart — Progressive login lockout (Redis-backed + memory fallback)    */
 /*                                                                             */
 /*  Protects password grant attempts against brute-force / credential stuffing */
 /*  on our auth API surface.                                                   */
@@ -11,7 +11,15 @@
 /*   - Force-reset auto-expires after 24h so a lost mailbox isn't forever      */
 /*   - Per-IP spray cap (independent of email)                                 */
 /*   - Forgot-password: max 2 successful sends per email / 30 minutes          */
+/*                                                                             */
+/*  Storage: Upstash Redis REST when configured (survives cold starts /        */
+/*  multi-instance). Falls back to in-process Maps for local/dev.              */
 /* -------------------------------------------------------------------------- */
+
+import {
+  createUpstashRestStore,
+  type RedisLikeStore,
+} from "@/lib/rateLimiterRedis";
 
 export const LOGIN_LOCKOUT = {
   /** Wrong attempts allowed before the first cooldown starts. */
@@ -60,6 +68,25 @@ const emailLocks = new Map<string, EmailLockState>();
 const ipFailures = new Map<string, CounterState>();
 const forgotSends = new Map<string, CounterState>();
 
+let redisStore: RedisLikeStore | null | undefined;
+
+function getStore(): RedisLikeStore | null {
+  if (redisStore !== undefined) return redisStore;
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (url && token) {
+    try {
+      redisStore = createUpstashRestStore(url, token);
+      return redisStore;
+    } catch {
+      redisStore = null;
+      return null;
+    }
+  }
+  redisStore = null;
+  return null;
+}
+
 function now(): number {
   return Date.now();
 }
@@ -94,7 +121,51 @@ function pruneMaps(ts: number): void {
   }
 }
 
-function getEmailState(email: string): EmailLockState {
+function emailRedisKey(email: string): string {
+  return `loginlock:email:${normalizeEmail(email)}`;
+}
+
+function ipRedisKey(ip: string): string {
+  return `loginlock:ip:${sanitizeIp(ip)}`;
+}
+
+function forgotRedisKey(email: string): string {
+  return `loginlock:forgot:${normalizeEmail(email)}`;
+}
+
+async function readJson<T>(key: string): Promise<T | null> {
+  const store = getStore();
+  if (!store) return null;
+  try {
+    const raw = await store.get(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function writeJson(key: string, value: unknown, ttlSec: number): Promise<void> {
+  const store = getStore();
+  if (!store) return;
+  try {
+    await store.set(key, JSON.stringify(value), { ex: Math.max(60, ttlSec) });
+  } catch {
+    /* fall through to memory */
+  }
+}
+
+async function deleteKey(key: string): Promise<void> {
+  const store = getStore();
+  if (!store) return;
+  try {
+    await store.del(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+function getEmailStateMemory(email: string): EmailLockState {
   const key = normalizeEmail(email);
   const existing = emailLocks.get(key);
   if (existing) {
@@ -124,6 +195,27 @@ function getEmailState(email: string): EmailLockState {
   };
   emailLocks.set(key, fresh);
   return fresh;
+}
+
+async function loadEmailState(email: string): Promise<EmailLockState> {
+  const remote = await readJson<EmailLockState>(emailRedisKey(email));
+  if (remote && typeof remote.failures === "number") {
+    emailLocks.set(normalizeEmail(email), remote);
+    return getEmailStateMemory(email);
+  }
+  return getEmailStateMemory(email);
+}
+
+async function persistEmailState(email: string, state: EmailLockState): Promise<void> {
+  emailLocks.set(normalizeEmail(email), state);
+  const ttlSec = Math.ceil(
+    Math.max(
+      LOGIN_LOCKOUT.FAILURE_WINDOW_MS,
+      state.forceReset ? LOGIN_LOCKOUT.FORCE_RESET_TTL_MS : 0,
+      Math.max(0, state.lockedUntil - now()),
+    ) / 1000,
+  );
+  await writeJson(emailRedisKey(email), state, ttlSec + 60);
 }
 
 function snapshotFromState(state: EmailLockState, ipBlocked = false): LockoutSnapshot {
@@ -180,45 +272,97 @@ function formatWait(totalSec: number): string {
   return `${m}m ${s}s`;
 }
 
-function isIpOverLimit(ip: string): boolean {
-  const key = sanitizeIp(ip);
+async function isIpOverLimit(ip: string): Promise<boolean> {
+  const remote = await readJson<CounterState>(ipRedisKey(ip));
   const ts = now();
+  if (remote && ts <= remote.resetAt) {
+    return remote.count >= LOGIN_LOCKOUT.IP_MAX_FAILURES;
+  }
+  const key = sanitizeIp(ip);
   const entry = ipFailures.get(key);
   if (!entry || ts > entry.resetAt) return false;
   return entry.count >= LOGIN_LOCKOUT.IP_MAX_FAILURES;
 }
 
-function bumpIpFailure(ip: string): void {
+async function bumpIpFailure(ip: string): Promise<void> {
   const key = sanitizeIp(ip);
   const ts = now();
-  const entry = ipFailures.get(key);
-  if (!entry || ts > entry.resetAt) {
-    ipFailures.set(key, {
-      count: 1,
-      resetAt: ts + LOGIN_LOCKOUT.IP_WINDOW_MS,
-    });
-    return;
+  const remote = await readJson<CounterState>(ipRedisKey(ip));
+  let next: CounterState;
+  if (!remote || ts > remote.resetAt) {
+    next = { count: 1, resetAt: ts + LOGIN_LOCKOUT.IP_WINDOW_MS };
+  } else {
+    next = { count: remote.count + 1, resetAt: remote.resetAt };
   }
-  entry.count += 1;
+  ipFailures.set(key, next);
+  await writeJson(
+    ipRedisKey(ip),
+    next,
+    Math.ceil((next.resetAt - ts) / 1000) + 30,
+  );
 }
 
 /**
  * Read current lockout status without mutating counters.
+ * Prefer `getLoginLockoutAsync` in API routes (Redis-aware).
  */
 export function getLoginLockout(email: string, ip: string): LockoutSnapshot {
   pruneMaps(now());
-  const state = getEmailState(email);
-  return snapshotFromState(state, isIpOverLimit(ip));
+  const state = getEmailStateMemory(email);
+  const key = sanitizeIp(ip);
+  const entry = ipFailures.get(key);
+  const ipBlocked =
+    !!entry && now() <= entry.resetAt && entry.count >= LOGIN_LOCKOUT.IP_MAX_FAILURES;
+  return snapshotFromState(state, ipBlocked);
+}
+
+export async function getLoginLockoutAsync(
+  email: string,
+  ip: string,
+): Promise<LockoutSnapshot> {
+  pruneMaps(now());
+  const state = await loadEmailState(email);
+  return snapshotFromState(state, await isIpOverLimit(ip));
 }
 
 /**
  * Record a failed password attempt. Returns the updated lockout snapshot.
+ * Prefer `recordLoginFailureAsync` in API routes.
  */
 export function recordLoginFailure(email: string, ip: string): LockoutSnapshot {
   pruneMaps(now());
-  bumpIpFailure(ip);
+  const key = sanitizeIp(ip);
+  const ts = now();
+  const entry = ipFailures.get(key);
+  if (!entry || ts > entry.resetAt) {
+    ipFailures.set(key, { count: 1, resetAt: ts + LOGIN_LOCKOUT.IP_WINDOW_MS });
+  } else {
+    entry.count += 1;
+  }
 
-  const state = getEmailState(email);
+  const state = getEmailStateMemory(email);
+  state.failures += 1;
+  state.updatedAt = ts;
+  state.lockedUntil = ts + lockDurationMs(state.failures);
+
+  if (state.failures >= LOGIN_LOCKOUT.FORCE_RESET_AFTER) {
+    state.forceReset = true;
+    state.forceResetUntil = ts + LOGIN_LOCKOUT.FORCE_RESET_TTL_MS;
+  }
+
+  const ipBlocked =
+    (ipFailures.get(key)?.count ?? 0) >= LOGIN_LOCKOUT.IP_MAX_FAILURES;
+  return snapshotFromState(state, ipBlocked);
+}
+
+export async function recordLoginFailureAsync(
+  email: string,
+  ip: string,
+): Promise<LockoutSnapshot> {
+  pruneMaps(now());
+  await bumpIpFailure(ip);
+
+  const state = await loadEmailState(email);
   const ts = now();
   state.failures += 1;
   state.updatedAt = ts;
@@ -229,7 +373,8 @@ export function recordLoginFailure(email: string, ip: string): LockoutSnapshot {
     state.forceResetUntil = ts + LOGIN_LOCKOUT.FORCE_RESET_TTL_MS;
   }
 
-  return snapshotFromState(state, isIpOverLimit(ip));
+  await persistEmailState(email, state);
+  return snapshotFromState(state, await isIpOverLimit(ip));
 }
 
 /**
@@ -237,6 +382,12 @@ export function recordLoginFailure(email: string, ip: string): LockoutSnapshot {
  */
 export function clearLoginLockout(email: string): void {
   emailLocks.delete(normalizeEmail(email));
+  void deleteKey(emailRedisKey(email));
+}
+
+export async function clearLoginLockoutAsync(email: string): Promise<void> {
+  emailLocks.delete(normalizeEmail(email));
+  await deleteKey(emailRedisKey(email));
 }
 
 /**
@@ -271,6 +422,20 @@ export function canSendForgotPassword(email: string): {
   return { allowed: true, remaining, retryAfterSec: 0 };
 }
 
+export async function canSendForgotPasswordAsync(email: string): Promise<{
+  allowed: boolean;
+  remaining: number;
+  retryAfterSec: number;
+  message?: string;
+}> {
+  const remote = await readJson<CounterState>(forgotRedisKey(email));
+  const ts = now();
+  if (remote && ts <= remote.resetAt) {
+    forgotSends.set(`email:${normalizeEmail(email)}`, remote);
+  }
+  return canSendForgotPassword(email);
+}
+
 /**
  * Count a successful forgot-password send (call only after provider accepts).
  */
@@ -283,9 +448,19 @@ export function recordForgotPasswordSend(email: string): void {
       count: 1,
       resetAt: ts + LOGIN_LOCKOUT.FORGOT_WINDOW_MS,
     });
-    return;
+  } else {
+    entry.count += 1;
   }
-  entry.count += 1;
+  const next = forgotSends.get(key)!;
+  void writeJson(
+    forgotRedisKey(email),
+    next,
+    Math.ceil((next.resetAt - ts) / 1000) + 30,
+  );
+}
+
+export async function recordForgotPasswordSendAsync(email: string): Promise<void> {
+  recordForgotPasswordSend(email);
 }
 
 /** Extract client IP for lockout keys (proxy-aware). */

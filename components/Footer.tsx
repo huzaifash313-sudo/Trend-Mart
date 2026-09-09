@@ -9,6 +9,9 @@ import { usePathname } from "next/navigation";
 /*  fixed BottomNav (with safe padding so nothing sits under the bar).         */
 /* -------------------------------------------------------------------------- */
 
+/** Stable across SSR/CSR — avoids hydration mismatch from Date() edge cases. */
+const COPYRIGHT_YEAR = 2026;
+
 const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] }[] = [
   {
     heading: "Shop",
@@ -107,7 +110,7 @@ export default function Footer() {
         </div>
 
         <p className="mt-4 border-t border-zinc-100 pt-3 text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-          &copy; {new Date().getFullYear()} TrendsMart. All rights reserved.
+          &copy; {COPYRIGHT_YEAR} TrendsMart. All rights reserved.
         </p>
       </div>
 
@@ -154,7 +157,7 @@ export default function Footer() {
           ))}
         </div>
         <div className="mt-6 border-t border-zinc-100 pt-4 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-          &copy; {new Date().getFullYear()} TrendsMart. All rights reserved.
+          &copy; {COPYRIGHT_YEAR} TrendsMart. All rights reserved.
         </div>
       </div>
     </footer>

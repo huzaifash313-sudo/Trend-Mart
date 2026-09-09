@@ -182,14 +182,26 @@ export const BRAND_KNOWLEDGE: BrandKnowledgeEntry[] = [
   },
 ];
 
+/** Roman-Urdu / English glue words — never score these alone (false owner FAQs). */
+const SCORE_STOPWORDS = new Set([
+  "ka", "ki", "ke", "ko", "se", "par", "pe", "mein", "main", "me", "do", "de",
+  "dedo", "hai", "ho", "hain", "the", "a", "an", "of", "to", "for", "in", "on",
+  "is", "are", "ya", "or", "and", "aur", "ye", "yeh", "wo", "woh", "ji", "bhai",
+  "yar", "yaar", "plz", "please", "mujhe", "mujhay", "mera", "meri", "mere",
+]);
+
 function tokenize(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
       .replace(/[^\w\s\u0600-\u06FF]/g, " ")
       .split(/\s+/)
-      .filter((w) => w.length > 1),
+      .filter((w) => w.length > 2 && !SCORE_STOPWORDS.has(w)),
   );
+}
+
+function scoreKeyToken(token: string): boolean {
+  return token.length > 2 && !SCORE_STOPWORDS.has(token);
 }
 
 export function matchBrandKnowledge(
@@ -199,12 +211,11 @@ export function matchBrandKnowledge(
   const lower = message.toLowerCase();
   const tokens = tokenize(lower);
 
-  // Hard win for owner questions
+  // Hard win for clear owner / founder questions only
   if (
-    /(owner|founder|ceo|malik|banaya|banane|kis ne|kisne|who (made|created|owns)|huzaifa|creator|developer)/i.test(
+    /(owner|founder|ceo|malik|maalik|banaya|banane|kis\s*ne|kisne|who\s+(made|created|owns|built)|huzaifa|creator|developer)/i.test(
       lower,
-    ) &&
-    /(trend|app|mart|platform|ye|yeh|is|owner|founder)?/i.test(lower)
+    )
   ) {
     const entry = BRAND_KNOWLEDGE[0];
     return {
@@ -225,14 +236,23 @@ export function matchBrandKnowledge(
       (role === "shop" && entry.roles === "customer");
     if (!allowed) continue;
 
-    let score = (entry.priority ?? 0) / 10;
+    // Priority alone must NOT push past threshold — require real key hits.
+    let score = 0;
+    let phraseHit = false;
     for (const key of entry.keys) {
-      if (lower.includes(key.toLowerCase())) score += 30;
-      for (const t of key.toLowerCase().split(/\s+/)) {
-        if (tokens.has(t)) score += 8;
+      const keyLower = key.toLowerCase();
+      if (lower.includes(keyLower)) {
+        score += 30;
+        phraseHit = true;
+      }
+      for (const t of keyLower.split(/\s+/)) {
+        if (scoreKeyToken(t) && tokens.has(t)) score += 8;
       }
     }
-    if (score > bestScore) {
+    // Soft boost only after at least one meaningful signal
+    if (score > 0) score += (entry.priority ?? 0) / 20;
+
+    if (score > bestScore && (phraseHit || score >= 24)) {
       bestScore = score;
       best = entry;
     }

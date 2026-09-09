@@ -719,9 +719,17 @@ function HomeClient({
           return;
         }
 
-        // Radius mode needs a pin; otherwise fall back to unfiltered list
+        // Radius mode needs a pin — never fall back to the full unfiltered list
+        // (that silently bypassed the customer's "Near me" choice).
         if (scope === "radius" && !coords) {
-          setProximityActive(false);
+          setProximityActive(true);
+          setGeoFilteredShops([]);
+          return;
+        }
+
+        // City mode without a city/pin also stays empty until location is set.
+        if (scope === "city" && !coords && !globalLocation?.city) {
+          setProximityActive(true);
           setGeoFilteredShops([]);
           return;
         }
@@ -785,6 +793,11 @@ function HomeClient({
   ]);
 
   const displayShops = proximityActive ? geoFilteredShops : filteredShops;
+  const needsLocationForGeo =
+    proximityActive &&
+    displayShops.length === 0 &&
+    ((geoFilter.scope === "radius" && !(globalCoords || geoFilter.coordinates)) ||
+      (geoFilter.scope === "city" && !globalCoords && !globalLocation?.city));
   const showProximityBadges =
     proximityActive &&
     (geoFilter.scope === "radius"
@@ -1189,14 +1202,35 @@ function HomeClient({
               </svg>
             </div>
             <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
-              {searchQuery || activeCategory !== "All" ? "No shops match" : "No shops nearby yet"}
+              {needsLocationForGeo
+                ? geoFilter.scope === "city"
+                  ? "City / location chahiye"
+                  : "Location pin chahiye"
+                : searchQuery || activeCategory !== "All"
+                  ? "No shops match"
+                  : "No shops nearby yet"}
             </h3>
             <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-              {searchQuery || activeCategory !== "All"
-                ? "Try another category, clear search, or widen your area filter."
-                : "Browse products and deals while local stores come online. You can shop freely — checkout uses a verified email."}
+              {needsLocationForGeo
+                ? "Near me / city filter tabhi shops dikhata hai jab aap apni location share karo. Upar se location on karo, ya All Pakistan select karo."
+                : searchQuery || activeCategory !== "All"
+                  ? "Try another category, clear search, or widen your area filter."
+                  : "Browse products and deals while local stores come online. You can shop freely — checkout uses a verified email."}
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {needsLocationForGeo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGeoDetecting(true);
+                    void detectLocation().finally(() => setGeoDetecting(false));
+                  }}
+                  disabled={geoDetecting}
+                  className="tm-btn-primary rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60"
+                >
+                  {geoDetecting ? "Detecting…" : "Share my location"}
+                </button>
+              )}
               {(searchQuery || activeCategory !== "All") && (
                 <button
                   type="button"

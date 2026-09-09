@@ -171,7 +171,7 @@ export async function searchByShopNameAndProduct(
         `Possible reasons:\n` +
         `• Naam thora alag ho sakta hai — exact spelling try karein\n` +
         `• Shop abhi live nahi hai\n\n` +
-        `👉 [Browse all shops](/products) · [Search](/products?q=${encodeURIComponent(shopName)})`,
+        `👉 [Browse all shops](/products) · [Search](/search?q=${encodeURIComponent(shopName)})`,
     };
   }
 
@@ -243,7 +243,7 @@ export async function runUniversalSearch(
     });
   }
 
-  parts.push(`\n[Browse all](/products?q=${encodeURIComponent(q)})`);
+  parts.push(`\n[Browse all](/search?q=${encodeURIComponent(q)})`);
 
   return {
     intent: "universal_search",

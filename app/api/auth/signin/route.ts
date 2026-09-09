@@ -7,18 +7,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Session, User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
 import {
-  getLoginLockout,
-  recordLoginFailure,
-  clearLoginLockout,
+  getLoginLockoutAsync,
+  recordLoginFailureAsync,
+  clearLoginLockoutAsync,
   clientIpFromHeaders,
 } from "@/lib/loginLockout";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { findAuthUserByEmail, issueAndSendOtp } from "@/lib/authOtpServer";
 import { resendCooldownRemainingMs } from "@/lib/otp";
+import {
+  checkRateLimitAsync,
+  RATE_LIMITS,
+  buildRateLimitResponse,
+} from "@/lib/rateLimiter";
 
 export const runtime = "nodejs";
 
@@ -84,12 +88,27 @@ function buildSignInSuccessResponse(
   const role = resolveRole(data.user);
   const needsVerification = !data.user.email_confirmed_at;
 
+  // Unverified accounts must not receive a session cookie — guest browse only
+  // until email OTP succeeds. Client shows the verify modal from this payload.
+  if (needsVerification) {
+    return NextResponse.json({
+      success: false,
+      needsVerification: true,
+      error: "Please verify your email before signing in. Check your inbox for the code.",
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        email_confirmed_at: null,
+      },
+    }, { status: 403 });
+  }
+
   // SECURITY: never return access/refresh tokens in JSON — session lives in
   // httpOnly cookies set below. Tokens in response bodies leak via XSS/logs.
   const response = NextResponse.json({
     success: true,
-    needsVerification,
-    role: needsVerification ? undefined : role,
+    needsVerification: false,
+    role,
     user: {
       id: data.user.id,
       email: data.user.email,
@@ -107,7 +126,7 @@ function buildSignInSuccessResponse(
 }
 
 export async function POST(request: NextRequest) {
-  const limited = checkRateLimit(request, { ...RATE_LIMITS.AUTH, name: "auth-signin" });
+  const limited = await checkRateLimitAsync(request, { ...RATE_LIMITS.AUTH, name: "auth-signin" });
   if (!limited.allowed) {
     const res = buildRateLimitResponse(limited);
     return NextResponse.json(res.body, { status: res.status, headers: res.headers });
@@ -141,7 +160,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const lock = getLoginLockout(email, ip);
+  const lock = await getLoginLockoutAsync(email, ip);
   if (!lock.allowed) {
     return NextResponse.json(
       {
@@ -210,7 +229,7 @@ export async function POST(request: NextRequest) {
           await admin.auth.admin.updateUserById(existing.id, { email_confirm: true });
           const retry = await supabase.auth.signInWithPassword({ email, password });
           if (!retry.error && retry.data.user && retry.data.session) {
-            clearLoginLockout(email);
+            await clearLoginLockoutAsync(email);
             return buildSignInSuccessResponse(
               { user: retry.data.user, session: retry.data.session },
               pendingCookies,
@@ -245,7 +264,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const nextLock = recordLoginFailure(email, ip);
+    const nextLock = await recordLoginFailureAsync(email, ip);
     return NextResponse.json(
       {
         success: false,
@@ -263,7 +282,37 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  clearLoginLockout(email);
+  // Password ok but email not confirmed yet — do not keep the session.
+  if (!data.user.email_confirmed_at) {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* ignore */
+    }
+    const admin = getSupabaseAdminClient();
+    if (admin) {
+      const { data: pending } = await admin
+        .from("email_verification_otps")
+        .select("last_sent_at")
+        .eq("email", email)
+        .maybeSingle();
+      const lastSent = (pending as { last_sent_at?: string } | null)?.last_sent_at ?? "";
+      if (resendCooldownRemainingMs(lastSent) <= 0) {
+        await issueAndSendOtp(admin, email, data.user.id);
+      }
+    }
+    return NextResponse.json(
+      {
+        success: false,
+        needsVerification: true,
+        error: "Please verify your email before signing in. Check your inbox for the code.",
+        user: { id: data.user.id, email: data.user.email, email_confirmed_at: null },
+      },
+      { status: 403 },
+    );
+  }
+
+  await clearLoginLockoutAsync(email);
 
   return buildSignInSuccessResponse(
     { user: data.user, session: data.session },

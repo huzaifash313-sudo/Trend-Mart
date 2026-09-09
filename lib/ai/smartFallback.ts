@@ -125,7 +125,7 @@ async function tryStrongCatalog(
         intent: "shop_search",
         confidence: Math.min(0.92, 0.65 + shops[0].score / 200),
         suggestions: ["Best mobile ka link do", "Best deals?", "Order kaise karun?"],
-        reply: `🏪 *Shops for "${query}":*\n\n${list}\n\n🔎 [Browse products](/products?q=${encodeURIComponent(query)})`,
+        reply: `🏪 *Shops for "${query}":*\n\n${list}\n\n🔎 [Browse products](/search?q=${encodeURIComponent(query)})`,
       };
     }
   }

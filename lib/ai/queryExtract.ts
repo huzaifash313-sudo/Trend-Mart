@@ -3,7 +3,7 @@
 const STOP_PHRASES = [
   /\b(best|sasta|sasti|cheap|top|achha|achhi|behtarin|konsa|kon sa|konsi|kon si|recommended|suggest|recommend)\b/gi,
   /\b(link|url|de do|dedo|batao|batado|dikhao|dhundo|dhund|find|search|milega|milta|milenge|chahiye|chahye|chaye)\b/gi,
-  /\b(kahan|kaha|where|shop|dukan|dukaan|store|se|par|mein|main|hai|ho|ka|ki|ke|ko|wala|wali)\b/gi,
+  /\b(kahan|kaha|where|shop|dukan|dukaan|store|se|par|mein|main|hai|ho|ka|ki|ke|ko|do|de|wala|wali)\b/gi,
   /\b(mujhe|mujhay|mujhy|i need|i want|give me|show me|please|plz|yar|yaar|bhai|bro)\b/gi,
   /\b(product|item|cheez|saman|brand|option|options)\b/gi,
 ];
@@ -147,20 +147,31 @@ export function looksLikeProductSearch(message: string): boolean {
     return false;
   }
 
+  // Pure deal browsing ("best deals dikhao") is not a catalog product ask
+  const dealBrowse =
+    /\b(deals?|flash\s*sale|%\s*off|best\s+deals?|aaj\s+(ke\s+|ki\s+)?(deal|offer)s?|limited\s+offer)\b/i.test(
+      lower,
+    );
+  const words = lower.split(/\s+/).map((w) => w.replace(/[^a-z0-9\u0600-\u06FF]/g, ""));
+  const hasProductSignal = words.some((w) => PRODUCT_SIGNALS.has(w));
+  if (dealBrowse && !hasProductSignal) return false;
+
   if (
-    /(link|url|kahan|dhund|find|search|milega|milta|chahiye|dedo|de do|dikhao|recommend|suggest|available|stock|price|kitna|rate)/i.test(
+    /(link|url|kahan|dhund|find|search|milega|milta|chahiye|dedo|de do|recommend|suggest|available|stock|price|kitna|rate)/i.test(
       lower,
     )
   ) {
     return true;
   }
 
+  // "dikhao" alone is weak — need a product / brand signal
+  if (/\bdikhao\b/i.test(lower) && hasProductSignal) return true;
+
   if (/(best|sasta|top|cheap|behtarin|achha|achhi)\s+\w+/i.test(lower)) {
     return true;
   }
 
-  const words = lower.split(/\s+/);
-  return words.some((w) => PRODUCT_SIGNALS.has(w.replace(/[^a-z0-9]/g, "")));
+  return hasProductSignal;
 }
 
 export function shouldRunProductSearch(

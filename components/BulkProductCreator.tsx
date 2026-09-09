@@ -50,6 +50,8 @@ interface BulkRow {
   images: string[];
   variants: VariantGroup[];
   price_tiers: PriceTier[];
+  /** Default true — merchant can mark Out of Stock while bulk-adding. */
+  is_available: boolean;
 }
 
 function newRow(defaultSubId = ""): BulkRow {
@@ -64,6 +66,7 @@ function newRow(defaultSubId = ""): BulkRow {
     images: [],
     variants: [],
     price_tiers: [],
+    is_available: true,
   };
 }
 
@@ -287,7 +290,7 @@ export default function BulkProductCreator({
             : null,
         image_url: gallery.image_url,
         images: gallery.images,
-        is_available: true,
+        is_available: r.is_available !== false,
         category_id: shopCategory,
         sub_category_id: subId,
         variants: sanitizeVariantGroups(r.variants),
@@ -523,6 +526,20 @@ export default function BulkProductCreator({
                       className={fieldClass}
                       title="Original / was price"
                     />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRow(row.key, { is_available: !row.is_available })
+                      }
+                      className={`mt-1.5 w-full rounded-md px-1.5 py-1 text-[10px] font-semibold transition-colors ${
+                        row.is_available
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                      title="In stock / Out of stock"
+                    >
+                      {row.is_available ? "In stock" : "Out of stock"}
+                    </button>
                   </td>
                   <td className="px-2 py-2.5">
                     <input
@@ -681,6 +698,23 @@ export default function BulkProductCreator({
                     className={fieldClass}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Availability</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRow(row.key, { is_available: !row.is_available })
+                  }
+                  className={`w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    row.is_available
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                      : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                  }`}
+                >
+                  {row.is_available ? "In stock" : "Out of stock"}
+                </button>
               </div>
 
               <div>

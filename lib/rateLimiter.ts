@@ -466,3 +466,21 @@ export function resetRateLimits(): void {
   store.clear();
   lastCleanup = Date.now();
 }
+
+/**
+ * Redis-aware rate limit for Node API routes. Uses Upstash when configured,
+ * otherwise the same in-memory limiter as `checkRateLimit`.
+ */
+export async function checkRateLimitAsync(
+  request: NextRequest,
+  config?: RateLimitConfig,
+): Promise<RateLimitResult> {
+  try {
+    const { bootstrapDistributedRateLimiter, getDistributedRateLimiter } =
+      await import("./rateLimiterRedis");
+    bootstrapDistributedRateLimiter();
+    return await getDistributedRateLimiter().checkRateLimit(request, config);
+  } catch {
+    return checkRateLimit(request, config);
+  }
+}

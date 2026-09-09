@@ -29,8 +29,10 @@ import {
 import {
   refreshCartForScope,
   migrateGuestCartToUserBucket,
+  useCartStore,
 } from "@/store/cartStore";
 import { migrateGuestFavoritesToUserBucket } from "@/services/wishlistService";
+import { pullAndMergeCart } from "@/services/cartSyncService";
 
 /** Non-account device keys that predate namespacing and must never survive
  *  across accounts (notification bell rows, review dismissals). The current
@@ -61,6 +63,18 @@ function adoptGuestData(userId: string): void {
   adoptGuestBucket("trendsmart_recent_views_v1", userId);
   adoptGuestBucket("trendsmart_search_history_v1", userId);
   adoptGuestBucket("trendsmart_category_affinity_v1", userId);
+}
+
+async function syncCartFromCloud(): Promise<void> {
+  try {
+    const local = useCartStore.getState().items;
+    const merged = await pullAndMergeCart(local);
+    if (JSON.stringify(merged) !== JSON.stringify(local)) {
+      useCartStore.getState().replaceItemsQuiet(merged);
+    }
+  } catch {
+    /* offline */
+  }
 }
 
 export default function AccountScopeGuard() {
@@ -94,6 +108,7 @@ export default function AccountScopeGuard() {
 
       setScopeOwner(uid);
       refreshCartForScope();
+      if (uid) void syncCartFromCloud();
     }
 
     // `onAuthStateChange` fires an INITIAL_SESSION event immediately, which

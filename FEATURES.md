@@ -604,14 +604,20 @@ Google Places (new text search) → legacy → Photon → Nominatim; Pakistan-bo
 - Security: RLS hardening, idempotency, rate limiting, sanitization, security headers, env audit, mass-delete protection
 
 ### 🔜 Planned / Partially Wired (from `.cursorrules` roadmap)
-- **SMS Phone OTP at checkout** — removed in favor of email-only verification; `phone_verified_at` infrastructure exists
-- **Strict merchant approval queue** — DB configured for auto-approve (instant-live) via `DISABLE_merchant_approval_queue.sql`; admin UI exists but legacy
+- **SMS Phone OTP at checkout** — **later** (budget). Soft launch uses email verification only; `phone_verified_at` infrastructure exists for when SMS is enabled.
+- **Strict merchant approval queue** — **later**. Soft launch keeps auto-approve (`verification_status='approved'`, `is_live=true`) so merchants sell immediately after email OTP. Admin UI remains for future strict mode.
 - **Cloudinary image storage engine** — currently Supabase Storage; Cloudinary free-tier WebP compression is a documented goal
 - **Custom SMTP for all transactional email** — Resend wired; Supabase Auth custom SMTP config is an ops task
 - **2FA / View My Data** — marked "coming soon" in `/settings/privacy`
 - **Native app wrapper** (Capacitor/TWA) — PWA covers it for now
 - **Bulk-price tiers** in product form — marked "coming soon" in UI
-- **Payment gateway** — intentionally $0 (WhatsApp-first / COD); Stripe/JazzCash placeholders only
+- **Order payment gateway** — intentionally not used. Money is customer ↔ merchant (WhatsApp / COD). Platform billing (JazzCash placeholders) is for ads/tokens only, not product orders.
+
+### Soft-launch notes (Sep 2026)
+- Guests browse freely; order / open store / account actions need verified email login.
+- Merchant Order Desk: new orders stay “WhatsApp confirm” until merchant taps **WhatsApp mil gaya** (or confirms when changing status).
+- Cart: items persist locally + in `customer_carts` when signed in; floating cart badge is session-only (reopen → use `/cart`).
+- Geo “Near me” requires a real pin — no silent full-list fallback.
 
 ---
 

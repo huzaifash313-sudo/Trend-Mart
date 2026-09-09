@@ -15,12 +15,15 @@ type AdminClient = NonNullable<ReturnType<typeof getSupabaseAdminClient>>;
 /**
  * HMAC key for hashing OTP codes.
  * Prefer a dedicated `OTP_HMAC_SECRET` so a service-role leak cannot forge codes.
- * Falls back to the service-role key only when the dedicated secret is unset
- * (local/dev). Never uses a hardcoded fallback string.
+ * In production the dedicated secret is required (fail closed).
+ * Local/dev may fall back to the service-role key.
  */
 export function getOtpHmacSecret(): string {
   const dedicated = process.env.OTP_HMAC_SECRET?.trim();
   if (dedicated) return dedicated;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("OTP_HMAC_SECRET is required in production.");
+  }
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (serviceRole) return serviceRole;
   throw new Error("OTP HMAC secret is not configured (set OTP_HMAC_SECRET).");

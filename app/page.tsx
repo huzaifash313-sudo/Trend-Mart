@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import type { ShopCategory, Shop, Story } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import HomeClient from "@/components/HomeClient";
@@ -17,39 +18,36 @@ export async function generateMetadata({
   const category = params.category?.trim();
   const q = params.q?.trim();
 
-  if (!category && !q) {
+  // Text queries redirect to /search — don't index thin /?q= URLs.
+  if (q) {
+    return {
+      ...generateHomepageMetadata(),
+      robots: { index: false, follow: true },
+    };
+  }
+
+  if (!category) {
     return generateHomepageMetadata();
   }
 
   const base = generateHomepageMetadata();
-  const title = q
-    ? `Shops: "${q}"`
-    : category && SHOP_CATEGORIES.includes(category as ShopCategory)
-      ? `${category} shops near you`
-      : base.title;
+  const title = SHOP_CATEGORIES.includes(category as ShopCategory)
+    ? `${category} shops near you`
+    : base.title;
 
   return {
     ...base,
     title: title as string,
-    description: q
-      ? `Local shops matching "${q}" on TrendsMart — browse products, deals, and order via WhatsApp.`
-      : category
-        ? `Discover ${category.toLowerCase()} shops on TrendsMart. Order via WhatsApp from stores near you.`
-        : base.description,
+    description: `Discover ${category.toLowerCase()} shops on TrendsMart. Order via WhatsApp from stores near you.`,
+    robots: { index: true, follow: true },
   };
 }
 
 /**
  * Homepage — server-rendered storefront.
  *
- * The server fetches the core public datasets (shops + stories) so the first
- * paint ships real content instead of skeletons, and the client seeds its
- * React Query cache with that data (no duplicate fetch). Deals / coupons and
- * all interactivity stay on the client as non-blocking enrichment.
- *
- * SSR is a progressive enhancement: if the initial fetch fails (misconfig,
- * Supabase hiccup) we render with empty seeds and the client fetches on its
- * own, exactly like the previous client-only behaviour.
+ * Text queries (`?q=`) redirect to unified `/search` so products + shops +
+ * deals share one path. Category filters stay on `/`.
  */
 export default async function Home({
   searchParams,
@@ -57,8 +55,12 @@ export default async function Home({
   searchParams: Promise<{ category?: string; q?: string }>;
 }) {
   const params = await searchParams;
+  const q = params.q?.trim();
+  if (q) {
+    redirect(`/search?q=${encodeURIComponent(q)}`);
+  }
+
   const initialCategory = (params.category as ShopCategory | undefined) ?? "All";
-  const initialQuery = params.q ?? "";
 
   let initial = { shops: EMPTY_SHOPS, stories: EMPTY_STORIES, myShopId: null as string | null };
   try {
@@ -75,7 +77,7 @@ export default async function Home({
       initialCategory={
         SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All"
       }
-      initialQuery={initialQuery}
+      initialQuery=""
     />
   );
 }

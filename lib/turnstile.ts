@@ -9,11 +9,20 @@ const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverif
 
 export { getTurnstileSiteKey, isTurnstileUiEnabled } from "@/lib/turnstilePublic";
 
-/** Server: enforce captcha only when the secret is configured. */
+/** Server: enforce captcha when secret+site key are set; in production fail closed if half-configured. */
 export function isTurnstileEnforced(): boolean {
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
   const siteKey = getTurnstileSiteKey();
   return Boolean(secret && siteKey);
+}
+
+/** True when production expects captcha but keys are incomplete. */
+export function isTurnstileMisconfiguredInProduction(): boolean {
+  if (process.env.NODE_ENV !== "production") return false;
+  const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
+  const siteKey = getTurnstileSiteKey();
+  // Soft-launch: only fail closed if one side is set without the other.
+  return Boolean((secret && !siteKey) || (!secret && siteKey));
 }
 
 export interface TurnstileVerifyResult {
@@ -29,6 +38,13 @@ export async function verifyTurnstileToken(
   token: string | undefined | null,
   remoteIp?: string,
 ): Promise<TurnstileVerifyResult> {
+  if (isTurnstileMisconfiguredInProduction()) {
+    return {
+      ok: false,
+      error: "Security check is misconfigured. Please try again later.",
+    };
+  }
+
   if (!isTurnstileEnforced()) {
     return { ok: true };
   }

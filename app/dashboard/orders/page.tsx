@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMyShop } from "@/services/shopService";
-import { fetchOrdersByShopId } from "@/services/orderService";
+import { fetchOrdersByShopId, confirmOrderWhatsAppAsMerchant } from "@/services/orderService";
 import { getOrCreateConversationForOrder } from "@/services/messagingService";
 import {
   getStatusLabel,
@@ -173,13 +173,25 @@ export default function MerchantOrdersPage() {
       // Guard: never let an unverified order silently move into fulfilment.
       if (isAwaitingWhatsApp(order) && status !== "Cancelled") {
         const proceed = await confirm({
-          title: "Order abhi confirm nahi hua",
-          message: `${VERIFY_NOTICE_LONG}\n\nKya aap ne customer se baat kar li hai?`,
-          confirmLabel: "Haan, confirm ho chuka",
-          cancelLabel: "Pehle confirm karta hoon",
+          title: "Pehle WhatsApp confirm?",
+          message: `${VERIFY_NOTICE_LONG}\n\nAgar WhatsApp / call pe order mil gaya hai to Confirm dabao.`,
+          confirmLabel: "Haan, WhatsApp mil gaya",
+          cancelLabel: "Pehle check karta hoon",
           variant: "warning",
         });
         if (!proceed) return;
+        const confirmed = await confirmOrderWhatsAppAsMerchant(order.id);
+        if (!confirmed.success) {
+          addToast(confirmed.error ?? "WhatsApp confirm nahi hua.", "error");
+          return;
+        }
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? { ...o, whatsapp_sent_at: confirmed.data.whatsappSentAt ?? new Date().toISOString() }
+              : o,
+          ),
+        );
       }
       const result = await transitionOrderStatus(order.id, status);
       if (result.success) {
@@ -190,6 +202,25 @@ export default function MerchantOrdersPage() {
       }
     },
     [addToast, confirm],
+  );
+
+  const markWhatsAppReceived = useCallback(
+    async (order: Order) => {
+      const result = await confirmOrderWhatsAppAsMerchant(order.id);
+      if (result.success) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? { ...o, whatsapp_sent_at: result.data.whatsappSentAt ?? new Date().toISOString() }
+              : o,
+          ),
+        );
+        addToast("WhatsApp confirm ho gaya — ab pack kar sakte ho.", "success");
+      } else {
+        addToast(result.error ?? "Confirm nahi hua.", "error");
+      }
+    },
+    [addToast],
   );
 
   const openCustomerWhatsApp = (order: Order) => {
@@ -439,8 +470,19 @@ export default function MerchantOrdersPage() {
                       title={isAwaitingWhatsApp(order) ? "Customer se WhatsApp par order confirm karein" : "Customer ko WhatsApp par message karein"}
                     >
                       <span aria-hidden="true">💬</span>
-                      {isAwaitingWhatsApp(order) ? "Confirm karein" : "WhatsApp"}
+                      {isAwaitingWhatsApp(order) ? "WhatsApp" : "WhatsApp"}
                     </button>
+                    {isAwaitingWhatsApp(order) && (
+                      <button
+                        type="button"
+                        onClick={() => void markWhatsAppReceived(order)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 dark:hover:bg-emerald-900/50"
+                        title="WhatsApp pe order mil gaya — confirm karein"
+                      >
+                        <span aria-hidden="true">✓</span>
+                        WhatsApp mil gaya
+                      </button>
+                    )}
                     {isAwaitingWhatsApp(order) && order.status === "Pending" && (
                       <button
                         type="button"

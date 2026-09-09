@@ -15,6 +15,8 @@ import type { PriceTier, Product, Shop } from "@/types";
 import { getProductDiscount } from "@/lib/formatters";
 import { applyPooledTierPrices } from "@/lib/priceTiers";
 import { scopedKey, scopedKeyFor } from "@/lib/clientScope";
+import { activateCartDock, deactivateCartDock } from "@/lib/cartDockSession";
+import { schedulePushCartToDb } from "@/services/cartSyncService";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -184,6 +186,14 @@ interface CartState {
     originalPrice?: number | null,
   ) => void;
   clearCart: () => void;
+  /** Replace items after DB merge (does not activate the floating dock). */
+  replaceItemsQuiet: (items: CartItem[]) => void;
+}
+
+function afterActiveCartMutation(): void {
+  if (typeof window === "undefined") return;
+  activateCartDock();
+  schedulePushCartToDb(useCartStore.getState().items);
 }
 
 export const useCartStore = create<CartState>()(
@@ -273,6 +283,7 @@ export const useCartStore = create<CartState>()(
             ]),
           };
         });
+        afterActiveCartMutation();
       },
 
       removeItem: (cartItemId) => {
@@ -280,6 +291,7 @@ export const useCartStore = create<CartState>()(
         set((state) => ({
           items: applyPooledTierPrices(state.items.filter((i) => i.id !== cartItemId)),
         }));
+        afterActiveCartMutation();
       },
 
       updateQuantity: (cartItemId, quantity) => {
@@ -287,6 +299,7 @@ export const useCartStore = create<CartState>()(
         const safeQuantity = sanitizeQuantity(quantity);
         if (safeQuantity < 1) {
           set((state) => ({ items: state.items.filter((i) => i.id !== cartItemId) }));
+          afterActiveCartMutation();
           return;
         }
         set((state) => ({
@@ -301,6 +314,7 @@ export const useCartStore = create<CartState>()(
             ),
           ),
         }));
+        afterActiveCartMutation();
       },
 
       updateItemNotes: (cartItemId, notes) => {
@@ -311,6 +325,7 @@ export const useCartStore = create<CartState>()(
             i.id === cartItemId ? { ...i, notes: safeNotes || undefined } : i,
           ),
         }));
+        afterActiveCartMutation();
       },
 
       updateItemVariant: (cartItemId, variant, price, originalPrice) => {
@@ -334,6 +349,7 @@ export const useCartStore = create<CartState>()(
             ),
           ),
         }));
+        afterActiveCartMutation();
       },
 
       clearCart: () => {
@@ -343,10 +359,17 @@ export const useCartStore = create<CartState>()(
             useCartStore.persist.clearStorage();
             // Legacy flat key from pre-namespacing builds.
             localStorage.removeItem("trendsmart_cart");
+            deactivateCartDock();
+            schedulePushCartToDb([]);
           }
         } catch {
           /* ignore */
         }
+      },
+
+      replaceItemsQuiet: (items) => {
+        set({ items: applyPooledTierPrices(sanitizeCartItems(items)) });
+        schedulePushCartToDb(useCartStore.getState().items);
       },
     }),
     {

@@ -248,6 +248,7 @@ export function generateProductsMetadata(query?: string): Metadata {
     description: desc,
     keywords: ["products", "For You", "local products Pakistan", ...DEFAULT_KEYWORDS],
     alternates: { canonical: absoluteUrl("/products") },
+    robots: query ? { index: false, follow: true } : undefined,
     openGraph: {
       title: `${title} — ${SITE_NAME}`,
       description: desc,
@@ -287,6 +288,7 @@ export function generateDealsMetadata(query?: string, day?: string): Metadata {
       ...DEFAULT_KEYWORDS,
     ],
     alternates: { canonical: absoluteUrl("/deals") },
+    robots: query ? { index: false, follow: true } : undefined,
     openGraph: {
       title: `${title} — ${SITE_NAME}`,
       description: desc,
@@ -602,7 +604,7 @@ export function generateSiteJsonLd(): Record<string, unknown>[] {
         "@type": "SearchAction",
         target: {
           "@type": "EntryPoint",
-          urlTemplate: `${absoluteUrl("/products")}?q={search_term_string}`,
+          urlTemplate: `${absoluteUrl("/search")}?q={search_term_string}`,
         },
         "query-input": "required name=search_term_string",
       },

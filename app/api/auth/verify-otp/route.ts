@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
-import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
+import { checkRateLimitAsync, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 import {
   isValidOtpFormat,
   isOtpExpired,
@@ -39,7 +39,7 @@ function json(status: number, body: Record<string, unknown>) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = checkRateLimit(request, { ...RATE_LIMITS.AUTH, name: "auth-verify-otp" });
+  const limited = await checkRateLimitAsync(request, { ...RATE_LIMITS.AUTH, name: "auth-verify-otp" });
   if (!limited.allowed) {
     const res = buildRateLimitResponse(limited);
     return NextResponse.json(res.body, { status: res.status, headers: res.headers });

@@ -3,6 +3,8 @@ import { absoluteUrl, generateDealsMetadata, generateProductsMetadata } from "@/
 
 const SITE_NAME = "TrendsMart";
 
+const NOINDEX: Metadata["robots"] = { index: false, follow: true };
+
 /** Dynamic metadata for `/products` listing (query + category filters). */
 export function buildProductsListingMetadata(params: {
   q?: string;
@@ -12,8 +14,20 @@ export function buildProductsListingMetadata(params: {
   const category = params.category?.trim();
   const base = generateProductsMetadata(q);
 
+  // Thin query pages stay out of the index; canonical points at clean listing.
+  if (q) {
+    return {
+      ...base,
+      robots: NOINDEX,
+      alternates: { canonical: absoluteUrl("/products") },
+      openGraph: {
+        ...base.openGraph,
+        url: absoluteUrl(`/products?q=${encodeURIComponent(q)}`),
+      },
+    };
+  }
+
   const pathParams = new URLSearchParams();
-  if (q) pathParams.set("q", q);
   if (category && category !== "All") pathParams.set("category", category);
   const path = pathParams.toString()
     ? `/products?${pathParams.toString()}`
@@ -22,20 +36,16 @@ export function buildProductsListingMetadata(params: {
   if (!category || category === "All") {
     return {
       ...base,
-      alternates: { canonical: absoluteUrl(path) },
+      alternates: { canonical: absoluteUrl("/products") },
       openGraph: {
         ...base.openGraph,
-        url: absoluteUrl(path),
+        url: absoluteUrl("/products"),
       },
     };
   }
 
-  const title = q
-    ? `${category} — "${q}"`
-    : `${category} products`;
-  const desc = q
-    ? `${category} products matching "${q}" on ${SITE_NAME} — order via WhatsApp from local shops.`
-    : `Browse ${category.toLowerCase()} products from verified local shops on ${SITE_NAME}.`;
+  const title = `${category} products`;
+  const desc = `Browse ${category.toLowerCase()} products from verified local shops on ${SITE_NAME}.`;
 
   return {
     ...base,
@@ -74,8 +84,21 @@ export function buildDealsListingMetadata(params: {
   const day = params.day?.trim();
   const base = generateDealsMetadata(q, day);
 
+  if (q) {
+    return {
+      ...base,
+      title: `Deals: "${q}"`,
+      robots: NOINDEX,
+      alternates: { canonical: absoluteUrl("/deals") },
+      openGraph: {
+        ...base.openGraph,
+        title: `Deals: "${q}" · ${SITE_NAME}`,
+        url: absoluteUrl(`/deals?q=${encodeURIComponent(q)}`),
+      },
+    };
+  }
+
   const pathParams = new URLSearchParams();
-  if (q) pathParams.set("q", q);
   if (category && category !== "All") pathParams.set("category", category);
   if (params.filter && params.filter !== "today") {
     pathParams.set("filter", params.filter);
@@ -87,9 +110,7 @@ export function buildDealsListingMetadata(params: {
 
   let title = "Deals for you";
   if (category && category !== "All") {
-    title = q ? `${category} deals — "${q}"` : `${category} deals`;
-  } else if (q) {
-    title = `Deals: "${q}"`;
+    title = `${category} deals`;
   } else if (day) {
     title = `Deals on ${day}`;
   }
@@ -103,7 +124,7 @@ export function buildDealsListingMetadata(params: {
     ...base,
     title,
     description: desc,
-    alternates: { canonical: absoluteUrl(path) },
+    alternates: { canonical: absoluteUrl(path === "/deals" ? "/deals" : path) },
     openGraph: {
       ...base.openGraph,
       title: `${title} · ${SITE_NAME}`,

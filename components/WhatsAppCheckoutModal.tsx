@@ -378,7 +378,16 @@ function buildWhatsAppMessage(
   lines.push(`${safeCustomerPhone}`);
 
   if (isPickup) {
-    lines.push(`Customer will collect from the shop.`);
+    lines.push(`Customer will collect from the shop${safeLocation ? ` (${safeLocation})` : ""}.`);
+    // Optional "coming from" pin — helps merchant know roughly where the
+    // customer is, without inventing a fake 0,0 Maps link.
+    if (mapsPinUrl) {
+      lines.push(`📍 Customer approx. location: ${mapsPinUrl}`);
+      const accuracy = customerCoords?.accuracyMeters;
+      if (typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy > 150) {
+        lines.push(`   (pin ±${Math.round(accuracy)} m — rough only)`);
+      }
+    }
   } else {
     if (safeAddress) {
       lines.push(`${safeAddress}`);
@@ -1461,7 +1470,17 @@ export default function WhatsAppCheckoutModal({
         status: "Pending",
       });
 
-      // Build WhatsApp message (TrendsMart product links + Maps pin)
+      // Build WhatsApp message (TrendsMart product links + Maps pin).
+      // Never invent 0,0 — only pass real coords when we have them.
+      const coordsForMessage =
+        pinLat != null &&
+        pinLng != null &&
+        Number.isFinite(pinLat) &&
+        Number.isFinite(pinLng) &&
+        !(Math.abs(pinLat) < 0.01 && Math.abs(pinLng) < 0.01)
+          ? { latitude: pinLat, longitude: pinLng }
+          : null;
+
       const whatsappText = buildWhatsAppMessage(
         shop,
         resolvedItems,
@@ -1473,40 +1492,32 @@ export default function WhatsAppCheckoutModal({
         serverGrandTotal,
         couponCode,
         ref,
-        { latitude: pinLat ?? 0, longitude: pinLng ?? 0 },
+        coordsForMessage,
         isPickup ? "pickup" : "delivery",
       );
 
       const whatsappUrl = `https://wa.me/${merchantPhone}?text=${encodeURIComponent(whatsappText)}`;
       setPendingWhatsAppUrl(whatsappUrl);
 
-      // Store the exact message server-side so "Send again" from My Orders works.
+      // Store message only — do NOT mark whatsapp_sent_at here. Merchant confirms
+      // on their Order Desk that the chat actually arrived (popup ≠ sent).
       void updateOrderWhatsApp(ref, { message: whatsappText }).catch(() => undefined);
 
-      // WhatsApp-first: order placed → open the merchant chat immediately, then
-      // close with a single confirmation toast. If the popup is blocked, fall
-      // back to the success screen so the shopper can still open it with one tap.
-      let opened: Window | null = null;
+      // WhatsApp-first: open merchant chat. Success screen always shows so the
+      // shopper can re-open if the popup was blocked.
       try {
-        opened = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
       } catch {
-        opened = null;
+        /* popup may be blocked — success step still has the button */
       }
 
       setIsSubmitting(false);
-      if (opened) {
-        addToast("Order placed — WhatsApp chat opened.", "success");
-        void updateOrderWhatsApp(ref, { message: whatsappText, sent: true }).catch(
-          () => undefined,
-        );
-        onOrderPlaced();
-      } else {
-        addToast(
-          "Order saved. WhatsApp was blocked — tap Open WhatsApp to send your order.",
-          "info",
-        );
-        setStep("success");
-      }
+      addToast(
+        "Order placed — WhatsApp kholo aur message bhejo. Merchant confirm karega.",
+        "success",
+      );
+      setStep("success");
+      onOrderPlaced();
     } catch (err) {
       // Keep the console error message-only (no customer PII in dev logs).
       console.error(

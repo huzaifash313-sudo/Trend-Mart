@@ -60,7 +60,7 @@ export function buildHonestRefuseReply(options?: {
         `🔍 *${q}* ka *confirmed* match abhi nahi mila — main galat product/fee invent nahi karunga.\n\n` +
         `Aap try karein:\n` +
         `1️⃣ Clear naam (brand + item)\n` +
-        `2️⃣ [Products search](/products?q=${encodeURIComponent(options?.query?.slice(0, 40) || "")})\n` +
+        `2️⃣ [Products search](/search?q=${encodeURIComponent(options?.query?.slice(0, 40) || "")})\n` +
         `3️⃣ [Deals](/deals) · [Support](/support)\n\n` +
         `_${TREND_BOT_NAME} — nahi pata to seedha keh deta hoon._`,
     };

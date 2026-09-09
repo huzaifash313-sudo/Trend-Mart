@@ -10,6 +10,7 @@ import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import type { Shop } from "@/types";
 import { fetchShopById } from "@/services/shopService";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { isCartDockActive } from "@/lib/cartDockSession";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline Icons                                                               */
@@ -131,6 +132,14 @@ export default function CartBar() {
   /** True once fetchShopById finishes (success or fallback) — avoid stub race. */
   const [shopReady, setShopReady] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [dockActive, setDockActive] = useState(false);
+
+  useEffect(() => {
+    setDockActive(isCartDockActive());
+    const onDock = () => setDockActive(isCartDockActive());
+    window.addEventListener("tm:cart-dock", onDock);
+    return () => window.removeEventListener("tm:cart-dock", onDock);
+  }, []);
 
   const shopGroups = useMemo(() => groupItemsByShop(items), [items]);
 
@@ -199,7 +208,8 @@ export default function CartBar() {
     pathname.startsWith("/t/") ||
     pathname === "/login" ||
     pathname === "/signup" ||
-    totalItems === 0;
+    totalItems === 0 ||
+    !dockActive;
 
   const checkoutItems: WhatsAppCartItem[] = (checkoutShop?.items ?? []).map((i) => ({
     id: i.id,
