@@ -3541,13 +3541,19 @@ html.dark .tm-story-skel-label {
 .tm-brand-video-el.is-ready {
   opacity: 1;
 }
-.tm-brand-video-poster {
-  object-fit: cover;
-  object-position: center;
+/* Soft placeholder until the reel’s first frame is ready — never use the
+   OG share image (white logo tile + tagline) as a poster flash. */
+.tm-brand-video-stage {
+  position: absolute;
+  inset: 0;
   z-index: 0;
-  transition: opacity 0.35s ease;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.28), transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, rgba(13, 148, 136, 0.45), transparent 50%),
+    linear-gradient(165deg, #0f766e 0%, #0d9488 42%, #115e59 100%);
+  transition: opacity 0.4s ease;
 }
-.tm-brand-video-poster.is-hidden {
+.tm-brand-video-stage.is-hidden {
   opacity: 0;
   pointer-events: none;
 }

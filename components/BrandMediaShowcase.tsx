@@ -3,16 +3,13 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Brand promo video (homepage)                                  */
 /*                                                                            */
-/*  Fixed-aspect stage always reserved (no CLS). A static poster is the LCP   */
-/*  paint; the MP4 mounts later (in-view + idle) so it never fights shop LCP.  */
+/*  Fixed-aspect stage always reserved (no CLS). A soft CSS stage holds the   */
+/*  slot (never flash the OG share image with its white logo tile). The MP4   */
+/*  mounts in-view + idle, then cross-fades in when the first frame is ready. */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
-
-/** Static LCP poster — same mark used in splash; fills the reserved stage. */
-const BRAND_PROMO_POSTER = "/og-default.png";
 
 function shouldSkipHeavyMedia(): boolean {
   if (typeof window === "undefined") return false;
@@ -99,7 +96,7 @@ function BrandVideo() {
       ([entry]) => {
         if (entry.isIntersecting) {
           video.play().catch(() => {
-            /* autoplay blocked — poster stays visible */
+            /* autoplay blocked — CSS stage stays visible */
           });
         } else {
           video.pause();
@@ -111,16 +108,14 @@ function BrandVideo() {
     return () => io.disconnect();
   }, [allowVideo, skip]);
 
+  const showVideo = allowVideo && !skip && !failed && videoReady;
+
   return (
     <div ref={wrapRef} className="tm-brand-video">
-      {/* LCP: local poster (Next can optimize; page already preloads this URL) */}
-      <Image
-        src={BRAND_PROMO_POSTER}
-        alt="TrendsMart"
-        fill
-        priority
-        sizes="(max-width: 640px) 100vw, 1152px"
-        className={`tm-brand-video-poster${videoReady && !skip && !failed ? " is-hidden" : ""}`}
+      {/* Soft brand stage — never flash /og-default.png (white logo tile). */}
+      <div
+        className={`tm-brand-video-stage${showVideo ? " is-hidden" : ""}`}
+        aria-hidden={showVideo}
       />
       {allowVideo && !skip && !failed ? (
         <video
@@ -130,7 +125,7 @@ function BrandVideo() {
           muted
           loop
           playsInline
-          preload="none"
+          preload="metadata"
           aria-label="TrendsMart brand promo"
           onLoadedData={() => setVideoReady(true)}
           onError={() => setFailed(true)}
