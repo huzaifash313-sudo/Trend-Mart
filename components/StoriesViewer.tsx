@@ -236,7 +236,7 @@ export default function StoriesViewer({
     let cancelled = false;
     async function load() {
       try {
-        const result = await fetchActiveStories();
+        const result = await fetchActiveStories(150);
         if (!cancelled && result.success) {
           const sorted = sortStoriesUnseenFirst(result.data);
           setStories(sorted);

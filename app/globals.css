@@ -6074,8 +6074,8 @@ html.tm-first-paint .tm-boot-splash {
 }
 
 .tm-splash--exit {
-  /* Must stay in sync with AppSplash STAGE_MS.exit (340ms). */
-  animation: tm-splash-fade-out 0.34s ease forwards;
+  /* Must stay in sync with AppSplash STAGE_MS.exit (420ms). */
+  animation: tm-splash-fade-out 0.42s ease forwards;
   pointer-events: none;
 }
 
@@ -6148,7 +6148,7 @@ html.tm-first-paint .tm-boot-splash {
   /* Logo starts dead-center, then the whole stage rises once "TrendsMart"
      reveals — matches the requested "logo center → rise + shrink" beat. */
   transform: translateY(0);
-  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tm-splash--brand .tm-splash-stage,
@@ -6179,10 +6179,10 @@ html.tm-first-paint .tm-boot-splash {
     0 12px 36px rgba(0, 0, 0, 0.22),
     0 0 0 1px rgba(255, 255, 255, 0.4);
   padding: 0.55rem;
-  transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    width 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.7s ease,
-    padding 0.7s ease;
+  transition: height 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.85s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.85s ease,
+    padding 0.85s ease;
   /* Snappier pop: must finish before STAGE_MS.logoHold ends so the boot →
      React handoff happens against the logo's resting pose (no mid-pop swap). */
   animation: tm-splash-logo-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -6221,7 +6221,7 @@ html.tm-first-paint .tm-boot-splash {
   letter-spacing: -0.02em;
   line-height: 1.05;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-  transition: max-width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: max-width 0.85s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Letter-by-letter reveal: each letter pops up with a slight stagger */
@@ -6230,9 +6230,9 @@ html.tm-first-paint .tm-boot-splash {
   opacity: 0;
   transform: translateY(0.6em);
   transition:
-    opacity 0.4s ease,
-    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  transition-delay: calc(var(--letter-i, 0) * 60ms);
+    opacity 0.45s ease,
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--letter-i, 0) * 70ms);
 }
 
 .tm-splash--brand .tm-splash-title,
@@ -6254,34 +6254,46 @@ html.tm-first-paint .tm-boot-splash {
 
 .tm-splash-copy {
   width: 100%;
-  margin-top: 1rem;
+  margin-top: 1.15rem;
   text-align: center;
   opacity: 0;
   transform: translateY(18px);
   pointer-events: none;
-  transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.55s ease 0.05s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
 }
 
 .tm-splash--details .tm-splash-copy,
-.tm-splash--hold .tm-splash-copy {
+.tm-splash--hold .tm-splash-copy,
+.tm-splash--exit .tm-splash-copy {
   opacity: 1;
   transform: translateY(0);
 }
 
 .tm-splash-tagline {
-  margin: 0 auto 1.25rem;
+  margin: 0 auto 1.15rem;
   max-width: 18rem;
   font-size: 0.92rem;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.92);
   text-wrap: balance;
+  opacity: 0;
+  transform: translateY(10px);
+}
+.tm-splash--details .tm-splash-tagline {
+  animation: tm-splash-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards;
+}
+/* Keep revealed state — do NOT re-run animation when phase → hold/exit. */
+.tm-splash--hold .tm-splash-tagline,
+.tm-splash--exit .tm-splash-tagline {
+  opacity: 1;
+  transform: none;
 }
 
 /* Value intro — clean feature rows instead of page mockups */
 .tm-splash-features {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.75rem;
   margin: 0 auto;
   max-width: 17rem;
   list-style: none;
@@ -6294,19 +6306,22 @@ html.tm-first-paint .tm-boot-splash {
   align-items: center;
   gap: 0.7rem;
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(14px);
 }
 
-.tm-splash--details .tm-splash-feature,
-.tm-splash--hold .tm-splash-feature {
-  animation: tm-splash-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+/* Animate only once during details — hold/exit keep the final pose. */
+.tm-splash--details .tm-splash-feature {
+  animation: tm-splash-rise 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
-.tm-splash--details .tm-splash-feature:nth-child(1),
-.tm-splash--hold .tm-splash-feature:nth-child(1) { animation-delay: 0.15s; }
-.tm-splash--details .tm-splash-feature:nth-child(2),
-.tm-splash--hold .tm-splash-feature:nth-child(2) { animation-delay: 0.3s; }
-.tm-splash--details .tm-splash-feature:nth-child(3),
-.tm-splash--hold .tm-splash-feature:nth-child(3) { animation-delay: 0.45s; }
+.tm-splash--details .tm-splash-feature:nth-child(1) { animation-delay: 0.22s; }
+.tm-splash--details .tm-splash-feature:nth-child(2) { animation-delay: 0.58s; }
+.tm-splash--details .tm-splash-feature:nth-child(3) { animation-delay: 0.94s; }
+
+.tm-splash--hold .tm-splash-feature,
+.tm-splash--exit .tm-splash-feature {
+  opacity: 1;
+  transform: none;
+}
 
 .tm-splash-feature-icon {
   display: inline-flex;
@@ -6340,21 +6355,21 @@ html.tm-first-paint .tm-boot-splash {
   color: rgba(255, 255, 255, 0.78);
 }
 
-/* Loading pill — shown only when home data isn't ready yet during hold */
+/* Loading pill — hold beat before homepage (always shown, even if data is warm) */
 .tm-splash-loading {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  margin-top: 1.2rem;
-  padding: 0.5rem 1rem;
+  margin-top: 1.35rem;
+  padding: 0.55rem 1.15rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.98);
+  font-size: 0.84rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  animation: tm-splash-rise 0.4s ease both;
+  animation: tm-splash-rise 0.45s ease both;
 }
 .tm-splash-spinner {
   width: 0.85rem;
@@ -6547,6 +6562,7 @@ html.tm-first-paint .tm-boot-splash {
   .tm-splash-copy,
   .tm-splash-phone,
   .tm-splash-feature,
+  .tm-splash-tagline,
   .tm-splash-loading {
     opacity: 1;
     transform: none;

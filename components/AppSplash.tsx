@@ -15,8 +15,6 @@ import { fetchShops } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import { fetchActiveDeals } from "@/services/dealService";
 
-export const SPLASH_KEY = "tm_splash_seen_v6";
-
 /**
  * First-impression intro.
  * - Installed PWA (standalone, "added to home screen"): plays on EVERY cold
@@ -26,53 +24,58 @@ export const SPLASH_KEY = "tm_splash_seen_v6";
  * - Regular browser tabs: once per session on the homepage. In-session
  *   refreshes / client-side navigations never replay it.
  *
- * Beat (deliberately slow + smooth so it never feels rushed):
- *   1) Logo pops in centered on the green/seagreen stage
- *   2) Logo rises + shrinks while "TrendsMart" reveals letter-by-letter
- *   3) Three value lines slide in one by one
- *   4) THEN a loading spinner appears and home data prefetches — no network
- *      or CPU work runs during the intro beats, so the animation stays smooth
- *   5) Spinner ends → slow cross-fade into the (now-warm) homepage
+ * Beat (cinematic — never rush into the homepage mid-animation):
+ *   1) Logo pops in and rests centered so the mark is clearly seen
+ *   2) Logo + "TrendsMart" rise together (wordmark letter-by-letter)
+ *   3) Three value lines enter one by one
+ *   4) Loading pill — network prefetch only starts here (beats stay smooth)
+ *   5) Soft cross-fade into the homepage
  *
  * `SPLASH_KEY` is written only when the intro finishes — never at start — so
  * Strict Mode remounts and mid-animation tab switches cannot strand the teal
  * boot cover or abort a first-run play.
+ *
+ * Timings MUST stay ≥ the CSS transition/animation durations in globals.css
+ * (logo pop 0.34s, brand rise 0.7s, letter stagger, feature rise delays).
  */
+export const SPLASH_KEY = "tm_splash_seen_v7";
+
 const STAGE_MS = {
-  logoHold: 380, // >= .tm-splash-logo pop (0.34s): logo rests before boot→React handoff
-  brand: 280,
-  details: 340,
-  /** Minimum spinner time so the loading phase reads as deliberate (not a flash). */
-  holdMin: 400,
+  /** Logo pop (0.34s) + deliberate rest so the icon is the first clear beat. */
+  logoHold: 920,
+  /** Stage rise + logo shrink (0.7s) + letter stagger (~0.7s) to finish. */
+  brand: 1150,
+  /** Copy fade + three feature lines (delays 0.2 / 0.55 / 0.95 + 0.65s). */
+  details: 1750,
+  /** Loading pill must read as intentional even when SSR data is already warm. */
+  holdMin: 1000,
   /** Keep in sync with `.tm-splash--exit` animation duration in globals.css */
-  exit: 340,
-  /** Never block home forever if network is slow. */
-  maxWaitForData: 550,
+  exit: 420,
+  /** Soft wait for any remaining prefetch; never cut the holdMin floor. */
+  maxWaitForData: 900,
   /** Hard cap for the whole hold phase before we bail out to home. */
-  hardCapWait: 1000,
+  hardCapWait: 1600,
 };
 
 const REDUCED_MS = {
-  logoHold: 120,
-  brand: 70,
-  details: 80,
-  holdMin: 60,
-  exit: 120,
-  maxWaitForData: 160,
-  hardCapWait: 300,
-};
-
-/** Slow networks / Save-Data: skip the marketing beat and open the app. */
-const SLOW_NET_MS = {
-  /* Stays >= the logo pop (0.34s) so the boot logo holds seamlessly; the
-     beats after it are cut to a minimum. */
-  logoHold: 380,
-  brand: 140,
-  details: 160,
+  logoHold: 160,
+  brand: 120,
+  details: 140,
   holdMin: 80,
   exit: 160,
-  maxWaitForData: 260,
-  hardCapWait: 600,
+  maxWaitForData: 120,
+  hardCapWait: 240,
+};
+
+/** Save-Data / 2G only — keep a readable beat, not a flash. */
+const SLOW_NET_MS = {
+  logoHold: 520,
+  brand: 720,
+  details: 1000,
+  holdMin: 520,
+  exit: 300,
+  maxWaitForData: 400,
+  hardCapWait: 800,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -148,7 +151,7 @@ function releaseSplashBackground() {
     // Drop any inline teal the boot script painted onto <html> so the app
     // surface's own background shows — no green residue after the intro.
     root.style.removeProperty("background-color");
-  }, 520);
+  }, 560);
 }
 
 async function unwrap<T>(
@@ -176,18 +179,10 @@ function stageTiming(): StageTiming {
     if (
       c?.saveData ||
       c?.effectiveType === "slow-2g" ||
-      c?.effectiveType === "2g" ||
-      c?.effectiveType === "3g"
+      c?.effectiveType === "2g"
     ) {
       return SLOW_NET_MS;
     }
-  } catch {
-    /* ignore */
-  }
-  // SSR already seeded React Query — don't make the user wait on a long intro.
-  try {
-    // Soft signal: if shops are already cached, use the fast path.
-    // (queryClient is not available here; rely on session + boot only.)
   } catch {
     /* ignore */
   }
@@ -312,31 +307,59 @@ export default function AppSplash() {
         prefetch = Promise.resolve();
         return prefetch;
       }
-      prefetch = Promise.allSettled([
-        queryClient.prefetchInfiniteQuery({
-          queryKey: [...queryKeys.shopsInfinite, PUBLIC_SHOP_PAGE_SIZE],
-          queryFn: ({ pageParam }) =>
-            unwrap(
-              fetchShops({
-                publicOnly: true,
-                limit: PUBLIC_SHOP_PAGE_SIZE,
-                offset: pageParam as number,
-              }),
-            ),
-          initialPageParam: 0,
-          staleTime: 2 * 60_000,
-        }),
-        queryClient.prefetchQuery({
-          queryKey: queryKeys.stories,
-          queryFn: () => unwrap(fetchActiveStories()),
-          staleTime: 2 * 60_000,
-        }),
-        queryClient.prefetchQuery({
-          queryKey: queryKeys.deals(48),
-          queryFn: () => unwrap(fetchActiveDeals(48)),
-          staleTime: 2 * 60_000,
-        }),
-      ]).then(() => {
+
+      // Homepage SSR seeds React Query via HomeClient — if those caches are
+      // already warm, skip competing network work during the spinner.
+      const shopsKey = [...queryKeys.shopsInfinite, PUBLIC_SHOP_PAGE_SIZE] as const;
+      const dealsKey = queryKeys.deals(24);
+      const shopsWarm = Boolean(queryClient.getQueryData(shopsKey));
+      const storiesWarm = Boolean(queryClient.getQueryData(queryKeys.stories));
+      const dealsWarm = Boolean(queryClient.getQueryData(dealsKey));
+      if (shopsWarm && storiesWarm && dealsWarm) {
+        dataReadyRef.current = true;
+        prefetch = Promise.resolve();
+        return prefetch;
+      }
+
+      const jobs: Promise<unknown>[] = [];
+      if (!shopsWarm) {
+        jobs.push(
+          queryClient.prefetchInfiniteQuery({
+            queryKey: shopsKey,
+            queryFn: ({ pageParam }) =>
+              unwrap(
+                fetchShops({
+                  publicOnly: true,
+                  limit: PUBLIC_SHOP_PAGE_SIZE,
+                  offset: pageParam as number,
+                }),
+              ),
+            initialPageParam: 0,
+            staleTime: 2 * 60_000,
+          }),
+        );
+      }
+      if (!storiesWarm) {
+        jobs.push(
+          queryClient.prefetchQuery({
+            queryKey: queryKeys.stories,
+            queryFn: () => unwrap(fetchActiveStories()),
+            staleTime: 2 * 60_000,
+          }),
+        );
+      }
+      if (!dealsWarm) {
+        jobs.push(
+          queryClient.prefetchQuery({
+            // Must match HomeClient useDeals(24) — was 48 and never hit cache.
+            queryKey: dealsKey,
+            queryFn: () => unwrap(fetchActiveDeals(24)),
+            staleTime: 2 * 60_000,
+          }),
+        );
+      }
+
+      prefetch = Promise.allSettled(jobs).then(() => {
         dataReadyRef.current = true;
       });
       return prefetch;
@@ -358,39 +381,41 @@ export default function AppSplash() {
     }, t);
     t += ms.details;
 
-    // 3) Loading: the intro is fully shown — start the prefetch NOW (nothing
-    //    ran during the beats above) and keep the spinner up while it warms.
+    // 3) Loading pill: intro beats are done. Prefetch may already be warm from
+    //    SSR — still keep the pill on screen for holdMin so the handoff feels
+    //    intentional (never snap to home mid-animation).
     trackTimeout(() => {
       if (isStopped() || exitingRef.current) return;
       setPhase("hold");
       const holdStarted = Date.now();
       const loading = startPrefetch();
       void (async () => {
-        // Wait for data to be ready OR the max wait window.
-        await Promise.race([
-          loading,
-          new Promise<void>((resolve) => {
-            trackTimeout(resolve, ms.maxWaitForData);
-          }),
-        ]);
+        // Floor first: let the loading beat breathe even when data is warm.
+        await new Promise<void>((resolve) => {
+          trackTimeout(resolve, ms.holdMin);
+        });
         if (isStopped() || exitingRef.current) return;
-        // If data still isn't ready, keep the spinner going up to the hard
-        // cap so home is never blank.
+
         if (!dataReadyRef.current) {
           await Promise.race([
             loading,
             new Promise<void>((resolve) => {
-              trackTimeout(resolve, ms.hardCapWait);
+              trackTimeout(resolve, ms.maxWaitForData);
             }),
           ]);
           if (isStopped() || exitingRef.current) return;
+          if (!dataReadyRef.current) {
+            const elapsed = Date.now() - holdStarted;
+            const remain = Math.max(0, ms.holdMin + ms.hardCapWait - elapsed);
+            await Promise.race([
+              loading,
+              new Promise<void>((resolve) => {
+                trackTimeout(resolve, remain);
+              }),
+            ]);
+            if (isStopped() || exitingRef.current) return;
+          }
         }
-        const elapsed = Date.now() - holdStarted;
-        const waitMore = Math.max(0, ms.holdMin - elapsed);
-        await new Promise<void>((resolve) => {
-          trackTimeout(resolve, waitMore);
-        });
-        if (isStopped() || exitingRef.current) return;
         beginExit(ms.exit);
       })();
     }, t);
@@ -464,12 +489,12 @@ export default function AppSplash() {
             ))}
           </ul>
 
-          {phase === "hold" && (
+          {phase === "hold" || phase === "exit" ? (
             <div className="tm-splash-loading" role="status" aria-live="polite">
               <span className="tm-splash-spinner" aria-hidden="true" />
-              <span>Loading your local shops…</span>
+              <span>Opening your marketplace…</span>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

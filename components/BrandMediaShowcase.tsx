@@ -4,7 +4,7 @@
 /*  TrendsMart — Brand promo video (homepage)                                  */
 /*                                                                            */
 /*  Fixed-aspect stage always reserved (no CLS). A static poster is the LCP   */
-/*  paint; the MP4 fades in later inside the same box (no layout jump).        */
+/*  paint; the MP4 mounts later (in-view + idle) so it never fights shop LCP.  */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
@@ -44,12 +44,11 @@ function shouldSkipHeavyMedia(): boolean {
 function BrandVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  /** Must start false so <video> mounts on first paint; otherwise the mount
-   *  effect never finds the ref and play/IO never attach. Skip only after
-   *  reduced-motion / Save-Data / 2G check. */
   const [skip, setSkip] = useState(false);
   const [failed, setFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  /** Mount <video> only after the stage is near viewport — keeps first paint light. */
+  const [allowVideo, setAllowVideo] = useState(false);
 
   useEffect(() => {
     if (shouldSkipHeavyMedia()) {
@@ -57,6 +56,41 @@ function BrandVideo() {
       return;
     }
 
+    const el = wrapRef.current;
+    if (!el) return;
+
+    let cancelled = false;
+    const arm = () => {
+      if (!cancelled) setAllowVideo(true);
+    };
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        io.disconnect();
+        // Yield to shop banners / hydration before starting the MP4 download.
+        const ric = (
+          window as Window & {
+            requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+          }
+        ).requestIdleCallback;
+        if (typeof ric === "function") {
+          ric(arm, { timeout: 1200 });
+        } else {
+          window.setTimeout(arm, 400);
+        }
+      },
+      { rootMargin: "120px 0px", threshold: 0.01 },
+    );
+    io.observe(el);
+    return () => {
+      cancelled = true;
+      io.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!allowVideo || skip) return;
     const el = wrapRef.current;
     const video = videoRef.current;
     if (!el || !video) return;
@@ -75,11 +109,11 @@ function BrandVideo() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [allowVideo, skip]);
 
   return (
     <div ref={wrapRef} className="tm-brand-video">
-      {/* LCP: eager poster in a size-reserved box */}
+      {/* LCP: local poster (Next can optimize; page already preloads this URL) */}
       <Image
         src={BRAND_PROMO_POSTER}
         alt="TrendsMart"
@@ -87,9 +121,8 @@ function BrandVideo() {
         priority
         sizes="(max-width: 640px) 100vw, 1152px"
         className={`tm-brand-video-poster${videoReady && !skip && !failed ? " is-hidden" : ""}`}
-        unoptimized
       />
-      {!skip && !failed ? (
+      {allowVideo && !skip && !failed ? (
         <video
           ref={videoRef}
           className={`tm-brand-video-el${videoReady ? " is-ready" : ""}`}
@@ -97,7 +130,7 @@ function BrandVideo() {
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="none"
           aria-label="TrendsMart brand promo"
           onLoadedData={() => setVideoReady(true)}
           onError={() => setFailed(true)}

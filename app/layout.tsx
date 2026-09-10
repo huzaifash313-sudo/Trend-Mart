@@ -82,7 +82,7 @@ html.tm-boot-splash #tm-boot-splash{display:flex;position:fixed;inset:0;z-index:
 #tm-boot-splash .tm-boot-logo img{display:block;width:100%;height:100%;object-fit:contain}
 `;
 
-const SPLASH_BOOTSTRAP = `(function(){try{var r=document.documentElement;var p=location.pathname||"/";var home=p==="/"||p==="";var st=function(){try{return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||(window.matchMedia&&window.matchMedia("(display-mode: fullscreen)").matches)||navigator.standalone===true;}catch(e){return false;}}();var full=home&&(st||sessionStorage.getItem("tm_splash_seen_v6")!=="1");if(full){r.style.setProperty("background-color","var(--tm-splash-bg, #0f766e)");r.classList.add("tm-boot-splash","tm-splash-lock");}}catch(e){}})();`;
+const SPLASH_BOOTSTRAP = `(function(){try{var r=document.documentElement;var p=location.pathname||"/";var home=p==="/"||p==="";var st=function(){try{return (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||(window.matchMedia&&window.matchMedia("(display-mode: fullscreen)").matches)||navigator.standalone===true;}catch(e){return false;}}();var full=home&&(st||sessionStorage.getItem("tm_splash_seen_v7")!=="1");if(full){r.style.setProperty("background-color","var(--tm-splash-bg, #0f766e)");r.classList.add("tm-boot-splash","tm-splash-lock");}}catch(e){}})();`;
 
 const SITE_JSON_LD = generateSiteJsonLd();
 

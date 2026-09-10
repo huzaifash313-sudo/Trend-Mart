@@ -14,7 +14,8 @@ import {
   markWishlistBadgeSeen,
   WISHLIST_BADGE_EVENT,
 } from "@/lib/wishlistBadgeSession";
-import { getFavoriteCount } from "@/services/wishlistService";
+import { useFavorites, queryKeys } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -209,6 +210,9 @@ export default function Navbar() {
     }
   };
 
+  const queryClient = useQueryClient();
+  const favoritesQuery = useFavorites();
+
   useEffect(() => {
     setCartDockActive(isCartDockActive());
     const onDock = () => setCartDockActive(isCartDockActive());
@@ -217,25 +221,22 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const applyCount = (n: number) => {
-      const count = Math.max(0, Number(n) || 0);
-      if (cancelled) return;
-      setWishlistCount(count);
-      setWishlistBadge(syncWishlistBadgeDelta(count));
-    };
+    const count = favoritesQuery.data?.length ?? 0;
+    setWishlistCount(count);
+    setWishlistBadge(syncWishlistBadgeDelta(count));
+  }, [favoritesQuery.data]);
+
+  useEffect(() => {
     const refresh = () => {
-      void getFavoriteCount().then(applyCount);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.favorites });
     };
-    refresh();
     window.addEventListener("favoritesUpdated", refresh);
     window.addEventListener(WISHLIST_BADGE_EVENT, refresh);
     return () => {
-      cancelled = true;
       window.removeEventListener("favoritesUpdated", refresh);
       window.removeEventListener(WISHLIST_BADGE_EVENT, refresh);
     };
-  }, [pathname]);
+  }, [queryClient, pathname]);
 
   // Visiting cart / wishlist clears the icon badge (items stay saved).
   useEffect(() => {
@@ -244,14 +245,12 @@ export default function Navbar() {
       setCartDockActive(false);
     }
     if (pathname === "/wishlist" || pathname.startsWith("/wishlist/")) {
-      void getFavoriteCount().then((n) => {
-        const count = Math.max(0, Number(n) || 0);
-        markWishlistBadgeSeen(count);
-        setWishlistCount(count);
-        setWishlistBadge(0);
-      });
+      const count = favoritesQuery.data?.length ?? 0;
+      markWishlistBadgeSeen(count);
+      setWishlistCount(count);
+      setWishlistBadge(0);
     }
-  }, [pathname]);
+  }, [pathname, favoritesQuery.data]);
 
   // Live navbar suggestions (products / shops / deals) — debounce 280ms
   useEffect(() => {

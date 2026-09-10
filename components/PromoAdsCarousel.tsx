@@ -37,6 +37,8 @@ interface PromoAdsCarouselProps {
   placement?: PromoAdPlacement;
   /** Required for store-page ads — only shows banners tied to this shop. */
   shopId?: string | null;
+  /** When provided by parent (e.g. homepage), skip a second useMyShop fetch. */
+  myShopId?: string | null;
   className?: string;
   /** Hide the "View all" link (e.g. on individual store pages). */
   showViewAll?: boolean;
@@ -493,6 +495,7 @@ function SponsoredShelf({
 export default function PromoAdsCarousel({
   placement = "homepage_top",
   shopId = null,
+  myShopId: myShopIdProp,
   className = "",
   showViewAll = false,
   compact = false,
@@ -501,9 +504,9 @@ export default function PromoAdsCarousel({
   const [ads, setAds] = useState<PromotionalAd[]>([]);
   const [loading, setLoading] = useState(true);
   const pingedRef = useRef<Set<string>>(new Set());
-  // A merchant never sees their own sponsored ad in the marketplace carousel.
-  const myShopQuery = useMyShop();
-  const myShopId = myShopQuery.data?.id ?? null;
+  // Parent (homepage) can pass myShopId to avoid a duplicate auth/shop lookup.
+  const myShopQuery = useMyShop({ enabled: myShopIdProp === undefined });
+  const myShopId = myShopIdProp !== undefined ? myShopIdProp : myShopQuery.data?.id ?? null;
 
   useEffect(() => {
     let cancelled = false;

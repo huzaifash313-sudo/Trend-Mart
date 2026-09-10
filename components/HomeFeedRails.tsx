@@ -29,8 +29,9 @@ import {
 import { formatPrice, getProductDiscount } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
 import { useCart } from "@/context/CartContext";
-import { useMarketplaceProducts } from "@/lib/queries";
-import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
+import { useMarketplaceProducts, useFavorites, queryKeys } from "@/lib/queries";
+import { toggleFavorite } from "@/services/wishlistService";
+import { useQueryClient } from "@tanstack/react-query";
 import { fetchShopById } from "@/services/shopService";
 import { trackProductView, trackCategoryInterest } from "@/lib/behavior";
 import { logProductClick } from "@/services/analyticsService";
@@ -208,6 +209,18 @@ function useMiniRailAutoLoop(limit: number) {
       return;
     }
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    try {
+      const nav = navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+      };
+      const c = nav.connection;
+      if (c?.saveData || c?.effectiveType === "2g" || c?.effectiveType === "slow-2g") {
+        setEnabled(false);
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
     setEnabled(!reduce && limit > 4);
   }, [limit]);
 
@@ -222,7 +235,7 @@ function useMiniRailAutoLoop(limit: number) {
     let onScreen = false;
     let resumeAt = 0;
     let last = performance.now();
-    const SPEED_PX_PER_SEC = 34;
+    const SPEED_PX_PER_SEC = 22;
     /** Grace period after a swipe so the rail never fights the user's finger. */
     const RESUME_DELAY_MS = 2500;
 
@@ -441,24 +454,22 @@ function ProductsRailInner({
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
   const [orderIntent, setOrderIntent] = useState<ProductOrderIntent | null>(null);
   const [orderShop, setOrderShop] = useState<Shop | null>(null);
+  const queryClient = useQueryClient();
+  const favoritesQuery = useFavorites();
 
   useEffect(() => {
-    let cancelled = false;
+    const items = favoritesQuery.data;
+    if (!items) return;
+    setFavorites(new Set(items.filter((i) => i.type === "product").map((i) => i.id)));
+  }, [favoritesQuery.data]);
+
+  useEffect(() => {
     const refresh = () => {
-      getAllFavorites()
-        .then((items) => {
-          if (cancelled) return;
-          setFavorites(new Set(items.filter((i) => i.type === "product").map((i) => i.id)));
-        })
-        .catch(() => undefined);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.favorites });
     };
-    refresh();
     window.addEventListener("favoritesUpdated", refresh);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("favoritesUpdated", refresh);
-    };
-  }, []);
+    return () => window.removeEventListener("favoritesUpdated", refresh);
+  }, [queryClient]);
 
   const fullFor = useCallback(
     (product: Product): MarketplaceProduct =>
@@ -633,8 +644,21 @@ function ProductsRailInner({
 
 /* ── Sponsored shelf (interleaved in the shop feed) ──────────────────────── */
 
-function SponsoredRailInner({ title = "Sponsored" }: { title?: string }) {
-  return <PromoAdsCarousel placement="homepage_feed" sectionLabel={title} className="tm-rail" />;
+function SponsoredRailInner({
+  title = "Sponsored",
+  myShopId = null,
+}: {
+  title?: string;
+  myShopId?: string | null;
+}) {
+  return (
+    <PromoAdsCarousel
+      placement="homepage_feed"
+      sectionLabel={title}
+      className="tm-rail"
+      myShopId={myShopId}
+    />
+  );
 }
 
 /* ── Public exports ───────────────────────────────────────────────────────── */

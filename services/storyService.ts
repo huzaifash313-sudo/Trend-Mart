@@ -8,6 +8,7 @@ import type { Story, StoryQuota } from "@/types";
 import { getStoriesQuota } from "@/types";
 import { logError } from "@/services/errorService";
 import { getOrCreateStoryViewerKey } from "@/lib/storyViewed";
+import { PUBLIC_STORY_LIMIT } from "@/lib/mobilePerf";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -73,8 +74,11 @@ function mapStoryRow(row: Record<string, unknown>): Story {
   };
 }
 
-export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
+export async function fetchActiveStories(
+  limit = PUBLIC_STORY_LIMIT,
+): Promise<ServiceResult<Story[]>> {
   const supabase = createClient();
+  const rowLimit = Math.max(1, Math.min(limit, 150));
 
   try {
     // Prefer join so tray/viewer can show merchant shop name + geo for filtering.
@@ -85,7 +89,7 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
       )
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(150);
+      .limit(rowLimit);
 
     if (!withShop.error && withShop.data) {
       return {
@@ -100,7 +104,7 @@ export async function fetchActiveStories(): Promise<ServiceResult<Story[]>> {
       .select("*")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(150);
+      .limit(rowLimit);
 
     if (error) throw error;
     return {

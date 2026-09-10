@@ -11,6 +11,7 @@ import { fetchShops, fetchMyShop } from "@/services/shopService";
 import { fetchActiveStories } from "@/services/storyService";
 import { fetchActiveDeals } from "@/services/dealService";
 import { fetchActiveCouponsForShops } from "@/services/couponService";
+import { getAllFavorites, type FavoriteItem } from "@/services/wishlistService";
 import { fetchShopDeliveryMetaForIds } from "@/services/shopDeliveryMeta";
 import {
   fetchMarketplaceProducts,
@@ -50,6 +51,7 @@ export const queryKeys = {
   deals: (limit: number) => ["deals", limit] as const,
   coupons: (shopIds: string[]) => ["coupons", idsKey(shopIds)] as const,
   myShop: ["my-shop"] as const,
+  favorites: ["favorites"] as const,
 };
 
 /* ── Shops ─────────────────────────────────────────────────────────────────── */
@@ -88,6 +90,7 @@ export function useShopsInfinite(options?: { initialData?: Shop[]; pageSize?: nu
       return lastPage.length >= pageSize ? fetched : undefined;
     },
     staleTime: 2 * 60_000,
+    refetchOnMount: false,
     placeholderData: keepPreviousData,
     ...(options?.initialData !== undefined
       ? {
@@ -95,12 +98,14 @@ export function useShopsInfinite(options?: { initialData?: Shop[]; pageSize?: nu
             pages: [options.initialData],
             pageParams: [0],
           },
+          // Treat SSR seed as fresh so mount doesn't immediately refetch.
+          initialDataUpdatedAt: Date.now(),
         }
       : {}),
   });
 }
 
-export function useMyShop() {
+export function useMyShop(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.myShop,
     queryFn: async (): Promise<Shop | null> => {
@@ -108,6 +113,7 @@ export function useMyShop() {
       // "Not authenticated" / fetch errors are not UI errors here — just no shop.
       return result.success ? result.data : null;
     },
+    enabled: options?.enabled !== false,
     retry: false,
     staleTime: 5 * 60_000,
     placeholderData: keepPreviousData,
@@ -121,9 +127,13 @@ export function useStories(options?: { initialData?: Story[] }) {
     queryKey: queryKeys.stories,
     queryFn: () => unwrap(fetchActiveStories()),
     staleTime: 2 * 60_000,
+    refetchOnMount: false,
     placeholderData: keepPreviousData,
     ...(options?.initialData !== undefined
-      ? { initialData: options.initialData }
+      ? {
+          initialData: options.initialData,
+          initialDataUpdatedAt: Date.now(),
+        }
       : {}),
   });
 }
@@ -133,6 +143,7 @@ export function useDeals(limit = 48, options?: { initialData?: ShopDeal[] }) {
     queryKey: queryKeys.deals(limit),
     queryFn: () => unwrap(fetchActiveDeals(limit)),
     staleTime: 2 * 60_000,
+    refetchOnMount: false,
     placeholderData: keepPreviousData,
     ...(options?.initialData !== undefined
       ? {
@@ -178,6 +189,16 @@ export function useShopCoupons(shopIds: string[]) {
     enabled: shopIds.length > 0,
     staleTime: 60_000,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** Shared wishlist cache — homepage / rails / navbar share one fetch. */
+export function useFavorites() {
+  return useQuery({
+    queryKey: queryKeys.favorites,
+    queryFn: (): Promise<FavoriteItem[]> => getAllFavorites(),
+    staleTime: 30_000,
+    refetchOnMount: false,
   });
 }
 

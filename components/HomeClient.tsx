@@ -21,7 +21,7 @@ import {
   sortStoriesUnseenFirst,
   getViewedStoryIds,
 } from "@/lib/storyViewed";
-import { toggleFavorite as toggleFav, getAllFavorites } from "@/services/wishlistService";
+import { toggleFavorite as toggleFav } from "@/services/wishlistService";
 import { useToast } from "@/components/Toast";
 import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
 import { getSafeImageUrl } from "@/services/storageService";
@@ -39,7 +39,7 @@ import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
 import { dealCommerceId } from "@/lib/dealCommerce";
 import { useQueryClient } from "@tanstack/react-query";
-import { useShopsInfinite, useStories, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
+import { useShopsInfinite, useStories, useDeals, useShopCoupons, useMyShop, useFavorites, queryKeys } from "@/lib/queries";
 import { useConnection } from "@/lib/connection";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
 import { getTopAffinityCategories } from "@/lib/behavior";
@@ -430,20 +430,9 @@ function HomeClient({
 
   // A merchant must never see (or order from) their own store in the public
   // marketplace — shops, deals, and stories are all filtered by owner id.
-  const myShopQuery = useMyShop();
+  // Guests: skip auth/shop lookup (SSR already resolved myShopId for merchants).
+  const myShopQuery = useMyShop({ enabled: Boolean(initialMyShopId) });
   const myShopId = myShopQuery.data?.id ?? initialMyShopId ?? null;
-  const myShop = useMemo(
-    () =>
-      myShopQuery.data
-        ? {
-            id: myShopQuery.data.id,
-            category: myShopQuery.data.category,
-            name: myShopQuery.data.name,
-            logo_url: myShopQuery.data.logo_url ?? null,
-          }
-        : null,
-    [myShopQuery.data],
-  );
 
   const shopsQuery = useShopsInfinite(
     initialShops.length > 0 ? { initialData: initialShops, pageSize: PAGE_SIZE } : { pageSize: PAGE_SIZE },
@@ -501,6 +490,26 @@ function HomeClient({
   }, [activeDeals]);
 
   const storiesQuery = useStories(initialStories.length > 0 ? { initialData: initialStories } : undefined);
+  const myShop = useMemo(() => {
+    if (myShopQuery.data) {
+      return {
+        id: myShopQuery.data.id,
+        category: myShopQuery.data.category,
+        name: myShopQuery.data.name,
+        logo_url: myShopQuery.data.logo_url ?? null,
+      };
+    }
+    if (!myShopId) return null;
+    // Instant ring from SSR stories while useMyShop resolves.
+    const story = (storiesQuery.data ?? initialStories).find((s) => s.shop_id === myShopId);
+    return {
+      id: myShopId,
+      category: "" as string,
+      name: story?.shop_name?.trim() || "My shop",
+      logo_url: story?.shop_logo_url ?? null,
+    };
+  }, [myShopQuery.data, myShopId, storiesQuery.data, initialStories]);
+
   const [storiesVersion, setStoriesVersion] = useState(0);
   /** Merchant's own active stories — always first in the tray (sticky ring).
    *  Newest first so the latest post is the ring thumbnail. */
@@ -565,30 +574,24 @@ function HomeClient({
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
   const [myStoryViewerOpen, setMyStoryViewerOpen] = useState(false);
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
-  // Empty on both server + first client render — hearts are hydrated from
-  // localStorage / DB in the effect below (reading localStorage in a useState
-  // initializer would break SSR hydration).
+  // Empty on both server + first client render — hearts hydrate from the
+  // shared favorites query (localStorage / DB) after mount.
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
+  const favoritesQuery = useFavorites();
 
-  // Keep the shop hearts in sync with the real wishlist (DB for signed-in
-  // users, localStorage for guests) and refresh whenever it changes.
   useEffect(() => {
-    let cancelled = false;
+    const items = favoritesQuery.data;
+    if (!items) return;
+    setFavorites(new Set(items.filter((i) => i.type === "shop").map((i) => i.id)));
+  }, [favoritesQuery.data]);
+
+  useEffect(() => {
     const refresh = () => {
-      getAllFavorites()
-        .then((items) => {
-          if (cancelled) return;
-          setFavorites(new Set(items.filter((i) => i.type === "shop").map((i) => i.id)));
-        })
-        .catch(() => undefined);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.favorites });
     };
-    refresh();
     window.addEventListener("favoritesUpdated", refresh);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("favoritesUpdated", refresh);
-    };
-  }, []);
+    return () => window.removeEventListener("favoritesUpdated", refresh);
+  }, [queryClient]);
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -836,7 +839,7 @@ function HomeClient({
           />
         );
       }
-      return <SponsoredRail key={`sponsored-rail-${ci}`} />;
+      return <SponsoredRail key={`sponsored-rail-${ci}`} myShopId={myShopId} />;
     },
     [activeDeals, myShopId, dealProductIds],
   );
@@ -858,16 +861,17 @@ function HomeClient({
           void shopsQuery.fetchNextPage();
         }
       },
-      { rootMargin: "900px 0px" },
+      { rootMargin: "320px 0px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [hasMoreShops, loadingMoreShops, offline, shopsQuery]);
 
-  // Coupons only for shops currently on screen — first paint set, grows with pages.
+  // Coupons from catalog pages (not geo-filtered visible set) so proximity
+  // reorders don't churn the React Query key.
   const couponShopIds = useMemo(
-    () => visibleShops.slice(0, 48).map((s) => s.id).filter(Boolean),
-    [visibleShops],
+    () => shops.slice(0, 24).map((s) => s.id).filter(Boolean),
+    [shops],
   );
   const couponsQuery = useShopCoupons(couponShopIds);
   const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
@@ -1274,7 +1278,7 @@ function HomeClient({
                   <LazyMount
                     eager={ci === 0}
                     minHeight={ci % 3 === 2 ? 120 : 200}
-                    rootMargin="800px 0px"
+                    rootMargin="400px 0px"
                   >
                     {renderFeedRail(ci)}
                   </LazyMount>
