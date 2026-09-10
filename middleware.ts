@@ -879,11 +879,18 @@ export async function middleware(request: NextRequest) {
     });
     applySecurityHeaders(response);
     stripSensitiveHeaders(response);
-    // Allow CDN / bfcache for anonymous catalog GETs (matches next.config /deals headers).
+    // Allow CDN / bfcache for anonymous catalog GETs.
+    // Keep home/shop longer than generic browse (matches next.config intent).
     if (isBrowseGet && !authenticated) {
+      const isHome = pathname === "/" || pathname === "";
+      const isShop =
+        pathname === "/shop" ||
+        (/^\/shop\/[^/]+/.test(pathname) && !pathname.startsWith("/shop/manage"));
       response.headers.set(
         "Cache-Control",
-        "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
+        isHome || isShop
+          ? "public, max-age=120, s-maxage=600, stale-while-revalidate=86400"
+          : "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
       );
     }
     return response;

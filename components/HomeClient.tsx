@@ -408,6 +408,7 @@ const ShopCardRow = memo(function ShopCardRow({
 interface HomeClientProps {
   initialShops: Shop[];
   initialStories: Story[];
+  initialDeals?: ShopDeal[];
   /** Merchant's own shop id resolved on the server (avoids a flash of the
    *  merchant's own store before the client auth query resolves). */
   initialMyShopId: string | null;
@@ -418,6 +419,7 @@ interface HomeClientProps {
 function HomeClient({
   initialShops,
   initialStories,
+  initialDeals = [],
   initialMyShopId,
   initialCategory,
   initialQuery,
@@ -501,7 +503,10 @@ function HomeClient({
     return () => window.clearTimeout(hard);
   }, [veilGone]);
 
-  const dealsQuery = useDeals(24);
+  const dealsQuery = useDeals(
+    24,
+    initialDeals.length > 0 ? { initialData: initialDeals } : undefined,
+  );
   const activeDeals = useMemo(() => {
     const all = dealsQuery.data ?? EMPTY_DEALS;
     return myShopId ? all.filter((d) => d.shop_id !== myShopId) : all;

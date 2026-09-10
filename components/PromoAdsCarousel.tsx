@@ -30,7 +30,7 @@ import { fetchActiveAds, pingAdImpression, pingAdClick } from "@/services/adsSer
 import { demoAdsEnabled, getDemoAdsForPlacement } from "@/lib/demoPromoAds";
 import { useMyShop } from "@/lib/queries";
 import { getSafeImageUrl, isFallbackUrl } from "@/services/storageService";
-import { PROMO_CARD_IMAGE_SIZES } from "@/lib/imageSizes";
+import { PROMO_CARD_IMAGE_SIZES, PRODUCT_CARD_IMAGE_QUALITY } from "@/lib/imageSizes";
 import type { PromotionalAd, PromoAdPlacement } from "@/types";
 
 interface PromoAdsCarouselProps {
@@ -121,7 +121,7 @@ function SponsoredCard({
   const [imgError, setImgError] = useState(false);
   const raw = ad.image_url || "";
   const safeSrc =
-    !imgError && raw && !isFallbackUrl(raw) ? getSafeImageUrl(raw, "generic") : null;
+    !imgError && raw && !isFallbackUrl(raw) ? getSafeImageUrl(raw, "product", "card") : null;
   const isExternal = /^https?:\/\//i.test(ad.link_url);
 
   const card = (
@@ -138,7 +138,8 @@ function SponsoredCard({
             sizes={PROMO_CARD_IMAGE_SIZES}
             priority={priority}
             loading={priority ? "eager" : "lazy"}
-            quality={75}
+            quality={PRODUCT_CARD_IMAGE_QUALITY}
+            unoptimized
             onError={() => setImgError(true)}
           />
         ) : null}

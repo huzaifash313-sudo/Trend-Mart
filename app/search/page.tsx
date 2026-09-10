@@ -1,18 +1,17 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import SearchResultsClient from "./SearchResultsClient";
 import { absoluteUrl, SITE_NAME } from "@/lib/metadata";
 
+type PageProps = {
+  searchParams: Promise<{ q?: string; type?: string }>;
+};
+
 export async function generateMetadata({
   searchParams,
-}: {
-  searchParams: Promise<{ q?: string; type?: string }>;
-}): Promise<Metadata> {
+}: PageProps): Promise<Metadata> {
   const params = await searchParams;
   const q = params.q?.trim();
 
-  // Query result pages are thin / personalized — keep them out of the index
-  // while still allowing discovery of the search entry point.
   if (q) {
     return {
       title: `Search: "${q}"`,
@@ -37,11 +36,20 @@ export async function generateMetadata({
 
 /**
  * Unified search results page — products, shops, and deals from /api/search.
+ * URL state comes from the server so first paint is not blocked by Suspense.
  */
-export default function SearchPage() {
-  return (
-    <Suspense>
-      <SearchResultsClient />
-    </Suspense>
-  );
+export default async function SearchPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const q = params.q?.trim() ?? "";
+  const typeRaw = params.type?.trim() ?? "all";
+  const initialType =
+    typeRaw === "products" || typeRaw === "product"
+      ? "products"
+      : typeRaw === "shops" || typeRaw === "shop"
+        ? "shops"
+        : typeRaw === "deals" || typeRaw === "deal"
+          ? "deals"
+          : "all";
+
+  return <SearchResultsClient initialQ={q} initialType={initialType} />;
 }

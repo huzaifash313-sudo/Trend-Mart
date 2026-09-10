@@ -62,7 +62,12 @@ export default async function Home({
 
   const initialCategory = (params.category as ShopCategory | undefined) ?? "All";
 
-  let initial = { shops: EMPTY_SHOPS, stories: EMPTY_STORIES, myShopId: null as string | null };
+  let initial = {
+    shops: EMPTY_SHOPS,
+    stories: EMPTY_STORIES,
+    deals: [] as import("@/lib/dealSchedule").ShopDeal[],
+    myShopId: null as string | null,
+  };
   try {
     initial = await fetchHomeInitialData();
   } catch {
@@ -73,6 +78,7 @@ export default async function Home({
     <HomeClient
       initialShops={initial.shops}
       initialStories={initial.stories}
+      initialDeals={initial.deals}
       initialMyShopId={initial.myShopId}
       initialCategory={
         SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All"

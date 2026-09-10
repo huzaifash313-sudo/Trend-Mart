@@ -635,7 +635,7 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   animation: tm-badge-blink 1.7s ease-in-out infinite;
   transform-origin: center;
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
 }
 .tm-badge-deal {
   display: inline-flex;
@@ -2815,16 +2815,14 @@ html.dark .tm-home-deals-progress {
   transform-origin: left center;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--tm-text-strong) 0%, var(--tm-text-faint) 55%, var(--tm-text-strong) 100%);
-  background-size: 200% 100%;
-  animation-name: tm-home-deals-hold, tm-home-deals-sheen;
-  animation-timing-function: linear, linear;
-  animation-fill-mode: forwards, none;
-  animation-iteration-count: 1, infinite;
-  animation-duration: inherit, 2.2s;
+  animation-name: tm-home-deals-hold;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+  animation-duration: inherit;
 }
 html.dark .tm-home-deals-progress-bar {
   background: linear-gradient(90deg, var(--tm-text-strong) 0%, var(--tm-text-faint) 55%, var(--tm-text-strong) 100%);
-  background-size: 200% 100%;
 }
 @keyframes tm-home-deals-hold {
   from {
@@ -2832,14 +2830,6 @@ html.dark .tm-home-deals-progress-bar {
   }
   to {
     transform: scaleX(1);
-  }
-}
-@keyframes tm-home-deals-sheen {
-  from {
-    background-position: 0% 0;
-  }
-  to {
-    background-position: 200% 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -5017,17 +5007,14 @@ html.dark .tm-product-add-text:hover {
   100% {
     opacity: 1;
     transform: scale(1);
-    filter: brightness(1);
   }
   40% {
     opacity: 0.72;
     transform: scale(0.96);
-    filter: brightness(1.08);
   }
   55% {
     opacity: 1;
     transform: scale(1.07);
-    filter: brightness(1.18);
   }
 }
 
@@ -5347,7 +5334,6 @@ html.dark .shop-card:hover {
   font-weight: 600;
   line-height: 1;
   overflow: hidden;
-  animation: tm-offer-bar-glow 2.4s ease-in-out infinite;
 }
 html.dark .tm-offer-ticker {
   background: color-mix(in srgb, var(--tm-sea) 18%, #18181b);

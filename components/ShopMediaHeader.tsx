@@ -74,6 +74,7 @@ export function ShopLogoAvatar({
             fill
             className="object-cover"
             sizes={size === "md" ? "48px" : size === "xs" ? "24px" : "32px"}
+            unoptimized
             onError={onLogoError}
           />
         ) : (
@@ -159,6 +160,7 @@ export default function ShopMediaHeader({
                   : "(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
               }
               priority={eager}
+              unoptimized
               onError={onBannerError}
             />
           ) : (
@@ -213,6 +215,7 @@ export default function ShopMediaHeader({
                 fill
                 className="object-cover"
                 sizes={isHero ? "72px" : "44px"}
+                unoptimized
                 onError={onLogoError}
               />
             ) : (

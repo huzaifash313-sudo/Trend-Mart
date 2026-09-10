@@ -18,10 +18,13 @@ import { createClient as createAnonClient, type SupabaseClient } from "@supabase
 import { createClient } from "@/lib/supabase/server";
 import { PUBLIC_SHOP_PAGE_SIZE, PUBLIC_STORY_LIMIT } from "@/lib/mobilePerf";
 import type { Shop, Story } from "@/types";
+import type { ShopDeal } from "@/lib/dealSchedule";
 
 export interface HomeInitialData {
   shops: Shop[];
   stories: Story[];
+  /** First deals page for Featured deals / rails (SSR). */
+  deals: ShopDeal[];
   /** Merchant's own shop id (server-resolved) so their store never flickers
    *  into the public grid before the client auth query resolves. */
   myShopId: string | null;
@@ -194,11 +197,13 @@ async function fetchMyShopId(supabase: Awaited<ReturnType<typeof createClient>>)
 
 /** Fetch everything the homepage needs for a content-rich first paint. */
 export async function fetchHomeInitialData(): Promise<HomeInitialData> {
-  const [{ shops, stories }, myShopId] = await Promise.all([
+  const { getDealsPageInitialData } = await import("@/lib/dealsData");
+  const [{ shops, stories }, myShopId, deals] = await Promise.all([
     getCachedCatalog(),
     fetchMyShopIdWithCookieCheck(),
+    getDealsPageInitialData().catch(() => []),
   ]);
-  return { shops, stories, myShopId };
+  return { shops, stories, deals, myShopId };
 }
 
 /**

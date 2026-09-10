@@ -23,7 +23,7 @@ import { fetchDealsByShopId } from "@/services/dealService";
 import type { ShopDeal } from "@/lib/dealSchedule";
 import { createClient } from "@/lib/supabase/client";
 import { PUBLIC_SHOP_LIMIT, PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
-import type { Product, Shop, Story } from "@/types";
+import type { Product, Shop, Story, MarketplaceProduct } from "@/types";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -127,12 +127,18 @@ export function useStories(options?: { initialData?: Story[] }) {
   });
 }
 
-export function useDeals(limit = 48) {
+export function useDeals(limit = 48, options?: { initialData?: ShopDeal[] }) {
   return useQuery({
     queryKey: queryKeys.deals(limit),
     queryFn: () => unwrap(fetchActiveDeals(limit)),
     staleTime: 2 * 60_000,
     placeholderData: keepPreviousData,
+    ...(options?.initialData !== undefined
+      ? {
+          initialData: options.initialData,
+          initialDataUpdatedAt: Date.now(),
+        }
+      : {}),
   });
 }
 
@@ -256,7 +262,10 @@ export function useMarketplaceProducts(filters: MarketplaceProductFilters) {
  * `offset`, so the app scales to large catalogues ("lakh products") without
  * loading everything up front. Pages accumulate in `data.pages`.
  */
-export function useMarketplaceProductsInfinite(filters: MarketplaceProductFilters) {
+export function useMarketplaceProductsInfinite(
+  filters: MarketplaceProductFilters,
+  options?: { initialData?: MarketplaceProduct[] },
+) {
   const pageSize = filters.limit ?? 48;
   const queryKey = [
     "marketplace-products-infinite",
@@ -280,5 +289,14 @@ export function useMarketplaceProductsInfinite(filters: MarketplaceProductFilter
     },
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+    ...(options?.initialData !== undefined
+      ? {
+          initialData: {
+            pages: [options.initialData],
+            pageParams: [0],
+          },
+          initialDataUpdatedAt: Date.now(),
+        }
+      : {}),
   });
 }

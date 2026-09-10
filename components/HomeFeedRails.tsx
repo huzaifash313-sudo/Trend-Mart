@@ -148,6 +148,7 @@ function MiniTile({
             sizes={PRODUCT_CARD_IMAGE_SIZES}
             loading="lazy"
             quality={PRODUCT_CARD_IMAGE_QUALITY}
+            unoptimized
             onError={() => setImgError(true)}
           />
         ) : (

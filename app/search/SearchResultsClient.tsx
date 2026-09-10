@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import { suggestSearchCorrections } from "@/lib/fuzzySearch";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import SearchInput from "@/components/SearchInput";
@@ -90,7 +90,7 @@ function DiscountBadge({ pct }: { pct: number }) {
 }
 
 function ProductCard({ item }: { item: ProductResult }) {
-  const img = getSafeImageUrl(item.image_url);
+  const img = getSafeImageUrl(item.image_url, "product", "card");
   const href =
     item.path?.trim() ||
     `/products?product=${encodeURIComponent(item.id)}`;
@@ -108,6 +108,7 @@ function ProductCard({ item }: { item: ProductResult }) {
             fill
             sizes="(max-width:640px) 45vw, 200px"
             className="object-cover transition group-hover:scale-105"
+            unoptimized
           />
         ) : (
           <div className="flex h-full items-center justify-center text-3xl text-zinc-200">🛍️</div>
@@ -134,7 +135,7 @@ function ProductCard({ item }: { item: ProductResult }) {
 }
 
 function ShopCard({ item }: { item: ShopResult }) {
-  const img = getSafeImageUrl(item.logo_url);
+  const img = getSafeImageUrl(item.logo_url, "shop", "avatar");
   const href = getShopPath({ id: item.id, name: item.name, slug: item.slug });
   return (
     <Link
@@ -143,7 +144,14 @@ function ShopCard({ item }: { item: ShopResult }) {
     >
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800">
         {img ? (
-          <Image src={img} alt={item.name} fill sizes="48px" className="object-cover" />
+          <Image
+            src={img}
+            alt={item.name}
+            fill
+            sizes="48px"
+            className="object-cover"
+            unoptimized
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-xl">🏪</div>
         )}
@@ -167,7 +175,7 @@ function ShopCard({ item }: { item: ShopResult }) {
 }
 
 function DealCard({ item }: { item: DealResult }) {
-  const img = getSafeImageUrl(item.image_url);
+  const img = getSafeImageUrl(item.image_url, "product", "card");
   const href =
     item.path?.trim() ||
     `/deals?q=${encodeURIComponent(item.title)}&filter=all`;
@@ -190,6 +198,7 @@ function DealCard({ item }: { item: DealResult }) {
             fill
             sizes="(max-width:640px) 45vw, 200px"
             className="object-cover transition group-hover:scale-105"
+            unoptimized
           />
         ) : (
           <div className="flex h-full items-center justify-center text-3xl text-amber-200">%</div>
@@ -273,11 +282,16 @@ const TABS: { value: Tab; label: string }[] = [
 /*  Main client                                                                */
 /* -------------------------------------------------------------------------- */
 
-export default function SearchResultsClient() {
+export default function SearchResultsClient({
+  initialQ = "",
+  initialType = "all",
+}: {
+  initialQ?: string;
+  initialType?: Tab;
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const qParam    = searchParams.get("q") ?? "";
-  const typeParam = (searchParams.get("type") as Tab) ?? "all";
+  const qParam = initialQ;
+  const typeParam = initialType;
 
   const [query, setQuery]       = useState(qParam);
   const [activeTab, setActiveTab] = useState<Tab>(

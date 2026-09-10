@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { MarketplaceProduct, Product, Shop, ShopCategory } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import { type MarketplaceSort } from "@/services/productService";
@@ -83,22 +83,35 @@ const EMPTY_PRODUCTS: MarketplaceProduct[] = [];
 const EMPTY_DEALS: ShopDeal[] = [];
 const EMPTY_COUPONS: Record<string, Coupon[]> = {};
 
+export type ProductsUrlState = {
+  q: string;
+  category: ShopCategory;
+  sub: string | null;
+  sort: MarketplaceSort;
+  product: string | null;
+};
+
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                      */
 /* -------------------------------------------------------------------------- */
 
-function ProductsPageInner() {
+function ProductsPageInner({
+  urlState,
+  initialProducts = EMPTY_PRODUCTS,
+}: {
+  urlState: ProductsUrlState;
+  initialProducts?: MarketplaceProduct[];
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { addToast } = useToast();
   const { addItem } = useCart();
   const { coordinates: globalCoords, location: globalLocation } = useLocation();
 
-  const qParam = searchParams.get("q") ?? "";
-  const categoryParam = (searchParams.get("category") as ShopCategory | null) ?? "All";
-  const subParam = searchParams.get("sub");
-  const sortParam = (searchParams.get("sort") as MarketplaceSort | null) ?? "for_you";
-  const productParam = searchParams.get("product");
+  const qParam = urlState.q;
+  const categoryParam = urlState.category;
+  const subParam = urlState.sub;
+  const sortParam = urlState.sort;
+  const productParam = urlState.product;
 
   const [query, setQuery] = useState(qParam);
   /** Keep input snappy; defer heavy fuzzy/geo ranking until idle. */
@@ -133,13 +146,22 @@ function ProductsPageInner() {
   const myShopQuery = useMyShop();
   const myShopId = myShopQuery.data?.id ?? null;
 
-  const productsQuery = useMarketplaceProductsInfinite({
-    query: qParam,
-    category: categoryParam === "All" ? undefined : categoryParam,
-    subCategoryId: subParam,
-    sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
-    limit: 48,
-  });
+  const productsQuery = useMarketplaceProductsInfinite(
+    {
+      query: qParam,
+      category: categoryParam === "All" ? undefined : categoryParam,
+      subCategoryId: subParam,
+      sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
+      limit: 48,
+    },
+    !qParam.trim() &&
+      categoryParam === "All" &&
+      !subParam &&
+      sortParam === "for_you" &&
+      initialProducts.length > 0
+      ? { initialData: initialProducts }
+      : undefined,
+  );
   // Flatten accumulated pages into a single deduped array (stable across renders).
   const products = useMemo(() => {
     const flat = productsQuery.data?.pages.flat() ?? EMPTY_PRODUCTS;
@@ -966,16 +988,12 @@ function ProductsPageInner() {
   );
 }
 
-export default function ProductsPageClient() {
-  return (
-    <Suspense
-      fallback={
-        <div className="mx-auto flex min-h-[50vh] max-w-6xl items-center justify-center px-4">
-          <div className="h-9 w-9 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-        </div>
-      }
-    >
-      <ProductsPageInner />
-    </Suspense>
-  );
+export default function ProductsPageClient({
+  urlState,
+  initialProducts = EMPTY_PRODUCTS,
+}: {
+  urlState: ProductsUrlState;
+  initialProducts?: MarketplaceProduct[];
+}) {
+  return <ProductsPageInner urlState={urlState} initialProducts={initialProducts} />;
 }
