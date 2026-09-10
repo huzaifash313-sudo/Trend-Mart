@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useCallback, useEffect, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import AuthForm from "@/components/AuthForm";
+import AuthForm, { type TurnstileFieldHandle } from "@/components/AuthForm";
 import OtpVerificationModal from "@/components/OtpVerificationModal";
 import { signInWithEmail, getCurrentUser, detectUserRole, getDashboardPath } from "@/services/authService";
 import { withTimeout } from "@/lib/withTimeout";
 import { useToast } from "@/components/Toast";
 import type { SignInSubmitValues } from "@/components/AuthForm";
+import { isTurnstileUiEnabled } from "@/lib/turnstilePublic";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants — pre-compute particle values                                   */
@@ -104,6 +105,7 @@ function LoginPageInner() {
   const [pendingPassword, setPendingPassword] = useState<string>("");
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const [forcePasswordReset, setForcePasswordReset] = useState(false);
+  const turnstileRef = useRef<TurnstileFieldHandle | null>(null);
 
   useEffect(() => {
     if (lockoutSeconds <= 0) return;
@@ -208,11 +210,26 @@ function LoginPageInner() {
     // OTP verification does not create a session — sign in with the password
     // the user just entered so cookies + JWT are fresh and confirmed.
     if (email && password) {
-      const signIn = await signInWithEmail(email, password);
+      let captchaToken: string | undefined;
+      if (isTurnstileUiEnabled()) {
+        turnstileRef.current?.reset();
+        captchaToken =
+          (await turnstileRef.current?.waitForToken(12_000)) ?? undefined;
+        if (!captchaToken) {
+          addToast(
+            "Email verified — please sign in again (security check timed out).",
+            "info",
+          );
+          return;
+        }
+      }
+      const signIn = await signInWithEmail(email, password, captchaToken);
       if (signIn.success) {
         await finishLogin(signIn.role, signIn.user);
         return;
       }
+      addToast(signIn.error ?? "Please sign in with your password.", "info");
+      return;
     }
 
     await finishLogin();
@@ -333,6 +350,7 @@ function LoginPageInner() {
               serverError={serverError}
               lockoutSeconds={lockoutSeconds}
               forcePasswordReset={forcePasswordReset}
+              turnstileRef={turnstileRef}
             />
 
             {/* Sign-up link */}

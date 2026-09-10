@@ -5,12 +5,24 @@
 /*  issuing + emailing a fresh verification code. Never import from client.    */
 /* -------------------------------------------------------------------------- */
 
+import { createHmac, timingSafeEqual } from "crypto";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, emailShell } from "@/lib/email";
-import { generateOtpCode, hashOtp, otpExpiryIso, otpEmailBody } from "@/lib/otp";
+import {
+  generateOtpCode,
+  hashOtp,
+  otpExpiryIso,
+  otpEmailBody,
+  passwordResetOtpEmailBody,
+} from "@/lib/otp";
 
 type AdminClient = NonNullable<ReturnType<typeof getSupabaseAdminClient>>;
+
+export type OtpEmailKind = "signup" | "password_reset";
+
+/** How long a post-OTP password-reset grant stays valid. */
+const PASSWORD_RESET_GRANT_TTL_MS = 15 * 60 * 1000;
 
 /**
  * HMAC key for hashing OTP codes.
@@ -84,6 +96,7 @@ export async function issueAndSendOtp(
   admin: AdminClient,
   email: string,
   userId: string,
+  kind: OtpEmailKind = "signup",
 ): Promise<{ success: boolean; error?: string }> {
   const normalized = email.trim().toLowerCase();
   const code = generateOtpCode();
@@ -107,14 +120,23 @@ export async function issueAndSendOtp(
     console.error("[authOtpServer] failed to persist OTP:", dbError.message);
     return {
       success: false,
-      error: "Could not start email verification. Please try again.",
+      error:
+        kind === "password_reset"
+          ? "Could not start password reset. Please try again."
+          : "Could not start email verification. Please try again.",
     };
   }
 
+  const isReset = kind === "password_reset";
   const sent = await sendEmail({
     to: normalized,
-    subject: "Your TrendsMart verification code",
-    html: emailShell("Verify your email", otpEmailBody(code)),
+    subject: isReset
+      ? "Your TrendsMart password reset code"
+      : "Your TrendsMart verification code",
+    html: emailShell(
+      isReset ? "Reset your password" : "Verify your email",
+      isReset ? passwordResetOtpEmailBody(code) : otpEmailBody(code),
+    ),
   });
 
   if (!sent.success) {
@@ -122,9 +144,60 @@ export async function issueAndSendOtp(
       success: false,
       error:
         sent.error ||
-        "We couldn't send the verification email. Please try again shortly.",
+        (isReset
+          ? "We couldn't send the reset email. Please try again shortly."
+          : "We couldn't send the verification email. Please try again shortly."),
     };
   }
 
   return { success: true };
+}
+
+/**
+ * Short-lived signed grant after a recovery OTP succeeds — used to set a new
+ * password without relying on Supabase magic-link sessions or localhost redirects.
+ */
+export function createPasswordResetGrant(
+  email: string,
+  userId: string,
+  secret: string = otpSecret(),
+): string {
+  const exp = Date.now() + PASSWORD_RESET_GRANT_TTL_MS;
+  const normalized = email.trim().toLowerCase();
+  const payload = `${normalized}:${userId}:${exp}`;
+  const sig = createHmac("sha256", secret).update(payload).digest("base64url");
+  return Buffer.from(
+    JSON.stringify({ e: normalized, u: userId, x: exp, s: sig }),
+    "utf8",
+  ).toString("base64url");
+}
+
+export function verifyPasswordResetGrant(
+  token: string,
+  secret: string = otpSecret(),
+): { email: string; userId: string } | null {
+  try {
+    const raw = JSON.parse(
+      Buffer.from(token, "base64url").toString("utf8"),
+    ) as { e?: string; u?: string; x?: number; s?: string };
+    if (
+      typeof raw.e !== "string" ||
+      typeof raw.u !== "string" ||
+      typeof raw.x !== "number" ||
+      typeof raw.s !== "string"
+    ) {
+      return null;
+    }
+    if (Date.now() > raw.x) return null;
+
+    const payload = `${raw.e}:${raw.u}:${raw.x}`;
+    const expected = createHmac("sha256", secret).update(payload).digest("base64url");
+    const a = Buffer.from(expected);
+    const b = Buffer.from(raw.s);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+
+    return { email: raw.e, userId: raw.u };
+  } catch {
+    return null;
+  }
 }

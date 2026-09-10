@@ -134,7 +134,7 @@ function VerifyNoticeInner() {
           router.replace(target);
         }, 1500);
       } else {
-        addToast("Email not yet verified. Check your inbox for the confirmation link or 6-digit code.", "info");
+        addToast("Email not yet verified. Check your inbox for the 6-digit TrendsMart code.", "info");
       }
     } catch {
       addToast("Could not check verification status.", "error");
@@ -172,7 +172,7 @@ function VerifyNoticeInner() {
           {verified
             ? "Your email has been confirmed. Redirecting you now..."
             : email
-              ? `We sent a verification email to ${email}. Open it and tap the confirmation link (some setups also show a 6-digit code). After that, return here or go back to checkout — your cart is saved.`
+              ? `We sent a 6-digit verification code to ${email} from TrendsMart. Enter it on the sign-in or sign-up screen, then return here — your cart is saved.`
               : "Please verify your email address to access this feature."}
         </p>
 
@@ -185,11 +185,7 @@ function VerifyNoticeInner() {
                 <li>Check your spam or junk folder</li>
                 <li>Make sure you entered the correct email address</li>
                 <li>Wait a minute — some email providers are slower</li>
-                {process.env.NODE_ENV === "development" && (
-                  <li className="text-amber-600 dark:text-amber-400">
-                    (Dev mode) Check the Supabase dashboard → Authentication → Users for the confirmation link
-                  </li>
-                )}
+                <li>Use Resend on the sign-in or sign-up screen if the code expired</li>
               </ul>
             </div>
 

@@ -1,19 +1,19 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Forgot-password with send caps (anti-enumeration + anti-spam) */
+/*  TrendsMart — Forgot-password via branded Resend OTP (no Supabase links)    */
 /*  POST /api/auth/forgot-password                                              */
 /* -------------------------------------------------------------------------- */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { checkRateLimit, RATE_LIMITS, buildRateLimitResponse } from "@/lib/rateLimiter";
 import { buildSafeErrorResponse } from "@/lib/responseSanitizer";
-import { getPublicAppUrl } from "@/lib/appUrl";
 import {
   canSendForgotPassword,
   recordForgotPasswordSend,
   clientIpFromHeaders,
 } from "@/lib/loginLockout";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { findAuthUserByEmail, issueAndSendOtp } from "@/lib/authOtpServer";
 
 export const runtime = "nodejs";
 
@@ -76,44 +76,46 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) {
+  const admin = getSupabaseAdminClient();
+  if (!admin) {
     return NextResponse.json(
       { success: false, error: "Password reset is temporarily unavailable." },
       { status: 503 },
     );
   }
 
-  const supabase = createClient(url, anon, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${getPublicAppUrl()}/auth/reset-password`,
-  });
-
-  // Always respond with the same message to avoid account enumeration.
-  // Still count a send only when the provider accepted the request.
-  if (!error) {
-    recordForgotPasswordSend(email);
-  } else {
-    const lowered = error.message.toLowerCase();
-    if (lowered.includes("rate limit") || lowered.includes("too many")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too many reset emails. Please wait a bit and try again.",
-        },
-        { status: 429 },
-      );
+  // Anti-enumeration: always return GENERIC_OK unless send caps / captcha fail.
+  // Only email a code when the account actually exists.
+  let sent = false;
+  try {
+    const user = await findAuthUserByEmail(admin, email);
+    if (user?.id) {
+      const result = await issueAndSendOtp(admin, email, user.id, "password_reset");
+      if (result.success) {
+        sent = true;
+        recordForgotPasswordSend(email);
+      } else if (result.error?.toLowerCase().includes("couldn't send")) {
+        // Resend misconfigured — surface a clear ops error (not "account missing").
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "We couldn't send the reset email right now. Please try again shortly.",
+          },
+          { status: 503 },
+        );
+      }
     }
-    // Unknown provider errors: still return generic OK so attackers learn nothing.
+  } catch (err) {
+    console.error(
+      "[auth/forgot-password] unexpected:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   return NextResponse.json({
     success: true,
     message: GENERIC_OK,
-    remainingSends: Math.max(0, (cap.remaining ?? 1) - (error ? 0 : 1)),
+    remainingSends: Math.max(0, (cap.remaining ?? 1) - (sent ? 1 : 0)),
   });
 }

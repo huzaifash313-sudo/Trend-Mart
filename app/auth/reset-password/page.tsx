@@ -18,6 +18,7 @@ function ResetPasswordInner() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [verified, setVerified] = useState(false);
+  const [resetToken, setResetToken] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function verifyCode(e: FormEvent) {
@@ -25,10 +26,11 @@ function ResetPasswordInner() {
     setLoading(true);
     const result = await verifyRecoveryOtp(email, code);
     setLoading(false);
-    if (!result.success) {
+    if (!result.success || !result.resetToken) {
       addToast(result.error || "Invalid code.", "error");
       return;
     }
+    setResetToken(result.resetToken);
     setVerified(true);
     addToast("Code verified — set your new password.", "success");
   }
@@ -43,8 +45,16 @@ function ResetPasswordInner() {
       addToast("Passwords do not match.", "error");
       return;
     }
+    if (!resetToken) {
+      addToast("Reset session expired. Please verify your OTP again.", "error");
+      setVerified(false);
+      return;
+    }
     setLoading(true);
-    const result = await updatePasswordAfterRecovery(password);
+    const result = await updatePasswordAfterRecovery(password, {
+      email: email.trim().toLowerCase(),
+      resetToken,
+    });
     setLoading(false);
     if (!result.success) {
       addToast(result.error || "Could not update password.", "error");
@@ -58,7 +68,7 @@ function ResetPasswordInner() {
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-12">
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Reset password</h1>
       <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        Enter the OTP from your email, then choose a new password.
+        Enter the 6-digit code from your TrendsMart email, then choose a new password.
       </p>
 
       {!verified ? (
@@ -81,7 +91,7 @@ function ResetPasswordInner() {
               inputMode="numeric"
               required
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="6-digit code"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm tracking-widest dark:border-zinc-700 dark:bg-zinc-800"
             />

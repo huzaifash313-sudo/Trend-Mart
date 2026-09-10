@@ -108,16 +108,31 @@ export function resendCooldownRemainingMs(
   return elapsed >= OTP_RESEND_COOLDOWN_MS ? 0 : OTP_RESEND_COOLDOWN_MS - elapsed;
 }
 
-/** Branded email body (inner HTML) for a verification code. */
-export function otpEmailBody(code: string): string {
+function otpCodeBlock(code: string): string {
   const spaced = code.split("").join("&nbsp;&nbsp;");
   return `
-    <p>Welcome to TrendsMart! Use the verification code below to finish creating your account:</p>
     <div style="margin:24px 0;text-align:center;">
       <span style="display:inline-block;padding:16px 28px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;font-size:30px;font-weight:700;letter-spacing:6px;color:#047857;font-family:'Courier New',monospace;">
         ${spaced}
       </span>
     </div>
+  `;
+}
+
+/** Branded email body (inner HTML) for a signup verification code. */
+export function otpEmailBody(code: string): string {
+  return `
+    <p>Welcome to TrendsMart! Use the verification code below to finish creating your account:</p>
+    ${otpCodeBlock(code)}
     <p style="color:#71717a;font-size:13px;">This code expires in 10 minutes. If you didn't request it, you can safely ignore this email — no account will be created.</p>
+  `;
+}
+
+/** Branded email body for a password-reset OTP (no links — code only). */
+export function passwordResetOtpEmailBody(code: string): string {
+  return `
+    <p>We received a request to reset your TrendsMart password. Enter this code on the reset page:</p>
+    ${otpCodeBlock(code)}
+    <p style="color:#71717a;font-size:13px;">This code expires in 10 minutes. If you didn't request a password reset, you can safely ignore this email — your password will stay the same.</p>
   `;
 }

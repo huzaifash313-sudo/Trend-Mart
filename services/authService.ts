@@ -422,26 +422,36 @@ export async function requestPasswordReset(
   }
 }
 
-/** Verify recovery OTP, then caller can set a new password while session is active. */
+/** Verify recovery OTP via branded Resend flow — returns a short-lived reset grant. */
 export async function verifyRecoveryOtp(
   email: string,
   token: string,
-): Promise<OtpVerificationResult> {
+): Promise<OtpVerificationResult & { resetToken?: string }> {
   try {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: token.trim(),
-      type: "recovery",
+    const res = await fetch("/api/auth/verify-recovery-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        code: token.trim(),
+      }),
     });
-    if (error) {
-      return { success: false, error: mapSupabaseError(error.message) };
+
+    const jsonBody = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+      resetToken?: string;
+    };
+
+    if (!res.ok || !jsonBody.success || !jsonBody.resetToken) {
+      return {
+        success: false,
+        error: jsonBody.error ?? "Verification failed.",
+      };
     }
-    if (!data.session) {
-      return { success: false, error: "Code accepted but session missing. Try again." };
-    }
-    // Email ownership proven — drop progressive lockout / force-reset.
+
     void fetch("/api/auth/clear-lockout", { method: "POST" }).catch(() => undefined);
-    return { success: true };
+    return { success: true, resetToken: jsonBody.resetToken };
   } catch (err) {
     return {
       success: false,
@@ -450,16 +460,34 @@ export async function verifyRecoveryOtp(
   }
 }
 
-/** Set a new password after a successful recovery OTP / magic-link session. */
+/** Set a new password after a successful recovery OTP (uses server grant, not Supabase session). */
 export async function updatePasswordAfterRecovery(
   newPassword: string,
+  opts: { email: string; resetToken: string },
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      return { success: false, error: mapSupabaseError(error.message) };
+    const res = await fetch("/api/auth/complete-password-reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: opts.email.trim().toLowerCase(),
+        resetToken: opts.resetToken,
+        password: newPassword,
+      }),
+    });
+
+    const jsonBody = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      error?: string;
+    };
+
+    if (!res.ok || !jsonBody.success) {
+      return {
+        success: false,
+        error: jsonBody.error ?? "Could not update password.",
+      };
     }
-    // Clear progressive lockout so the user can sign in with the new password.
+
     void fetch("/api/auth/clear-lockout", { method: "POST" }).catch(() => undefined);
     return { success: true };
   } catch (err) {
