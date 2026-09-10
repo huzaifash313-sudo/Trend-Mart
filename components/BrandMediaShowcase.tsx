@@ -44,8 +44,11 @@ function shouldSkipHeavyMedia(): boolean {
 function BrandVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  /** Must start false so <video> mounts on first paint; otherwise the mount
+   *  effect never finds the ref and play/IO never attach. Skip only after
+   *  reduced-motion / Save-Data / 2G check. */
+  const [skip, setSkip] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [skip, setSkip] = useState(true); // start skipped until idle check
   const [videoReady, setVideoReady] = useState(false);
 
   useEffect(() => {
@@ -53,7 +56,6 @@ function BrandVideo() {
       setSkip(true);
       return;
     }
-    setSkip(false);
 
     const el = wrapRef.current;
     const video = videoRef.current;
@@ -61,7 +63,6 @@ function BrandVideo() {
 
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (!video) return;
         if (entry.isIntersecting) {
           video.play().catch(() => {
             /* autoplay blocked — poster stays visible */
@@ -96,7 +97,7 @@ function BrandVideo() {
           muted
           loop
           playsInline
-          preload="none"
+          preload="metadata"
           aria-label="TrendsMart brand promo"
           onLoadedData={() => setVideoReady(true)}
           onError={() => setFailed(true)}
