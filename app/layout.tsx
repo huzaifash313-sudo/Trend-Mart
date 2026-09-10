@@ -29,7 +29,7 @@ import type { ReactNode } from "react";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-  display: "swap",
+  display: "optional",
   adjustFontFallback: true,
 });
 
@@ -38,7 +38,7 @@ const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-display",
   subsets: ["latin"],
   weight: ["600", "700"],
-  display: "swap",
+  display: "optional",
   adjustFontFallback: true,
 });
 

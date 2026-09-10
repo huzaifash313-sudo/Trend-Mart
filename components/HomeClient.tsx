@@ -33,6 +33,7 @@ import {
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
+import BrandMediaShowcase from "@/components/BrandMediaShowcase";
 import { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
@@ -49,14 +50,6 @@ import LazyMount from "@/components/LazyMount";
 import { ShopCardGridSkeleton } from "@/components/Skeletons";
 import { PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
-  ssr: false,
-});
-const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
-  loading: () => null,
-  ssr: false,
-});
-const BrandMediaShowcase = dynamic(() => import("@/components/BrandMediaShowcase"), {
-  loading: () => null,
   ssr: false,
 });
 const GeoRadiusFilter = dynamic(() => import("@/components/GeoRadiusFilter"), {
@@ -488,29 +481,6 @@ function HomeClient({
   // Nothing to show at all and the fetch failed — real error / offline empty.
   const hardFail = Boolean(error) && !savedContent && !loading;
 
-  /* Blurred reveal loader: only when this visit has no content yet (SSR seeds
-     missing and the client is fetching). Once anything settles — data or a
-     hard error — the veil fades out to reveal the page underneath. When the
-     server shipped seeds this whole path is skipped (no artificial delay). */
-  const [veilGone, setVeilGone] = useState(() => initialShops.length > 0);
-  const [veilExiting, setVeilExiting] = useState(false);
-  useEffect(() => {
-    if (veilGone) return;
-    if (shopsQuery.isLoading) return;
-    setVeilExiting(true);
-    const t = window.setTimeout(() => setVeilGone(true), 320);
-    return () => window.clearTimeout(t);
-  }, [veilGone, shopsQuery.isLoading]);
-  // Safety net: never trap the user behind the veil on a hung request.
-  useEffect(() => {
-    if (veilGone) return;
-    const hard = window.setTimeout(() => {
-      setVeilExiting(true);
-      window.setTimeout(() => setVeilGone(true), 320);
-    }, 9000);
-    return () => window.clearTimeout(hard);
-  }, [veilGone]);
-
   const dealsQuery = useDeals(
     24,
     initialDeals.length > 0 ? { initialData: initialDeals } : undefined,
@@ -904,7 +874,7 @@ function HomeClient({
 
   return (
     <>
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-3 md:pb-6">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-safe-nav md:px-4 md:py-3 md:pb-6">
       {/* Stories tray — top of homepage, always reserved */}
       <section aria-label="Merchant stories" className="tm-stories-tray">
         <div className="tm-stories-tray-head">
@@ -1080,21 +1050,18 @@ function HomeClient({
         />
       )}
 
-      {/* ── Brand video + sponsored (original size, ~3% shorter on homepage) ── */}
+      {/* ── Brand video (SSR + reserved aspect — poster is LCP) ── */}
       <div className="tm-home-hero-compact">
         <BrandMediaShowcase />
-        <PromoAdsCarousel placement="homepage_top" />
       </div>
 
-      {/* ── Colourful category tiles (icons + gradients, under the video) ── */}
-      {!loading && (
-        <HomeCategories
-          categories={orderedCategories}
-          counts={categoryCountsMap}
-          activeCategory={activeCategory}
-          onSelect={handleCategoryChange}
-        />
-      )}
+      {/* ── Colourful category tiles — always mounted (stable height) ── */}
+      <HomeCategories
+        categories={orderedCategories}
+        counts={categoryCountsMap}
+        activeCategory={activeCategory}
+        onSelect={handleCategoryChange}
+      />
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
       <section aria-label="Live shops" className="tm-feed-scroll-stable">
@@ -1338,32 +1305,6 @@ function HomeClient({
           </>
         )}
       </section>
-
-      {/* Blurred reveal loader — first paint without content warms up behind a
-          soft blur, then fades away so nothing "pops" into place. */}
-      {!veilGone && (
-        <div
-          className={`tm-reveal-veil${veilExiting ? " is-exit" : ""}`}
-          role="status"
-          aria-live="polite"
-        >
-          <div className="tm-reveal-veil-card">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/trendsmart-mark.png?v=16"
-              alt=""
-              width={44}
-              height={44}
-              decoding="async"
-              className="tm-reveal-veil-logo"
-            />
-            <span className="tm-reveal-veil-spinner" aria-hidden="true" />
-            <span className="tm-reveal-veil-text">
-              Warming up your local shops…
-            </span>
-          </div>
-        </div>
-      )}
     </div>
     </>
   );

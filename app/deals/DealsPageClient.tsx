@@ -46,10 +46,6 @@ const DealQuickView = dynamic(() => import("@/components/DealQuickView"), {
   ssr: false,
 });
 
-const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
-  ssr: false,
-});
-
 const GeoRadiusFilter = dynamic(() => import("@/components/GeoRadiusFilter"), {
   ssr: false,
   loading: () => (
@@ -104,7 +100,6 @@ function DealsInner({
   // sub-category names even before a specific category is selected.
   const [allSubGroups, setAllSubGroups] = useState<Record<string, SubCategoryWithMeta[]>>({});
   const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
-  const [showPromoAds, setShowPromoAds] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -126,25 +121,6 @@ function DealsInner({
     initialDeals && initialDeals.length > 0 ? { initialData: initialDeals } : undefined,
   );
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-
-  // Sponsored shelf is below-the-fold chrome — don't contend with LCP deal images.
-  useEffect(() => {
-    let idleId: number | null = null;
-    let timeoutId: number | null = null;
-    const show = () => setShowPromoAds(true);
-    const ric = window.requestIdleCallback?.bind(window);
-    if (typeof ric === "function") {
-      idleId = ric(show, { timeout: 3500 });
-    } else {
-      timeoutId = window.setTimeout(show, 2500);
-    }
-    return () => {
-      if (idleId != null && typeof window.cancelIdleCallback === "function") {
-        window.cancelIdleCallback(idleId);
-      }
-      if (timeoutId != null) window.clearTimeout(timeoutId);
-    };
-  }, []);
 
   // Trigger next page when sentinel enters viewport.
   useEffect(() => {
@@ -610,7 +586,7 @@ function DealsInner({
     .join(" ");
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-4 md:pb-8">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-safe-nav md:px-4 md:py-4 md:pb-8">
       <header className="mb-0">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-[1.65rem]">
           Deals for you
@@ -626,9 +602,8 @@ function DealsInner({
         className="mb-0"
       />
 
-      {showPromoAds ? <PromoAdsCarousel placement="deals_top" className="mb-0" /> : null}
-
-      {/* Single-tap category filter — only categories that actually have deals. */}
+      {/* Category strip — reserved min-height so late data doesn't shift layout */}
+      <div className="min-h-[2.75rem]">
       {availableCategories.length > 0 ? (
         <section aria-label="Filter deals by category" className="tm-cat-bar -mx-3 sm:-mx-4">
           <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
@@ -659,6 +634,7 @@ function DealsInner({
           </FadeScrollX>
         </section>
       ) : null}
+      </div>
 
       {/* Sub-category drill-down for the selected main category. */}
       {activeCategory !== "All" && (subsLoading || visibleSubs.length > 0) ? (

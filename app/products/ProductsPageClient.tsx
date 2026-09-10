@@ -51,10 +51,6 @@ const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
   ssr: false,
 });
 
-const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
-  ssr: false,
-});
-
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -745,7 +741,7 @@ function ProductsPageInner({
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack tm-feed-scroll-stable px-3 py-2 pb-3 md:px-4 md:py-4 md:pb-8">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack tm-feed-scroll-stable px-3 py-2 pb-safe-nav md:px-4 md:py-4 md:pb-8">
       {/* Search — products only; no deal-match chrome */}
       <SearchInput
         value={query}
@@ -756,8 +752,6 @@ function ProductsPageInner({
         showClearButton
         className="mb-0"
       />
-
-      <PromoAdsCarousel placement="products_top" className="mb-0" />
 
       {/* Categories */}
       <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">

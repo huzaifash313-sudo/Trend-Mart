@@ -3,12 +3,16 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Brand promo video (homepage)                                  */
 /*                                                                            */
-/*  Promo reel: muted autoplay loop while in view. Skips heavy media on        */
-/*  Save-Data / 2G so mid-range Android & iPhone stay responsive.              */
+/*  Fixed-aspect stage always reserved (no CLS). A static poster is the LCP   */
+/*  paint; the MP4 fades in later inside the same box (no layout jump).        */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
+
+/** Static LCP poster — same mark used in splash; fills the reserved stage. */
+const BRAND_PROMO_POSTER = "/og-default.png";
 
 function shouldSkipHeavyMedia(): boolean {
   if (typeof window === "undefined") return false;
@@ -41,13 +45,15 @@ function BrandVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
-  const [skip, setSkip] = useState(false);
+  const [skip, setSkip] = useState(true); // start skipped until idle check
+  const [videoReady, setVideoReady] = useState(false);
 
   useEffect(() => {
     if (shouldSkipHeavyMedia()) {
       setSkip(true);
       return;
     }
+    setSkip(false);
 
     const el = wrapRef.current;
     const video = videoRef.current;
@@ -58,7 +64,7 @@ function BrandVideo() {
         if (!video) return;
         if (entry.isIntersecting) {
           video.play().catch(() => {
-            /* autoplay blocked — still show poster frame */
+            /* autoplay blocked — poster stays visible */
           });
         } else {
           video.pause();
@@ -70,21 +76,32 @@ function BrandVideo() {
     return () => io.disconnect();
   }, []);
 
-  if (failed || skip) return null;
-
   return (
     <div ref={wrapRef} className="tm-brand-video">
-      <video
-        ref={videoRef}
-        className="tm-brand-video-el"
-        src={BRAND_PROMO_VIDEO}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        aria-label="TrendsMart brand promo"
-        onError={() => setFailed(true)}
+      {/* LCP: eager poster in a size-reserved box */}
+      <Image
+        src={BRAND_PROMO_POSTER}
+        alt="TrendsMart"
+        fill
+        priority
+        sizes="(max-width: 640px) 100vw, 1152px"
+        className={`tm-brand-video-poster${videoReady && !skip && !failed ? " is-hidden" : ""}`}
+        unoptimized
       />
+      {!skip && !failed ? (
+        <video
+          ref={videoRef}
+          className={`tm-brand-video-el${videoReady ? " is-ready" : ""}`}
+          src={BRAND_PROMO_VIDEO}
+          muted
+          loop
+          playsInline
+          preload="none"
+          aria-label="TrendsMart brand promo"
+          onLoadedData={() => setVideoReady(true)}
+          onError={() => setFailed(true)}
+        />
+      ) : null}
       <div className="tm-brand-video-glow" aria-hidden />
     </div>
   );

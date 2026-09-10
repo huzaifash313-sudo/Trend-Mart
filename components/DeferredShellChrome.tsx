@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import Footer from "@/components/Footer";
 
 /**
- * Non-critical storefront chrome — mounts after first paint / idle so LCP and
- * hydration aren't competing with footer, cart dock, PWA, policy, etc.
- * Navbar + BottomNav stay eager (above-fold navigation).
+ * Non-critical chrome after first paint. Footer stays SSR-synced via eager
+ * import so bottom layout doesn't jump (CLS). Cart/PWA/policy idle-mount.
  */
-const Footer = dynamic(() => import("@/components/Footer"), { ssr: false });
 const CartBar = dynamic(() => import("@/components/CartBar"), { ssr: false });
 const MerchantQuickAddHost = dynamic(
   () => import("@/components/MerchantQuickAddHost"),
@@ -54,20 +53,22 @@ export default function DeferredShellChrome() {
     };
   }, []);
 
-  if (!ready) return null;
-
   return (
     <>
       <ErrorBoundary name="Footer" autoResetMs={2500}>
         <Footer />
       </ErrorBoundary>
-      <ErrorBoundary name="CartBar" autoResetMs={2500}>
-        <CartBar />
-      </ErrorBoundary>
-      <MerchantQuickAddHost />
-      <PolicyNotice />
-      <ConnectionStatus />
-      <PwaRegister />
+      {ready ? (
+        <>
+          <ErrorBoundary name="CartBar" autoResetMs={2500}>
+            <CartBar />
+          </ErrorBoundary>
+          <MerchantQuickAddHost />
+          <PolicyNotice />
+          <ConnectionStatus />
+          <PwaRegister />
+        </>
+      ) : null}
     </>
   );
 }

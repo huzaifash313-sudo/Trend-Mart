@@ -89,6 +89,7 @@ export default async function Home({
 
   return (
     <>
+      <link rel="preload" as="image" href="/og-default.png" fetchPriority="high" />
       {bannerPreloads.map((href) => (
         <link key={href} rel="preload" as="image" href={href} fetchPriority="high" />
       ))}
