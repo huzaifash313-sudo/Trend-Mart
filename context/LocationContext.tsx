@@ -183,20 +183,37 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // ── 2. Refresh with a fresh GPS fix on mount (silent, once per session) ──
-  // Always attempt a current read so a customer who moved cities (e.g.
-  // Gujranwala → Lahore) sees shops around their *current* position, never a
-  // stale last-known pin. The browser only prompts once (permission is
-  // remembered), so this stays silent for returning users. When the fresh fix
-  // is essentially the same as the saved pin we skip the reverse-geocode and
-  // just refresh the pin timestamp.
+  // Defer GPS until after first paint / idle so Lighthouse LCP isn't fighting
+  // geolocation + reverse-geocode on every public page load.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (autoDetectAttempted.current) return;
     autoDetectAttempted.current = true;
-    try { sessionStorage.setItem(AUTO_DETECT_KEY, "1"); } catch { /* ignore */ }
+    try {
+      sessionStorage.setItem(AUTO_DETECT_KEY, "1");
+    } catch {
+      /* ignore */
+    }
 
-    void syncFromDevice({ timeout: 12_000 });
+    const run = () => {
+      void syncFromDevice({ timeout: 12_000 });
+    };
+
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+    const ric = window.requestIdleCallback?.bind(window);
+    if (typeof ric === "function") {
+      idleId = ric(run, { timeout: 4500 });
+    } else {
+      timeoutId = window.setTimeout(run, 3500);
+    }
+
+    return () => {
+      if (idleId != null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
   }, [syncFromDevice]);
 
   // ── 3. Follow the customer while they move ──────────────────────────────

@@ -19,7 +19,7 @@ import {
 import { getShopPath } from "@/lib/shopSlug";
 import { getDealSeoPath } from "@/lib/seo/dealSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
-import { OfferTickerMarquee } from "@/components/ProductGrid";
+import { OfferTickerMarquee } from "@/components/OfferTickerMarquee";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { useCart } from "@/context/CartContext";
 import { toggleFavorite, isFavorited } from "@/services/wishlistService";

@@ -36,14 +36,14 @@ export default function DeferredAppChrome() {
       };
 
     if (typeof w.requestIdleCallback === "function") {
-      const id = w.requestIdleCallback(arm, { timeout: 2200 });
+      const id = w.requestIdleCallback(arm, { timeout: 8000 });
       return () => {
         cancelled = true;
         w.cancelIdleCallback?.(id);
       };
     }
 
-    const t = window.setTimeout(arm, 900);
+    const t = window.setTimeout(arm, 4500);
     return () => {
       cancelled = true;
       window.clearTimeout(t);

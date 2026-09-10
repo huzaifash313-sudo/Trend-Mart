@@ -1,18 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Geist, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { Geist, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
-import Footer from "@/components/Footer";
-import PwaRegister from "@/components/PwaRegister";
-import ConnectionStatus from "@/components/ConnectionStatus";
 import AppSplash from "@/components/AppSplash";
 import ChunkReloadGuard from "@/components/ChunkReloadGuard";
 import NavigationRecovery from "@/components/NavigationRecovery";
 import InteractionUnlock from "@/components/InteractionUnlock";
 import AccountScopeGuard from "@/components/AccountScopeGuard";
 import RouteErrorBoundary from "@/components/RouteErrorBoundary";
-import CartBar from "@/components/CartBar";
 import CartProvider from "@/context/CartContext";
 import QueryProvider from "@/components/QueryProvider";
 import { LocationProvider } from "@/context/LocationContext";
@@ -23,10 +19,9 @@ import { ToastProvider } from "@/components/Toast";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppNotifications from "@/components/AppNotifications";
-import MerchantQuickAddHost from "@/components/MerchantQuickAddHost";
-import PolicyNotice from "@/components/PolicyNotice";
 import ScrollToTop from "@/components/ScrollToTop";
 import DeferredAppChrome from "@/components/DeferredAppChrome";
+import DeferredShellChrome from "@/components/DeferredShellChrome";
 import { ScrollToTopSuspense } from "@/components/PageLoadingShell";
 import { generateRootMetadata, generateSiteJsonLd } from "@/lib/metadata";
 import type { ReactNode } from "react";
@@ -38,29 +33,11 @@ const geistSans = Geist({
   adjustFontFallback: true,
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-  adjustFontFallback: true,
-});
-
-/* Display face for headings / brand / prices — a single premium font keeps
-   the marketplace hierarchy consistent while Geist carries body + UI text. */
+/* One display face for headings / brand — two weights keep LCP font cost low. */
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-  display: "swap",
-  adjustFontFallback: true,
-});
-
-/* Soft optical serif for shop names — heavy, professional, and distinctive
-   against the sans UI so store brands (e.g. Tandoori Express) feel premium. */
-const fraunces = Fraunces({
-  variable: "--font-shop",
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: ["600", "700"],
   display: "swap",
   adjustFontFallback: true,
 });
@@ -115,7 +92,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       suppressHydrationWarning
       data-brand-theme="green"
-      className={`light ${geistSans.variable} ${geistMono.variable} ${plusJakarta.variable} ${fraunces.variable} h-full antialiased`}
+      className={`light ${geistSans.variable} ${plusJakarta.variable} h-full antialiased`}
     >
       <head>
         <meta name="theme-color" content="#0f766e" />
@@ -190,22 +167,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <RouteErrorBoundary name="MainContent" autoResetMs={1500}>
                 <main className="tm-main tm-route-fade flex-1">{children}</main>
               </RouteErrorBoundary>
-              <ErrorBoundary name="Footer" autoResetMs={2500}>
-                <Footer />
-              </ErrorBoundary>
               <ErrorBoundary name="BottomNav" autoResetMs={2500}>
                 <BottomNav />
-              </ErrorBoundary>
-              <ErrorBoundary name="CartBar" autoResetMs={2500}>
-                <CartBar />
               </ErrorBoundary>
               <ErrorBoundary name="DeferredChrome" autoResetMs={2500}>
                 <DeferredAppChrome />
               </ErrorBoundary>
-              <MerchantQuickAddHost />
-              <PolicyNotice />
-              <ConnectionStatus />
-              <PwaRegister />
+              <DeferredShellChrome />
               </AppNotifications>
               </ShopReviewsProvider>
               </MerchantQuickAddProvider>

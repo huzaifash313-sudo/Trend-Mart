@@ -29,7 +29,7 @@ import {
   useMyShop,
 } from "@/lib/queries";
 import { filterShopsByProximity, getCustomerArea } from "@/services/geoRadiusService";
-import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
+import { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { useLocation } from "@/context/LocationContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
@@ -48,6 +48,13 @@ const DealQuickView = dynamic(() => import("@/components/DealQuickView"), {
 
 const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
   ssr: false,
+});
+
+const GeoRadiusFilter = dynamic(() => import("@/components/GeoRadiusFilter"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-10 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" aria-hidden />
+  ),
 });
 
 type FilterMode = "today" | "featured" | "upcoming" | "all";
@@ -97,6 +104,7 @@ function DealsInner({
   // sub-category names even before a specific category is selected.
   const [allSubGroups, setAllSubGroups] = useState<Record<string, SubCategoryWithMeta[]>>({});
   const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
+  const [showPromoAds, setShowPromoAds] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -119,6 +127,25 @@ function DealsInner({
   );
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
+  // Sponsored shelf is below-the-fold chrome — don't contend with LCP deal images.
+  useEffect(() => {
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+    const show = () => setShowPromoAds(true);
+    const ric = window.requestIdleCallback?.bind(window);
+    if (typeof ric === "function") {
+      idleId = ric(show, { timeout: 3500 });
+    } else {
+      timeoutId = window.setTimeout(show, 2500);
+    }
+    return () => {
+      if (idleId != null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
+  }, []);
+
   // Trigger next page when sentinel enters viewport.
   useEffect(() => {
     const el = loadMoreRef.current;
@@ -129,7 +156,7 @@ function DealsInner({
           void dealsQuery.fetchNextPage();
         }
       },
-      { rootMargin: "1200px" },
+      { rootMargin: "400px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -233,17 +260,35 @@ function DealsInner({
   const subNameById = useMemo(() => new Map(subs.map((s) => [s.id, s.name])), [subs]);
 
   // One-time fetch of the full taxonomy for global search-by-sub-category.
+  // Idle-deferred so it never blocks first paint / LCP.
   useEffect(() => {
     let cancelled = false;
-    fetchAllSubCategoriesGrouped()
-      .then((res) => {
-        if (!cancelled && res.success) setAllSubGroups(res.data);
-      })
-      .catch(() => {
-        /* taxonomy is optional for search — deals still work without it */
-      });
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+
+    const load = () => {
+      fetchAllSubCategoriesGrouped()
+        .then((res) => {
+          if (!cancelled && res.success) setAllSubGroups(res.data);
+        })
+        .catch(() => {
+          /* taxonomy is optional for search — deals still work without it */
+        });
+    };
+
+    const ric = window.requestIdleCallback?.bind(window);
+    if (typeof ric === "function") {
+      idleId = ric(load, { timeout: 5000 });
+    } else {
+      timeoutId = window.setTimeout(load, 3000);
+    }
+
     return () => {
       cancelled = true;
+      if (idleId != null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) window.clearTimeout(timeoutId);
     };
   }, []);
 
@@ -567,7 +612,7 @@ function DealsInner({
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-3 md:px-4 md:py-4 md:pb-8">
       <header className="mb-0">
-        <h1 className="text-2xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-[1.65rem]">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-[1.65rem]">
           Deals for you
         </h1>
       </header>
@@ -581,7 +626,7 @@ function DealsInner({
         className="mb-0"
       />
 
-      <PromoAdsCarousel placement="deals_top" className="mb-0" />
+      {showPromoAds ? <PromoAdsCarousel placement="deals_top" className="mb-0" /> : null}
 
       {/* Single-tap category filter — only categories that actually have deals. */}
       {availableCategories.length > 0 ? (
@@ -694,7 +739,7 @@ function DealsInner({
         </div>
       </div>
 
-      <p className="mb-2 text-[11px] text-zinc-400 dark:text-zinc-500">
+      <p className="mb-2 text-[11px] text-zinc-600 dark:text-zinc-400">
         {loading ? (
           "Loading deals…"
         ) : (

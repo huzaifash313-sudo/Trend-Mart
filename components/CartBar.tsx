@@ -1,16 +1,21 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart, type CartItem } from "@/context/CartContext";
 import { formatRupees } from "@/lib/formatters";
-import WhatsAppCheckoutModal from "@/components/WhatsAppCheckoutModal";
 import type { WhatsAppCartItem } from "@/components/WhatsAppCheckoutModal";
 import type { Shop } from "@/types";
 import { fetchShopById } from "@/services/shopService";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { isCartDockActive } from "@/lib/cartDockSession";
+
+const WhatsAppCheckoutModal = dynamic(
+  () => import("@/components/WhatsAppCheckoutModal"),
+  { ssr: false },
+);
 
 /* -------------------------------------------------------------------------- */
 /*  Inline Icons                                                               */

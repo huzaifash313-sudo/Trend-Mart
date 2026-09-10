@@ -5,9 +5,12 @@ import { SHOP_CATEGORIES } from "@/types";
 import HomeClient from "@/components/HomeClient";
 import { fetchHomeInitialData } from "@/lib/homeData";
 import { generateHomepageMetadata } from "@/lib/metadata";
+import { getSafeImageUrl } from "@/services/storageService";
 
 const EMPTY_SHOPS: Shop[] = [];
 const EMPTY_STORIES: Story[] = [];
+
+export const revalidate = 120;
 
 export async function generateMetadata({
   searchParams,
@@ -18,7 +21,7 @@ export async function generateMetadata({
   const category = params.category?.trim();
   const q = params.q?.trim();
 
-  // Text queries redirect to /search — don't index thin /?q= URLs.
+  // Search queries redirect to /search — don't index thin /?q= URLs.
   if (q) {
     return {
       ...generateHomepageMetadata(),
@@ -46,7 +49,7 @@ export async function generateMetadata({
 /**
  * Homepage — server-rendered storefront.
  *
- * Text queries (`?q=`) redirect to unified `/search` so products + shops +
+ * Search queries (`?q=`) redirect to unified `/search` so products + shops +
  * deals share one path. Category filters stay on `/`.
  */
 export default async function Home({
@@ -74,16 +77,31 @@ export default async function Home({
     // Non-fatal — client queries will fetch as before.
   }
 
+  const bannerPreloads: string[] = [];
+  for (const shop of initial.shops) {
+    const raw = shop.banner_url?.trim();
+    if (!raw) continue;
+    const src = getSafeImageUrl(raw, "shop", "banner");
+    if (!src || src.startsWith("data:")) continue;
+    if (!bannerPreloads.includes(src)) bannerPreloads.push(src);
+    if (bannerPreloads.length >= 2) break;
+  }
+
   return (
-    <HomeClient
-      initialShops={initial.shops}
-      initialStories={initial.stories}
-      initialDeals={initial.deals}
-      initialMyShopId={initial.myShopId}
-      initialCategory={
-        SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All"
-      }
-      initialQuery=""
-    />
+    <>
+      {bannerPreloads.map((href) => (
+        <link key={href} rel="preload" as="image" href={href} fetchPriority="high" />
+      ))}
+      <HomeClient
+        initialShops={initial.shops}
+        initialStories={initial.stories}
+        initialDeals={initial.deals}
+        initialMyShopId={initial.myShopId}
+        initialCategory={
+          SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All"
+        }
+        initialQuery=""
+      />
+    </>
   );
 }

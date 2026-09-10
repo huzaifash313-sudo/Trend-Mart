@@ -59,6 +59,7 @@ export function useShops(options?: { initialData?: Shop[] }) {
     queryKey: queryKeys.shops,
     queryFn: () => unwrap(fetchShops({ publicOnly: true, limit: PUBLIC_SHOP_LIMIT })),
     staleTime: 2 * 60_000,
+    refetchOnMount: false,
     // Keep the previous list on screen during refetch so content never flashes
     // blank / skeletons when a merchant publishes or the user pulls to refresh.
     placeholderData: keepPreviousData,

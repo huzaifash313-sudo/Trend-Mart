@@ -33,7 +33,7 @@ import {
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
 import ShopCard from "@/components/ShopCard";
-import GeoRadiusFilter, { type GeoFilterState } from "@/components/GeoRadiusFilter";
+import { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
 import { dealCommerceId } from "@/lib/dealCommerce";
@@ -53,9 +53,17 @@ const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
 });
 const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
   loading: () => null,
+  ssr: false,
 });
 const BrandMediaShowcase = dynamic(() => import("@/components/BrandMediaShowcase"), {
   loading: () => null,
+  ssr: false,
+});
+const GeoRadiusFilter = dynamic(() => import("@/components/GeoRadiusFilter"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-10 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" aria-hidden />
+  ),
 });
 
 /* Stable empty fallbacks so derived memos don't change identity every render. */

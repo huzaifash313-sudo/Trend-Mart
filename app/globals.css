@@ -114,8 +114,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-display: var(--font-display);
-  --font-shop: var(--font-shop);
-  --font-mono: var(--font-geist-mono);
+  /* Shop titles reuse display face — separate serif family was a multi-file font cost. */
+  --font-shop: var(--font-display);
+  --font-mono: var(--font-geist-sans), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Remap Tailwind emerald/teal → brand tokens (whole-app theme switch) */
   --color-emerald-50: var(--tm-brand-50);
@@ -633,9 +634,6 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
   color: #fff;
   background: var(--tm-danger-soft);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-  animation: tm-badge-blink 1.7s ease-in-out infinite;
-  transform-origin: center;
-  will-change: transform, opacity;
 }
 .tm-badge-deal {
   display: inline-flex;
@@ -685,9 +683,8 @@ html.dark .tm-badge-deal {
 
 /* Animation-only hook for one-off promo chips (hero slides, custom tags) */
 .tm-badge-pulse {
-  animation: tm-badge-blink 1.8s ease-in-out infinite;
+  /* Static — infinite blink costs main-thread time on every product card. */
   transform-origin: center;
-  will-change: transform, opacity, filter;
 }
 
 /* Compact category tab — used by the deals day strip so the always-visible
@@ -1701,7 +1698,6 @@ html.dark .trend-card:hover {
     transparent 58%
   );
   opacity: 0.65;
-  animation: tm-navbar-glow-breathe 6.5s ease-in-out infinite;
 }
 
 .tm-navbar-trend-svg {
@@ -1720,14 +1716,12 @@ html.dark .trend-card:hover {
   stroke-dasharray: 420;
   stroke-dashoffset: 0;
   opacity: 0.9;
-  animation: tm-navbar-line-draw 9s ease-in-out infinite;
 }
 
 .tm-navbar-trend-arrow {
   opacity: 0.45;
   transform-box: fill-box;
   transform-origin: center;
-  animation: tm-navbar-arrow-pulse 4s ease-in-out infinite;
 }
 
 .tm-navbar-inner {
@@ -4612,10 +4606,13 @@ html.dark .tm-product-title {
   gap: 0.85rem;
   height: 100%;
   padding-inline: 0.65rem;
-  animation-name: tm-product-offer-marquee;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  /* Avoid will-change on every card — creates GPU layers and janks old iPhones */
+}
+@media (hover: hover) and (min-width: 1024px) {
+  .tm-product-offer-track {
+    animation-name: tm-product-offer-marquee;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
 }
 .tm-product-offer-chip {
   display: inline-flex;
@@ -5199,7 +5196,6 @@ html.dark .tm-dash-quick-card:hover .tm-dash-card-desc {
   border-radius: 999px;
   background: #ef4444;
   box-shadow: 0 0 0 1px color-mix(in srgb, #ef4444 30%, transparent);
-  animation: tm-live-blink 1.35s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
