@@ -3,9 +3,9 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Brand promo video (homepage)                                  */
 /*                                                                            */
-/*  Fixed-aspect stage always reserved (no CLS). A soft CSS stage holds the   */
-/*  slot (never flash the OG share image with its white logo tile). The MP4   */
-/*  mounts in-view + idle, then cross-fades in when the first frame is ready. */
+/*  No poster flash (OG image / teal empty stage). The reel mounts immediately */
+/*  under the splash so by the time the intro ends the first frame is ready.   */
+/*  Slot keeps a dark letterbox (matches the video) — never a branded teal box. */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
@@ -44,93 +44,70 @@ function BrandVideo() {
   const [skip, setSkip] = useState(false);
   const [failed, setFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  /** Mount <video> only after the stage is near viewport — keeps first paint light. */
-  const [allowVideo, setAllowVideo] = useState(false);
 
+  // Mount + download as soon as the hero is on the page (often still under the
+  // splash). That way the empty slot is gone by the time the intro finishes.
   useEffect(() => {
     if (shouldSkipHeavyMedia()) {
       setSkip(true);
-      return;
     }
-
-    const el = wrapRef.current;
-    if (!el) return;
-
-    let cancelled = false;
-    const arm = () => {
-      if (!cancelled) setAllowVideo(true);
-    };
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-        io.disconnect();
-        // Yield to shop banners / hydration before starting the MP4 download.
-        const ric = (
-          window as Window & {
-            requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-          }
-        ).requestIdleCallback;
-        if (typeof ric === "function") {
-          ric(arm, { timeout: 1200 });
-        } else {
-          window.setTimeout(arm, 400);
-        }
-      },
-      { rootMargin: "120px 0px", threshold: 0.01 },
-    );
-    io.observe(el);
-    return () => {
-      cancelled = true;
-      io.disconnect();
-    };
   }, []);
 
   useEffect(() => {
-    if (!allowVideo || skip) return;
+    if (skip || failed) return;
     const el = wrapRef.current;
     const video = videoRef.current;
     if (!el || !video) return;
 
+    const tryPlay = () => {
+      if (document.hidden) return;
+      video.play().catch(() => {
+        /* autoplay blocked — first frame still visible once ready */
+      });
+    };
+
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          video.play().catch(() => {
-            /* autoplay blocked — CSS stage stays visible */
-          });
-        } else {
-          video.pause();
-        }
+        if (entry.isIntersecting) tryPlay();
+        else video.pause();
       },
-      { threshold: 0.25 },
+      { threshold: 0.15 },
     );
     io.observe(el);
-    return () => io.disconnect();
-  }, [allowVideo, skip]);
 
-  const showVideo = allowVideo && !skip && !failed && videoReady;
+    const onVis = () => {
+      if (!document.hidden) tryPlay();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [skip, failed, videoReady]);
+
+  if (skip || failed) return null;
 
   return (
-    <div ref={wrapRef} className="tm-brand-video">
-      {/* Soft brand stage — never flash /og-default.png (white logo tile). */}
-      <div
-        className={`tm-brand-video-stage${showVideo ? " is-hidden" : ""}`}
-        aria-hidden={showVideo}
+    <div
+      ref={wrapRef}
+      className={`tm-brand-video${videoReady ? " is-ready" : " is-loading"}`}
+      aria-busy={!videoReady}
+    >
+      <video
+        ref={videoRef}
+        className={`tm-brand-video-el${videoReady ? " is-ready" : ""}`}
+        src={BRAND_PROMO_VIDEO}
+        muted
+        loop
+        playsInline
+        autoPlay
+        preload="auto"
+        aria-label="TrendsMart brand promo"
+        onLoadedData={() => setVideoReady(true)}
+        onCanPlay={() => setVideoReady(true)}
+        onError={() => setFailed(true)}
       />
-      {allowVideo && !skip && !failed ? (
-        <video
-          ref={videoRef}
-          className={`tm-brand-video-el${videoReady ? " is-ready" : ""}`}
-          src={BRAND_PROMO_VIDEO}
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          aria-label="TrendsMart brand promo"
-          onLoadedData={() => setVideoReady(true)}
-          onError={() => setFailed(true)}
-        />
-      ) : null}
       <div className="tm-brand-video-glow" aria-hidden />
     </div>
   );

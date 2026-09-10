@@ -1054,7 +1054,7 @@ function HomeClient({
         />
       )}
 
-      {/* ── Brand video (SSR + reserved aspect — poster is LCP) ── */}
+      {/* Brand promo reel — mounts immediately under splash; hidden until first frame */}
       <div className="tm-home-hero-compact">
         <BrandMediaShowcase />
       </div>

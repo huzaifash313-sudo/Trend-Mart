@@ -3415,6 +3415,20 @@ html.dark .tm-story-skel-label {
   flex-direction: column;
   gap: 0.65rem;
 }
+/* Keep the <video> in the layout tree so it can buffer during splash, but
+   take no visible space until the first frame is ready. */
+.tm-brand-showcase:has(.tm-brand-video.is-loading) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
 .tm-brand-showcase-head {
   display: flex;
   align-items: baseline;
@@ -3439,9 +3453,20 @@ html.dark .tm-story-skel-label {
   overflow: hidden;
   border-radius: var(--tm-radius-2xl);
   border: 1px solid color-mix(in srgb, var(--tm-text-strong) 8%, transparent);
+  /* Neutral letterbox — never a teal “splash” tile while the reel buffers. */
   background: #050a14;
   box-shadow: var(--tm-shadow-xl);
   aspect-ratio: 16 / 9;
+}
+.tm-brand-video.is-loading {
+  /* Keep the slot so shops don’t jump, but stay dark — no teal empty flash. */
+  background: #050a14;
+}
+.tm-brand-video.is-loading .tm-brand-video-el {
+  opacity: 0;
+}
+.tm-brand-video.is-ready {
+  background: #050a14;
 }
 
 /* Homepage hero — full width, height trimmed a touch more */
@@ -3449,6 +3474,10 @@ html.dark .tm-story-skel-label {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+/* Collapse hero chrome when Save-Data / reduced-motion skips the reel. */
+.tm-home-hero-compact:not(:has(.tm-brand-video)) {
+  display: none;
 }
 
 .tm-home-hero-compact .tm-brand-video {
@@ -3541,30 +3570,19 @@ html.dark .tm-story-skel-label {
 .tm-brand-video-el.is-ready {
   opacity: 1;
 }
-/* Soft placeholder until the reel’s first frame is ready — never use the
-   OG share image (white logo tile + tagline) as a poster flash. */
-.tm-brand-video-stage {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(120% 80% at 50% -10%, rgba(94, 234, 212, 0.28), transparent 55%),
-    radial-gradient(90% 70% at 100% 100%, rgba(13, 148, 136, 0.45), transparent 50%),
-    linear-gradient(165deg, #0f766e 0%, #0d9488 42%, #115e59 100%);
-  transition: opacity 0.4s ease;
-}
-.tm-brand-video-stage.is-hidden {
-  opacity: 0;
-  pointer-events: none;
-}
 .tm-brand-video-glow {
   pointer-events: none;
   position: absolute;
   inset: 0;
   z-index: 2;
+  opacity: 0;
+  transition: opacity 0.35s ease;
   background:
     radial-gradient(ellipse 60% 50% at 80% 40%, color-mix(in srgb, var(--tm-sea-400) 12%, transparent), transparent 70%),
     linear-gradient(to top, rgba(5, 10, 20, 0.35) 0%, transparent 40%);
+}
+.tm-brand-video.is-ready .tm-brand-video-glow {
+  opacity: 1;
 }
 
 /* Mobile cover must come AFTER the base contain rule */
