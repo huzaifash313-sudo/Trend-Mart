@@ -282,7 +282,7 @@ function OrdersInner() {
   // names — fetching unapproved/offline shops (which carry owner_id + contact
   // details) here would leak them to any signed-in customer.
   useEffect(() => {
-    fetchShops({ publicOnly: true }).then((r) => {
+    fetchShops({ publicOnly: true, limit: 48 }).then((r) => {
       if (r.success) {
         const map = new Map<string, Shop>();
         r.data.forEach((s) => map.set(s.id, s));

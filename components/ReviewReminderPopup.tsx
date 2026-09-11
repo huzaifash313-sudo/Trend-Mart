@@ -3,11 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
-import {
-  subscribeToCustomerOrders,
-  type OrderPayload,
-} from "@/lib/supabase/realtime";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { fetchMyReviews, submitReview } from "@/services/reviewService";
 
 /* -------------------------------------------------------------------------- */
@@ -229,50 +224,31 @@ export default function ReviewReminderPopup() {
     };
   }, [maybeAutoOpen, openFor, checkForReviewable]);
 
-  // Realtime (app open on ANY page): a merchant marks one of the customer's
-  // orders Delivered → re-check reviewable shops and surface the popup right
-  // away, even if the customer isn't on the tracking page. Also covers a
-  // mid-session sign-in, so pending delivered orders appear right after login.
+  // Auth + focus poll (Free-tier): no always-on order Realtime socket on every
+  // page. Delivered → review still fires via `trendsmart:order-update` (tracking)
+  // and when the tab becomes visible / user signs in.
   useEffect(() => {
-    let unsub: (() => void) | undefined;
     let cancelled = false;
-
     const supabase = createClient();
-
-    const setup = (userId: string) => {
-      currentUserIdRef.current = userId;
-      unsub?.();
-      unsub = subscribeToCustomerOrders(userId, (payload) => {
-        const record = (payload as RealtimePostgresChangesPayload<OrderPayload>).new;
-        if (!record || !("status" in record)) return;
-        if (String(record.status ?? "").toLowerCase() === "delivered") {
-          void checkForReviewable();
-        }
-      });
-    };
 
     void supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled || !session?.user) return;
-      setup(session.user.id);
+      currentUserIdRef.current = session.user.id;
+      void checkForReviewable();
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
-      if (event === "SIGNED_IN") {
-        if (session?.user) {
-          setup(session.user.id);
-          void checkForReviewable();
-        }
+      if (event === "SIGNED_IN" && session?.user) {
+        currentUserIdRef.current = session.user.id;
+        void checkForReviewable();
       } else if (event === "SIGNED_OUT") {
         currentUserIdRef.current = "";
-        unsub?.();
-        unsub = undefined;
       }
     });
 
     return () => {
       cancelled = true;
-      unsub?.();
       authListener.subscription.unsubscribe();
     };
   }, [checkForReviewable]);

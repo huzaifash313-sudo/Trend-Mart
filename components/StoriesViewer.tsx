@@ -90,7 +90,7 @@ function StoryImage({ story }: { story: Story }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={getSafeImageUrl(story.image_url, "product")}
+      src={getSafeImageUrl(story.image_url, "product", "story")}
       alt={story.shop_name || story.caption || "Story"}
       onError={() => setImgError(true)}
       className="max-h-full max-w-full object-contain"
@@ -236,7 +236,7 @@ export default function StoriesViewer({
     let cancelled = false;
     async function load() {
       try {
-        const result = await fetchActiveStories(150);
+        const result = await fetchActiveStories(48);
         if (!cancelled && result.success) {
           const sorted = sortStoriesUnseenFirst(result.data);
           setStories(sorted);
@@ -322,11 +322,11 @@ export default function StoriesViewer({
     const next = stories[currentIndex + 1];
     if (next?.image_url) {
       const img = new Image();
-      img.src = getSafeImageUrl(next.image_url, "product");
+      img.src = getSafeImageUrl(next.image_url, "product", "story");
     }
   }, [stories, currentIndex]);
 
-  /* Progress timer — pauses in place, resumes from the exact same spot */
+  /* Progress timer — rAF instead of 25 React setStates/sec (2 GB phones) */
   useEffect(() => {
     if (loading || stories.length === 0) return;
 
@@ -337,24 +337,31 @@ export default function StoriesViewer({
 
     setProgress(Math.min(elapsedRef.current / STORY_DURATION_MS, 1));
     const start = Date.now() - elapsedRef.current;
+    let raf = 0;
+    let lastPaint = 0;
 
-    const timer = setInterval(() => {
+    const tick = () => {
       const elapsed = Date.now() - start;
       elapsedRef.current = elapsed;
       const pct = Math.min(elapsed / STORY_DURATION_MS, 1);
       if (pct >= 1) {
-        clearInterval(timer);
         elapsedRef.current = 0;
         const total = storiesRef.current.length;
         const idx = currentIndexRef.current;
         if (idx >= total - 1) onCloseRef.current();
         else setCurrentIndex((prev) => prev + 1);
-      } else {
+        return;
+      }
+      // Throttle React updates to ~10fps — bar still feels smooth via CSS.
+      if (elapsed - lastPaint >= 100) {
+        lastPaint = elapsed;
         setProgress(pct);
       }
-    }, 40);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
 
-    return () => clearInterval(timer);
+    return () => cancelAnimationFrame(raf);
   }, [currentIndex, stories.length, loading, paused]);
 
   /* ── Touch: hold to pause, swipe or tap to navigate ──────────────────── */

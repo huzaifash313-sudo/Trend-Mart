@@ -546,7 +546,14 @@ export function extractPathFromUrl(url: string): string | null {
 }
 
 /** Delivery presets for list cards — keeps mobile payloads tiny on Cloudinary. */
-export type ImageDeliveryRole = "card" | "banner" | "logo" | "thumb" | "avatar" | "full";
+export type ImageDeliveryRole =
+  | "card"
+  | "banner"
+  | "logo"
+  | "thumb"
+  | "avatar"
+  | "story"
+  | "full";
 
 const DELIVERY_BY_ROLE: Record<
   ImageDeliveryRole,
@@ -562,6 +569,8 @@ const DELIVERY_BY_ROLE: Record<
   thumb: { width: 64, height: 64, crop: "fill", quality: "eco" },
   /** Tiny card shop chips (h-3 / 12–16px) */
   avatar: { width: 48, height: 48, crop: "fill", quality: "eco" },
+  /** Fullscreen story viewer — smaller than `full` for 2 GB phones */
+  story: { width: 720, height: 1280, crop: "limit", quality: "eco" },
   /** Detail / lightbox / upload preview — full image, still capped */
   full: { width: 1400, height: 1400, crop: "limit", quality: "good" },
 };

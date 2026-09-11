@@ -23,6 +23,7 @@ import {
   isValidCoordinate,
 } from "@/lib/geoCoords";
 import { getPublicAppUrl } from "@/lib/appUrl";
+import { GEO_SHOP_FETCH_CAP, PUBLIC_SHOP_LIMIT } from "@/lib/mobilePerf";
 
 export { isValidLatitude, isValidLongitude, isValidCoordinate };
 
@@ -610,10 +611,13 @@ export async function filterShopsByProximity(
       const supabase = createClient();
       const { data, error } = await supabase
         .from("shops")
-        .select("*")
+        .select(
+          "id, name, slug, category, location, logo_url, banner_url, is_live, verification_status, latitude, longitude, delivery_radius_km, delivery_zones, free_delivery_radius_km",
+        )
         .eq("is_live", true)
         .eq("verification_status", "approved")
-        .order("name", { ascending: true });
+        .order("name", { ascending: true })
+        .limit(Math.min(PUBLIC_SHOP_LIMIT, GEO_SHOP_FETCH_CAP));
 
       if (error) throw error;
       allShops = (data as Shop[]) ?? [];

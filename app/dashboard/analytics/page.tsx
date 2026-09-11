@@ -153,22 +153,28 @@ export default function AnalyticsDashboard() {
         if (cancelled) return;
         setShop(shopData);
 
+        const cutoffISO = new Date(
+          Date.now() - timeRange * 24 * 60 * 60 * 1000,
+        ).toISOString();
+
         const { data: orders } = await supabase
           .from("orders")
-          .select("*")
+          .select(
+            "id, shop_id, customer_phone, items_json, total_amount, status, created_at",
+          )
           .eq("shop_id", shopData.id)
-          .order("created_at", { ascending: false });
-
-        const { data: logs } = await supabase
-          .from("analytics_logs")
-          .select("*")
-          .eq("shop_id", shopData.id);
+          .gte("created_at", cutoffISO)
+          .order("created_at", { ascending: false })
+          .limit(400);
 
         const { data: products } = await supabase
           .from("products")
-          .select("*")
+          .select(
+            "id, name, price, is_available, click_count, orders_count, created_at",
+          )
           .eq("shop_id", shopData.id)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(200);
 
         if (cancelled) return;
 
@@ -180,8 +186,6 @@ export default function AnalyticsDashboard() {
         // Analytics Overview summary (views + clicks) — fetched in parallel.
         const summaryRes = await fetchAnalyticsSummary(shopData.id);
         if (!cancelled && summaryRes.success) setSummary(summaryRes.data);
-
-        const logList = (logs as { event_type: string; product_id?: string; created_at: string }[]) ?? [];
 
         const dailyMap = new Map<string, { revenue: number; orders: number; customers: Set<string> }>();
         const now = new Date();
@@ -221,11 +225,11 @@ export default function AnalyticsDashboard() {
           }
         }
 
+        // Prefer denormalized click_count — never download full analytics_logs.
         const clickMap = new Map<string, number>();
-        for (const l of logList) {
-          if (l.event_type === "product_click" && l.product_id) {
-            clickMap.set(l.product_id, (clickMap.get(l.product_id) ?? 0) + 1);
-          }
+        for (const p of productList) {
+          const clicks = Math.max(0, Number(p.click_count) || 0);
+          if (clicks > 0) clickMap.set(p.id, clicks);
         }
 
         const topProducts: ProductAnalyticsData[] = [];
@@ -255,7 +259,9 @@ export default function AnalyticsDashboard() {
         const whatsappEntry = leadSources.get("whatsapp")!;
         whatsappEntry.count += orderList.length;
         whatsappEntry.converted += orderList.length;
-        const shopViewCount = logList.filter((l) => l.event_type === "shop_view").length;
+        const shopViewCount = summaryRes.success
+          ? summaryRes.data.total_views
+          : 0;
         const catEntry = leadSources.get("catalog")!;
         catEntry.count = shopViewCount;
 

@@ -14,8 +14,6 @@ import type { Review } from "@/types";
 import { formatRelativeTime } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
 import { paginateReviews, REVIEW_PAGE_SIZE } from "@/lib/reviewRules";
-import { subscribeToReviews, type ReviewPayload } from "@/lib/supabase/realtime";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 /* -------------------------------------------------------------------------- */
 /*  Star Rating                                                                */
@@ -411,32 +409,20 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
     };
   }, [shopId, ownerId]);
 
-  // Live social proof: reviews posted by other customers while this page is
-  // open show up instantly (no refresh needed).
+  // Soft refresh on tab focus — avoids a Realtime socket per guest storefront
+  // while still picking up new reviews when the shopper returns to the page.
   useEffect(() => {
     let cancelled = false;
-
-    const unsub = subscribeToReviews(shopId, (payload) => {
-      const row = (payload as RealtimePostgresChangesPayload<ReviewPayload>).new;
-      if (cancelled || !row || !("id" in row)) return;
-      const incoming: Review = {
-        id: String(row.id),
-        shop_id: String(row.shop_id ?? shopId),
-        customer_name: String(row.customer_name ?? "Anonymous"),
-        rating: Math.min(5, Math.max(1, Number(row.rating) || 0)),
-        comment: String(row.comment ?? ""),
-        created_at: String(row.created_at ?? new Date().toISOString()),
-        user_id: null,
-        merchant_reply: "",
-        merchant_reply_at: null,
-        verified_purchase: false,
-      };
-      setReviews((prev) => (prev.some((r) => r.id === incoming.id) ? prev : [incoming, ...prev]));
-    });
-
+    const softRefresh = () => {
+      if (document.visibilityState !== "visible" || cancelled) return;
+      void fetchReviewsByShopId(shopId).then((reviewResult) => {
+        if (!cancelled && reviewResult.success) setReviews(reviewResult.data);
+      });
+    };
+    document.addEventListener("visibilitychange", softRefresh);
     return () => {
       cancelled = true;
-      unsub();
+      document.removeEventListener("visibilitychange", softRefresh);
     };
   }, [shopId]);
 

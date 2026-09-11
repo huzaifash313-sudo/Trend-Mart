@@ -3,40 +3,13 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Brand promo video (homepage)                                  */
 /*                                                                            */
-/*  No poster flash (OG image / teal empty stage). The reel mounts immediately */
-/*  under the splash so by the time the intro ends the first frame is ready.   */
-/*  Slot keeps a dark letterbox (matches the video) — never a branded teal box. */
+/*  Low-end / Save-Data / reduced-motion: skip the reel entirely (Daraz-smooth */
+/*  on 2 GB phones). Stronger devices: metadata preload + play only in view.  */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
 import { BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
-
-function shouldSkipHeavyMedia(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return true;
-    }
-  } catch {
-    /* ignore */
-  }
-  try {
-    const nav = navigator as Navigator & {
-      connection?: { saveData?: boolean; effectiveType?: string };
-    };
-    const c = nav.connection;
-    if (
-      c?.saveData ||
-      c?.effectiveType === "slow-2g" ||
-      c?.effectiveType === "2g"
-    ) {
-      return true;
-    }
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
+import { shouldSkipHeavyMedia } from "@/lib/mobilePerf";
 
 function BrandVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -44,17 +17,35 @@ function BrandVideo() {
   const [skip, setSkip] = useState(false);
   const [failed, setFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [armed, setArmed] = useState(false);
 
-  // Mount + download as soon as the hero is on the page (often still under the
-  // splash). That way the empty slot is gone by the time the intro finishes.
   useEffect(() => {
     if (shouldSkipHeavyMedia()) {
       setSkip(true);
+      return;
     }
+    // Defer source attach until the hero is near the viewport — avoids competing
+    // with splash + first shop paint on mid-range phones.
+    const el = wrapRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setArmed(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setArmed(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "80px 0px", threshold: 0.01 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   useEffect(() => {
-    if (skip || failed) return;
+    if (skip || failed || !armed) return;
     const el = wrapRef.current;
     const video = videoRef.current;
     if (!el || !video) return;
@@ -83,8 +74,9 @@ function BrandVideo() {
     return () => {
       io.disconnect();
       document.removeEventListener("visibilitychange", onVis);
+      video.pause();
     };
-  }, [skip, failed, videoReady]);
+  }, [skip, failed, armed, videoReady]);
 
   if (skip || failed) return null;
 
@@ -92,22 +84,24 @@ function BrandVideo() {
     <div
       ref={wrapRef}
       className={`tm-brand-video${videoReady ? " is-ready" : " is-loading"}`}
-      aria-busy={!videoReady}
+      aria-busy={!videoReady && armed}
     >
-      <video
-        ref={videoRef}
-        className={`tm-brand-video-el${videoReady ? " is-ready" : ""}`}
-        src={BRAND_PROMO_VIDEO}
-        muted
-        loop
-        playsInline
-        autoPlay
-        preload="auto"
-        aria-label="TrendsMart brand promo"
-        onLoadedData={() => setVideoReady(true)}
-        onCanPlay={() => setVideoReady(true)}
-        onError={() => setFailed(true)}
-      />
+      {armed ? (
+        <video
+          ref={videoRef}
+          className={`tm-brand-video-el${videoReady ? " is-ready" : ""}`}
+          src={BRAND_PROMO_VIDEO}
+          muted
+          loop
+          playsInline
+          autoPlay
+          preload="metadata"
+          aria-label="TrendsMart brand promo"
+          onLoadedData={() => setVideoReady(true)}
+          onCanPlay={() => setVideoReady(true)}
+          onError={() => setFailed(true)}
+        />
+      ) : null}
       <div className="tm-brand-video-glow" aria-hidden />
     </div>
   );

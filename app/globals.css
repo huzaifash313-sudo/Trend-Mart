@@ -3637,7 +3637,7 @@ html.dark .tm-story-skel-label {
   .tm-brand-video-el {
     object-fit: cover;
     object-position: center center;
-    transform: scale(1.08);
+    transform: none;
     transform-origin: center center;
   }
 }

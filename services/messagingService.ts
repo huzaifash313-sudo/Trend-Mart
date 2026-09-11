@@ -5,6 +5,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { sanitizeLight, truncate } from "@/lib/sanitization";
+import { CHAT_MESSAGE_PAGE_SIZE } from "@/lib/mobilePerf";
 
 type ServiceResult<T> =
   | { success: true; data: T }
@@ -316,16 +317,21 @@ export async function fetchMessages(
 ): Promise<ServiceResult<ChatMessage[]>> {
   const supabase = createClient();
   try {
+    // Newest page first (desc), then reverse for chronological UI — never load
+    // the oldest 500 and skip recent messages.
     const { data, error } = await supabase
       .from("conversation_messages")
-      .select("*")
+      .select(
+        "id, conversation_id, sender_role, sender_user_id, body, is_deleted, created_at, read_at",
+      )
       .eq("conversation_id", conversationId)
       .eq("is_deleted", false)
-      .order("created_at", { ascending: true })
-      .limit(500);
+      .order("created_at", { ascending: false })
+      .limit(CHAT_MESSAGE_PAGE_SIZE);
 
     if (error) throw error;
-    return { success: true, data: (data as ChatMessage[]) ?? [] };
+    const rows = ((data as ChatMessage[]) ?? []).slice().reverse();
+    return { success: true, data: rows };
   } catch (err) {
     logError(err, { module: "messagingService.fetchMessages", meta: { conversationId } });
     return { success: false, error: toError(err) };

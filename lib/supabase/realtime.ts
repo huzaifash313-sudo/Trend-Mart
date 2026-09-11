@@ -3,13 +3,10 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Supabase Realtime WebSocket Channel Manager                    */
 /*                                                                             */
-/*  Provides typed subscriptions for:                                          */
-/*   - Order inserts/updates (merchant dashboard live feed)                    */
-/*   - Customer inquiry inserts (merchant notification)                       */
-/*   - Product availability changes (storefront live update)                  */
-/*   - Review inserts (storefront social proof)                               */
-/*                                                                             */
-/*  Handles automatic reconnection, channel cleanup, and error recovery.       */
+/*  Free-tier aware: ONE physical channel per logical key with ref-counted     */
+/*  fan-out (dashboard + kitchen + orders no longer open 3 sockets).           */
+/*  Public storefront product/review live updates are optional — prefer soft   */
+/*  refresh there; merchant / chat / notifications stay fully live.            */
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
@@ -17,8 +14,6 @@ import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 
-// Using `type` instead of `interface` ensures compatibility with
-// RealtimePostgresChangesPayload generic constraints.
 export type OrderPayload = {
   id: string;
   shop_id: string;
@@ -143,647 +138,580 @@ type StateChangeCallback = (state: ConnectionState, channelKey: string) => void;
 const stateListeners = new Set<StateChangeCallback>();
 let globalConnectionState: ConnectionState = "disconnected";
 
-/**
- * Register a listener for real-time connection state changes across all channels.
- * Useful for showing connection status indicators in the UI.
- */
 export function onConnectionStateChange(callback: StateChangeCallback): () => void {
   stateListeners.add(callback);
-  return () => { stateListeners.delete(callback); };
+  return () => {
+    stateListeners.delete(callback);
+  };
 }
 
 function notifyStateChange(state: ConnectionState, channelKey: string): void {
   globalConnectionState = state;
   for (const listener of stateListeners) {
-    try { listener(state, channelKey); } catch { /* swallow */ }
+    try {
+      listener(state, channelKey);
+    } catch {
+      /* swallow */
+    }
   }
 }
 
-/** Returns the current global connection state. */
 export function getConnectionState(): ConnectionState {
   return globalConnectionState;
 }
 
-// ─── Channel Manager ──────────────────────────────────────────────────────────
+// ─── Shared (ref-counted) channel manager ─────────────────────────────────────
 
 const activeChannels = new Map<string, RealtimeChannel>();
 
-// Monotonic counter so multiple concurrent listeners on the SAME logical
-// channel (e.g. the global bell AND the dashboard live feed both subscribe to
-// the same shop's orders) each get a unique physical channel name. The previous
-// single-slot-per-key design unsubscribed the first listener whenever a second
-// subscribed, silently killing earlier callbacks.
-let channelSeq = 0;
-function uniqueKey(base: string): string {
-  channelSeq += 1;
-  return `${base}#${channelSeq}`;
-}
+type SharedBucket = {
+  channel: RealtimeChannel;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  listeners: Set<any>;
+};
+
+const sharedBuckets = new Map<string, SharedBucket>();
 
 /**
- * Subscribe to real-time INSERT/UPDATE events on the orders table for a specific shop.
- * The merchant dashboard uses this to see new orders appear instantly.
+ * One physical Realtime channel per logical key. Multiple UI surfaces
+ * (dashboard + kitchen + orders) share the socket; last unsubscriber tears it down.
  */
+function acquireShared<TListener>(
+  logicalKey: string,
+  listener: TListener,
+  createChannel: (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fanout: (invoke: (listener: TListener) => void) => void,
+  ) => RealtimeChannel,
+): () => void {
+  let bucket = sharedBuckets.get(logicalKey);
+  if (!bucket) {
+    const listeners = new Set<TListener>();
+    const channel = createChannel((invoke) => {
+      for (const l of listeners) {
+        try {
+          invoke(l);
+        } catch {
+          /* swallow per-listener errors */
+        }
+      }
+    });
+    bucket = { channel, listeners };
+    sharedBuckets.set(logicalKey, bucket);
+    activeChannels.set(logicalKey, channel);
+  }
+  bucket.listeners.add(listener);
+  return () => {
+    const b = sharedBuckets.get(logicalKey);
+    if (!b) return;
+    b.listeners.delete(listener);
+    if (b.listeners.size === 0) {
+      unsubscribe(logicalKey);
+      sharedBuckets.delete(logicalKey);
+    }
+  };
+}
+
+function bindStatus(channel: RealtimeChannel, channelKey: string, label: string): RealtimeChannel {
+  return channel.subscribe((status, err) => {
+    if (status === "SUBSCRIBED") {
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[Realtime] ✅ ${label}`);
+      }
+      notifyStateChange("connected", channelKey);
+    } else if (status === "CHANNEL_ERROR") {
+      console.error(`[Realtime] ❌ ${label}`, err);
+      notifyStateChange("error", channelKey);
+    } else if (status === "TIMED_OUT") {
+      notifyStateChange("connecting", channelKey);
+    }
+  });
+}
+
+/** Merchant dashboard — live new orders + status changes. */
 export function subscribeToOrders(
   shopId: string,
   onInsert: RealtimeCallback<OrderPayload>,
   onUpdate?: RealtimeCallback<OrderPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`orders-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "orders",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onInsert(payload as RealtimePostgresChangesPayload<OrderPayload>);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "orders",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onUpdate?.(payload as RealtimePostgresChangesPayload<OrderPayload>);
-      },
-    )
-    .subscribe((status, err) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to orders for shop: ${shopId}`);
-        notifyStateChange("connected", channelKey);
-      } else if (status === "CHANNEL_ERROR") {
-        console.error(`[Realtime] ❌ Channel error for orders:${shopId}`, err);
-        notifyStateChange("error", channelKey);
-      } else if (status === "TIMED_OUT") {
-        console.warn(`[Realtime] ⏱️ Timeout for orders:${shopId} — will retry`);
-        notifyStateChange("connecting", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `orders-${shopId}`;
+  type L = { onInsert: RealtimeCallback<OrderPayload>; onUpdate?: RealtimeCallback<OrderPayload> };
+  return acquireShared<L>(logicalKey, { onInsert, onUpdate }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase
+        .channel(logicalKey)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "orders", filter: `shop_id=eq.${shopId}` },
+          (payload) =>
+            fanout((l) => l.onInsert(payload as RealtimePostgresChangesPayload<OrderPayload>)),
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "orders", filter: `shop_id=eq.${shopId}` },
+          (payload) =>
+            fanout((l) =>
+              l.onUpdate?.(payload as RealtimePostgresChangesPayload<OrderPayload>),
+            ),
+        ),
+      logicalKey,
+      `orders:${shopId}`,
+    );
+  });
 }
 
-/**
- * Subscribe to real-time INSERT/UPDATE events on the customer_inquiries table
- * for a specific shop. Dashboard shows new inquiries instantly.
- */
 export function subscribeToInquiries(
   shopId: string,
   onInsert: RealtimeCallback<InquiryPayload>,
   onUpdate?: RealtimeCallback<InquiryPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`inquiries-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "customer_inquiries",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onInsert(payload as RealtimePostgresChangesPayload<InquiryPayload>);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "customer_inquiries",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onUpdate?.(payload as RealtimePostgresChangesPayload<InquiryPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to inquiries for shop: ${shopId}`);
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `inquiries-${shopId}`;
+  type L = {
+    onInsert: RealtimeCallback<InquiryPayload>;
+    onUpdate?: RealtimeCallback<InquiryPayload>;
+  };
+  return acquireShared<L>(logicalKey, { onInsert, onUpdate }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase
+        .channel(logicalKey)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "customer_inquiries",
+            filter: `shop_id=eq.${shopId}`,
+          },
+          (payload) =>
+            fanout((l) => l.onInsert(payload as RealtimePostgresChangesPayload<InquiryPayload>)),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "customer_inquiries",
+            filter: `shop_id=eq.${shopId}`,
+          },
+          (payload) =>
+            fanout((l) =>
+              l.onUpdate?.(payload as RealtimePostgresChangesPayload<InquiryPayload>),
+            ),
+        ),
+      logicalKey,
+      `inquiries:${shopId}`,
+    );
+  });
 }
 
-/**
- * Merchant dashboard — live conversation list updates (new threads, previews).
- */
 export function subscribeToShopConversations(
   shopId: string,
   onChange: RealtimeCallback<ConversationPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`conversations-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "conversations",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to conversations for shop: ${shopId}`);
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `conversations-${shopId}`;
+  type L = { onChange: RealtimeCallback<ConversationPayload> };
+  return acquireShared<L>(logicalKey, { onChange }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations", filter: `shop_id=eq.${shopId}` },
+        (payload) =>
+          fanout((l) =>
+            l.onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>),
+          ),
+      ),
+      logicalKey,
+      `conversations:${shopId}`,
+    );
+  });
 }
 
-/** Customer portal — live conversation list updates. */
 export function subscribeToMyConversations(
   userId: string,
   onChange: RealtimeCallback<ConversationPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`my-conversations-${userId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "conversations",
-        filter: `customer_user_id=eq.${userId}`,
-      },
-      (payload) => {
-        onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>);
-      },
-    )
-    .subscribe();
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `my-conversations-${userId}`;
+  type L = { onChange: RealtimeCallback<ConversationPayload> };
+  return acquireShared<L>(logicalKey, { onChange }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "conversations",
+          filter: `customer_user_id=eq.${userId}`,
+        },
+        (payload) =>
+          fanout((l) =>
+            l.onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>),
+          ),
+      ),
+      logicalKey,
+      `my-conversations:${userId}`,
+    );
+  });
 }
 
-/**
- * Live messages inside an open chat thread.
- */
 export function subscribeToConversationMessages(
   conversationId: string,
   onInsert: RealtimeCallback<ChatMessagePayload>,
   onUpdate?: RealtimeCallback<ChatMessagePayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`chat-messages-${conversationId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "conversation_messages",
-        filter: `conversation_id=eq.${conversationId}`,
-      },
-      (payload) => {
-        onInsert(payload as RealtimePostgresChangesPayload<ChatMessagePayload>);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "conversation_messages",
-        filter: `conversation_id=eq.${conversationId}`,
-      },
-      (payload) => {
-        onUpdate?.(payload as RealtimePostgresChangesPayload<ChatMessagePayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `chat-messages-${conversationId}`;
+  type L = {
+    onInsert: RealtimeCallback<ChatMessagePayload>;
+    onUpdate?: RealtimeCallback<ChatMessagePayload>;
+  };
+  return acquireShared<L>(logicalKey, { onInsert, onUpdate }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase
+        .channel(logicalKey)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "conversation_messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) =>
+            fanout((l) =>
+              l.onInsert(payload as RealtimePostgresChangesPayload<ChatMessagePayload>),
+            ),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "conversation_messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) =>
+            fanout((l) =>
+              l.onUpdate?.(payload as RealtimePostgresChangesPayload<ChatMessagePayload>),
+            ),
+        ),
+      logicalKey,
+      `chat:${conversationId}`,
+    );
+  });
 }
 
-/** Customer portal — live updates when the merchant replies. */
 export function subscribeToMyInquiries(
   userId: string,
   onUpdate: RealtimeCallback<InquiryPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`my-inquiries-${userId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "customer_inquiries",
-        filter: `customer_user_id=eq.${userId}`,
-      },
-      (payload) => {
-        onUpdate(payload as RealtimePostgresChangesPayload<InquiryPayload>);
-      },
-    )
-    .subscribe();
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `my-inquiries-${userId}`;
+  type L = { onUpdate: RealtimeCallback<InquiryPayload> };
+  return acquireShared<L>(logicalKey, { onUpdate }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "customer_inquiries",
+          filter: `customer_user_id=eq.${userId}`,
+        },
+        (payload) =>
+          fanout((l) =>
+            l.onUpdate(payload as RealtimePostgresChangesPayload<InquiryPayload>),
+          ),
+      ),
+      logicalKey,
+      `my-inquiries:${userId}`,
+    );
+  });
 }
 
-/**
- * Subscribe to order status updates for a logged-in customer.
- */
+/** Customer order status (tracking / review reminder when intentionally wired). */
 export function subscribeToCustomerOrders(
   userId: string,
   onUpdate: RealtimeCallback<OrderPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`customer-orders-${userId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "orders",
-        filter: `customer_user_id=eq.${userId}`,
-      },
-      (payload) => {
-        onUpdate(payload as RealtimePostgresChangesPayload<OrderPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        notifyStateChange("connected", channelKey);
-      } else if (status === "CHANNEL_ERROR") {
-        notifyStateChange("error", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `customer-orders-${userId}`;
+  type L = { onUpdate: RealtimeCallback<OrderPayload> };
+  return acquireShared<L>(logicalKey, { onUpdate }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `customer_user_id=eq.${userId}`,
+        },
+        (payload) =>
+          fanout((l) => l.onUpdate(payload as RealtimePostgresChangesPayload<OrderPayload>)),
+      ),
+      logicalKey,
+      `customer-orders:${userId}`,
+    );
+  });
 }
 
-/**
- * Subscribe to new DB-backed notifications for a signed-in user.
- * Rows are created by server-side triggers (support tickets, orders,
- * inquiries) — see supabase/migrations/20260819020000_db_notifications.sql.
- */
 export function subscribeToNotifications(
   userId: string,
   onInsert: RealtimeCallback<NotificationPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`notifications-${userId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "notifications",
-        filter: `user_id=eq.${userId}`,
-      },
-      (payload) => {
-        onInsert(payload as RealtimePostgresChangesPayload<NotificationPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to notifications for user: ${userId}`);
-        notifyStateChange("connected", channelKey);
-      } else if (status === "CHANNEL_ERROR") {
-        notifyStateChange("error", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `notifications-${userId}`;
+  type L = { onInsert: RealtimeCallback<NotificationPayload> };
+  return acquireShared<L>(logicalKey, { onInsert }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) =>
+          fanout((l) =>
+            l.onInsert(payload as RealtimePostgresChangesPayload<NotificationPayload>),
+          ),
+      ),
+      logicalKey,
+      `notifications:${userId}`,
+    );
+  });
 }
 
-/**
- * Subscribe to new platform support tickets (Admin Support Inbox live feed).
- * Only admins receive rows via RLS; the dashboard re-queries on insert.
- */
 export function subscribeToSupportTickets(
   onInsert: RealtimeCallback<SupportTicketPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`support-tickets`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "support_tickets",
-      },
-      (payload) => {
-        onInsert(payload as RealtimePostgresChangesPayload<SupportTicketPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log("[Realtime] ✅ Subscribed to new support tickets");
-        notifyStateChange("connected", channelKey);
-      } else if (status === "CHANNEL_ERROR") {
-        notifyStateChange("error", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `support-tickets`;
+  type L = { onInsert: RealtimeCallback<SupportTicketPayload> };
+  return acquireShared<L>(logicalKey, { onInsert }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "support_tickets" },
+        (payload) =>
+          fanout((l) =>
+            l.onInsert(payload as RealtimePostgresChangesPayload<SupportTicketPayload>),
+          ),
+      ),
+      logicalKey,
+      "support-tickets",
+    );
+  });
 }
 
-/**
- * Subscribe to product changes (INSERT/UPDATE/DELETE) for a specific shop.
- * The public storefront uses this to reflect availability changes in real-time.
- */
+/** Optional storefront live catalog — prefer soft refresh for guests on Free tier. */
 export function subscribeToProducts(
   shopId: string,
   onUpdate: RealtimeCallback<ProductPayload>,
   onInsert?: RealtimeCallback<ProductPayload>,
   onDelete?: RealtimeCallback<ProductPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`products-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "products",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onUpdate(payload as RealtimePostgresChangesPayload<ProductPayload>);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "products",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onInsert?.(payload as RealtimePostgresChangesPayload<ProductPayload>);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "products",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onDelete?.(payload as RealtimePostgresChangesPayload<ProductPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to products for shop: ${shopId}`);
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `products-${shopId}`;
+  type L = {
+    onUpdate: RealtimeCallback<ProductPayload>;
+    onInsert?: RealtimeCallback<ProductPayload>;
+    onDelete?: RealtimeCallback<ProductPayload>;
+  };
+  return acquireShared<L>(logicalKey, { onUpdate, onInsert, onDelete }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase
+        .channel(logicalKey)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "products", filter: `shop_id=eq.${shopId}` },
+          (payload) =>
+            fanout((l) =>
+              l.onUpdate(payload as RealtimePostgresChangesPayload<ProductPayload>),
+            ),
+        )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "products", filter: `shop_id=eq.${shopId}` },
+          (payload) =>
+            fanout((l) =>
+              l.onInsert?.(payload as RealtimePostgresChangesPayload<ProductPayload>),
+            ),
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "products", filter: `shop_id=eq.${shopId}` },
+          (payload) =>
+            fanout((l) =>
+              l.onDelete?.(payload as RealtimePostgresChangesPayload<ProductPayload>),
+            ),
+        ),
+      logicalKey,
+      `products:${shopId}`,
+    );
+  });
 }
 
-/**
- * Subscribe to new reviews for a specific shop.
- * The storefront page updates the review list in real-time.
- */
 export function subscribeToReviews(
   shopId: string,
   onInsert: RealtimeCallback<ReviewPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`reviews-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "reviews",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onInsert(payload as RealtimePostgresChangesPayload<ReviewPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to reviews for shop: ${shopId}`);
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `reviews-${shopId}`;
+  type L = { onInsert: RealtimeCallback<ReviewPayload> };
+  return acquireShared<L>(logicalKey, { onInsert }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "reviews", filter: `shop_id=eq.${shopId}` },
+        (payload) =>
+          fanout((l) => l.onInsert(payload as RealtimePostgresChangesPayload<ReviewPayload>)),
+      ),
+      logicalKey,
+      `reviews:${shopId}`,
+    );
+  });
 }
 
-/**
- * Subscribe to inventory_variants changes for a specific shop.
- * Live inventory deduction updates and low-stock alerts.
- * Both merchant dashboard and public storefront benefit from this.
- */
 export function subscribeToInventory(
   shopId: string,
   onUpdate: RealtimeCallback<InventoryVariantPayload>,
   onInsert?: RealtimeCallback<InventoryVariantPayload>,
   onDelete?: RealtimeCallback<InventoryVariantPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`inventory-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "inventory_variants",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onUpdate(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "inventory_variants",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onInsert?.(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "inventory_variants",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onDelete?.(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to inventory for shop: ${shopId}`);
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `inventory-${shopId}`;
+  type L = {
+    onUpdate: RealtimeCallback<InventoryVariantPayload>;
+    onInsert?: RealtimeCallback<InventoryVariantPayload>;
+    onDelete?: RealtimeCallback<InventoryVariantPayload>;
+  };
+  return acquireShared<L>(logicalKey, { onUpdate, onInsert, onDelete }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase
+        .channel(logicalKey)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "inventory_variants",
+            filter: `shop_id=eq.${shopId}`,
+          },
+          (payload) =>
+            fanout((l) =>
+              l.onUpdate(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>),
+            ),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "inventory_variants",
+            filter: `shop_id=eq.${shopId}`,
+          },
+          (payload) =>
+            fanout((l) =>
+              l.onInsert?.(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>),
+            ),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "inventory_variants",
+            filter: `shop_id=eq.${shopId}`,
+          },
+          (payload) =>
+            fanout((l) =>
+              l.onDelete?.(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>),
+            ),
+        ),
+      logicalKey,
+      `inventory:${shopId}`,
+    );
+  });
 }
 
-/**
- * Subscribe to analytics_logs INSERT events for a specific shop.
- * Pushes live analytics log updates to the merchant dashboard
- * (e.g., "Someone clicked on Product X just now").
- */
+/** Unused on soft-launch — kept for API stability; prefer summary polling. */
 export function subscribeToAnalytics(
   shopId: string,
   onInsert: RealtimeCallback<AnalyticsPayload>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`analytics-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "analytics_logs",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onInsert(payload as RealtimePostgresChangesPayload<AnalyticsPayload>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        console.log(`[Realtime] ✅ Subscribed to analytics for shop: ${shopId}`);
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `analytics-${shopId}`;
+  type L = { onInsert: RealtimeCallback<AnalyticsPayload> };
+  return acquireShared<L>(logicalKey, { onInsert }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "analytics_logs",
+          filter: `shop_id=eq.${shopId}`,
+        },
+        (payload) =>
+          fanout((l) =>
+            l.onInsert(payload as RealtimePostgresChangesPayload<AnalyticsPayload>),
+          ),
+      ),
+      logicalKey,
+      `analytics:${shopId}`,
+    );
+  });
 }
 
-/**
- * Live ad stats for the merchant ads dashboard — updates when
- * impression_count / click_count / status change on their rows.
- */
 export function subscribeToShopAds(
   shopId: string,
   onChange: RealtimeCallback<Record<string, unknown>>,
 ): () => void {
-  const supabase = createClient();
-  const channelKey = uniqueKey(`shop-ads-${shopId}`);
-
-  const channel = supabase
-    .channel(channelKey)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "promotional_ads",
-        filter: `shop_id=eq.${shopId}`,
-      },
-      (payload) => {
-        onChange(payload as RealtimePostgresChangesPayload<Record<string, unknown>>);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        notifyStateChange("connected", channelKey);
-      }
-    });
-
-  activeChannels.set(channelKey, channel);
-  return () => unsubscribe(channelKey);
+  const logicalKey = `shop-ads-${shopId}`;
+  type L = { onChange: RealtimeCallback<Record<string, unknown>> };
+  return acquireShared<L>(logicalKey, { onChange }, (fanout) => {
+    const supabase = createClient();
+    return bindStatus(
+      supabase.channel(logicalKey).on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "promotional_ads",
+          filter: `shop_id=eq.${shopId}`,
+        },
+        (payload) =>
+          fanout((l) =>
+            l.onChange(payload as RealtimePostgresChangesPayload<Record<string, unknown>>),
+          ),
+      ),
+      logicalKey,
+      `shop-ads:${shopId}`,
+    );
+  });
 }
 
-// ─── Utility ──────────────────────────────────────────────────────────────────
-
-/** Unsubscribe and remove a specific channel. */
 export function unsubscribe(channelKey: string): void {
   const existing = activeChannels.get(channelKey);
   if (existing) {
     existing.unsubscribe();
     activeChannels.delete(channelKey);
-    console.log(`[Realtime] 🔌 Unsubscribed from: ${channelKey}`);
+    sharedBuckets.delete(channelKey);
     notifyStateChange("disconnected", channelKey);
   }
 }
 
-/** Unsubscribe from ALL active real-time channels. */
 export function unsubscribeAll(): void {
   for (const [key, channel] of activeChannels) {
     channel.unsubscribe();
-    console.log(`[Realtime] 🔌 Unsubscribed from: ${key}`);
     notifyStateChange("disconnected", key);
   }
   activeChannels.clear();
+  sharedBuckets.clear();
 }

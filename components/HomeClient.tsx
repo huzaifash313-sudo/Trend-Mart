@@ -48,7 +48,12 @@ import HomeCategories from "@/components/HomeCategories";
 import { DealsRail, ProductsRail, SponsoredRail } from "@/components/HomeFeedRails";
 import LazyMount from "@/components/LazyMount";
 import { ShopCardGridSkeleton } from "@/components/Skeletons";
-import { PUBLIC_SHOP_PAGE_SIZE } from "@/lib/mobilePerf";
+import {
+  PUBLIC_SHOP_PAGE_SIZE,
+  getFeedSentinelRootMargin,
+  getLazyMountRootMargin,
+  shouldSkipHeavyMedia,
+} from "@/lib/mobilePerf";
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
 });
@@ -811,6 +816,7 @@ function HomeClient({
     }
     return chunks;
   }, [visibleShops]);
+  const lowEndFeed = shouldSkipHeavyMedia();
 
   /*
    * One compact shelf after EVERY shop chunk — deals → products → sponsored →
@@ -861,7 +867,7 @@ function HomeClient({
           void shopsQuery.fetchNextPage();
         }
       },
-      { rootMargin: "320px 0px" },
+      { rootMargin: getFeedSentinelRootMargin() },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -969,7 +975,7 @@ function HomeClient({
                     >
                       {first.image_url && !brokenStoryImgs.has(first.id) ? (
                         <Image
-                          src={getSafeImageUrl(first.image_url, "product")}
+                          src={getSafeImageUrl(first.image_url, "product", "thumb")}
                           alt=""
                           fill
                           className="object-cover"
@@ -1265,7 +1271,7 @@ function HomeClient({
                     force={chunk.length > 8}
                     estimateRowHeight={260}
                     gapClassName="gap-2 sm:gap-4"
-                    overscan={3}
+                    overscan={2}
                     columnBreakpoints={{ base: 2, md: 3, lg: 4, xl: 5 }}
                     renderItem={(shop, index) => {
                       const withDistance = shop as ShopWithDistance;
@@ -1285,13 +1291,16 @@ function HomeClient({
                       );
                     }}
                   />
-                  <LazyMount
-                    eager={ci === 0}
-                    minHeight={ci % 3 === 2 ? 120 : 200}
-                    rootMargin="400px 0px"
-                  >
-                    {renderFeedRail(ci)}
-                  </LazyMount>
+                  {/* Low-end: only the first two rails — shop grids stay (virtualized). */}
+                  {(!lowEndFeed || ci < 2) && (
+                    <LazyMount
+                      eager={ci === 0}
+                      minHeight={ci % 3 === 2 ? 120 : 200}
+                      rootMargin={getLazyMountRootMargin()}
+                    >
+                      {renderFeedRail(ci)}
+                    </LazyMount>
+                  )}
                 </div>
               );
             })}

@@ -84,11 +84,14 @@ export async function fetchAlertCounts(
   try {
     const [lowStockResult, pendingOrdersResult, inquiriesResult] =
       await Promise.all([
-        // 1. Fetch all available inventory variants (stock comparison done client-side)
+        // Cap variants download — stock≤threshold compared client-side (PostgREST
+        // cannot compare two columns without an RPC).
         supabase
           .from("inventory_variants")
           .select("id, stock, low_stock_threshold, is_available")
-          .eq("shop_id", shopId),
+          .eq("shop_id", shopId)
+          .eq("is_available", true)
+          .limit(200),
 
         // 2. Pending orders
         supabase

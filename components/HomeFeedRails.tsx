@@ -28,6 +28,7 @@ import {
 } from "@/lib/imageSizes";
 import { formatPrice, getProductDiscount } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
+import { shouldSkipHeavyMedia } from "@/lib/mobilePerf";
 import { useCart } from "@/context/CartContext";
 import { useMarketplaceProducts, useFavorites, queryKeys } from "@/lib/queries";
 import { toggleFavorite } from "@/services/wishlistService";
@@ -209,17 +210,9 @@ function useMiniRailAutoLoop(limit: number) {
       return;
     }
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    try {
-      const nav = navigator as Navigator & {
-        connection?: { saveData?: boolean; effectiveType?: string };
-      };
-      const c = nav.connection;
-      if (c?.saveData || c?.effectiveType === "2g" || c?.effectiveType === "slow-2g") {
-        setEnabled(false);
-        return;
-      }
-    } catch {
-      /* ignore */
+    if (shouldSkipHeavyMedia()) {
+      setEnabled(false);
+      return;
     }
     setEnabled(!reduce && limit > 4);
   }, [limit]);

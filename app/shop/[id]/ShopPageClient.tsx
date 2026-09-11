@@ -58,7 +58,6 @@ import {
   normalizeFacebookUrl,
   tikTokProfileUrl,
 } from "@/lib/socialLinks";
-import { subscribeToProducts } from "@/lib/supabase/realtime";
 import ServiceBookingModal, { type ServicePackageItem } from "@/components/ServiceBookingModal";
 import AvailabilitySchedule, { type AvailabilityDay } from "@/components/AvailabilitySchedule";
 import type { PortfolioItem } from "@/components/ServicePortfolioManager";
@@ -477,21 +476,30 @@ function ShopDetailInner({
     };
   }, [loading, shop, liveShopDeals.length, products.length]);
 
-  // ── Real-time product updates ─────────────────────────────────────────────
+  // Soft refresh on focus (Free-tier): guests no longer hold a Realtime WS per
+  // storefront visit. Merchants still get instant updates via their own edits /
+  // dashboard; shoppers see fresh stock when they return to the tab.
   useEffect(() => {
-    if (!resolvedShopId) return;
-    const unsubProducts = subscribeToProducts(resolvedShopId, (payload) => {
-      const updated = payload.new as Product;
-      setProducts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
-    }, (payload) => {
-      const newProduct = payload.new as Product;
-      setProducts((prev) => [...prev, newProduct]);
-    }, (payload) => {
-      const deleted = payload.old as { id: string };
-      setProducts((prev) => prev.filter((p) => p.id !== deleted.id));
-    });
-    return () => { unsubProducts(); };
-  }, [resolvedShopId]);
+    if (!resolvedShopId || isOwner) return;
+    let cancelled = false;
+    const softRefresh = () => {
+      if (document.visibilityState !== "visible" || cancelled) return;
+      void fetchShopProductsPage(resolvedShopId, {
+        limit: SHOP_STOREFRONT_PRODUCT_LIMIT,
+        offset: 0,
+      }).then((res) => {
+        if (!cancelled && res.success) {
+          const byId = new Map(res.data.map((p) => [p.id, p]));
+          setProducts((prev) => prev.map((p) => byId.get(p.id) ?? p));
+        }
+      });
+    };
+    document.addEventListener("visibilitychange", softRefresh);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", softRefresh);
+    };
+  }, [resolvedShopId, isOwner]);
 
   // ── Wishlist product IDs ──────────────────────────────────────────────────
   useEffect(() => {

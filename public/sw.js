@@ -1,4 +1,4 @@
-/* TrendsMart SW v54 — offline-first app shell.
+/* TrendsMart SW v55 — offline-first app shell.
    Goals:
    - Repeat PWA opens feel native: successful visits to PUBLIC pages are
      cached, and cached copies are served INSTANTLY on the next navigation
@@ -6,7 +6,8 @@
      background — no waiting on the network for the shell on every open.
    - App assets (/ _next/static JS/CSS, fonts, icons) are cached as they are
      used (SWR), so a cached page can still hydrate when offline.
-   - Images (Cloudinary / Next image proxy) stay SWR-cached as before.
+   - Images (Cloudinary / Next image proxy) stay SWR-cached as before,
+     with a hard IMAGE_CACHE_LIMIT so 2 GB phones don't thrash memory.
    - Private areas (dashboard/admin/account/orders/settings/cart/auth…) are
      NEVER cached — only public catalog pages may be stored.
    - When a page had to be served from cache because the network failed, the
@@ -14,14 +15,15 @@
      show a subtle "You're offline" pill instead of looking broken.
    Push / notifications logic unchanged from v52. */
 
-const PAGE_CACHE = "tm-pages-v54"; /* rendered HTML of visited public pages */
-const SHELL_CACHE = "tm-shell-v54"; /* /_next/static, fonts, icons, /offline */
-const IMAGE_CACHE = "tm-images-v54"; /* Cloudinary / Next image proxy */
+const PAGE_CACHE = "tm-pages-v55"; /* rendered HTML of visited public pages */
+const SHELL_CACHE = "tm-shell-v55"; /* /_next/static, fonts, icons, /offline */
+const IMAGE_CACHE = "tm-images-v55"; /* Cloudinary / Next image proxy */
 const KEEP = new Set([PAGE_CACHE, SHELL_CACHE, IMAGE_CACHE]);
 
 /** Keep these bounded — evict oldest entries past the cap on every write. */
 const PAGE_CACHE_LIMIT = 24;
 const SHELL_CACHE_LIMIT = 140;
+const IMAGE_CACHE_LIMIT = 60;
 
 /** Route prefixes that may be cached for offline reading (public catalog). */
 const PUBLIC_ROOTS = [
@@ -76,6 +78,11 @@ function isShellAsset(url) {
 
 function isSwCacheableImage(url, req) {
   const host = url.hostname;
+  const path = url.pathname.toLowerCase();
+  // Never cache brand promo MP4s (or any video) — 2 GB phones hang.
+  if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(path) || req.destination === "video") {
+    return false;
+  }
   if (host.includes("res.cloudinary.com") || host.includes("cloudinary.com")) return true;
   if (url.pathname.startsWith("/_next/image")) return true;
   if (url.origin === self.location.origin && req.destination === "image") return true;
@@ -321,8 +328,11 @@ self.addEventListener("fetch", (event) => {
         // Revalidate in background (stale-while-revalidate).
         event.waitUntil(
           fetch(req)
-            .then((res) => {
-              if (res && res.ok) return cache.put(req, res.clone());
+            .then(async (res) => {
+              if (res && res.ok) {
+                await cache.put(req, res.clone());
+                await trimCache(IMAGE_CACHE, IMAGE_CACHE_LIMIT);
+              }
             })
             .catch(() => undefined),
         );
@@ -331,7 +341,12 @@ self.addEventListener("fetch", (event) => {
       try {
         const res = await fetch(req);
         if (res && res.ok) {
-          cache.put(req, res.clone()).catch(() => undefined);
+          event.waitUntil(
+            cache
+              .put(req, res.clone())
+              .then(() => trimCache(IMAGE_CACHE, IMAGE_CACHE_LIMIT))
+              .catch(() => undefined),
+          );
         }
         return res;
       } catch {

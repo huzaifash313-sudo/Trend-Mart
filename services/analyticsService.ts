@@ -13,6 +13,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { AnalyticsSummary } from "@/types";
 import { logError } from "@/services/errorService";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import {
+  PRODUCT_CLICK_DEDUPE_MS,
+  PRODUCT_CLICK_SAMPLE_RATE,
+} from "@/lib/mobilePerf";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -164,6 +168,35 @@ function markShopViewLogged(shopId: string): void {
   }
 }
 
+const PRODUCT_CLICK_STORAGE_PREFIX = "trendsmart_product_click_at_";
+
+function recentlyLoggedProductClick(shopId: string, productId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(
+      `${PRODUCT_CLICK_STORAGE_PREFIX}${shopId}:${productId}`,
+    );
+    if (!raw) return false;
+    const ts = Number(raw);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < PRODUCT_CLICK_DEDUPE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markProductClickLogged(shopId: string, productId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      `${PRODUCT_CLICK_STORAGE_PREFIX}${shopId}:${productId}`,
+      String(Date.now()),
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
 async function isCurrentUserShopOwner(shopId: string): Promise<boolean> {
   try {
     const supabase = createClient();
@@ -206,12 +239,22 @@ export async function logShopView(shopId: string): Promise<void> {
 
 /**
  * Log a product click event.
- * Uses batched queue for performance under high traffic.
+ * Free-tier: per-product 10-min dedupe + probabilistic sample so analytics_logs
+ * (and click_count triggers) stay small under browse traffic. Shop views stay
+ * fully counted (already 45-min deduped).
  */
 export async function logProductClick(
   shopId: string,
   productId: string,
 ): Promise<void> {
+  if (!shopId || !productId) return;
+  if (recentlyLoggedProductClick(shopId, productId)) return;
+  if (Math.random() > PRODUCT_CLICK_SAMPLE_RATE) {
+    markProductClickLogged(shopId, productId);
+    return;
+  }
+  markProductClickLogged(shopId, productId);
+
   eventQueue.push({
     shop_id: shopId,
     event_type: "product_click",
@@ -220,7 +263,6 @@ export async function logProductClick(
   });
   scheduleFlush();
 
-  // Trigger real-time push
   notifyMetricsSubscribers(shopId, "product_click");
 }
 
