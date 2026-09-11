@@ -95,9 +95,12 @@ export default function HomeCategories({
   return (
     <section aria-label="Browse by category" className="tm-home-cats">
       <div className="tm-home-cats-head">
-        <h2 className="tm-home-cats-title">Shop by category</h2>
+        <div className="tm-home-kicker-row">
+          <h2 className="tm-home-cats-title">Categories</h2>
+          <span className="tm-home-kicker">Swipe to explore</span>
+        </div>
         <Link href="/search" className="tm-home-cats-more">
-          All categories
+          See all
           <svg
             className="h-3.5 w-3.5"
             viewBox="0 0 24 24"
@@ -113,17 +116,20 @@ export default function HomeCategories({
         </Link>
       </div>
 
-      {/* Mobile: swipeable row (fade edges) · md+: wrapping icon grid */}
+      {/* Mobile: swipeable row · md+: wrapping icon grid */}
       <div className="tm-home-cats-grid md:flex-row md:flex-wrap">
         {tiles.map((cat) => {
           const isActive = activeCategory === cat;
+          const count = cat === "All" ? undefined : counts.get(cat);
           return (
             <button
               key={cat}
               type="button"
               onClick={() => onSelect(cat)}
               aria-pressed={isActive}
-              aria-label={`${cat} shops`}
+              aria-label={
+                count && count > 0 ? `${cat} shops, ${count}` : `${cat} shops`
+              }
               className={`tm-home-cat-tile${isActive ? " is-active" : ""}`}
             >
               <span
@@ -131,6 +137,9 @@ export default function HomeCategories({
                 aria-hidden="true"
               >
                 <span className="tm-home-cat-emoji">{iconFor(cat)}</span>
+                {typeof count === "number" && count > 0 ? (
+                  <span className="tm-home-cat-count">{count > 99 ? "99+" : count}</span>
+                ) : null}
               </span>
               <span className="tm-home-cat-label">
                 {cat === "All" ? "All" : (SHORT_CATEGORY_NAMES[cat] ?? cat)}

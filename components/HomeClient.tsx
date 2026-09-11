@@ -878,11 +878,14 @@ function HomeClient({
 
   return (
     <>
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-safe-nav md:px-4 md:py-3 md:pb-6">
+    <div className="tm-home mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-safe-nav md:px-4 md:py-3 md:pb-6">
       {/* Stories tray — top of homepage, always reserved */}
       <section aria-label="Merchant stories" className="tm-stories-tray">
         <div className="tm-stories-tray-head">
-          <h2 className="tm-stories-tray-title">Stories</h2>
+          <div className="tm-home-kicker-row">
+            <h2 className="tm-stories-tray-title">Stories</h2>
+            <span className="tm-home-kicker">Live from shops</span>
+          </div>
         </div>
         <div className="tm-stories-tray-scroll">
           {myShop ? (
@@ -1054,7 +1057,7 @@ function HomeClient({
         />
       )}
 
-      {/* Brand promo reel — mounts immediately under splash; hidden until first frame */}
+      {/* Brand promo — compact so shops reach the first viewport faster */}
       <div className="tm-home-hero-compact">
         <BrandMediaShowcase />
       </div>
@@ -1068,45 +1071,52 @@ function HomeClient({
       />
 
       {/* ── Live Shops Grid ───────────────────────────────────────── */}
-      <section aria-label="Live shops" className="tm-feed-scroll-stable">
-        <div className="tm-live-shops-heading mb-1">
-          <div className="tm-live-shops-heading-main min-w-0">
-            <h2 className="tm-live-shops-title">
-              <span className="tm-live-shops-indicator" aria-hidden="true">
-                <span className="tm-live-shops-indicator-ping" />
-                <span className="tm-live-shops-indicator-dot" />
-              </span>
-              Live Shops
-            </h2>
-            {!loading && (
-              <p className="tm-live-shops-count">
-                {displayShops.length} shop{displayShops.length !== 1 && "s"}
-              </p>
-            )}
+      <section aria-label="Live shops" className="tm-feed-scroll-stable tm-live-shops">
+        <div className="tm-live-shops-panel">
+          <div className="tm-live-shops-heading">
+            <div className="tm-live-shops-heading-main min-w-0">
+              <h2 className="tm-live-shops-title">
+                <span className="tm-live-shops-indicator" aria-hidden="true">
+                  <span className="tm-live-shops-indicator-ping" />
+                  <span className="tm-live-shops-indicator-dot" />
+                </span>
+                Live Shops
+              </h2>
+              {!loading && (
+                <p className="tm-live-shops-count">
+                  {displayShops.length} shop{displayShops.length !== 1 && "s"}
+                  {geoFilter.scope === "radius"
+                    ? " nearby"
+                    : geoFilter.scope === "city"
+                      ? " in your city"
+                      : " across Pakistan"}
+                </p>
+              )}
+            </div>
+            <Link href="/recently-viewed" className="tm-live-shops-recent">
+              Recently viewed
+              <svg
+                className="tm-live-shops-recent-arrow"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </Link>
           </div>
-          <Link href="/recently-viewed" className="tm-live-shops-recent">
-            Recently viewed
-            <svg
-              className="tm-live-shops-recent-arrow"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </Link>
-        </div>
-        <div className="tm-live-shops-geo mb-2.5">
-          <GeoRadiusFilter
-            onFilterChange={setGeoFilter}
-            isDetecting={geoDetecting}
-            onDetectStart={() => setGeoDetecting(true)}
-            onDetectEnd={() => setGeoDetecting(false)}
-          />
+          <div className="tm-live-shops-geo">
+            <GeoRadiusFilter
+              onFilterChange={setGeoFilter}
+              isDetecting={geoDetecting}
+              onDetectStart={() => setGeoDetecting(true)}
+              onDetectEnd={() => setGeoDetecting(false)}
+            />
+          </div>
         </div>
 
         {/* Loading skeletons */}
@@ -1289,7 +1299,7 @@ function HomeClient({
             {/* Infinite-scroll sentinel — next page + skeleton while fetching. */}
             <div
               ref={feedSentinelRef}
-              className="mt-6 flex min-h-[3rem] flex-col items-center justify-center gap-3"
+              className="tm-live-shops-sentinel flex min-h-[3rem] flex-col items-center justify-center gap-3"
             >
               {loadingMoreShops ? (
                 <div className="w-full" aria-busy="true" aria-label="Loading more shops">
@@ -1304,7 +1314,11 @@ function HomeClient({
                 >
                   Show more shops
                 </button>
-              ) : null}
+              ) : (
+                <p className="tm-live-shops-end" role="status">
+                  You&apos;re all caught up
+                </p>
+              )}
             </div>
           </>
         )}
