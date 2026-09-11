@@ -84,32 +84,42 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Anti-enumeration: always return GENERIC_OK unless send caps / captcha fail.
-  // Only email a code when the account actually exists.
+  // Anti-enumeration: unknown emails still get GENERIC_OK (no reveal).
+  // Known accounts must actually receive a code — never fake success on send failure.
   let sent = false;
   try {
     const user = await findAuthUserByEmail(admin, email);
     if (user?.id) {
       const result = await issueAndSendOtp(admin, email, user.id, "password_reset");
-      if (result.success) {
-        sent = true;
-        recordForgotPasswordSend(email);
-      } else if (result.error?.toLowerCase().includes("couldn't send")) {
-        // Resend misconfigured — surface a clear ops error (not "account missing").
+      if (!result.success) {
+        console.error(
+          "[auth/forgot-password] OTP send failed for existing user:",
+          result.error,
+        );
         return NextResponse.json(
           {
             success: false,
             error:
+              result.error ??
               "We couldn't send the reset email right now. Please try again shortly.",
           },
           { status: 503 },
         );
       }
+      sent = true;
+      recordForgotPasswordSend(email);
     }
   } catch (err) {
     console.error(
       "[auth/forgot-password] unexpected:",
       err instanceof Error ? err.message : err,
+    );
+    return NextResponse.json(
+      {
+        success: false,
+        error: "We couldn't send the reset email right now. Please try again shortly.",
+      },
+      { status: 503 },
     );
   }
 

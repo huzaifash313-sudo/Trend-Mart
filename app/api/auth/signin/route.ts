@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
       if (admin) {
         const existing = await Promise.race([
           findAuthUserByEmail(admin, email),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2_500)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000)),
         ]);
         if (existing?.email_confirmed_at) {
           // OTP already confirmed the email — re-assert and retry once (handles stale auth state).
@@ -249,7 +249,20 @@ export async function POST(request: NextRequest) {
             .maybeSingle();
           const lastSent = (pending as { last_sent_at?: string } | null)?.last_sent_at ?? "";
           if (resendCooldownRemainingMs(lastSent) <= 0) {
-            await issueAndSendOtp(admin, email, existing.id);
+            const issued = await issueAndSendOtp(admin, email, existing.id);
+            if (!issued.success) {
+              console.error("[auth/signin] OTP send failed:", issued.error);
+              return NextResponse.json(
+                {
+                  success: false,
+                  needsVerification: true,
+                  error:
+                    issued.error ??
+                    "Please verify your email — we couldn't send the code just now. Try Resend in a moment.",
+                },
+                { status: 403 },
+              );
+            }
           }
         }
       }
@@ -298,7 +311,21 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
       const lastSent = (pending as { last_sent_at?: string } | null)?.last_sent_at ?? "";
       if (resendCooldownRemainingMs(lastSent) <= 0) {
-        await issueAndSendOtp(admin, email, data.user.id);
+        const issued = await issueAndSendOtp(admin, email, data.user.id);
+        if (!issued.success) {
+          console.error("[auth/signin] OTP send failed (unconfirmed session):", issued.error);
+          return NextResponse.json(
+            {
+              success: false,
+              needsVerification: true,
+              error:
+                issued.error ??
+                "Please verify your email — we couldn't send the code just now. Try Resend in a moment.",
+              user: { id: data.user.id, email: data.user.email, email_confirmed_at: null },
+            },
+            { status: 403 },
+          );
+        }
       }
     }
     return NextResponse.json(

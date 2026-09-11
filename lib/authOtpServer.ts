@@ -46,8 +46,8 @@ function otpSecret(): string {
 }
 
 /**
- * Find an auth user by email. Prefer indexed lookups (OTP row / getUserById)
- * before paging listUsers — keeps sign-in OTP fast as the user base grows.
+ * Find an auth user by email. Prefer indexed lookups (OTP row / GoTrue filter)
+ * before paging listUsers — keeps OTP flows fast as the user base grows.
  */
 export async function findAuthUserByEmail(
   admin: AdminClient,
@@ -72,13 +72,54 @@ export async function findAuthUserByEmail(
     /* continue */
   }
 
-  // 2) Page listUsers as a fallback (capped).
+  // 2) GoTrue admin filter (exact email match) — O(1) vs multi-page scan.
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    if (url && serviceKey) {
+      const endpoint = new URL(`${url}/auth/v1/admin/users`);
+      endpoint.searchParams.set("page", "1");
+      endpoint.searchParams.set("per_page", "50");
+      endpoint.searchParams.set("filter", target);
+      const res = await fetch(endpoint.toString(), {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const payload = (await res.json()) as { users?: User[] };
+        const match = (payload.users ?? []).find(
+          (u) => (u.email ?? "").toLowerCase() === target,
+        );
+        if (match) return match;
+      } else {
+        console.warn(
+          "[authOtpServer] admin users filter failed:",
+          res.status,
+          (await res.text().catch(() => "")).slice(0, 160),
+        );
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[authOtpServer] admin users filter error:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  // 3) Page listUsers as a last resort (capped).
   const perPage = 200;
   const maxPages = 50;
 
   for (let page = 1; page <= maxPages; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-    if (error) return null;
+    if (error) {
+      console.error("[authOtpServer] listUsers failed:", error.message);
+      return null;
+    }
     const users = data?.users ?? [];
     const match = users.find((u) => (u.email ?? "").toLowerCase() === target);
     if (match) return match;
@@ -102,13 +143,16 @@ export async function issueAndSendOtp(
   const code = generateOtpCode();
   const codeHash = hashOtp(code, normalized, otpSecret());
 
+  const nowIso = new Date().toISOString();
   const row = {
     email: normalized,
     user_id: userId,
     code_hash: codeHash,
     expires_at: otpExpiryIso(),
     attempts: 0,
-    last_sent_at: new Date().toISOString(),
+    // Keep previous last_sent_at until delivery succeeds so a failed send
+    // does not start the resend cooldown against an undelivered code.
+    last_sent_at: nowIso,
   };
 
   // Untyped Supabase client infers upsert payloads as `never` — cast payload.
@@ -140,17 +184,52 @@ export async function issueAndSendOtp(
   });
 
   if (!sent.success) {
+    // Drop the undelivered code so the user can retry immediately and we
+    // don't leave a hash that can never be verified from their inbox.
+    await admin.from("email_verification_otps").delete().eq("email", normalized);
+    console.error(
+      "[authOtpServer] email delivery failed:",
+      sent.error ?? "unknown",
+      "to:",
+      normalized,
+      "kind:",
+      kind,
+    );
     return {
       success: false,
-      error:
-        sent.error ||
-        (isReset
-          ? "We couldn't send the reset email. Please try again shortly."
-          : "We couldn't send the verification email. Please try again shortly."),
+      error: friendlyEmailDeliveryError(sent.error, isReset),
     };
   }
 
   return { success: true };
+}
+
+function friendlyEmailDeliveryError(
+  raw: string | undefined,
+  isReset: boolean,
+): string {
+  const msg = (raw ?? "").toLowerCase();
+  if (!msg || msg.includes("not configured")) {
+    return isReset
+      ? "Password-reset email isn't configured yet. Please contact support."
+      : "Verification email isn't configured yet. Please contact support.";
+  }
+  if (
+    msg.includes("domain") ||
+    msg.includes("from") ||
+    msg.includes("not verified") ||
+    msg.includes("invalid")
+  ) {
+    return isReset
+      ? "We couldn't send the reset email (mail provider rejected it). Please try again shortly or contact support."
+      : "We couldn't send the verification email (mail provider rejected it). Please try again shortly or contact support.";
+  }
+  return (
+    raw ||
+    (isReset
+      ? "We couldn't send the reset email. Please try again shortly."
+      : "We couldn't send the verification email. Please try again shortly.")
+  );
 }
 
 /**

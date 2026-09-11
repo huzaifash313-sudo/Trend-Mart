@@ -77,10 +77,15 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       replyTo: input.replyTo,
     });
 
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      console.error("[TrendsMart Email] Resend API error:", error.message);
+      return { success: false, error: error.message };
+    }
     return { success: true, id: data?.id };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "Unknown email error." };
+    const message = err instanceof Error ? err.message : "Unknown email error.";
+    console.error("[TrendsMart Email] send threw:", message);
+    return { success: false, error: message };
   }
 }
 
