@@ -30,6 +30,7 @@ import {
   fetchTokenBalance,
   publishAdWithTokens,
 } from "@/services/billingService";
+import { fetchMyShop } from "@/services/shopService";
 import type { PromotionalAd, PromotionalAdFormData, AdPlan, AdPlacementChoice } from "@/types";
 import { AD_PLACEMENT_LABELS, AD_PLACEMENT_OPTIONS } from "@/types";
 import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
@@ -103,7 +104,7 @@ export default function MerchantAdsPage() {
     };
   }, []);
 
-  // ── Resolve merchant's shop ──────────────────────────────────────────────
+  // ── Resolve merchant's shop (one store per account) ──────────────────────
   useEffect(() => {
     let cancelled = false;
     async function resolveShop() {
@@ -113,22 +114,21 @@ export default function MerchantAdsPage() {
         router.replace("/auth");
         return;
       }
-      const { data: shop } = await supabase
-        .from("shops")
-        .select("id, name")
-        .eq("owner_id", data.user.id)
-        .maybeSingle();
-      if (!cancelled) {
-        if (shop) {
-          setShopId(shop.id as string);
-          setShopName((shop.name as string) ?? "");
-        }
-        setLoading(false);
+      const result = await fetchMyShop();
+      if (cancelled) return;
+      if (result.success && result.data) {
+        setShopId(result.data.id);
+        setShopName(result.data.name ?? "");
+      } else if (!result.success) {
+        addToast(result.error || "Could not load your store.", "error");
       }
+      setLoading(false);
     }
-    resolveShop();
-    return () => { cancelled = true; };
-  }, [supabase, router]);
+    void resolveShop();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, router, addToast]);
 
   // ── Load ad requests ─────────────────────────────────────────────────────
   const loadAds = useCallback(async (id: string) => {
@@ -233,6 +233,8 @@ export default function MerchantAdsPage() {
 
     const placements = resolveAdPlacements(placementChoice);
     let failed = false;
+    let liveCount = 0;
+    let pendingCount = 0;
     for (const placement of placements) {
       const result = await createAdRequest(
         shopId,
@@ -244,19 +246,32 @@ export default function MerchantAdsPage() {
         failed = true;
         break;
       }
+      const ad = result.data;
+      if (ad.status === "approved" && ad.is_active) liveCount += 1;
+      else pendingCount += 1;
     }
 
     if (!failed) {
-      addToast(
-        !isPaidFeaturesEnabled()
-          ? placements.length > 1
-            ? `Ads live on ${placements.length} pages!`
-            : "Ad is live!"
-          : placements.length > 1
-            ? `Ad requests submitted for ${placements.length} pages!`
-            : "Ad request submitted for review!",
-        "success",
-      );
+      if (liveCount > 0 && pendingCount === 0) {
+        addToast(
+          liveCount > 1 ? `Ads live on ${liveCount} pages!` : "Ad is live!",
+          "success",
+        );
+      } else if (liveCount > 0) {
+        addToast(
+          `${liveCount} live, ${pendingCount} waiting for review.`,
+          "info",
+        );
+      } else {
+        addToast(
+          !isPaidFeaturesEnabled()
+            ? "Ad saved — waiting to go live. Check status below."
+            : pendingCount > 1
+              ? `Ad requests submitted for ${pendingCount} pages!`
+              : "Ad request submitted for review!",
+          "success",
+        );
+      }
       await loadAds(shopId);
       handleCancel();
     }
@@ -365,7 +380,7 @@ export default function MerchantAdsPage() {
                 }}
                 className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
               >
-                <PlusIcon /> Request Ad Slot
+                <PlusIcon /> {!isPaidFeaturesEnabled() ? "Create Ad" : "Request Ad Slot"}
               </button>
             )}
           </div>

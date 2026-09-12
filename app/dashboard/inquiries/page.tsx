@@ -20,7 +20,7 @@ function MerchantMessagesContent() {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          window.location.replace("/login?redirect=/dashboard/inquiries");
+          window.location.replace("/auth?redirect=/dashboard/inquiries");
           return;
         }
         const shopResult = await fetchMyShop();

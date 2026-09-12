@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
 import { getPublicAppUrl } from "@/lib/appUrl";
-import { SHOP_CATEGORIES } from "@/types";
 import {
   entryLastModified,
   fetchActiveStoryShopIds,
@@ -65,12 +64,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.95,
     },
     {
-      url: `${BASE_URL}/search`,
-      lastModified: now,
-      changeFrequency: "hourly",
-      priority: 0.7,
-    },
-    {
       url: `${BASE_URL}/faq`,
       lastModified: now,
       changeFrequency: "monthly",
@@ -124,15 +117,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: getCategoryPriority(cat.count, maxCategoryCount) * 0.95,
     }));
 
-  const homeCategoryRoutes: MetadataRoute.Sitemap = SHOP_CATEGORIES.filter(
-    (c) => c !== "All",
-  ).map((category) => ({
-    url: `${BASE_URL}/?category=${encodeURIComponent(category)}`,
-    lastModified: now,
-    changeFrequency: "daily",
-    priority: 0.85,
-  }));
-
   const shopRoutes: MetadataRoute.Sitemap = shops.map((shop, index) => ({
     url: `${BASE_URL}${shop.seo_path}`,
     lastModified: entryLastModified(shop.updated_at, shop.created_at, now),
@@ -162,7 +146,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...staticRoutes,
     ...categoryRoutes,
     ...dealCategoryRoutes,
-    ...homeCategoryRoutes,
     ...shopRoutes,
     ...productRoutes,
     ...dealRoutes,

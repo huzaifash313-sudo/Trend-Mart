@@ -19,6 +19,7 @@ import {
   fetchTodayDineStats,
   updateDineStatus,
 } from "@/services/dineInService";
+import { fetchMyShop } from "@/services/shopService";
 import { subscribeToOrders } from "@/lib/supabase/realtime";
 import { useToast } from "@/components/Toast";
 import KitchenManualOrderModal from "@/components/KitchenManualOrderModal";
@@ -78,14 +79,20 @@ export default function KitchenBoardPage() {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          window.location.replace("/login?redirect=/dashboard/kitchen");
+          window.location.replace("/auth?redirect=/dashboard/kitchen");
           return;
         }
         const shopResult = await fetchMyDineInShop();
         if (!shopResult.success || !shopResult.data) {
           if (!cancelled) {
-            addToast("Register a restaurant store first to open the kitchen board.", "info");
-            window.location.replace("/account/become-merchant");
+            const anyShop = await fetchMyShop();
+            if (anyShop.success && anyShop.data) {
+              addToast("Kitchen board is for restaurants & cafés only.", "info");
+              window.location.replace("/dashboard");
+            } else {
+              addToast("Register a restaurant store first to open the kitchen board.", "info");
+              window.location.replace("/account/become-merchant");
+            }
           }
           return;
         }

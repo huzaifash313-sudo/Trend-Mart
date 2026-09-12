@@ -179,6 +179,7 @@ export default function AddressesPage() {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [pinSeededHint, setPinSeededHint] = useState(false);
 
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(false);
@@ -210,6 +211,7 @@ export default function AddressesPage() {
   const applyPin = useCallback(
     async (lat: number, lng: number, fillText: boolean) => {
       if (!isValidCoordinate(lat, lng)) return;
+      setPinSeededHint(false);
       setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
       if (!fillText) return;
       setPinBusy(true);
@@ -273,9 +275,12 @@ export default function AddressesPage() {
   }, [addToast, applyPin, coordinates, detectLocationDetailed]);
 
   // When opening a blank form, seed the map from the live location so the pin
-  // isn't sitting on a random city centre.
+  // isn't sitting on a random city centre — but tell the customer so they can drag it.
   useEffect(() => {
-    if (!showForm || editingId) return;
+    if (!showForm || editingId) {
+      setPinSeededHint(false);
+      return;
+    }
     const lat = location?.coordinates?.latitude;
     const lng = location?.coordinates?.longitude;
     if (
@@ -285,25 +290,30 @@ export default function AddressesPage() {
     ) {
       return;
     }
-    setForm((f) => (hasPin(f) ? f : { ...f, latitude: lat, longitude: lng }));
+    setForm((f) => {
+      if (hasPin(f)) return f;
+      return { ...f, latitude: lat, longitude: lng };
+    });
+    setPinSeededHint(true);
   }, [showForm, editingId, location]);
 
-  // Auth check
+  // Auth check — stay on skeleton until we know the session (no guest UI flash).
   useEffect(() => {
     let cancelled = false;
     async function checkSession() {
       const { data } = await supabase.auth.getUser();
-      if (!cancelled) {
-        if (!data.user) {
-          router.replace("/login?redirect=/account/addresses");
-        } else {
-          setUserId(data.user.id);
-        }
-        setAuthLoading(false);
+      if (cancelled) return;
+      if (!data.user) {
+        router.replace("/login?redirect=/account/addresses");
+        return;
       }
+      setUserId(data.user.id);
+      setAuthLoading(false);
     }
     checkSession();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [supabase.auth, router]);
 
   // Load addresses
@@ -366,7 +376,8 @@ export default function AddressesPage() {
       city: form.city.trim(),
       postal_code: form.postal_code?.trim() || null,
       delivery_notes: form.delivery_notes?.trim() || null,
-      is_default: form.is_default,
+      // First saved address becomes default so checkout skips the GPS nudge.
+      is_default: form.is_default || (!editingId && addresses.length === 0),
       latitude: form.latitude,
       longitude: form.longitude,
     };
@@ -417,7 +428,7 @@ export default function AddressesPage() {
     }
 
     setSaving(false);
-  }, [userId, form, editingId, supabase, addToast]);
+  }, [userId, form, editingId, addresses.length, supabase, addToast]);
 
   // ── Edit address ───────────────────────────────────────────────────────────
   const handleEdit = useCallback((address: CustomerAddress) => {
@@ -497,6 +508,7 @@ export default function AddressesPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(INITIAL_ADDRESS_FORM);
+    setPinSeededHint(false);
   }, []);
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -509,7 +521,7 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-surface)]">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
@@ -688,7 +700,9 @@ export default function AddressesPage() {
                 />
                 <p className="mt-1.5 text-[0.65rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
                   {hasPin(form)
-                    ? "✅ Pin set — checkout pe isi location se rider aayega. Drag karke adjust kar sakte hain."
+                    ? pinSeededHint
+                      ? "📍 Pin auto-filled from your current location — drag the map if this isn’t exact."
+                      : "✅ Pin set — checkout pe isi location se rider aayega. Drag karke adjust kar sakte hain."
                     : "⚠️ Pin lagayein — sirf text address se rider aapko nahi dhundh sakta."}
                 </p>
               </div>

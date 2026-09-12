@@ -97,7 +97,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <meta name="theme-color" content="#0f766e" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Trends Mart" />
+        <meta name="apple-mobile-web-app-title" content="TrendsMart" />
         <meta
           name="apple-mobile-web-app-status-bar-style"
           content="black-translucent"

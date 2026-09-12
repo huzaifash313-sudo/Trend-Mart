@@ -13,6 +13,7 @@ import {
   buildFuzzyIlikeOr,
   FUZZY_MIN_SCORE,
   normalizeSearchText,
+  scoreTextMatch,
 } from "@/lib/fuzzySearch";
 import { scoreProductPopularity } from "@/lib/marketplaceDiversity";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
@@ -112,11 +113,17 @@ const PRODUCT_SELECT = [
   "shops!inner ( name, slug, category, is_live, verification_status )",
 ].join(", ");
 
-async function searchProducts(supabase: SupabaseClient, q: string, limit: number) {
+async function searchProducts(
+  supabase: SupabaseClient,
+  q: string,
+  limit: number,
+  offset = 0,
+) {
   // Real columns only — products.category does not exist (use name/title/description).
   const ilike = buildFuzzyIlikeOr(q, ["name", "title", "description"], 12);
-  if (!ilike) return [];
+  if (!ilike) return { items: [], hasMore: false };
 
+  const pool = clamp(Math.max(limit + offset, limit) * 4, 24, 120);
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
@@ -126,11 +133,11 @@ async function searchProducts(supabase: SupabaseClient, q: string, limit: number
     .or(ilike)
     .order("orders_count", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(clamp(limit * 4, 24, 120));
+    .limit(pool);
 
   if (error) {
     console.error("[api/search] products:", error.message);
-    return [];
+    return { items: [], hasMore: false };
   }
 
   const rows = (data as unknown as Record<string, unknown>[]) ?? [];
@@ -151,54 +158,77 @@ async function searchProducts(supabase: SupabaseClient, q: string, limit: number
     },
   );
 
-  return ranked.slice(0, limit).map((r) => {
-    const p = r.item as Record<string, unknown>;
-    const shop = (p.shops ?? {}) as Record<string, unknown>;
-    const price = Number(p.price) || 0;
-    const original = Number(p.original_price) || 0;
-    const discountPct =
-      original > price ? Math.round(((original - price) / original) * 100) : 0;
+  const mapped = ranked
+    .map((r) => mapProductHit(r.item as Record<string, unknown>, r.score, q))
+    .sort((a, b) => b.score - a.score);
 
-    const ageMs = p.created_at ? Date.now() - Date.parse(String(p.created_at)) : 0;
-    const freshness = Math.max(0, 100 - (ageMs / (30 * 24 * 60 * 60 * 1000)) * 100);
+  const slice = mapped.slice(offset, offset + limit);
+  return { items: slice, hasMore: offset + limit < mapped.length };
+}
 
-    const discountSignal =
-      discountPct > 0 ? Math.sqrt(Math.min(discountPct, 60) / 60) * 100 : 0;
+function mapProductHit(
+  p: Record<string, unknown>,
+  fuzzyScore: number,
+  q: string,
+) {
+  const shop = (p.shops ?? {}) as Record<string, unknown>;
+  const price = Number(p.price) || 0;
+  const original = Number(p.original_price) || 0;
+  const discountPct =
+    original > price ? Math.round(((original - price) / original) * 100) : 0;
 
-    const popularity = scoreProductPopularity(p as unknown as MarketplaceProduct);
-    const blended =
-      r.score * 0.5 + popularity * 0.25 + freshness * 0.15 + discountSignal * 0.1;
+  const ageMs = p.created_at ? Date.now() - Date.parse(String(p.created_at)) : 0;
+  const freshness = Math.max(0, 100 - (ageMs / (30 * 24 * 60 * 60 * 1000)) * 100);
 
-    const name = String(p.name ?? p.title ?? "");
-    const shortCode = p.short_code ? String(p.short_code) : null;
-    const id = String(p.id);
+  const discountSignal =
+    discountPct > 0 ? Math.sqrt(Math.min(discountPct, 60) / 60) * 100 : 0;
 
-    return {
-      type: "product" as const,
-      id,
-      name,
-      price,
-      original_price: original || null,
-      discount_pct: discountPct,
-      image_url: p.image_url ? String(p.image_url) : null,
-      shop_id: String(p.shop_id ?? ""),
-      shop_name: String(shop.name ?? ""),
-      shop_slug: shop.slug ? String(shop.slug) : null,
-      short_code: shortCode,
-      path: getProductSeoPath(name, shortCode, id),
-      score: blended,
-    };
-  });
+  const popularity = scoreProductPopularity(p as unknown as MarketplaceProduct);
+  const name = String(p.name ?? p.title ?? "");
+  // Exact / prefix name matches always rank above popularity noise.
+  const nameExact = scoreTextMatch(q, name);
+  const blended =
+    nameExact * 0.55 +
+    fuzzyScore * 0.2 +
+    popularity * 0.15 +
+    freshness * 0.05 +
+    discountSignal * 0.05;
+
+  const shortCode = p.short_code ? String(p.short_code) : null;
+  const id = String(p.id);
+
+  return {
+    type: "product" as const,
+    id,
+    name,
+    price,
+    original_price: original || null,
+    discount_pct: discountPct,
+    image_url: p.image_url ? String(p.image_url) : null,
+    shop_id: String(p.shop_id ?? ""),
+    shop_name: String(shop.name ?? ""),
+    shop_slug: shop.slug ? String(shop.slug) : null,
+    short_code: shortCode,
+    path: getProductSeoPath(name, shortCode, id),
+    score: blended,
+    exact: nameExact >= 94,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
 /*  Deal search                                                                */
 /* -------------------------------------------------------------------------- */
 
-async function searchDeals(supabase: SupabaseClient, q: string, limit: number) {
+async function searchDeals(
+  supabase: SupabaseClient,
+  q: string,
+  limit: number,
+  offset = 0,
+) {
   const ilike = buildFuzzyIlikeOr(q, ["title", "description", "badge_text"]);
-  if (!ilike) return [];
+  if (!ilike) return { items: [], hasMore: false };
 
+  const pool = clamp(Math.max(limit + offset, limit) * 4, 12, 80);
   const { data, error } = await supabase
     .from("shop_deals")
     .select(
@@ -210,11 +240,11 @@ async function searchDeals(supabase: SupabaseClient, q: string, limit: number) {
     .or(ilike)
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(clamp(limit * 4, 12, 80));
+    .limit(pool);
 
   if (error) {
     console.error("[api/search] deals:", error.message);
-    return [];
+    return { items: [], hasMore: false };
   }
 
   const rows = (data as unknown as Record<string, unknown>[]) ?? [];
@@ -240,36 +270,48 @@ async function searchDeals(supabase: SupabaseClient, q: string, limit: number) {
     if (!key || seen.has(key)) continue;
     seen.add(key);
     deduped.push(r);
-    if (deduped.length >= limit) break;
   }
 
-  return deduped.map((r) => {
-    const d = r.item as Record<string, unknown>;
-    const shop = (d.shops as Record<string, unknown>) ?? {};
-    const price = Number(d.price) || 0;
-    const original = Number(d.original_price) || 0;
-    const discountPct =
-      original > price ? Math.round(((original - price) / original) * 100) : 0;
-    const id = String(d.id);
-    const title = String(d.title ?? "");
+  const mapped = deduped
+    .map((r) => mapDealHit(r.item as Record<string, unknown>, r.score, q))
+    .sort((a, b) => b.score - a.score);
 
-    return {
-      type: "deal" as const,
-      id,
-      title,
-      badge_text: d.badge_text ? String(d.badge_text) : null,
-      image_url: d.image_url ? String(d.image_url) : null,
-      is_featured: d.is_featured === true,
-      price,
-      original_price: original || null,
-      discount_pct: discountPct,
-      shop_id: String(d.shop_id ?? ""),
-      shop_name: String(shop.name ?? ""),
-      shop_slug: shop.slug ? String(shop.slug) : null,
-      path: getDealSeoPath(title, id),
-      score: r.score,
-    };
-  });
+  const slice = mapped.slice(offset, offset + limit);
+  return { items: slice, hasMore: offset + limit < mapped.length };
+}
+
+function mapDealHit(
+  d: Record<string, unknown>,
+  fuzzyScore: number,
+  q: string,
+) {
+  const shop = (d.shops as Record<string, unknown>) ?? {};
+  const price = Number(d.price) || 0;
+  const original = Number(d.original_price) || 0;
+  const discountPct =
+    original > price ? Math.round(((original - price) / original) * 100) : 0;
+  const id = String(d.id);
+  const title = String(d.title ?? "");
+  const titleExact = scoreTextMatch(q, title);
+  const score = titleExact * 0.6 + fuzzyScore * 0.4;
+
+  return {
+    type: "deal" as const,
+    id,
+    title,
+    badge_text: d.badge_text ? String(d.badge_text) : null,
+    image_url: d.image_url ? String(d.image_url) : null,
+    is_featured: d.is_featured === true,
+    price,
+    original_price: original || null,
+    discount_pct: discountPct,
+    shop_id: String(d.shop_id ?? ""),
+    shop_name: String(shop.name ?? ""),
+    shop_slug: shop.slug ? String(shop.slug) : null,
+    path: getDealSeoPath(title, id),
+    score,
+    exact: titleExact >= 94,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -283,44 +325,85 @@ export async function GET(req: NextRequest) {
   const q = normalizeSearchText(rawQ);
   const type = searchParams.get("type") ?? "all";
   const limit = clamp(Number(searchParams.get("limit") ?? "10"), 4, 24);
+  const offset = Math.max(0, Math.floor(Number(searchParams.get("offset") ?? "0") || 0));
 
   if (!q) {
     return NextResponse.json({
       query: "",
       results: [],
+      related: [],
       counts: { products: 0, shops: 0, deals: 0 },
+      hasMore: false,
+      nextOffset: 0,
     });
   }
 
   const supabase = await createServerClient();
 
-  const [products, shops, deals] = await Promise.all([
-    type === "shops" || type === "deals" ? [] : searchProducts(supabase, q, limit),
+  const [productsRes, shops, dealsRes] = await Promise.all([
+    type === "shops" || type === "deals"
+      ? { items: [], hasMore: false }
+      : searchProducts(supabase, q, limit, type === "products" ? offset : 0),
     type === "products" || type === "deals" ? [] : searchShops(supabase, q, limit),
-    type === "products" || type === "shops" ? [] : searchDeals(supabase, q, limit),
+    type === "products" || type === "shops"
+      ? { items: [], hasMore: false }
+      : searchDeals(supabase, q, limit, type === "deals" ? offset : 0),
   ]);
 
-  const p = [...products].sort((a, b) => b.score - a.score).slice(0, limit);
-  const s = [...shops].sort((a, b) => b.score - a.score).slice(0, limit);
-  const d = [...deals].sort((a, b) => b.score - a.score).slice(0, limit);
+  const products = productsRes.items;
+  const deals = dealsRes.items;
+  const p = [...products].sort((a, b) => b.score - a.score);
+  const s = [...shops].sort((a, b) => b.score - a.score);
+  const d = [...deals].sort((a, b) => b.score - a.score);
 
-  const mixed: (typeof p[number] | typeof s[number] | typeof d[number])[] = [];
-  const maxLen = Math.max(p.length, s.length, d.length);
-  for (let i = 0; i < maxLen; i++) {
-    if (p[i]) mixed.push(p[i]);
-    if (s[i]) mixed.push(s[i]);
-    if (d[i]) mixed.push(d[i]);
+  // Exact hits first in "all", then related (non-exact) so shoppers see true matches.
+  const exactFirst = <T extends { exact?: boolean; score: number }>(items: T[]) => {
+    const exact = items.filter((i) => i.exact);
+    const rest = items.filter((i) => !i.exact);
+    return [...exact, ...rest];
+  };
+
+  let mixed: (typeof p[number] | typeof s[number] | typeof d[number])[] = [];
+  if (type === "products") {
+    mixed = exactFirst(p);
+  } else if (type === "deals") {
+    mixed = exactFirst(d);
+  } else if (type === "shops") {
+    mixed = s;
+  } else {
+    const pExact = exactFirst(p);
+    const dExact = exactFirst(d);
+    const maxLen = Math.max(pExact.length, s.length, dExact.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (pExact[i]) mixed.push(pExact[i]);
+      if (s[i]) mixed.push(s[i]);
+      if (dExact[i]) mixed.push(dExact[i]);
+    }
   }
+
+  // Related = soft matches (non-exact) from the same page — no extra DB hit.
+  const related = mixed.filter((r) => "exact" in r && r.exact === false).slice(0, 8);
+  const primary = mixed.filter((r) => !("exact" in r) || r.exact !== false);
+
+  const hasMore =
+    type === "products"
+      ? productsRes.hasMore
+      : type === "deals"
+        ? dealsRes.hasMore
+        : false;
 
   return NextResponse.json(
     {
       query: rawQ,
-      results: mixed,
+      results: primary.length > 0 ? primary : mixed,
+      related: primary.length > 0 ? related : [],
       counts: {
         products: products.length,
         shops: shops.length,
         deals: deals.length,
       },
+      hasMore,
+      nextOffset: offset + limit,
     },
     {
       status: 200,

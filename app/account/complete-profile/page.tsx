@@ -13,6 +13,7 @@ import {
   isValidPkMobile,
   PK_PHONE_PLACEHOLDER,
 } from "@/lib/phoneFormat";
+import { isCustomerDeliveryProfileComplete } from "@/lib/customerProfile";
 import type { UserLocation } from "@/types";
 
 /* -------------------------------------------------------------------------- */
@@ -87,17 +88,8 @@ export default function CompleteProfilePage() {
           .maybeSingle();
 
         if (!cancelled && profile) {
-          const nameOk =
-            typeof profile.full_name === "string" && profile.full_name.trim().length >= 2;
-          const phoneOk =
-            typeof profile.phone === "string" && profile.phone.trim().length >= 7;
-          const locationOk =
-            typeof profile.latitude === "number" ||
-            (typeof profile.address === "string" && profile.address.trim().length > 0);
-
-          // Already onboarded — never show the form twice (refresh, sign-out,
-          // re-login). The delivery profile is a one-time step.
-          if (nameOk && phoneOk && locationOk) {
+          // Same criteria as /account hub — avoids complete-profile ↔ hub trap.
+          if (isCustomerDeliveryProfileComplete(profile)) {
             router.replace("/account");
             return;
           }
@@ -171,6 +163,14 @@ export default function CompleteProfilePage() {
 
       await supabase.auth.updateUser({ data: { full_name: name, phone: phoneClean } });
 
+      const locationLabel =
+        location?.address?.trim() ||
+        location?.deliveryZone?.trim() ||
+        location?.city?.trim() ||
+        (typeof lat === "number" && typeof lng === "number"
+          ? `Pinned location (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+          : null);
+
       const { error } = await supabase.from("user_profiles").upsert(
         {
           user_id: userId,
@@ -180,12 +180,11 @@ export default function CompleteProfilePage() {
           latitude: typeof lat === "number" ? lat : null,
           longitude: typeof lng === "number" ? lng : null,
           city: location?.city ?? null,
-          location_label: location?.address ?? location?.deliveryZone ?? null,
+          location_label: locationLabel,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" },
       );
-
       if (error) {
         addToast(error.message, "error");
         setSaving(false);
@@ -218,7 +217,7 @@ export default function CompleteProfilePage() {
     "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100";
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-surface)]">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-4">
           <div>
@@ -337,9 +336,11 @@ export default function CompleteProfilePage() {
 
         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
           <Link href="/account" className="font-medium text-emerald-600 underline dark:text-emerald-400">
-            Skip for now →
-          </Link>{" "}
-          — you can finish this later from Account Settings.
+            Skip for now → My Account
+          </Link>
+          <span className="mt-1 block">
+            You can finish name, phone, and delivery pin later from My Account → Complete profile.
+          </span>
         </p>
       </main>
     </div>

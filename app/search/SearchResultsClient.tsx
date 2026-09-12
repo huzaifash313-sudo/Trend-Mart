@@ -73,7 +73,10 @@ type SearchResult = ProductResult | ShopResult | DealResult;
 interface SearchResponse {
   query: string;
   results: SearchResult[];
+  related?: SearchResult[];
   counts: { products: number; shops: number; deals: number };
+  hasMore?: boolean;
+  nextOffset?: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -93,7 +96,7 @@ function ProductCard({ item }: { item: ProductResult }) {
   const img = getSafeImageUrl(item.image_url, "product", "card");
   const href =
     item.path?.trim() ||
-    `/products?product=${encodeURIComponent(item.id)}`;
+    `/products/${encodeURIComponent(item.id)}`;
   return (
     <Link
       href={href}
@@ -298,36 +301,83 @@ export default function SearchResultsClient({
     TABS.some((t) => t.value === typeParam) ? typeParam : "all",
   );
   const [data, setData]         = useState<SearchResponse | null>(null);
+  const [related, setRelated]   = useState<SearchResult[]>([]);
   const [loading, setLoading]   = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore]   = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
   const [error, setError]       = useState<string | null>(null);
   const abortRef                = useRef<AbortController | null>(null);
   const debounceRef             = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadMoreRef             = useRef<HTMLDivElement | null>(null);
+  const dataRef                 = useRef<SearchResponse | null>(null);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   /* ── Core fetch ─────────────────────────────────────────────────────── */
-  const doSearch = useCallback(async (q: string, type: Tab) => {
+  const doSearch = useCallback(async (q: string, type: Tab, opts?: { append?: boolean; offset?: number }) => {
     const trimmed = q.trim();
-    if (!trimmed) { setData(null); return; }
+    if (!trimmed) {
+      setData(null);
+      setRelated([]);
+      setHasMore(false);
+      return;
+    }
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    setLoading(true);
-    setError(null);
+    const append = opts?.append === true;
+    const offset = opts?.offset ?? 0;
+    if (append) setLoadingMore(true);
+    else {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
-      const params = new URLSearchParams({ q: trimmed, limit: "10" });
+      const params = new URLSearchParams({
+        q: trimmed,
+        limit: "12",
+        offset: String(offset),
+      });
       if (type !== "all") params.set("type", type);
       const res  = await fetch(`/api/search?${params}`, { signal: ctrl.signal });
       if (!res.ok) throw new Error("Search failed");
       const json = (await res.json()) as SearchResponse;
-      setData(json);
+
+      if (append && dataRef.current) {
+        const prev = dataRef.current;
+        const seen = new Set(prev.results.map((r) => `${r.type}:${r.id}`));
+        const merged = [
+          ...prev.results,
+          ...json.results.filter((r) => !seen.has(`${r.type}:${r.id}`)),
+        ];
+        setData({
+          ...json,
+          results: merged,
+          counts: {
+            products: merged.filter((r) => r.type === "product").length,
+            shops: merged.filter((r) => r.type === "shop").length,
+            deals: merged.filter((r) => r.type === "deal").length,
+          },
+        });
+      } else {
+        setData(json);
+        setRelated(json.related ?? []);
+      }
+      setHasMore(Boolean(json.hasMore) && (type === "products" || type === "deals"));
+      setNextOffset(json.nextOffset ?? offset + 12);
     } catch (err) {
       if ((err as { name?: string }).name !== "AbortError") {
         setError("Search failed. Please try again.");
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -387,6 +437,32 @@ export default function SearchResultsClient({
     () => (data?.results.filter((r): r is DealResult => r.type === "deal") ?? []),
     [data],
   );
+  const relatedProducts = useMemo(
+    () => related.filter((r): r is ProductResult => r.type === "product"),
+    [related],
+  );
+  const relatedDeals = useMemo(
+    () => related.filter((r): r is DealResult => r.type === "deal"),
+    [related],
+  );
+
+  /* ── Infinite scroll (products / deals tabs only — light pages) ─────── */
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el || !hasMore || loading || loadingMore) return;
+    if (activeTab !== "products" && activeTab !== "deals") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        const q = (qParam || query).trim();
+        if (!q) return;
+        void doSearch(q, activeTab, { append: true, offset: nextOffset });
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, activeTab, qParam, query, nextOffset, doSearch]);
 
   const hasResults =
     data && (data.counts.products > 0 || data.counts.shops > 0 || data.counts.deals > 0);
@@ -426,7 +502,7 @@ export default function SearchResultsClient({
   const displayQ = qParam || query.trim();
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-6 md:px-4 md:py-5">
+    <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-3 pb-safe-nav md:px-4 md:py-5">
       {/* Search bar */}
       <SearchInput
         value={query}
@@ -630,6 +706,35 @@ export default function SearchResultsClient({
               </div>
             </section>
           )}
+
+          {/* Soft matches — related after exact hits */}
+          {(relatedProducts.length > 0 || relatedDeals.length > 0) &&
+            (activeTab === "all" || activeTab === "products" || activeTab === "deals") && (
+            <section aria-label="Related results" className="border-t border-zinc-100 pt-6 dark:border-zinc-800">
+              <h2 className="mb-3 text-[15px] font-bold text-zinc-900 dark:text-zinc-100">
+                Related
+              </h2>
+              {relatedProducts.length > 0 && (activeTab === "all" || activeTab === "products") ? (
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {relatedProducts.map((p) => (
+                    <ProductCard key={`rel-${p.id}`} item={p} />
+                  ))}
+                </div>
+              ) : null}
+              {relatedDeals.length > 0 && (activeTab === "all" || activeTab === "deals") ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {relatedDeals.map((d) => (
+                    <DealCard key={`rel-${d.id}`} item={d} />
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          )}
+
+          <div ref={loadMoreRef} className="h-1" aria-hidden />
+          {loadingMore ? (
+            <p className="py-3 text-center text-xs text-zinc-400">Loading more…</p>
+          ) : null}
         </div>
       )}
     </div>

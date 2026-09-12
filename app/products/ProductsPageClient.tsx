@@ -20,8 +20,7 @@ import ProductOrderModal, { type ProductOrderIntent } from "@/components/Product
 import { fetchShopById } from "@/services/shopService";
 import { getAllFavorites, toggleFavorite } from "@/services/wishlistService";
 import { filterShopsByProximity, haversineDistance, getCustomerArea } from "@/services/geoRadiusService";
-import { diversifyMarketplaceFeed } from "@/lib/marketplaceDiversity";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useMarketplaceProductsInfinite, useDeals, useShopCoupons, useMyShop } from "@/lib/queries";
 import { type Coupon } from "@/services/couponService";
 import { ProductGridSkeleton } from "@/components/Skeletons";
@@ -46,6 +45,10 @@ import {
   trackCategoryInterest,
 } from "@/lib/behavior";
 import { logProductClick } from "@/services/analyticsService";
+import { fetchShops } from "@/services/shopService";
+import { GEO_SHOP_CANDIDATE_LIMIT } from "@/lib/mobilePerf";
+import { locationHintLabel, sortWithNearbyBoost } from "@/lib/nearbyBoost";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
 
 const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
   ssr: false,
@@ -123,10 +126,13 @@ function ProductsPageInner({
   const [geoFilter, setGeoFilter] = useState<GeoFilterState>({
     coordinates: null,
     maxDistanceKm: 0,
-    locationAvailable: false,
-    scope: "radius",
+    locationAvailable: true,
+    scope: "pakistan",
   });
   const [areaOpen, setAreaOpen] = useState(false);
+  /** null = no geo restriction; string[] = only these shops (may be empty). */
+  const [geoShopIds, setGeoShopIds] = useState<string[] | null>(null);
+  const [geoResolved, setGeoResolved] = useState(true);
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
@@ -142,6 +148,97 @@ function ProductsPageInner({
   const myShopQuery = useMyShop();
   const myShopId = myShopQuery.data?.id ?? null;
 
+  const needsGeoCandidates =
+    geoFilter.scope !== "pakistan" &&
+    Boolean(geoFilter.coordinates ?? globalCoords);
+
+  const geoShopsQuery = useQuery({
+    queryKey: ["shops-geo-candidates", GEO_SHOP_CANDIDATE_LIMIT] as const,
+    queryFn: async () => {
+      const res = await fetchShops({
+        publicOnly: true,
+        limit: GEO_SHOP_CANDIDATE_LIMIT,
+      });
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: needsGeoCandidates,
+    staleTime: 60_000,
+  });
+
+  // Resolve geo shop IDs from a real shops catalog (not from already-fetched products).
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      async function compute() {
+        const scope = geoFilter.scope;
+        const coords = geoFilter.coordinates ?? globalCoords ?? null;
+
+        if (scope === "pakistan") {
+          if (!cancelled) {
+            setGeoShopIds(null);
+            setGeoResolved(true);
+          }
+          return;
+        }
+        if (scope === "city" && !coords) {
+          if (!cancelled) {
+            setGeoShopIds(null);
+            setGeoResolved(true);
+          }
+          return;
+        }
+        if (scope === "radius" && !coords) {
+          if (!cancelled) {
+            setGeoShopIds(null);
+            setGeoResolved(true);
+          }
+          return;
+        }
+
+        if (needsGeoCandidates && geoShopsQuery.isLoading) {
+          if (!cancelled) setGeoResolved(false);
+          return;
+        }
+
+        const pool = geoShopsQuery.data ?? [];
+        try {
+          const result = await filterShopsByProximity(pool, {
+            coordinates: coords,
+            maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
+            enforceServiceRadius: true,
+            sortByProximity: false,
+            scope,
+            deliveryZone: globalLocation?.deliveryZone ?? undefined,
+            customerCity: globalLocation?.city ?? undefined,
+            customerArea: getCustomerArea(globalLocation),
+          });
+          if (!cancelled) {
+            setGeoShopIds(result.shops.map((s) => s.id));
+            setGeoResolved(true);
+          }
+        } catch {
+          if (!cancelled) {
+            setGeoShopIds(null);
+            setGeoResolved(true);
+          }
+        }
+      }
+      void compute();
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    geoFilter,
+    globalCoords,
+    globalLocation,
+    needsGeoCandidates,
+    geoShopsQuery.data,
+    geoShopsQuery.isLoading,
+  ]);
+
   const productsQuery = useMarketplaceProductsInfinite(
     {
       query: qParam,
@@ -149,14 +246,19 @@ function ProductsPageInner({
       subCategoryId: subParam,
       sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
       limit: 48,
+      shopIds: geoShopIds,
     },
-    !qParam.trim() &&
+    {
+      enabled: geoResolved,
+      ...(!qParam.trim() &&
       categoryParam === "All" &&
       !subParam &&
       sortParam === "for_you" &&
+      geoShopIds === null &&
       initialProducts.length > 0
-      ? { initialData: initialProducts }
-      : undefined,
+        ? { initialData: initialProducts }
+        : {}),
+    },
   );
   // Flatten accumulated pages into a single deduped array (stable across renders).
   const products = useMemo(() => {
@@ -169,7 +271,7 @@ function ProductsPageInner({
       return true;
     });
   }, [productsQuery.data, myShopId]);
-  const loading = productsQuery.isLoading;
+  const loading = productsQuery.isLoading || !geoResolved;
   const error = productsQuery.error ? productsQuery.error.message : null;
   const hasNextPage = !!productsQuery.hasNextPage;
   const isFetchingNextPage = productsQuery.isFetchingNextPage;
@@ -211,13 +313,13 @@ function ProductsPageInner({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Deep-link: open the quick view for a ?product=<id> in the URL.
+  // Deep-link: ?product=<id> → full SEO product page (Option B — no modal).
   useEffect(() => {
     if (!productParam) return;
     const match = products.find((p) => p.id === productParam);
     if (match) {
       if (myShopId && match.shop_id === myShopId) return;
-      setQuickView(match);
+      router.replace(getProductSeoPath(match.name, match.short_code, match.id));
       return;
     }
     let cancelled = false;
@@ -226,21 +328,14 @@ function ProductsPageInner({
       const res = await fetchMarketplaceProductById(productParam);
       if (cancelled || !res.success || !res.data) return;
       if (myShopId && res.data.shop_id === myShopId) return;
-      setQuickView(res.data);
-      trackProductView({
-        id: res.data.id,
-        name: res.data.name,
-        price: res.data.price,
-        imageUrl: res.data.image_url,
-        shopId: res.data.shop_id,
-        shopName: res.data.shop_name,
-        category: res.data.shop_category ?? res.data.category_id ?? null,
-      });
+      router.replace(
+        getProductSeoPath(res.data.name, res.data.short_code, res.data.id),
+      );
     })();
     return () => {
       cancelled = true;
     };
-  }, [productParam, products, myShopId]);
+  }, [productParam, products, myShopId, router]);
 
   // Invalidate cached queries when merchants publish/update in other tabs.
   useEffect(() => {
@@ -363,86 +458,49 @@ function ProductsPageInner({
     return ranked.length ? ranked.map((r) => r.item) : [];
   }, [activeDeals, deferredQuery]);
 
-  // Build a deduplicated list of pseudo-shops from the product join so the
-  // same proximity / merchant-coverage engine used on the homepage applies here.
-  const productShops = useMemo(() => {
-    const map = new Map<string, Shop>();
-    for (const p of products) {
-      if (!p.shop_id || map.has(p.shop_id)) continue;
-      map.set(p.shop_id, {
-        id: p.shop_id,
-        name: p.shop_name ?? "",
-        category: p.shop_category ?? "",
-        location: p.shop_location ?? "",
-        whatsapp_number: p.shop_whatsapp ?? "",
-        is_live: true,
-        latitude: p.shop_latitude ?? null,
-        longitude: p.shop_longitude ?? null,
-        service_radius_km: p.shop_service_radius_km ?? null,
-        delivery_zones: p.shop_delivery_zones ?? null,
-      });
-    }
-    return [...map.values()];
-  }, [products]);
+  // Geo is applied server-side via shopIds on the marketplace query.
 
-  // Location-visible shop IDs (radius / city / pakistan scope + merchant coverage).
-  const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      async function compute() {
-        const scope = geoFilter.scope;
-        const coords = geoFilter.coordinates ?? globalCoords ?? null;
-
-        // All Pakistan never narrows by location — show every shop's products.
-        if (scope === "pakistan") {
-          setGeoVisibleShopIds(null);
-          return;
-        }
-        // No pin + city browse → no location restriction on products.
-        if (scope === "city" && !coords) {
-          setGeoVisibleShopIds(null);
-          return;
-        }
-        if (scope === "radius" && !coords) {
-          setGeoVisibleShopIds(null);
-          return;
-        }
-
-        try {
-          const result = await filterShopsByProximity(productShops, {
-            coordinates: coords,
-            maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
-            enforceServiceRadius: true,
-            sortByProximity: false,
-            scope,
-            deliveryZone: globalLocation?.deliveryZone ?? undefined,
-            customerCity: globalLocation?.city ?? undefined,
-            customerArea: getCustomerArea(globalLocation),
-          });
-          if (!cancelled) {
-            setGeoVisibleShopIds(new Set(result.shops.map((s) => s.id)));
-          }
-        } catch {
-          if (!cancelled) setGeoVisibleShopIds(null);
-        }
+  const productDistanceKm = useCallback(
+    (p: MarketplaceProduct | Product): number | null => {
+      if (!globalCoords) return null;
+      const lat = (p as MarketplaceProduct).shop_latitude;
+      const lng = (p as MarketplaceProduct).shop_longitude;
+      if (
+        typeof lat !== "number" ||
+        typeof lng !== "number" ||
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng)
+      ) {
+        return null;
       }
-      void compute();
-    }, 120);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [productShops, geoFilter, globalCoords, globalLocation]);
+      return haversineDistance(
+        globalCoords.latitude,
+        globalCoords.longitude,
+        lat,
+        lng,
+      );
+    },
+    [globalCoords],
+  );
+
+  const getLocationHint = useCallback(
+    (p: Product) =>
+      locationHintLabel(
+        productDistanceKm(p as MarketplaceProduct),
+        (p as MarketplaceProduct).shop_location ?? null,
+      ),
+    [productDistanceKm],
+  );
 
   const displayProducts = useMemo(() => {
     let list = products;
 
-    if (geoVisibleShopIds) {
-      list = diversifyMarketplaceFeed(
-        list.filter((p) => geoVisibleShopIds.has(p.shop_id)),
-        sort,
-      );
+    // Soft nearby boost for discovery sorts (keep price / newest / nearest as-is).
+    const softBoostSorts: MarketplaceSort[] = ["for_you", "popular", "discount"];
+    if (globalCoords && softBoostSorts.includes(sort) && sort !== "nearest") {
+      list = sortWithNearbyBoost(list as MarketplaceProduct[], (p) =>
+        productDistanceKm(p),
+      ) as typeof list;
     }
 
     // "Nearest" sort: re-sort by straight-line distance to the customer's pin.
@@ -474,11 +532,11 @@ function ProductsPageInner({
     return list;
   }, [
     products,
-    geoVisibleShopIds,
     sort,
     globalCoords,
     deferredQuery,
     searchMatchedDeals,
+    productDistanceKm,
   ]);
 
   const searchSuggestions = useMemo(() => {
@@ -532,8 +590,6 @@ function ProductsPageInner({
       const full =
         productsRef.current.find((p) => p.id === product.id) ??
         (product as MarketplaceProduct);
-      setQuickView(full);
-      syncUrlRef.current({ product: full.id });
       // Behaviour memory: recently viewed + category affinity.
       trackProductView({
         id: full.id,
@@ -547,8 +603,9 @@ function ProductsPageInner({
       trackCategoryInterest(full.shop_category ?? full.category_id, "click");
       // Real click tally → feeds the popularity-based search/feed ranking.
       void logProductClick(full.shop_id, full.id);
+      router.push(getProductSeoPath(full.name, full.short_code, full.id));
     },
-    [],
+    [router],
   );
 
   const handleCloseQuickView = useCallback(() => {
@@ -566,11 +623,9 @@ function ProductsPageInner({
         addToast("This product is unavailable.", "error");
         return;
       }
-      // Variant products must open the option picker first — otherwise the
-      // customer would silently add the base (Size/Flavour) price to cart.
+      // Variant products → full page option picker (lighter than keeping a modal catalogue).
       if (customerVariantGroups(full.variants).length > 0) {
-        setQuickView(full);
-        syncUrlRef.current({ product: full.id });
+        router.push(getProductSeoPath(full.name, full.short_code, full.id));
         return;
       }
       const shop: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
@@ -581,7 +636,7 @@ function ProductsPageInner({
       addItem(full, shop, 1);
       addToast(`“${full.name}” added to cart`, "success");
     },
-    [addItem, addToast],
+    [addItem, addToast, router],
   );
 
   const handleOrder = useCallback(
@@ -717,19 +772,17 @@ function ProductsPageInner({
   // recreate on every parent render and defeat React.memo at 8k products.
   const handleGridOrder = useCallback(
     (product: Product) => {
-      // Variant products must open the option picker first so the WhatsApp
-      // order carries the selected Size/Flavour and its real price.
+      // Variant products → full page option picker (correct size/flavour price).
       if (customerVariantGroups(product.variants).length > 0) {
         const full =
           productsRef.current.find((p) => p.id === product.id) ??
           (product as MarketplaceProduct);
-        setQuickView(full);
-        syncUrlRef.current({ product: full.id });
+        router.push(getProductSeoPath(full.name, full.short_code, full.id));
         return;
       }
       handleOrder({ product, quantity: 1 });
     },
-    [handleOrder],
+    [handleOrder, router],
   );
 
   const quickViewShop: Pick<Shop, "id" | "name" | "whatsapp_number"> | null = quickView
@@ -857,6 +910,7 @@ function ProductsPageInner({
         showShopMeta
         favorites={favorites}
         getOfferContext={getOfferContext}
+        getLocationHint={getLocationHint}
         onProductClick={handleProductClick}
         onAddToCart={handleAddToCart}
         onOrder={handleGridOrder}

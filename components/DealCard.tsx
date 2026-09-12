@@ -66,6 +66,8 @@ interface DealCardProps {
   shopWhatsapp?: string | null;
   /** Open quick-view / photo modal (card body click). */
   onOpen?: () => void;
+  /** Compact km / city hint next to shop name. */
+  locationHint?: string | null;
 }
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -95,6 +97,7 @@ function DealCard({
   className = "",
   shopWhatsapp,
   onOpen,
+  locationHint = null,
 }: DealCardProps) {
   const isHomeDensity = density === "home";
   const { addItem } = useCart();
@@ -361,6 +364,11 @@ function DealCard({
                   </span>
                 )}
                 <span className="tm-shop-name-inline truncate">{deal.shop_name || "Store"}</span>
+                {locationHint ? (
+                  <span className="shrink-0 text-[9px] font-medium text-zinc-400 dark:text-zinc-500">
+                    · {locationHint}
+                  </span>
+                ) : null}
                 <span className="tm-live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
               </button>
               {tickerTags[0] ? (
@@ -539,6 +547,11 @@ function DealCard({
             <span className="tm-shop-name-inline truncate text-[10px] leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
               {deal.shop_name || "Store"}
             </span>
+            {locationHint ? (
+              <span className="shrink-0 text-[9px] font-medium leading-none text-zinc-400 dark:text-zinc-500">
+                · {locationHint}
+              </span>
+            ) : null}
             <span className="tm-live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
           </button>
 

@@ -6,6 +6,8 @@ import { detectUserRole } from "@/services/authService";
 import { getOrderHistory } from "@/services/orderHistoryService";
 import { fetchOrdersForCurrentUser } from "@/services/orderService";
 import { getFavoriteCount } from "@/services/wishlistService";
+import { isCustomerDeliveryProfileComplete } from "@/lib/customerProfile";
+import { useToast } from "@/components/Toast";
 import type { Order } from "@/types";
 import ProfileReviewsCard from "@/components/ProfileReviewsCard";
 
@@ -33,6 +35,7 @@ function StatCard({
 }
 
 export default function CustomerAccountPage() {
+  const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
@@ -43,14 +46,16 @@ export default function CustomerAccountPage() {
     address?: string | null;
     location_label?: string | null;
     city?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   } | null>(null);
   const [liveOrders, setLiveOrders] = useState<Order[] | null>(null);
   const [wishlistCount, setWishlistCount] = useState<number | null>(null);
 
-  const profileIncomplete = useMemo(() => {
-    return !profile?.full_name || !profile?.phone || (!profile?.location_label && !profile?.city);
-  }, [profile]);
-
+  const profileIncomplete = useMemo(
+    () => !isCustomerDeliveryProfileComplete(profile),
+    [profile],
+  );
   const localOrders = useMemo(() => {
     try {
       return getOrderHistory();
@@ -75,6 +80,15 @@ export default function CustomerAccountPage() {
       return age < 7 * 24 * 60 * 60 * 1000;
     }).length;
   }, [liveOrders, localOrders]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("notice") !== "admin_only") return;
+    addToast("Admin panel is only available to Super-Admins.", "info");
+    url.searchParams.delete("notice");
+    window.history.replaceState({}, "", url.pathname + (url.search || ""));
+  }, [addToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +133,7 @@ export default function CustomerAccountPage() {
         try {
           const { data: profileData } = await supabase
             .from("user_profiles")
-            .select("full_name, phone, address, location_label, city")
+            .select("full_name, phone, address, location_label, city, latitude, longitude")
             .eq("user_id", user.id)
             .maybeSingle();
           if (!cancelled && profileData) setProfile(profileData);
@@ -131,6 +145,7 @@ export default function CustomerAccountPage() {
           ([ordersRes, favCount]) => {
             if (cancelled) return;
             if (ordersRes.success) setLiveOrders(ordersRes.data);
+            else addToast("Couldn't load live orders — showing local history.", "info");
             setWishlistCount(favCount);
           },
         );
@@ -146,12 +161,12 @@ export default function CustomerAccountPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [addToast]);
 
   // Guests must never see portal chrome (orders from localStorage looked "logged in").
   if (loading || !authed) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 px-4 py-10">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-10 pb-safe-nav">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="h-24 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
         ))}
@@ -159,12 +174,6 @@ export default function CustomerAccountPage() {
           Checking your account…
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <Link
-            href="/dashboard"
-            className="text-sm font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
-          >
-            Open Dashboard →
-          </Link>
           <Link
             href="/"
             className="text-sm font-medium text-zinc-500 hover:underline"
@@ -177,7 +186,7 @@ export default function CustomerAccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-surface)]">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-4">
           <div>

@@ -4,11 +4,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/types";
 import type { ShopSeoRecord } from "@/lib/seo/fetchShopForSeo";
 import { customerVariantGroups } from "@/lib/variantPricing";
 import { logShopView, logProductClick } from "@/services/analyticsService";
 import { trackCategoryInterest, trackProductView } from "@/lib/behavior";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { useLocation } from "@/context/LocationContext";
 import { isCustomerWithinCoverage } from "@/services/geoRadiusService";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -229,6 +231,7 @@ function ShopDetailInner({
   const { confirm } = useConfirm();
   const { openQuickAdd } = useMerchantQuickAdd();
   const { openShopReviews } = useShopReviews();
+  const router = useRouter();
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
 
   // Owner-only deal manager state (all deals, incl. paused).
@@ -604,7 +607,6 @@ function ShopDetailInner({
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleProductClick = useCallback((product: Product) => {
-    setQuickViewProduct(product);
     trackProductView({
       id: product.id,
       name: product.name,
@@ -616,19 +618,19 @@ function ShopDetailInner({
     });
     // Real click tally → feeds the popularity-based search/feed ranking.
     if (shop?.id) void logProductClick(shop.id, product.id);
-  }, [shop]);
+    router.push(getProductSeoPath(product.name, product.short_code, product.id));
+  }, [shop, router]);
 
   const handleAddToCart = useCallback((product: Product) => {
     if (!shop || isOwner) return;
-    // Variant products must open the option picker first — otherwise the
-    // customer would silently add the base (Size/Flavour) price to cart.
+    // Variant products → full page option picker (correct size/flavour price).
     if (customerVariantGroups(product.variants).length > 0) {
-      setQuickViewProduct(product);
+      router.push(getProductSeoPath(product.name, product.short_code, product.id));
       return;
     }
     addItem(product, { id: shop.id, name: shop.name, whatsapp_number: shop.whatsapp_number });
     addToast(`"${product.name}" added to cart`, "success");
-  }, [shop, isOwner, addItem, addToast]);
+  }, [shop, isOwner, addItem, addToast, router]);
 
   const handleOrder = useCallback((intent: ProductOrderIntent) => {
     const product = intent.product;
@@ -693,15 +695,14 @@ function ShopDetailInner({
   // Stable per-card Order wrapper (avoids inline arrow defeating ProductCard memo).
   const handleGridOrder = useCallback(
     (product: Product) => {
-      // Variant products must open the option picker first so the WhatsApp
-      // order carries the selected Size/Flavour and its real price.
+      // Variant products → full page option picker (correct size/flavour price).
       if (customerVariantGroups(product.variants).length > 0) {
-        setQuickViewProduct(product);
+        router.push(getProductSeoPath(product.name, product.short_code, product.id));
         return;
       }
       handleOrder({ product, quantity: 1 });
     },
-    [handleOrder],
+    [handleOrder, router],
   );
 
   const openAddProduct = useCallback(() => {

@@ -224,6 +224,13 @@ const ROLE_ROUTE_MAP = {
 const AUTH_ROUTES = ["/login", "/signup", "/auth"] as const;
 
 function getRequiredRole(pathname: string): AppRole | "public" {
+  // Guest order lookup (phone / order ID) — must stay public for footer "Track an Order".
+  if (
+    pathname === "/orders/tracking" ||
+    pathname.startsWith("/orders/tracking/")
+  ) {
+    return "public";
+  }
   if (ROLE_ROUTE_MAP.admin.some((route) => pathname.startsWith(route)))
     return "admin";
   if (ROLE_ROUTE_MAP.merchant.some((route) => pathname.startsWith(route)))
@@ -455,6 +462,9 @@ function isPublicBrowsePath(pathname: string): boolean {
   if (pathname === "/search" || pathname.startsWith("/search/")) return true;
   if (pathname === "/cart" || pathname.startsWith("/cart/")) return true;
   if (pathname === "/wishlist" || pathname.startsWith("/wishlist/")) return true;
+  if (pathname === "/orders/tracking" || pathname.startsWith("/orders/tracking/"))
+    return true;
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) return true;
   if (pathname === "/faq" || pathname.startsWith("/faq/")) return true;
   if (pathname.startsWith("/legal")) return true;
   if (pathname === "/support" || pathname.startsWith("/support/")) return true;
@@ -999,12 +1009,13 @@ export async function middleware(request: NextRequest) {
         userRole,
         pathname,
       });
-      const forbidden = new NextResponse(
-        JSON.stringify({ error: "Forbidden: Insufficient permissions." }),
-        { status: 403, headers: { "Content-Type": "application/json" } },
-      );
-      stripSensitiveHeaders(forbidden);
-      return forbidden;
+      // Friendly redirect — never dump raw JSON 403 on humans.
+      const dest =
+        userRole === "merchant"
+          ? new URL("/dashboard", request.url)
+          : new URL("/account", request.url);
+      dest.searchParams.set("notice", "admin_only");
+      return buildRedirectWithLoopTracking(dest, request);
     }
   }
 

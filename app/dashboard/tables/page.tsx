@@ -22,6 +22,7 @@ import {
   fetchKitchenOrders,
   setTableActive,
 } from "@/services/dineInService";
+import { fetchMyShop } from "@/services/shopService";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import OrderBillModal from "@/components/OrderBillModal";
@@ -207,14 +208,20 @@ export default function MerchantTablesPage() {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          window.location.replace("/login?redirect=/dashboard/tables");
+          window.location.replace("/auth?redirect=/dashboard/tables");
           return;
         }
         const shopResult = await fetchMyDineInShop();
         if (!shopResult.success || !shopResult.data) {
           if (!cancelled) {
-            addToast("Register a restaurant store first to manage tables.", "info");
-            window.location.replace("/account/become-merchant");
+            const anyShop = await fetchMyShop();
+            if (anyShop.success && anyShop.data) {
+              addToast("Table QR codes are for restaurants & cafés only.", "info");
+              window.location.replace("/dashboard");
+            } else {
+              addToast("Register a restaurant store first to manage tables.", "info");
+              window.location.replace("/account/become-merchant");
+            }
           }
           return;
         }

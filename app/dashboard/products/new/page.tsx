@@ -9,12 +9,11 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { scopedKey } from "@/lib/clientScope";
 import type { Shop } from "@/types";
-import { fetchMyShops } from "@/services/shopService";
+import { fetchMyShop } from "@/services/shopService";
+import { getShopPath } from "@/lib/shopSlug";
 import { useToast } from "@/components/Toast";
 import BulkProductCreator from "@/components/BulkProductCreator";
-import CustomSelect from "@/components/CustomSelect";
 
 function ArrowLeftIcon() {
   return (
@@ -53,25 +52,22 @@ export default function NewProductPage() {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    async function loadShops() {
-      const result = await fetchMyShops();
+    async function loadShop() {
+      const result = await fetchMyShop();
       if (cancelled) return;
       if (result.success) {
-        const myShops = result.data;
-        setShops(myShops);
-        if (myShops.length > 0) {
-          const saved =
-            typeof window !== "undefined"
-              ? localStorage.getItem(scopedKey("trendsmart_active_shop"))
-              : null;
-          const match = saved ? myShops.find((s) => s.id === saved) : null;
-          setActiveShopId(match?.id ?? myShops[0].id);
+        if (result.data) {
+          setShops([result.data]);
+          setActiveShopId(result.data.id);
+        } else {
+          setShops([]);
+          setActiveShopId(null);
         }
       } else {
-        addToast(result.error || "Failed to load your shops.", "error");
+        addToast(result.error || "Could not load your store.", "error");
       }
     }
-    loadShops();
+    void loadShop();
     return () => {
       cancelled = true;
     };
@@ -88,7 +84,7 @@ export default function NewProductPage() {
   const activeShop = shops.find((s) => s.id === activeShopId);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
+    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-bg)]">
       <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -103,27 +99,10 @@ export default function NewProductPage() {
               Batch Add Products
             </h1>
           </div>
-
-          {shops.length > 1 && (
-            <CustomSelect
-              value={activeShopId ?? ""}
-              onChange={(val) => {
-                setActiveShopId(val);
-                if (val) {
-                  localStorage.setItem(scopedKey("trendsmart_active_shop"), val);
-                }
-              }}
-              options={shops.map((s) => ({ value: s.id, label: s.name }))}
-              ariaLabel="Select shop"
-              pill
-              size="sm"
-              fullWidth={false}
-            />
-          )}
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-4 px-3 py-5 sm:px-4">
+      <main className="mx-auto max-w-5xl space-y-4 px-3 py-5 pb-safe-nav sm:px-4">
         {!activeShop && (
           <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             Create a shop on your dashboard first, then come back to add products.
@@ -159,7 +138,7 @@ export default function NewProductPage() {
                 Manage inventory →
               </Link>
               <Link
-                href={`/shop/${activeShop.id}`}
+                href={getShopPath(activeShop)}
                 target="_blank"
                 className="font-semibold text-zinc-500 hover:underline dark:text-zinc-400"
               >

@@ -23,7 +23,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { scopedKey } from "@/lib/clientScope";
 import type {
   Product,
   ProductFormData,
@@ -40,7 +39,8 @@ import {
   bulkUpdateAvailability,
   bulkUpdateFulfillment,
 } from "@/services/productService";
-import { fetchShops } from "@/services/shopService";
+import { fetchMyShop } from "@/services/shopService";
+import { getShopPath } from "@/lib/shopSlug";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import { downloadProductsCSV } from "@/services/exportService";
 import { getProductDiscount } from "@/lib/formatters";
@@ -217,26 +217,30 @@ export default function ProductsDashboardPage() {
     return () => { cancelled = true; };
   }, [supabase.auth, router]);
 
-  // ── Load shops ──────────────────────────────────────────────────────────
+  // ── Load the merchant's single shop ─────────────────────────────────────
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    async function loadShops() {
-      const result = await fetchShops();
+    async function loadShop() {
+      const result = await fetchMyShop();
       if (cancelled) return;
       if (result.success) {
-        const myShops = result.data.filter((s) => s.owner_id === userId);
-        setShops(myShops);
-        if (myShops.length > 0 && !activeShopId) {
-          const saved = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendsmart_active_shop")) : null;
-          const match = saved ? myShops.find(s => s.id === saved) : null;
-          setActiveShopId(match?.id ?? myShops[0].id);
+        if (result.data) {
+          setShops([result.data]);
+          setActiveShopId(result.data.id);
+        } else {
+          setShops([]);
+          setActiveShopId(null);
         }
+      } else {
+        addToast(result.error || "Could not load your store.", "error");
       }
     }
-    loadShops();
-    return () => { cancelled = true; };
-  }, [userId, activeShopId]);
+    void loadShop();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, addToast]);
 
   // ── Load products & analytics ───────────────────────────────────────────
   useEffect(() => {
@@ -251,13 +255,14 @@ export default function ProductsDashboardPage() {
       ]);
       if (!cancelled) {
         if (productResult.success) setProducts(productResult.data);
+        else addToast(productResult.error || "Could not load products.", "error");
         if (analyticsResult.success) setAnalytics(analyticsResult.data);
         setProductsLoading(false);
       }
     }
     loadData();
     return () => { cancelled = true; };
-  }, [activeShopId]);
+  }, [activeShopId, addToast]);
 
   // ── Derived: filtered & sorted products ─────────────────────────────────
   const filteredProducts = useMemo(() => {
@@ -337,6 +342,10 @@ export default function ProductsDashboardPage() {
     if (!activeShopId) return;
     if (!form.name.trim()) { addToast("Product name is required.", "error"); return; }
     if (form.basePrice <= 0) { addToast("Price must be greater than 0.", "error"); return; }
+    if (!form.acceptsDelivery && !form.acceptsPickup) {
+      addToast("Enable Delivery and/or Pickup — at least one is required.", "error");
+      return;
+    }
 
     setFormSaving(true);
 
@@ -721,7 +730,7 @@ export default function ProductsDashboardPage() {
             </Link>
             {activeShopId && (
               <Link
-                href={`/shop/${activeShopId}`}
+                href={activeShop ? getShopPath(activeShop) : "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
@@ -729,15 +738,6 @@ export default function ProductsDashboardPage() {
                 View My Store
               </Link>
             )}
-            <CustomSelect
-              value={activeShopId ?? ""}
-              onChange={(val) => setActiveShopId(val)}
-              options={shops.map((s) => ({ value: s.id, label: s.name }))}
-              ariaLabel="Select shop"
-              pill
-              size="sm"
-              fullWidth={false}
-            />
           </div>
         </div>
       </header>

@@ -37,9 +37,18 @@ async function run(req: Request) {
 
   try {
     const admin = getSupabaseAdminClient();
-    const { data, error } = await admin.rpc("cleanup_analytics_logs", {
-      retention_days: ANALYTICS_RETENTION_DAYS,
-    });
+    if (!admin) {
+      return NextResponse.json(
+        { ok: false, error: "SUPABASE_SERVICE_ROLE_KEY not configured" },
+        { status: 503 },
+      );
+    }
+
+    // RPC args not yet in generated Database types — cast keeps production `tsc` green.
+    const { data, error } = await admin.rpc(
+      "cleanup_analytics_logs" as never,
+      { retention_days: ANALYTICS_RETENTION_DAYS } as never,
+    );
     if (error) throw error;
     return NextResponse.json({
       ok: true,

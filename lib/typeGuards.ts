@@ -264,7 +264,7 @@ export const userLocationSchema = z.object({
   city: z.string().max(100).nullable(),
   deliveryZone: z.string().max(100).nullable(),
   updatedAt: z.number().int().positive(),
-  source: z.enum(["gps", "manual", "cached"]),
+  source: z.enum(["gps", "pin", "manual", "cached"]),
 });
 
 export type UserLocationValidated = z.infer<typeof userLocationSchema>;

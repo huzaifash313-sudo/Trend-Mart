@@ -11,6 +11,12 @@ export const PUBLIC_SHOP_PAGE_SIZE = 24;
 /** Flat catalog fetch for deals/maps (not full marketplace dump). Was 300. */
 export const PUBLIC_SHOP_LIMIT = 48;
 
+/**
+ * Nearby / city geo candidate pool — large enough that “Nearest” isn’t limited
+ * to the first alphabetical/rating page of infinite scroll.
+ */
+export const GEO_SHOP_CANDIDATE_LIMIT = 96;
+
 /** Active stories seed for homepage tray. */
 export const PUBLIC_STORY_LIMIT = 48;
 

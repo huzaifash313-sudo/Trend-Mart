@@ -129,6 +129,8 @@ interface ProductGridProps {
   offerContext?: ProductOfferContext | null;
   /** Per-product shop context (marketplace feed). */
   getOfferContext?: (product: Product) => ProductOfferContext | null;
+  /** Optional compact area/km hint under the shop name (marketplace discovery). */
+  getLocationHint?: (product: Product) => string | null;
 }
 
 export const ProductCard = memo(function ProductCard({
@@ -140,6 +142,7 @@ export const ProductCard = memo(function ProductCard({
   offerContext,
   priority = false,
   isPinned = false,
+  locationHint = null,
   onProductClick,
   onAddToCart,
   onOrder,
@@ -157,6 +160,7 @@ export const ProductCard = memo(function ProductCard({
   offerContext?: ProductOfferContext | null;
   priority?: boolean;
   isPinned?: boolean;
+  locationHint?: string | null;
   onProductClick?: (product: Product) => void;
   onAddToCart?: (product: Product) => void;
   onOrder?: (product: Product) => void;
@@ -369,6 +373,14 @@ export const ProductCard = memo(function ProductCard({
               <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
                 {product.shop_name}
               </span>
+              {locationHint ? (
+                <span
+                  className="shrink-0 text-[9px] font-medium leading-none text-zinc-400 dark:text-zinc-500"
+                  title={locationHint}
+                >
+                  · {locationHint}
+                </span>
+              ) : null}
             </button>
             <CompactRating
               average={
@@ -513,6 +525,7 @@ export default function ProductGrid({
   showShopMeta = false,
   offerContext = null,
   getOfferContext,
+  getLocationHint,
 }: ProductGridProps) {
   const gridCols =
     columns === "2"
@@ -579,6 +592,7 @@ export default function ProductGrid({
           onPinToggle={onPinToggle}
           onDelete={onDelete}
           onShopClick={onShopClick}
+          locationHint={getLocationHint?.(product) ?? null}
         />
       )}
     />

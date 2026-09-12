@@ -126,6 +126,10 @@ export default function ProductEditorModal({
         addToast("Price must be greater than 0.", "error");
         return;
       }
+      if (!acceptsDelivery && !acceptsPickup) {
+        addToast("Enable Delivery and/or Pickup — at least one is required.", "error");
+        return;
+      }
 
       setSaving(true);
 

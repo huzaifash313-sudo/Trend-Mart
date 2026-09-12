@@ -20,7 +20,7 @@ export default function MerchantAssistantPage() {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          window.location.replace("/login?redirect=/dashboard/assistant");
+          window.location.replace("/auth?redirect=/dashboard/assistant");
           return;
         }
         const shopResult = await fetchMyShop();

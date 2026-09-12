@@ -183,29 +183,50 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Defer GPS until after first paint / idle so Lighthouse LCP isn't fighting
-  // geolocation + reverse-geocode on every public page load.
+  // Silent GPS refresh only when permission is already granted — never pop the
+  // browser prompt on idle (that surprises users and often looks like an error).
+  // First-time Allow happens on explicit taps (checkout, filter, map, settings).
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (autoDetectAttempted.current) return;
     autoDetectAttempted.current = true;
+
     try {
-      sessionStorage.setItem(AUTO_DETECT_KEY, "1");
+      if (sessionStorage.getItem(AUTO_DETECT_KEY) === "1") return;
     } catch {
       /* ignore */
     }
 
-    const run = () => {
-      void syncFromDevice({ timeout: 12_000 });
+    const run = async () => {
+      try {
+        sessionStorage.setItem(AUTO_DETECT_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+
+      // Only auto-sync when the OS already said Allow — never prompt here.
+      if (navigator.permissions?.query) {
+        try {
+          const status = await navigator.permissions.query({ name: "geolocation" });
+          if (status.state !== "granted") return;
+        } catch {
+          return;
+        }
+      } else {
+        // Safari often lacks permissions.query — skip idle GPS to avoid a prompt.
+        return;
+      }
+
+      await syncFromDevice({ timeout: 12_000 });
     };
 
     let idleId: number | null = null;
     let timeoutId: number | null = null;
     const ric = window.requestIdleCallback?.bind(window);
     if (typeof ric === "function") {
-      idleId = ric(run, { timeout: 4500 });
+      idleId = ric(() => void run(), { timeout: 4500 });
     } else {
-      timeoutId = window.setTimeout(run, 3500);
+      timeoutId = window.setTimeout(() => void run(), 3500);
     }
 
     return () => {

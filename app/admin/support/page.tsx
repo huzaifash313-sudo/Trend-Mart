@@ -14,6 +14,7 @@ import { subscribeToSupportTickets } from "@/lib/supabase/realtime";
 import type { SupportTicket, SupportTicketStatus } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { resolveClientAdminStatus } from "@/services/adminRoleCheck";
+import { useToast } from "@/components/Toast";
 
 const STATUS_OPTIONS: { value: SupportTicketStatus; label: string; color: string }[] = [
   { value: "open", label: "Open", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
@@ -33,6 +34,7 @@ function timeAgo(dateStr: string): string {
 
 export default function AdminSupportPage() {
   const router = useRouter();
+  const { addToast } = useToast();
 
   const [authLoading, setAuthLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -72,8 +74,11 @@ export default function AdminSupportPage() {
     async function load() {
       setLoading(true);
       const result = await fetchSupportTickets();
-      if (!cancelled && result.success) setTickets(result.data);
-      setLoading(false);
+      if (!cancelled) {
+        if (result.success) setTickets(result.data);
+        else addToast(result.error || "Could not load support tickets.", "error");
+        setLoading(false);
+      }
     }
     load();
 
@@ -106,7 +111,7 @@ export default function AdminSupportPage() {
       cancelled = true;
       unsub();
     };
-  }, [isAdmin]);
+  }, [isAdmin, addToast]);
 
   const filtered = useMemo(
     () => (filterStatus === "all" ? tickets : tickets.filter((t) => t.status === filterStatus)),
@@ -118,9 +123,12 @@ export default function AdminSupportPage() {
     const result = await updateSupportTicket(ticketId, { status });
     if (result.success) {
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? result.data : t)));
+      addToast("Ticket status updated.", "success");
+    } else {
+      addToast(result.error || "Could not update ticket.", "error");
     }
     setUpdatingId(null);
-  }, []);
+  }, [addToast]);
 
   const handleSaveNotes = useCallback(async (ticket: SupportTicket) => {
     const notes = (notesDraft[ticket.id] ?? ticket.admin_notes ?? "").trim();
@@ -131,9 +139,12 @@ export default function AdminSupportPage() {
     });
     if (result.success) {
       setTickets((prev) => prev.map((t) => (t.id === ticket.id ? result.data : t)));
+      addToast("Notes saved.", "success");
+    } else {
+      addToast(result.error || "Could not save notes.", "error");
     }
     setUpdatingId(null);
-  }, [notesDraft, updatingId]);
+  }, [notesDraft, updatingId, addToast]);
 
   if (authLoading) {
     return (

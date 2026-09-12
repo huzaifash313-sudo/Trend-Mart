@@ -75,6 +75,8 @@ async function fetchPublicShops(supabase: AnonClient): Promise<Shop[]> {
       .select(SHOP_LIST_SELECT)
       .eq("is_live", true)
       .eq("verification_status", "approved")
+      .order("avg_rating", { ascending: false, nullsFirst: false })
+      .order("review_count", { ascending: false, nullsFirst: false })
       .order("name", { ascending: true })
       .limit(PUBLIC_SHOP_PAGE_SIZE);
 
@@ -110,7 +112,8 @@ async function fetchActiveStories(supabase: AnonClient): Promise<Story[]> {
       .limit(PUBLIC_STORY_LIMIT);
 
     if (!withShop.error && withShop.data) {
-      return (withShop.data as Record<string, unknown>[]).map((row) => {
+      return (withShop.data as Record<string, unknown>[])
+        .map((row) => {
         const shop = row.shops as Record<string, unknown> | null | undefined;
         const rawViews = row.view_count;
         const viewCount =
@@ -140,7 +143,13 @@ async function fetchActiveStories(supabase: AnonClient): Promise<Story[]> {
           shop_is_live: (shop?.is_live as boolean | null) ?? null,
           shop_verification_status: (shop?.verification_status as string | null) ?? null,
         } as Story;
-      });
+      })
+        .filter(
+          (s) =>
+            s.shop_is_live === true &&
+            (s.shop_verification_status == null ||
+              s.shop_verification_status === "approved"),
+        );
     }
 
     const { data, error } = await supabase
@@ -171,7 +180,7 @@ const getCachedCatalog = unstable_cache(
     ]);
     return { shops, stories };
   },
-  ["home-catalog-v1"],
+  ["home-catalog-v2"],
   { revalidate: 300 }, // 5 minutes
 );
 

@@ -585,6 +585,23 @@ export default function DashboardSettingsPage() {
     );
   }
 
+  if (myShopQuery.isError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 text-center dark:bg-[color:var(--tm-surface)]">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Couldn’t load your store. Check your connection and try again.
+        </p>
+        <button
+          type="button"
+          onClick={() => void myShopQuery.refetch()}
+          className="mt-3 text-sm font-medium text-emerald-600 hover:underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   if (!shop) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 text-center dark:bg-[color:var(--tm-surface)]">
@@ -771,7 +788,7 @@ export default function DashboardSettingsPage() {
               </p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
                 {(shop?.verification_status ?? "approved") === "pending"
-                  ? "Your store is waiting for TrendsMart admin approval. Turning Live on prepares it — customers will only see it after approval."
+                  ? "Your store is under a rare visibility review. Soft launch stores usually go live after email verification — keep Live on when you’re ready for customers."
                   : (shop?.verification_status ?? "approved") === "rejected"
                     ? "This store was not approved. Update your details and contact support, or wait for a re-review."
                     : form.is_live

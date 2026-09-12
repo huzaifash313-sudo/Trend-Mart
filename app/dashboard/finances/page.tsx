@@ -22,8 +22,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { scopedKey } from "@/lib/clientScope";
-import { fetchShops } from "@/services/shopService";
+import { fetchMyShop } from "@/services/shopService";
 import { getStatusLabel } from "@/services/notificationService";
 import type { Shop, Order, OrderStatus } from "@/types";
 import { useToast } from "@/components/Toast";
@@ -231,27 +230,30 @@ export default function FinancesPage() {
     return () => { cancelled = true; };
   }, [supabase.auth, router]);
 
-  // Load shops
+  // Load the merchant's single shop
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    async function loadShops() {
-      const result = await fetchShops();
+    async function loadShop() {
+      const result = await fetchMyShop();
       if (cancelled) return;
       if (result.success) {
-        const myShops = result.data.filter((s) => s.owner_id === userId);
-        setAllShops(myShops);
-        const savedId = typeof window !== "undefined" ? localStorage.getItem(scopedKey("trendsmart_active_shop")) : null;
-        if (savedId && myShops.some((s) => s.id === savedId)) {
-          setActiveShopId(savedId);
-        } else if (myShops.length > 0) {
-          setActiveShopId(myShops[0].id);
+        if (result.data) {
+          setAllShops([result.data]);
+          setActiveShopId(result.data.id);
+        } else {
+          setAllShops([]);
+          setActiveShopId(null);
         }
+      } else {
+        addToast(result.error || "Could not load your store.", "error");
       }
     }
-    loadShops();
-    return () => { cancelled = true; };
-  }, [userId]);
+    void loadShop();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, addToast]);
 
   // Load finance entries and orders
   useEffect(() => {
@@ -267,8 +269,9 @@ export default function FinancesPage() {
         .order("date", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(500);
-      if (!cancelled && !error) {
-        setEntries((data ?? []) as CashEntry[]);
+      if (!cancelled) {
+        if (error) addToast("Could not load finance entries.", "error");
+        else setEntries((data ?? []) as CashEntry[]);
       }
       setEntriesLoading(false);
     }
@@ -281,8 +284,9 @@ export default function FinancesPage() {
         .eq("shop_id", activeShopId)
         .order("created_at", { ascending: false })
         .limit(500);
-      if (!cancelled && !error) {
-        setOrders((data ?? []) as unknown as Order[]);
+      if (!cancelled) {
+        if (error) addToast("Could not load order revenue.", "error");
+        else setOrders((data ?? []) as unknown as Order[]);
       }
       setOrdersLoading(false);
     }
@@ -290,7 +294,7 @@ export default function FinancesPage() {
     loadEntries();
     loadOrders();
     return () => { cancelled = true; };
-  }, [activeShopId, supabase]);
+  }, [activeShopId, supabase, addToast]);
 
   // ── Month-scoped data ───────────────────────────────────────────────────────
   const monthOrders = useMemo(() => {
@@ -532,21 +536,10 @@ export default function FinancesPage() {
               {shop?.name ? `${shop.name} — Finances` : "Financial Ledger"}
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Orders, income, expenses &amp; profit — sab ek jagah
+              Orders, income, expenses &amp; profit — latest 500 rows each
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {allShops.length > 1 && (
-              <CustomSelect
-                value={activeShopId ?? ""}
-                onChange={(val) => setActiveShopId(val)}
-                options={allShops.map((s) => ({ value: s.id, label: s.name }))}
-                ariaLabel="Switch shop"
-                pill
-                size="sm"
-                fullWidth={false}
-              />
-            )}
             <Link
               href="/dashboard/orders"
               className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"

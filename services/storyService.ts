@@ -94,7 +94,14 @@ export async function fetchActiveStories(
     if (!withShop.error && withShop.data) {
       return {
         success: true,
-        data: (withShop.data as Record<string, unknown>[]).map(mapStoryRow),
+        data: (withShop.data as Record<string, unknown>[])
+          .map(mapStoryRow)
+          .filter(
+            (s) =>
+              s.shop_is_live === true &&
+              (s.shop_verification_status == null ||
+                s.shop_verification_status === "approved"),
+          ),
       };
     }
 

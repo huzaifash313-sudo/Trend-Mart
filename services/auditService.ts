@@ -204,9 +204,12 @@ export async function fetchAuditLogs(opts?: {
 export async function fetchDistinctEventTypes(): Promise<ServiceResult<string[]>> {
   const supabase = createClient();
   try {
+    // Cap rows — dropdown only needs distinct recent event types, not full history.
     const { data, error } = await supabase
       .from("admin_audit_logs")
-      .select("event_type");
+      .select("event_type")
+      .order("created_at", { ascending: false })
+      .limit(2000);
 
     if (error) throw error;
 

@@ -9,8 +9,8 @@ import {
   type PointerEvent,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import DealCard from "@/components/DealCard";
-import DealQuickView from "@/components/DealQuickView";
 import {
   isDealActiveOnDate,
   toPkDateKey,
@@ -19,6 +19,7 @@ import {
 import { getDealImages } from "@/lib/productImages";
 import { dealToProduct } from "@/lib/dealCommerce";
 import { trackProductView } from "@/lib/behavior";
+import { getDealSeoPath } from "@/lib/seo/dealSlug";
 
 interface FeaturedDealsStripProps {
   deals: ShopDeal[];
@@ -119,15 +120,21 @@ function useVisibleDeals(
   }, [deals, day, preferFeatured, limit]);
 }
 
-function QuickDealModal({
-  deal,
-  onClose,
-}: {
-  deal: ShopDeal | null;
-  onClose: () => void;
-}) {
-  if (!deal) return null;
-  return <DealQuickView deal={deal} onClose={onClose} />;
+function openDealPage(
+  router: ReturnType<typeof useRouter>,
+  deal: ShopDeal,
+) {
+  const product = dealToProduct(deal);
+  trackProductView({
+    id: product.id,
+    name: deal.title,
+    price: Number(deal.price) || 0,
+    imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
+    shopId: deal.shop_id,
+    shopName: deal.shop_name,
+    category: null,
+  });
+  router.push(getDealSeoPath(deal.title, deal.id));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -147,11 +154,11 @@ function HomeShiftShelf({
   getOfferTags?: (shopId: string) => string[];
   className?: string;
 }) {
+  const router = useRouter();
   const count = deals.length;
   const perView = useHomePerView();
   const canSlide = count > perView;
   const [index, setIndex] = useState(0);
-  const [openDeal, setOpenDeal] = useState<ShopDeal | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [paused, setPaused] = useState(false);
   const [progressKey, setProgressKey] = useState(0);
@@ -200,20 +207,13 @@ function HomeShiftShelf({
     return () => ro?.disconnect();
   }, [measure, trackDeals, perView]);
 
-  const openDealCard = useCallback((deal: ShopDeal) => {
-    setPaused(true);
-    setOpenDeal(deal);
-    const product = dealToProduct(deal);
-    trackProductView({
-      id: product.id,
-      name: deal.title,
-      price: Number(deal.price) || 0,
-      imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
-      shopId: deal.shop_id,
-      shopName: deal.shop_name,
-      category: null,
-    });
-  }, []);
+  const openDealCard = useCallback(
+    (deal: ShopDeal) => {
+      setPaused(true);
+      openDealPage(router, deal);
+    },
+    [router],
+  );
 
   const go = useCallback(
     (dir: -1 | 1) => {
@@ -244,10 +244,10 @@ function HomeShiftShelf({
 
   // Auto: hold → snap next → hold…
   useEffect(() => {
-    if (reduceMotion || paused || !canSlide || openDeal) return;
+    if (reduceMotion || paused || !canSlide) return;
     const t = window.setTimeout(() => go(1), HOME_HOLD_MS);
     return () => window.clearTimeout(t);
-  }, [index, reduceMotion, paused, canSlide, openDeal, go, progressKey]);
+  }, [index, reduceMotion, paused, canSlide, go, progressKey]);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (!canSlide) return;
@@ -292,10 +292,8 @@ function HomeShiftShelf({
       moved.current = false;
       suppressClick.current = false;
     }, 0);
-    if (!openDeal) {
-      setPaused(false);
-      setProgressKey((k) => k + 1);
-    }
+    setPaused(false);
+    setProgressKey((k) => k + 1);
   };
 
   if (count === 0) return null;
@@ -359,12 +357,12 @@ function HomeShiftShelf({
           onMouseEnter={() => canSlide && setPaused(true)}
           onPointerEnter={() => canSlide && setPaused(true)}
           onMouseLeave={() => {
-            if (!canSlide || openDeal) return;
+            if (!canSlide) return;
             setPaused(false);
             setProgressKey((k) => k + 1);
           }}
           onPointerLeave={() => {
-            if (!canSlide || openDeal) return;
+            if (!canSlide) return;
             setPaused(false);
             setProgressKey((k) => k + 1);
           }}
@@ -404,7 +402,7 @@ function HomeShiftShelf({
           </div>
         </div>
 
-        {canSlide && !reduceMotion && !paused && !openDeal ? (
+        {canSlide && !reduceMotion && !paused ? (
           <div key={progressKey} className="tm-home-deals-progress" aria-hidden>
             <span
               className="tm-home-deals-progress-bar"
@@ -415,15 +413,6 @@ function HomeShiftShelf({
           <div className="tm-home-deals-progress tm-home-deals-progress--idle" aria-hidden />
         )}
       </div>
-
-      <QuickDealModal
-        deal={openDeal}
-        onClose={() => {
-          setOpenDeal(null);
-          setPaused(false);
-          setProgressKey((k) => k + 1);
-        }}
-      />
     </section>
   );
 }
@@ -445,6 +434,7 @@ function MarqueeShelf({
   getOfferTags?: (shopId: string) => string[];
   className?: string;
 }) {
+  const router = useRouter();
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const setRef = useRef<HTMLDivElement>(null);
@@ -458,7 +448,6 @@ function MarqueeShelf({
   const movedRef = useRef(false);
   const animRef = useRef<number | null>(null);
 
-  const [openDeal, setOpenDeal] = useState<ShopDeal | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -624,17 +613,7 @@ function MarqueeShelf({
             onOpen={() => {
               if (movedRef.current) return;
               pauseAuto(8000);
-              setOpenDeal(deal);
-              const product = dealToProduct(deal);
-              trackProductView({
-                id: product.id,
-                name: deal.title,
-                price: Number(deal.price) || 0,
-                imageUrl: getDealImages(deal)[0] ?? deal.image_url ?? null,
-                shopId: deal.shop_id,
-                shopName: deal.shop_name,
-                category: null,
-              });
+              openDealPage(router, deal);
             }}
           />
         </div>
@@ -714,8 +693,6 @@ function MarqueeShelf({
           </div>
         </div>
       </div>
-
-      <QuickDealModal deal={openDeal} onClose={() => setOpenDeal(null)} />
     </section>
   );
 }

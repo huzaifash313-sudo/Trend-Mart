@@ -352,7 +352,8 @@ export async function fetchDealsByShopId(shopId: string): Promise<ServiceResult<
           .from("shop_deals")
           .select(select)
           .eq("shop_id", shopId)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(500);
         return { data: res.data, error: res.error };
       },
     );
@@ -364,6 +365,62 @@ export async function fetchDealsByShopId(shopId: string): Promise<ServiceResult<
     };
   } catch (err) {
     logError(err, { module: "dealService.fetchDealsByShopId", meta: { shopId } });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
+ * Light "more deals from this shop" rail for deal detail pages.
+ * Caps at 6 — never the full shop deal list.
+ */
+export async function fetchRelatedDeals(opts: {
+  shopId: string;
+  excludeId: string;
+  limit?: number;
+}): Promise<ServiceResult<ShopDeal[]>> {
+  const shopId = (opts.shopId ?? "").trim();
+  const excludeId = (opts.excludeId ?? "").trim();
+  if (!shopId || !excludeId) return { success: true, data: [] };
+  const limit = Math.min(Math.max(opts.limit ?? 6, 1), 8);
+  const supabase = createClient();
+
+  try {
+    const { data, error } = await selectWithFallback(
+      LIST_SELECT_ATTEMPTS,
+      {
+        get: () => cachedListSelect,
+        set: (s) => {
+          cachedListSelect = s;
+        },
+      },
+      async (select) => {
+        const res = await supabase
+          .from("shop_deals")
+          .select(select)
+          .eq("shop_id", shopId)
+          .neq("id", excludeId)
+          .eq("is_active", true)
+          .order("is_featured", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        return { data: res.data, error: res.error };
+      },
+    );
+
+    if (error) throw error;
+    const rows = (Array.isArray(data) ? data : data ? [data] : []) as Record<
+      string,
+      unknown
+    >[];
+    return {
+      success: true,
+      data: rows.map((row) => parseDeal(row)).slice(0, limit),
+    };
+  } catch (err) {
+    logError(err, {
+      module: "dealService.fetchRelatedDeals",
+      meta: { shopId, excludeId },
+    });
     return { success: false, error: toError(err) };
   }
 }
@@ -411,10 +468,13 @@ export async function fetchDealById(
 export async function fetchActiveDeals(
   limit = 100,
   offset = 0,
+  opts?: { liveOnDate?: string | null },
 ): Promise<ServiceResult<ShopDeal[]>> {
   const supabase = createClient();
   const cap = Math.min(Math.max(limit, 12), 160);
   const start = Math.max(0, Math.floor(offset));
+  const liveOnDate = opts?.liveOnDate?.trim() || null;
+
   try {
     const { data, error } = await selectWithFallback(
       LIST_SELECT_ATTEMPTS,
@@ -433,8 +493,14 @@ export async function fetchActiveDeals(
           .order("is_featured", { ascending: false })
           .order("created_at", { ascending: false });
 
-        // Apply cursor pagination: range(start, end) for proper server-side paging.
-        q = q.range(start, start + cap - 1);
+        // Soft-prune clearly expired date_range deals at the DB when possible.
+        // Weekly/monthly still need client calendar checks.
+        if (liveOnDate) {
+          // Over-fetch a window so client/calendar filtering still fills a page.
+          q = q.range(0, Math.min(start + cap * 5, 199));
+        } else {
+          q = q.range(start, start + cap - 1);
+        }
 
         const withFeatured = await q;
 
@@ -446,8 +512,12 @@ export async function fetchActiveDeals(
             .from("shop_deals")
             .select(select)
             .eq("is_active", true)
-            .order("created_at", { ascending: false })
-            .range(start, start + cap - 1);
+            .order("created_at", { ascending: false });
+          if (liveOnDate) {
+            plain = plain.range(0, Math.min(start + cap * 5, 199));
+          } else {
+            plain = plain.range(start, start + cap - 1);
+          }
           const res = await plain;
           return { data: res.data, error: res.error };
         }
@@ -457,10 +527,25 @@ export async function fetchActiveDeals(
     );
 
     if (error) throw error;
-    return {
-      success: true,
-      data: ((data as Record<string, unknown>[]) ?? []).map(parseDeal),
-    };
+
+    const { isDealActiveOnDate, toPkDateKey } = await import("@/lib/dealSchedule");
+    const today = toPkDateKey();
+    let deals = ((data as Record<string, unknown>[]) ?? []).map(parseDeal);
+
+    // Drop date_range deals that already ended (keeps "All" + paging honest).
+    deals = deals.filter((d) => {
+      if (d.schedule_type === "date_range" && d.ends_on) {
+        return d.ends_on.slice(0, 10) >= today;
+      }
+      return true;
+    });
+
+    if (liveOnDate) {
+      const live = deals.filter((d) => isDealActiveOnDate(d, liveOnDate));
+      return { success: true, data: live.slice(start, start + cap) };
+    }
+
+    return { success: true, data: deals };
   } catch (err) {
     logError(err, { module: "dealService.fetchActiveDeals" });
     return { success: false, error: toError(err) };

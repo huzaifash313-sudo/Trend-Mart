@@ -30,7 +30,6 @@ export function getShopPath(
 ): string {
   const explicitSlug = shop.slug?.trim();
   if (explicitSlug) return `/shop/${encodeURIComponent(explicitSlug)}`;
-
-  const generatedSlug = generateShopSlug(shop.name, shop.id);
-  return `/shop/${encodeURIComponent(shop.id)}?n=${encodeURIComponent(generatedSlug)}`;
+  // Clean UUID path — never put ?n= in links/canonicals (hurts indexing).
+  return `/shop/${encodeURIComponent(shop.id)}`;
 }

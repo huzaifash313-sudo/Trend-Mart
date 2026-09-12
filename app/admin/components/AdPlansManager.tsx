@@ -139,7 +139,15 @@ export default function AdPlansManager() {
         </div>
         <button
           type="button"
-          onClick={startAdd}
+          onClick={() => {
+            if (showForm) {
+              setShowForm(false);
+              setEditingId(null);
+              setError(null);
+              return;
+            }
+            startAdd();
+          }}
           className="px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 shrink-0"
         >
           {showForm ? "Cancel" : "+ New Plan"}

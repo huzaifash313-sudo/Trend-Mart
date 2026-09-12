@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import type { FavoriteItem } from "@/services/wishlistService";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
 import {
   getAllFavorites,
   markWishlistSeen,
@@ -135,9 +136,7 @@ function WishlistCard({
   const href =
     item.type === "shop"
       ? `/shop/${item.id}`
-      : item.shopId
-        ? `/shop/${item.shopId}`
-        : `/search?q=${encodeURIComponent(item.name)}`;
+      : getProductSeoPath(item.name, null, item.id);
 
   const handleWhatsApp = async () => {
     if (waBusy) return;
@@ -348,7 +347,7 @@ export default function WishlistPage() {
             <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Wishlist</h1>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">
+        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 pb-safe-nav">
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-20 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" />
@@ -372,7 +371,7 @@ export default function WishlistPage() {
             <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Wishlist</h1>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">
+        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 pb-safe-nav">
           <ErrorState
             title="Could not load your wishlist"
             message="We couldn't fetch your saved items. This might be a temporary issue."
@@ -445,7 +444,7 @@ export default function WishlistPage() {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 pb-safe-nav">
         {totalEmpty && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">

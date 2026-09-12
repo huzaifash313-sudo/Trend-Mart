@@ -21,6 +21,7 @@ import DealManager from "@/components/DealManager";
 import { useToast } from "@/components/Toast";
 import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 import CustomSelect from "@/components/CustomSelect";
+import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
 
 function CloseIcon() {
   return (
@@ -288,9 +289,9 @@ export default function MerchantQuickAddModal() {
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   {isUnlimitedStoryQuota(storyQuota.quota)
                     ? `Post unlimited stories — no limit (${storyQuota.activeCount} live now).`
-                    : storyQuota.tier === "pro"
+                    : storyQuota.tier === "pro" && isPaidFeaturesEnabled()
                       ? `Pro plan: up to ${storyQuota.quota} active stories at once (${storyQuota.activeCount} live now).`
-                      : `${storyQuota.quota} active stor${storyQuota.quota === 1 ? "y" : "ies"} on the free plan (${storyQuota.activeCount} live now).`}{" "}
+                      : `Up to ${storyQuota.quota} active stor${storyQuota.quota === 1 ? "y" : "ies"} (${storyQuota.activeCount} live now).`}{" "}
                   Stories stay visible on the homepage for 24 hours.
                 </p>
               ) : (

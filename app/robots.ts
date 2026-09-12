@@ -46,6 +46,7 @@ export default function robots(): MetadataRoute.Robots {
     "/t/*",
     "/cart",
     "/wishlist",
+    "/search",
     "/login",
     "/signup",
     "/forgot-password",

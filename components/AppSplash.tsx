@@ -57,6 +57,21 @@ const STAGE_MS = {
   hardCapWait: 1600,
 };
 
+/**
+ * Regular browser tabs — keep the brand beat readable but exit fast so mobile
+ * Lighthouse LCP / Speed Index are not gated behind a ~5s cinematic intro.
+ * Installed PWA keeps STAGE_MS for the full app-open feel.
+ */
+const BROWSER_MS = {
+  logoHold: 420,
+  brand: 640,
+  details: 780,
+  holdMin: 220,
+  exit: 280,
+  maxWaitForData: 350,
+  hardCapWait: 600,
+};
+
 const REDUCED_MS = {
   logoHold: 160,
   brand: 120,
@@ -69,13 +84,13 @@ const REDUCED_MS = {
 
 /** Save-Data / 2G only — keep a readable beat, not a flash. */
 const SLOW_NET_MS = {
-  logoHold: 520,
-  brand: 720,
-  details: 1000,
-  holdMin: 520,
-  exit: 300,
-  maxWaitForData: 400,
-  hardCapWait: 800,
+  logoHold: 400,
+  brand: 520,
+  details: 640,
+  holdMin: 180,
+  exit: 240,
+  maxWaitForData: 280,
+  hardCapWait: 500,
 };
 
 type Phase = "off" | "logo" | "brand" | "details" | "hold" | "exit";
@@ -163,7 +178,7 @@ async function unwrap<T>(
 }
 
 function stageTiming(): StageTiming {
-  if (typeof window === "undefined") return STAGE_MS;
+  if (typeof window === "undefined") return BROWSER_MS;
   try {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return REDUCED_MS;
@@ -186,7 +201,10 @@ function stageTiming(): StageTiming {
   } catch {
     /* ignore */
   }
-  return STAGE_MS;
+  // Full cinematic intro only for installed PWA cold opens — browsers exit early
+  // so homepage LCP is not blocked ~5s behind the splash gate.
+  if (isStandaloneApp()) return STAGE_MS;
+  return BROWSER_MS;
 }
 
 /* Short, human value intro — no page mockups, just "what TrendsMart is". */

@@ -259,7 +259,8 @@ export async function fetchProductsByShopId(
       .from("products")
       .select("*")
       .eq("shop_id", shopId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(1000);
 
     if (error) throw error;
     return { success: true, data: (data as Product[]) ?? [] };
@@ -289,6 +290,11 @@ export interface MarketplaceProductFilters {
   /** Zero-based row offset for cursor pagination (default 0). */
   offset?: number;
   availableOnly?: boolean;
+  /**
+   * When set (geo / Nearest), only products from these shops are returned.
+   * Empty array = no nearby shops → empty page (not “all products”).
+   */
+  shopIds?: string[] | null;
 }
 
 type ShopJoin = {
@@ -449,6 +455,7 @@ async function topUpMarketplaceDiversity(
     query: string;
     subCategoryId?: string | null;
     category?: string;
+    shopIds?: string[] | null;
     targetShopSpread?: number;
   },
 ): Promise<MarketplaceProduct[]> {
@@ -486,6 +493,12 @@ async function topUpMarketplaceDiversity(
   if (opts.availableOnly) builder = builder.eq("is_available", true);
   builder = builder.not("shop_id", "in", `(${excludeIds.join(",")})`);
   if (opts.subCategoryId) builder = builder.eq("sub_category_id", opts.subCategoryId);
+  if (opts.category && opts.category !== "All") {
+    builder = builder.eq("shops.category", opts.category);
+  }
+  if (opts.shopIds?.length) {
+    builder = builder.in("shop_id", opts.shopIds.slice(0, 120));
+  }
 
   const fuzzyOr = opts.query
     ? buildFuzzyIlikeOr(opts.query, ["name", "title"], 10)
@@ -552,6 +565,10 @@ interface MarketplaceRowsQuery {
   availableOnly: boolean;
   q: string;
   subCategoryId?: string | null;
+  /** Exact shop category (shops.category) — server-side, not post-filter. */
+  shopCategory?: string | null;
+  /** Restrict to these shop IDs (geo). Chunked if very large. */
+  shopIds?: string[] | null;
 }
 
 /**
@@ -573,6 +590,13 @@ async function runMarketplaceRows(
       .eq("shops.is_live", true)
       .eq("shops.verification_status", "approved");
     if (opts.availableOnly) b = b.eq("is_available", true);
+    if (opts.shopCategory) {
+      b = b.eq("shops.category", opts.shopCategory);
+    }
+    if (opts.shopIds && opts.shopIds.length > 0) {
+      // PostgREST .in() is fine for soft-launch sized geo pools (≤96).
+      b = b.in("shop_id", opts.shopIds.slice(0, 120));
+    }
     if (opts.q) {
       const fuzzyOr = buildFuzzyIlikeOr(opts.q, ["name", "title"], 10);
       if (fuzzyOr) {
@@ -600,7 +624,7 @@ async function runMarketplaceRows(
     // ordering on missing columns).
     const legacy = await build(MARKETPLACE_SELECT_LEGACY, {
       orderBy: opts.orderBy?.filter(
-        ([col]) => col !== "orders_count" && col !== "click_count",
+        ([col]) => col !== "orders_count" && col !== "click_count" && col !== "avg_rating",
       ),
     });
     return {
@@ -612,6 +636,31 @@ async function runMarketplaceRows(
     rows: (primary.data as Record<string, unknown>[] | null) ?? null,
     error: primary.error,
   };
+}
+
+function serverOrderForSort(sort: MarketplaceSort): Array<[string, boolean]> {
+  switch (sort) {
+    case "price_asc":
+      return [["price", true], ["created_at", false]];
+    case "price_desc":
+      return [["price", false], ["created_at", false]];
+    case "newest":
+      return [["created_at", false]];
+    case "popular":
+      return [
+        ["orders_count", false],
+        ["click_count", false],
+        ["avg_rating", false],
+        ["created_at", false],
+      ];
+    case "discount":
+      // Discount % is computed client-side; prefer compare_at / original then price.
+      return [["created_at", false]];
+    case "nearest":
+    case "for_you":
+    default:
+      return [["created_at", false]];
+  }
 }
 
 /**
@@ -660,23 +709,30 @@ export async function fetchMarketplaceProducts(
     limit = 72,
     offset = 0,
     availableOnly = true,
+    shopIds = null,
   } = filters;
   // Page size clamped to [20, 200]; offset is a safe non-negative integer.
   const pageSize = Math.min(Math.max(Math.round(limit) || 20, 20), 200);
   const start = Math.max(0, Math.round(offset) || 0);
 
   try {
+    // Geo active with zero nearby shops → empty page (do not dump the catalog).
+    if (Array.isArray(shopIds) && shopIds.length === 0) {
+      return { success: true, data: [] };
+    }
+
     const q = query.trim();
     const searchMode = q.length > 0;
+    const shopCategory =
+      category && category !== "All" ? category : null;
+    const orderBy = serverOrderForSort(sort);
 
     let rows: Record<string, unknown>[] | null = null;
     let error: unknown = null;
 
     if (searchMode) {
       // Broader pool so popularity-aware ranking stays consistent across
-      // infinite-scroll pages. Two slices merged: newest matches (so a brand
-      // new exact match is never buried) + most-ordered/clicks (so demand
-      // leaders always surface). Deduped, then rank-blended client-side.
+      // infinite-scroll pages. Two slices merged: newest matches + demand.
       const [fresh, popular] = await Promise.all([
         runMarketplaceRows(supabase, {
           orderBy: [["created_at", false]],
@@ -684,6 +740,8 @@ export async function fetchMarketplaceProducts(
           availableOnly,
           q,
           subCategoryId,
+          shopCategory,
+          shopIds,
         }),
         runMarketplaceRows(supabase, {
           orderBy: [
@@ -695,17 +753,21 @@ export async function fetchMarketplaceProducts(
           availableOnly,
           q,
           subCategoryId,
+          shopCategory,
+          shopIds,
         }),
       ]);
       error = fresh.error || popular.error;
       rows = mergeMarketplaceRows(fresh.rows, popular.rows);
     } else {
       const res = await runMarketplaceRows(supabase, {
-        orderBy: [["created_at", false]],
+        orderBy,
         range: [start, start + pageSize - 1],
         availableOnly,
         q,
         subCategoryId,
+        shopCategory,
+        shopIds,
       });
       error = res.error;
       rows = res.rows;
@@ -720,25 +782,39 @@ export async function fetchMarketplaceProducts(
     if (subCategoryId && items.length === 0) {
       const subRes = await fetchShopIdsBySubCategory(subCategoryId);
       if (subRes.success && subRes.data.length > 0) {
-        const { data: fallbackRows, error: fbErr } = await supabase
-          .from("products")
-          .select(MARKETPLACE_SELECT)
-          .eq("shops.is_live", true)
-          .eq("shops.verification_status", "approved")
-          .eq("is_available", true)
-          .in("shop_id", subRes.data)
-          .order("created_at", { ascending: false })
-          .limit(Math.min(Math.max(limit, 20), 120));
-        if (!fbErr && fallbackRows) {
-          items = (fallbackRows as Record<string, unknown>[])
-            .map(mapMarketplaceRow)
-            .filter((p): p is MarketplaceProduct => !!p);
+        let shopPool = subRes.data;
+        if (shopIds?.length) {
+          const allowed = new Set(shopIds);
+          shopPool = shopPool.filter((id) => allowed.has(id));
+        }
+        if (shopPool.length > 0) {
+          const { data: fallbackRows, error: fbErr } = await supabase
+            .from("products")
+            .select(MARKETPLACE_SELECT)
+            .eq("shops.is_live", true)
+            .eq("shops.verification_status", "approved")
+            .eq("is_available", true)
+            .in("shop_id", shopPool.slice(0, 120))
+            .order("created_at", { ascending: false })
+            .limit(Math.min(Math.max(limit, 20), 120));
+          if (!fbErr && fallbackRows) {
+            items = (fallbackRows as Record<string, unknown>[])
+              .map(mapMarketplaceRow)
+              .filter((p): p is MarketplaceProduct => !!p);
+            if (shopCategory) {
+              const cat = shopCategory.toLowerCase();
+              items = items.filter(
+                (p) => (p.shop_category ?? "").toLowerCase() === cat,
+              );
+            }
+          }
         }
       }
     }
 
-    if (category && category !== "All") {
-      const cat = category.toLowerCase();
+    // Category is applied server-side; keep a soft client guard for join quirks.
+    if (shopCategory) {
+      const cat = shopCategory.toLowerCase();
       items = items.filter((p) => {
         const shopCat = (p.shop_category ?? "").toLowerCase();
         const prodCat = (p.category_id ?? "").toLowerCase();
@@ -757,6 +833,8 @@ export async function fetchMarketplaceProducts(
         .limit(Math.min(Math.max(limit, 40), 120));
       if (availableOnly) broad = broad.eq("is_available", true);
       if (subCategoryId) broad = broad.eq("sub_category_id", subCategoryId);
+      if (shopCategory) broad = broad.eq("shops.category", shopCategory);
+      if (shopIds?.length) broad = broad.in("shop_id", shopIds.slice(0, 120));
       const broadRes = await broad;
       if (!broadRes.error && broadRes.data) {
         const pool = (broadRes.data as Record<string, unknown>[])
@@ -779,8 +857,6 @@ export async function fetchMarketplaceProducts(
         (p) => [p.name, p.title, p.shop_name, p.shop_category],
         { minScore: FUZZY_MIN_SCORE, weights: [1, 0.95, 0.7, 0.55] },
       );
-      // Blended ranking: relevance leads, then reviews/orders/clicks lift the
-      // best-loved products. Skip the For You mix so typos still surface hits.
       const blended = ranked
         .map((r) => ({ item: r.item, score: blendSearchScore(r.score, r.item) }))
         .sort((a, b) => b.score - a.score)
@@ -793,12 +869,99 @@ export async function fetchMarketplaceProducts(
       query: q,
       subCategoryId,
       category,
+      shopIds,
       targetShopSpread: 12,
     });
 
-    return { success: true, data: sortMarketplaceProducts(items, sort) };
+    // Diversify for fair mix, then hard-cap to pageSize so infinite-scroll
+    // offsets stay aligned with the DB cursor (never inflate past pageSize).
+    const sorted = sortMarketplaceProducts(items, sort);
+    return { success: true, data: sorted.slice(0, pageSize) };
   } catch (err) {
     logError(err, { module: "productService.fetchMarketplaceProducts", meta: { ...filters } });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
+ * Light "more from this shop" rail for product detail pages.
+ * One small query (≤12 rows) — never the full shop catalogue.
+ */
+export async function fetchRelatedMarketplaceProducts(opts: {
+  shopId: string;
+  excludeId: string;
+  categoryId?: string | null;
+  subCategoryId?: string | null;
+  limit?: number;
+}): Promise<ServiceResult<MarketplaceProduct[]>> {
+  const shopId = opts.shopId?.trim();
+  const excludeId = opts.excludeId?.trim();
+  if (!shopId || !excludeId || !isValidUUID(shopId) || !isValidUUID(excludeId)) {
+    return { success: true, data: [] };
+  }
+  const limit = Math.min(Math.max(opts.limit ?? 8, 1), 12);
+  const supabase = createClient();
+
+  try {
+    const build = (select: string) => {
+      let q = supabase
+        .from("products")
+        .select(select)
+        .eq("shop_id", shopId)
+        .neq("id", excludeId)
+        .eq("is_available", true)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .order("orders_count", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(limit * 2);
+
+      if (opts.subCategoryId) {
+        q = q.eq("sub_category_id", opts.subCategoryId);
+      } else if (opts.categoryId) {
+        q = q.eq("category_id", opts.categoryId);
+      }
+      return q;
+    };
+
+    let res = await build(MARKETPLACE_SELECT);
+    if (res.error && isMissingRatingColumnError(res.error)) {
+      res = await build(MARKETPLACE_SELECT_LEGACY);
+    }
+
+    // Soft fallback: if category/sub filter returned nothing, same-shop only.
+    if (
+      (!res.error && (!res.data || (res.data as unknown[]).length === 0)) &&
+      (opts.subCategoryId || opts.categoryId)
+    ) {
+      const loose = await supabase
+        .from("products")
+        .select(MARKETPLACE_SELECT)
+        .eq("shop_id", shopId)
+        .neq("id", excludeId)
+        .eq("is_available", true)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (!loose.error && loose.data) {
+        const mapped = (loose.data as unknown as Record<string, unknown>[])
+          .map(mapMarketplaceRow)
+          .filter((p): p is MarketplaceProduct => p != null);
+        return { success: true, data: mapped.slice(0, limit) };
+      }
+    }
+
+    if (res.error) throw res.error;
+    const mapped = ((res.data as unknown as Record<string, unknown>[]) ?? [])
+      .map(mapMarketplaceRow)
+      .filter((p): p is MarketplaceProduct => p != null);
+    return { success: true, data: mapped.slice(0, limit) };
+  } catch (err) {
+    logError(err, {
+      module: "productService.fetchRelatedMarketplaceProducts",
+      meta: { shopId, excludeId },
+    });
     return { success: false, error: toError(err) };
   }
 }

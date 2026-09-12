@@ -43,6 +43,7 @@ import {
   parseCoverageFromZones,
   isCustomerWithinCoverage,
   isPreciseLocation,
+  CITY_CENTROIDS,
 } from "@/services/geoRadiusService";
 import { getShopHoursSummary } from "@/lib/shopHours";
 import { requireVerifiedEmailSession } from "@/services/authService";
@@ -55,8 +56,16 @@ import {
   toPkWhatsAppDigits,
 } from "@/lib/phoneFormat";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { getPublicAppUrl } from "@/lib/appUrl";
 import { useToast } from "@/components/Toast";
+
+const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-52 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+  ),
+});
 
 /** Wrap an async call so a slow/never-resolving request can't hang the UI forever. */
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
@@ -472,7 +481,7 @@ export default function WhatsAppCheckoutModal({
 }: WhatsAppCheckoutModalProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const { location, isDetecting, detectLocationDetailed, seedLocation } = useLocation();
+  const { location, isDetecting, detectLocationDetailed, seedLocation, setManualPin } = useLocation();
   const { addToast } = useToast();
 
   // ── State ───────────────────────────────────────────────────────────────
@@ -514,6 +523,8 @@ export default function WhatsAppCheckoutModal({
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [locationFillError, setLocationFillError] = useState<string | null>(null);
   const [locationFillBusy, setLocationFillBusy] = useState(false);
+  const [checkoutMapOpen, setCheckoutMapOpen] = useState(false);
+  const [mapPinBusy, setMapPinBusy] = useState(false);
   // Portal only after mount so fixed overlay escapes transform ancestors (deals carousel).
   const [portalReady, setPortalReady] = useState(false);
 
@@ -922,12 +933,13 @@ export default function WhatsAppCheckoutModal({
     };
   }, [items, supabase]);
 
-  // Refresh GPS only when we have no saved delivery pin. A Home/Office pin is
-  // the doorstep the customer wants the rider to reach — silently swapping it
-  // for "wherever the phone is right now" is how wrong deliveries start.
+  // Refresh GPS only when we have no saved delivery pin AND permission is
+  // already granted. Never surprise-prompt on modal open — GPS / Pin on map
+  // buttons handle first-time Allow with a clear user gesture.
   useEffect(() => {
     if (shop.accepts_delivery === false) return;
     if (!profileLoaded) return;
+    if (typeof window === "undefined") return;
     const defaultPinned = savedAddresses.some(
       (a) =>
         a.is_default &&
@@ -937,11 +949,32 @@ export default function WhatsAppCheckoutModal({
         Number.isFinite(a.longitude),
     );
     if (defaultPinned) return;
-    void detectLocationDetailed()
-      .then((r) => {
+    if (isPreciseLocation(location)) return;
+
+    void (async () => {
+      if (navigator.permissions?.query) {
+        try {
+          const status = await navigator.permissions.query({ name: "geolocation" });
+          if (status.state !== "granted") {
+            setCheckoutMapOpen(true);
+            return;
+          }
+        } catch {
+          setCheckoutMapOpen(true);
+          return;
+        }
+      } else {
+        // No Permissions API (some Safari) — open map instead of auto-prompting.
+        setCheckoutMapOpen(true);
+        return;
+      }
+      try {
+        const r = await detectLocationDetailed();
         if (r.location?.coordinates) hasFreshGpsRef.current = true;
-      })
-      .catch(() => undefined);
+      } catch {
+        /* ignore */
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileLoaded, savedAddresses, shop.accepts_delivery]);
 
@@ -1181,6 +1214,56 @@ export default function WhatsAppCheckoutModal({
     }
   }, [detectLocationDetailed, formatLocationAddress]);
 
+  /** Map center for checkout pin — prefer live/saved coords, else shop city, else Gujranwala. */
+  const checkoutMapCenter = useMemo(() => {
+    if (location?.coordinates) {
+      return {
+        latitude: location.coordinates.latitude,
+        longitude: location.coordinates.longitude,
+      };
+    }
+    const shopCity = (shop.location || "").trim();
+    const cityHit = Object.keys(CITY_CENTROIDS).find(
+      (c) => shopCity.toLowerCase().includes(c.toLowerCase()),
+    );
+    if (cityHit) {
+      const c = CITY_CENTROIDS[cityHit];
+      return { latitude: c.lat, longitude: c.lng };
+    }
+    const fallback = CITY_CENTROIDS.Gujranwala;
+    return { latitude: fallback.lat, longitude: fallback.lng };
+  }, [location?.coordinates, shop.location]);
+
+  const handleCheckoutMapPin = useCallback(
+    async (lat: number, lng: number) => {
+      setMapPinBusy(true);
+      setLocationFillError(null);
+      try {
+        const loc = await setManualPin(lat, lng);
+        setSelectedAddressId(null);
+        hasFreshGpsRef.current = true;
+        const line = formatLocationAddress(loc);
+        if (line) {
+          setShipping((s) => ({
+            ...s,
+            shippingAddress: s.shippingAddress.trim() || line,
+          }));
+        }
+        setErrors((e) => {
+          if (!e.shippingAddress) return e;
+          const next = { ...e };
+          delete next.shippingAddress;
+          return next;
+        });
+      } catch {
+        setLocationFillError("Map pin save nahi hua. Dobara try karein.");
+      } finally {
+        setMapPinBusy(false);
+      }
+    },
+    [setManualPin, formatLocationAddress],
+  );
+
   // Cleanup timer
   useEffect(() => {
     return () => {
@@ -1230,16 +1313,18 @@ export default function WhatsAppCheckoutModal({
             } else {
               setLocationFillError(
                 locationErrorMessage(fresh.error) ||
-                  "Location is required for delivery. Turn on GPS and tap Use my precise location.",
+                  "Location is required for delivery. Use GPS or set your pin on the map.",
               );
               setLocationFillBusy(false);
+              setCheckoutMapOpen(true);
               return;
             }
           } catch {
             setLocationFillError(
-              "Location is required for delivery. Turn on GPS and tap Use my precise location.",
+              "Location is required for delivery. Use GPS or set your pin on the map.",
             );
             setLocationFillBusy(false);
+            setCheckoutMapOpen(true);
             return;
           }
           setLocationFillBusy(false);
@@ -1385,7 +1470,7 @@ export default function WhatsAppCheckoutModal({
           !Number.isFinite(pinLng)
         ) {
           throw new Error(
-            "Your live location is required so the rider can find you. Turn on GPS, tap Use my precise location, then try again.",
+            "Delivery pin required. Go back, tap GPS or Pin on map, then try again.",
           );
         }
       }
@@ -1678,11 +1763,14 @@ export default function WhatsAppCheckoutModal({
               {authGate === "login" && (
                 <>
                   <Link
-                    href="/login?redirect=/"
+                    href="/login?redirect=/cart"
                     className={`rounded-full ${accentBg} px-5 py-2.5 text-sm font-semibold text-white ${accentBgHover}`}
                     onClick={() => {
                       try {
                         sessionStorage.setItem("tm_resume_checkout", "1");
+                        if (shop.id) {
+                          sessionStorage.setItem("tm_resume_checkout_shop", shop.id);
+                        }
                       } catch {
                         /* ignore */
                       }
@@ -1692,11 +1780,14 @@ export default function WhatsAppCheckoutModal({
                     Sign in
                   </Link>
                   <Link
-                    href="/signup?redirect=/"
+                    href="/signup?redirect=/cart"
                     className="rounded-full border border-zinc-200 px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                     onClick={() => {
                       try {
                         sessionStorage.setItem("tm_resume_checkout", "1");
+                        if (shop.id) {
+                          sessionStorage.setItem("tm_resume_checkout_shop", shop.id);
+                        }
                       } catch {
                         /* ignore */
                       }
@@ -1713,6 +1804,9 @@ export default function WhatsAppCheckoutModal({
                   onClick={() => {
                     try {
                       sessionStorage.setItem("tm_resume_checkout", "1");
+                      if (shop.id) {
+                        sessionStorage.setItem("tm_resume_checkout_shop", shop.id);
+                      }
                     } catch {
                       /* ignore */
                     }
@@ -2217,24 +2311,59 @@ export default function WhatsAppCheckoutModal({
                     )}
                   </label>
                   {!isPickup && (
-                    <button
-                      type="button"
-                      onClick={handleUsePreciseLocation}
-                      disabled={locationFillBusy || isDetecting}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
-                    >
-                      {(locationFillBusy || isDetecting) ? (
-                        <>
-                          <SpinnerIcon /> Detecting…
-                        </>
-                      ) : (
-                        <>
-                          <MapPinIcon /> Use my precise location
-                        </>
-                      )}
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutMapOpen((v) => !v)}
+                        className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[0.65rem] font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                      >
+                        <MapPinIcon /> {checkoutMapOpen ? "Hide map" : "Pin on map"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleUsePreciseLocation}
+                        disabled={locationFillBusy || isDetecting}
+                        className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.65rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+                      >
+                        {(locationFillBusy || isDetecting) ? (
+                          <>
+                            <SpinnerIcon /> Detecting…
+                          </>
+                        ) : (
+                          <>
+                            <MapPinIcon /> GPS
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
+                {!isPickup && checkoutMapOpen && (
+                  <div className="mb-2 space-y-1.5">
+                    <LocationMiniMap
+                      latitude={checkoutMapCenter.latitude}
+                      longitude={checkoutMapCenter.longitude}
+                      onPick={(lat, lng) => void handleCheckoutMapPin(lat, lng)}
+                      mode="compact"
+                      heightClassName="h-52"
+                      resizeKey={checkoutMapOpen}
+                      gpsFix={
+                        location?.source === "gps" && location.coordinates
+                          ? {
+                              latitude: location.coordinates.latitude,
+                              longitude: location.coordinates.longitude,
+                              accuracyMeters: location.coordinates.accuracyMeters,
+                            }
+                          : null
+                      }
+                    />
+                    <p className="text-[0.65rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                      {mapPinBusy
+                        ? "Pin save ho raha hai…"
+                        : "Map par tap / drag karke exact ghar ka pin lagayein — rider isi Maps link se aayega."}
+                    </p>
+                  </div>
+                )}
                 {!isPickup && locationAccuracyHint && (
                   <p
                     className={`mb-1.5 text-[0.65rem] font-medium ${
@@ -2293,7 +2422,7 @@ export default function WhatsAppCheckoutModal({
                     )}
                     {!location?.coordinates && !locationFillError && (
                       <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                        Live location is required for delivery. Tap <strong>Use my precise location</strong> so the rider gets a Maps pin.
+                        Delivery pin zaroori hai. <strong>GPS</strong> dabayein ya <strong>Pin on map</strong> se exact location lagayein.
                       </p>
                     )}
                     {location?.coordinates && (
@@ -2413,7 +2542,7 @@ export default function WhatsAppCheckoutModal({
                       </p>
                     ) : (
                       <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                        ⚠️ Live location missing — go back and tap Use my precise location
+                        ⚠️ Delivery pin missing — go back and use GPS or Pin on map
                       </p>
                     )}
                   </>

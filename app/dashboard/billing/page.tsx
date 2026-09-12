@@ -24,6 +24,7 @@ import {
 } from "@/services/billingService";
 import { PLAN_COPY, DEFAULT_TOKEN_PACKS } from "@/lib/billing/plans";
 import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
+import { fetchMyShop } from "@/services/shopService";
 
 function MerchantBillingInner() {
   const router = useRouter();
@@ -75,16 +76,14 @@ function MerchantBillingInner() {
         router.replace("/auth");
         return;
       }
-      const { data: shop } = await supabase
-        .from("shops")
-        .select("id, name")
-        .eq("owner_id", data.user.id)
-        .maybeSingle();
+      const result = await fetchMyShop();
       if (cancelled) return;
-      if (shop) {
-        setShopId(shop.id as string);
-        setShopName((shop.name as string) || "");
-        await refresh(shop.id as string);
+      if (result.success && result.data) {
+        setShopId(result.data.id);
+        setShopName(result.data.name || "");
+        await refresh(result.data.id);
+      } else if (!result.success) {
+        addToast(result.error || "Could not load your store.", "error");
       }
       setLoading(false);
     })();

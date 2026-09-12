@@ -163,14 +163,20 @@ export default function CartBar() {
     };
   }, []);
 
-  // After login/verify — reopen first shop checkout if cart still has items
+  // After login/verify — reopen the same shop checkout if cart still has items
   useEffect(() => {
     if (totalItems === 0 || shopGroups.length === 0) return;
     try {
       if (sessionStorage.getItem("tm_resume_checkout") === "1") {
         sessionStorage.removeItem("tm_resume_checkout");
+        const preferredShopId = sessionStorage.getItem("tm_resume_checkout_shop");
+        sessionStorage.removeItem("tm_resume_checkout_shop");
+        const preferred =
+          preferredShopId
+            ? shopGroups.find((g) => g.shopId === preferredShopId)
+            : undefined;
         setExpanded(true);
-        setCheckoutShop(shopGroups[0]!);
+        setCheckoutShop(preferred ?? shopGroups[0]!);
       }
     } catch {
       /* ignore */

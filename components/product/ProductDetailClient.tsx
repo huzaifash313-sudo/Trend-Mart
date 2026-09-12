@@ -9,7 +9,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MarketplaceProduct, Product, Shop } from "@/types";
-import { fetchProductByReference } from "@/services/productService";
+import { fetchProductByReference, fetchRelatedMarketplaceProducts } from "@/services/productService";
 import { fetchShopById } from "@/services/shopService";
 import { fetchProductReviewContext, type ProductReviewContext } from "@/services/reviewService";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
@@ -17,9 +17,11 @@ import { getProductImages } from "@/lib/productImages";
 import { hasPriceTiers, priceForQuantity, tierPreviewLabels } from "@/lib/priceTiers";
 import { getSafeImageUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import ProductOrderModal from "@/components/ProductOrderModal";
 import ProductRatingModal from "@/components/ProductRatingModal";
+import RelatedItemsRail, { type RelatedRailItem } from "@/components/RelatedItemsRail";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { computeVariantPricing, customerVariantGroups } from "@/lib/variantPricing";
 import { isComboUnavailable } from "@/lib/variantMatrix";
@@ -83,7 +85,14 @@ function stubShopFromProduct(p: MarketplaceProduct): Shop {
   } as Shop;
 }
 
-export default function ProductDetailClient({ code }: { code: string }) {
+export default function ProductDetailClient({
+  code,
+  suppressHeading = false,
+}: {
+  code: string;
+  /** When true, parent already rendered an SSR <h1> for crawlers. */
+  suppressHeading?: boolean;
+}) {
   const router = useRouter();
   const { addItem, items: cartItems, updateQuantity, removeItem } = useCart();
   const { addToast } = useToast();
@@ -102,6 +111,7 @@ export default function ProductDetailClient({ code }: { code: string }) {
   const [orderOpen, setOrderOpen] = useState(false);
   const [ratingOpen, setRatingOpen] = useState(false);
   const [ratingCtx, setRatingCtx] = useState<ProductReviewContext | null>(null);
+  const [related, setRelated] = useState<RelatedRailItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +119,7 @@ export default function ProductDetailClient({ code }: { code: string }) {
     setError(null);
     setProduct(null);
     setShop(null);
+    setRelated([]);
     setActiveIndex(0);
     setBroken(new Set());
     setSelectedVariants([]);
@@ -134,6 +145,25 @@ export default function ProductDetailClient({ code }: { code: string }) {
       setProduct(res.data);
       void fetchProductReviewContext(res.data.id).then((ctx) => {
         if (!cancelled) setRatingCtx(ctx);
+      });
+      void fetchRelatedMarketplaceProducts({
+        shopId: res.data.shop_id,
+        excludeId: res.data.id,
+        categoryId: res.data.category_id,
+        subCategoryId: res.data.sub_category_id,
+        limit: 8,
+      }).then((rel) => {
+        if (cancelled || !rel.success) return;
+        setRelated(
+          rel.data.map((p) => ({
+            id: p.id,
+            href: getProductSeoPath(p.name, p.short_code, p.id),
+            title: p.name,
+            price: p.price,
+            originalPrice: p.original_price ?? p.compare_at_price ?? null,
+            imageUrl: p.image_url,
+          })),
+        );
       });
 
       const shopRes = await fetchShopById(res.data.shop_id);
@@ -409,9 +439,15 @@ export default function ProductDetailClient({ code }: { code: string }) {
 
         <div className="space-y-2.5 p-4">
           <div>
-            <h1 className="text-lg font-bold leading-snug text-zinc-900 dark:text-zinc-100">
-              {product.name}
-            </h1>
+            {suppressHeading ? (
+              <p className="text-lg font-bold leading-snug text-zinc-900 dark:text-zinc-100">
+                {product.name}
+              </p>
+            ) : (
+              <h1 className="text-lg font-bold leading-snug text-zinc-900 dark:text-zinc-100">
+                {product.name}
+              </h1>
+            )}
             <div className="mt-1.5">
               <CompactRating
                 average={
@@ -605,6 +641,8 @@ export default function ProductDetailClient({ code }: { code: string }) {
           </p>
         </div>
       </div>
+
+      <RelatedItemsRail title="More from this shop" items={related} />
 
       {ratingOpen && product && (
         <ProductRatingModal

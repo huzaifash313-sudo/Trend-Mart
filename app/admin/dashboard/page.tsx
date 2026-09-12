@@ -176,7 +176,15 @@ export default function AdminDashboardPage() {
   const [filterCategory, setFilterCategory] = useState<string>("All");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    text: string;
+    tone: "success" | "error";
+  } | null>(null);
+
+  const flashAction = useCallback((text: string, tone: "success" | "error" = "success") => {
+    setActionMessage({ text, tone });
+    window.setTimeout(() => setActionMessage(null), tone === "error" ? 4000 : 3000);
+  }, []);
 
   // ─── Category Taxonomy Management ──────────────────────────────────────
   const [subCategories, setSubCategories] = useState<Record<string, SubCategoryWithMeta[]>>({});
@@ -211,10 +219,20 @@ export default function AdminDashboardPage() {
   // ─── User moderation ───────────────────────────────────────────────
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [usersSearchInput, setUsersSearchInput] = useState("");
   const [usersSearch, setUsersSearch] = useState("");
   const [usersRoleFilter, setUsersRoleFilter] = useState<string>("all");
   const [bannedOnly, setBannedOnly] = useState(false);
   const [banProcessingId, setBanProcessingId] = useState<string | null>(null);
+  const [metricsNote, setMetricsNote] = useState<string | null>(null);
+  const [ordersCapNote] = useState(
+    "Orders tab shows the latest 500 platform orders.",
+  );
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setUsersSearch(usersSearchInput), 350);
+    return () => window.clearTimeout(t);
+  }, [usersSearchInput]);
 
   // ─── Fetch All Data ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -223,22 +241,46 @@ export default function AdminDashboardPage() {
       setState((s) => ({ ...s, loading: true, error: null }));
 
       try {
-        // Fetch all shops with aggregated data
-        const { data: shops, error: shopsErr } = await supabase
-          .from("shops")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const PAGE = 1000;
+        const MAX_ORDER_ROWS = 20000;
+        const MAX_PRODUCT_ROWS = 20000;
 
-        if (shopsErr) throw shopsErr;
+        // Paginate shops (PostgREST default max ~1000 per request).
+        const allShopsArr: Record<string, unknown>[] = [];
+        for (let from = 0; ; from += PAGE) {
+          const { data, error: shopsErr } = await supabase
+            .from("shops")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .range(from, from + PAGE - 1);
+          if (shopsErr) throw shopsErr;
+          const batch = (data as Record<string, unknown>[]) ?? [];
+          allShopsArr.push(...batch);
+          if (batch.length < PAGE) break;
+        }
 
-        // Full order dataset (unlimited) — powers per-shop stats and the
-        // platform totals so metrics never silently undercount as the
-        // platform grows past 500 orders.
-        const { data: orderCountsRaw, error: countsErr } = await supabase
-          .from("orders")
-          .select("shop_id, total_amount, status, created_at");
-
-        if (countsErr) throw countsErr;
+        // Paginate order rows for platform/merchant metrics (honest totals).
+        const allCountsArr: Record<string, unknown>[] = [];
+        let ordersCapped = false;
+        for (let from = 0; from < MAX_ORDER_ROWS; from += PAGE) {
+          const { data, error: countsErr } = await supabase
+            .from("orders")
+            .select("shop_id, total_amount, status, created_at")
+            .order("created_at", { ascending: false })
+            .range(from, from + PAGE - 1);
+          if (countsErr) throw countsErr;
+          const batch = (data as Record<string, unknown>[]) ?? [];
+          allCountsArr.push(...batch);
+          if (batch.length < PAGE) break;
+          if (from + PAGE >= MAX_ORDER_ROWS && batch.length === PAGE) {
+            ordersCapped = true;
+          }
+        }
+        setMetricsNote(
+          ordersCapped
+            ? `Metrics include the latest ${MAX_ORDER_ROWS.toLocaleString()} orders (soft-launch safety cap).`
+            : null,
+        );
 
         // Recent-order snapshot — powers the Orders tab and backfills the
         // realtime feed so it isn't empty on first load.
@@ -271,23 +313,25 @@ export default function AdminDashboardPage() {
         if (recentOrdersErr) throw recentOrdersErr;
         const recentOrders = recentOrdersData ?? [];
 
-        // Product counts per shop — populates the merchant table column that
-        // was previously hardcoded to 0.
-        const { data: productRows, error: productsErr } = await supabase
-          .from("products")
-          .select("shop_id");
-        if (productsErr) throw productsErr;
+        // Product counts per shop — paginated so we don't silently undercount.
         const productCountByShop = new Map<string, number>();
-        for (const p of (productRows as Record<string, unknown>[]) ?? []) {
-          const sid = p.shop_id as string;
-          if (sid) {
-            productCountByShop.set(sid, (productCountByShop.get(sid) ?? 0) + 1);
+        for (let from = 0; from < MAX_PRODUCT_ROWS; from += PAGE) {
+          const { data: productRows, error: productsErr } = await supabase
+            .from("products")
+            .select("shop_id")
+            .range(from, from + PAGE - 1);
+          if (productsErr) throw productsErr;
+          const batch = (productRows as Record<string, unknown>[]) ?? [];
+          for (const p of batch) {
+            const sid = p.shop_id as string;
+            if (sid) {
+              productCountByShop.set(sid, (productCountByShop.get(sid) ?? 0) + 1);
+            }
           }
+          if (batch.length < PAGE) break;
         }
 
         // Aggregate
-        const allShopsArr = (shops as Record<string, unknown>[]) ?? [];
-        const allCountsArr = (orderCountsRaw as Record<string, unknown>[]) ?? [];
 
         // Build order stats by shop
         const shopOrderMap = new Map<
@@ -489,11 +533,14 @@ export default function AdminDashboardPage() {
     const result = await reviewAd(adId, decision, reason);
     if (result.success) {
       await loadAds();
-      setActionMessage(decision === "approved" ? "Ad approved — now live on the homepage." : "Ad rejected.");
+      flashAction(
+        decision === "approved"
+          ? "Ad approved — now live on the homepage."
+          : "Ad rejected.",
+      );
     } else {
-      setActionMessage(result.error);
+      flashAction(result.error, "error");
     }
-    setTimeout(() => setActionMessage(null), 3000);
     setAdProcessingId(null);
   }
 
@@ -502,6 +549,9 @@ export default function AdminDashboardPage() {
     const result = await setAdActiveService(ad.id, !ad.is_active);
     if (result.success) {
       setAds((prev) => prev.map((a) => (a.id === ad.id ? { ...a, is_active: !ad.is_active } : a)));
+      flashAction(ad.is_active ? "Ad paused." : "Ad activated.");
+    } else {
+      flashAction(result.error || "Could not update ad.", "error");
     }
     setAdProcessingId(null);
   }
@@ -512,6 +562,9 @@ export default function AdminDashboardPage() {
     const result = await deleteAdService(adId);
     if (result.success) {
       setAds((prev) => prev.filter((a) => a.id !== adId));
+      flashAction("Ad deleted.");
+    } else {
+      flashAction(result.error || "Could not delete ad.", "error");
     }
     setAdProcessingId(null);
   }
@@ -529,8 +582,7 @@ export default function AdminDashboardPage() {
       setPlatformAdForm(EMPTY_AD_FORM);
       setShowPlatformAdForm(false);
       await loadAds();
-      setActionMessage("Platform ad created and published.");
-      setTimeout(() => setActionMessage(null), 3000);
+      flashAction("Platform ad created and published.");
     } else {
       setPlatformAdError(result.error);
     }
@@ -569,11 +621,11 @@ export default function AdminDashboardPage() {
 
   async function toggleMerchantStatus(shopId: string, currentLive: boolean) {
     setProcessingId(shopId);
-    setActionMessage(null);
     try {
       const { error } = await supabase
         .from("shops")
-        .update({ is_live: !currentLive })
+        .update({
+          is_live: !currentLive })
         .eq("id", shopId);
 
       if (error) throw error;
@@ -618,12 +670,11 @@ export default function AdminDashboardPage() {
           : null,
       }));
 
-      setActionMessage(
+      flashAction(
         currentLive
           ? "Merchant suspended successfully."
-          : "Merchant verified & activated.",
+          : "Merchant store set live again.",
       );
-      setTimeout(() => setActionMessage(null), 3000);
 
       // Security trail: record the suspend/activate action.
       void logAuditEventWithContext({
@@ -639,8 +690,7 @@ export default function AdminDashboardPage() {
       });
     } catch (err) {
       logError(err, { module: "AdminDashboard.toggleStatus" });
-      setActionMessage("Action failed. Please try again.");
-      setTimeout(() => setActionMessage(null), 4000);
+      flashAction("Action failed. Please try again.", "error");
     } finally {
       setProcessingId(null);
     }
@@ -648,7 +698,6 @@ export default function AdminDashboardPage() {
 
   async function reviewShop(shopId: string, decision: "approved" | "rejected") {
     setProcessingId(shopId);
-    setActionMessage(null);
     try {
       const { error } = await supabase
         .from("shops")
@@ -705,12 +754,11 @@ export default function AdminDashboardPage() {
           : null,
       }));
 
-      setActionMessage(
+      flashAction(
         decision === "approved"
           ? "Store approved — now live on the marketplace."
           : "Store rejected. It will remain hidden from customers.",
       );
-      setTimeout(() => setActionMessage(null), 3000);
 
       // Security trail: record the approval/rejection decision.
       void logAuditEventWithContext({
@@ -728,8 +776,7 @@ export default function AdminDashboardPage() {
       });
     } catch (err) {
       logError(err, { module: "AdminDashboard.reviewShop" });
-      setActionMessage("Action failed. Please try again.");
-      setTimeout(() => setActionMessage(null), 4000);
+      flashAction("Action failed. Please try again.", "error");
     } finally {
       setProcessingId(null);
     }
@@ -752,7 +799,6 @@ export default function AdminDashboardPage() {
     }
 
     setProcessingId(shopId);
-    setActionMessage(null);
     try {
       const result = await deleteShop(shopId);
       if (!result.success) throw new Error(result.error);
@@ -787,8 +833,7 @@ export default function AdminDashboardPage() {
           : null,
       }));
 
-      setActionMessage("Merchant deleted permanently.");
-      setTimeout(() => setActionMessage(null), 3000);
+      flashAction("Merchant deleted permanently.");
 
       // Security trail: merchant deletion is the most destructive admin action.
       void logAuditEventWithContext({
@@ -802,8 +847,7 @@ export default function AdminDashboardPage() {
       });
     } catch (err) {
       logError(err, { module: "AdminDashboard.deleteMerchant" });
-      setActionMessage("Delete failed. Please try again.");
-      setTimeout(() => setActionMessage(null), 4000);
+      flashAction("Delete failed. Please try again.", "error");
     } finally {
       setProcessingId(null);
     }
@@ -890,7 +934,7 @@ export default function AdminDashboardPage() {
       bannedOnly: bannedOnly || undefined,
     });
     if (result.success) setUsers(result.data);
-    else setActionMessage(result.error);
+    else flashAction(result.error, "error");
     setUsersLoading(false);
   }, [usersSearch, usersRoleFilter, bannedOnly]);
 
@@ -905,7 +949,7 @@ export default function AdminDashboardPage() {
     const nextBanned = !user.is_banned;
     const ok = await confirm(
       nextBanned
-        ? `Ban ${user.full_name || user.email || "this user"}? They won't be able to sign in or place orders.`
+        ? `Ban ${user.full_name || user.email || "this user"}? Marks them banned for moderation (soft launch: full sign-in lockout not enforced yet).`
         : `Unban ${user.full_name || user.email || "this user"}?`,
     );
     if (!ok) {
@@ -917,8 +961,7 @@ export default function AdminDashboardPage() {
       setUsers((prev) =>
         prev.map((u) => (u.user_id === user.user_id ? { ...u, is_banned: nextBanned } : u)),
       );
-      setActionMessage(nextBanned ? "User banned." : "User unbanned.");
-      setTimeout(() => setActionMessage(null), 3000);
+      flashAction(nextBanned ? "User marked as banned." : "User unbanned.");
 
       // Security trail: user moderation actions.
       void logAuditEventWithContext({
@@ -931,8 +974,7 @@ export default function AdminDashboardPage() {
         severity: nextBanned ? "warning" : "info",
       });
     } else {
-      setActionMessage(result.error);
-      setTimeout(() => setActionMessage(null), 4000);
+      flashAction(result.error, "error");
     }
     setBanProcessingId(null);
   }
@@ -1017,12 +1059,12 @@ export default function AdminDashboardPage() {
             {actionMessage && (
               <div
                 className={`px-4 py-2 rounded-xl text-sm font-medium ${
-                  actionMessage.includes("success")
+                  actionMessage.tone === "success"
                     ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
                     : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
                 }`}
               >
-                {actionMessage}
+                {actionMessage.text}
               </div>
             )}
           </div>
@@ -1091,6 +1133,11 @@ export default function AdminDashboardPage() {
                 />
               </button>
             </div>
+            {metricsNote ? (
+              <p className="-mt-2 text-[0.65rem] text-zinc-400 dark:text-zinc-500">
+                {metricsNote}
+              </p>
+            ) : null}
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1658,8 +1705,8 @@ export default function AdminDashboardPage() {
               <input
                 type="text"
                 placeholder="Search name, phone, or user ID..."
-                value={usersSearch}
-                onChange={(e) => setUsersSearch(e.target.value)}
+                value={usersSearchInput}
+                onChange={(e) => setUsersSearchInput(e.target.value)}
                 className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm flex-grow max-w-xs"
               />
               <CustomSelect
@@ -1821,9 +1868,10 @@ export default function AdminDashboardPage() {
                 ]}
                 fullWidth={false}
               />
-              <span className="text-xs text-zinc-400 ml-auto">
+              <span className="text-xs text-zinc-400 ml-auto text-right">
                 {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
                 {orderPageCount > 1 ? ` · page ${safeOrdersPage}/${orderPageCount}` : ""}
+                <span className="mt-0.5 block text-[0.65rem] text-zinc-400">{ordersCapNote}</span>
               </span>
             </div>
 

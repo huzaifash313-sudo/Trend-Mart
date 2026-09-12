@@ -1,51 +1,79 @@
 "use client";
 
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Brand promo video (homepage)                                  */
+/*  TrendsMart — Brand promo (homepage)                                        */
 /*                                                                            */
-/*  Low-end / Save-Data / reduced-motion: skip the reel entirely (Daraz-smooth */
-/*  on 2 GB phones). Stronger devices: metadata preload + play only in view.  */
+/*  LCP strategy: always paint a lightweight poster first (priority Image).   */
+/*  The MP4 only attaches after idle + in-view so it never competes with      */
+/*  splash / first shop paint. Save-Data / 2G / reduced-motion skip video.    */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import { BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
+import Image from "next/image";
+import { BRAND_PROMO_POSTER, BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
 import { shouldSkipHeavyMedia } from "@/lib/mobilePerf";
 
 function BrandVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [skip, setSkip] = useState(false);
+  const [skipVideo, setSkipVideo] = useState(false);
   const [failed, setFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
-  const [armed, setArmed] = useState(false);
+  const [inView, setInView] = useState(false);
+  const [idleOk, setIdleOk] = useState(false);
 
   useEffect(() => {
     if (shouldSkipHeavyMedia()) {
-      setSkip(true);
+      setSkipVideo(true);
       return;
     }
-    // Defer source attach until the hero is near the viewport — avoids competing
-    // with splash + first shop paint on mid-range phones.
+    // Never start the reel until the browser is idle — protects mobile LCP.
+    let idleId = 0;
+    let timer = 0;
+    const armIdle = () => setIdleOk(true);
+    const ric = (
+      window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      }
+    ).requestIdleCallback;
+    if (typeof ric === "function") {
+      idleId = ric(armIdle, { timeout: 2800 });
+    } else {
+      timer = window.setTimeout(armIdle, 2200);
+    }
+    return () => {
+      if (idleId && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (skipVideo) return;
     const el = wrapRef.current;
     if (!el || typeof IntersectionObserver === "undefined") {
-      setArmed(true);
+      setInView(true);
       return;
     }
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          setArmed(true);
+          setInView(true);
           io.disconnect();
         }
       },
-      { rootMargin: "80px 0px", threshold: 0.01 },
+      { rootMargin: "120px 0px", threshold: 0.01 },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [skipVideo]);
+
+  const armed = !skipVideo && !failed && inView && idleOk;
 
   useEffect(() => {
-    if (skip || failed || !armed) return;
+    if (!armed || !videoReady) return;
     const el = wrapRef.current;
     const video = videoRef.current;
     if (!el || !video) return;
@@ -53,7 +81,7 @@ function BrandVideo() {
     const tryPlay = () => {
       if (document.hidden) return;
       video.play().catch(() => {
-        /* autoplay blocked — first frame still visible once ready */
+        /* autoplay blocked — poster stays visible */
       });
     };
 
@@ -70,22 +98,31 @@ function BrandVideo() {
       if (!document.hidden) tryPlay();
     };
     document.addEventListener("visibilitychange", onVis);
+    tryPlay();
 
     return () => {
       io.disconnect();
       document.removeEventListener("visibilitychange", onVis);
       video.pause();
     };
-  }, [skip, failed, armed, videoReady]);
-
-  if (skip || failed) return null;
+  }, [armed, videoReady]);
 
   return (
     <div
       ref={wrapRef}
-      className={`tm-brand-video${videoReady ? " is-ready" : " is-loading"}`}
-      aria-busy={!videoReady && armed}
+      className={`tm-brand-video is-ready${videoReady ? " tm-brand-video--playing" : ""}`}
+      aria-busy={armed && !videoReady}
     >
+      {/* Poster is the LCP candidate — always present, never waits on MP4. */}
+      <Image
+        src={BRAND_PROMO_POSTER}
+        alt="TrendsMart — local shopping across Pakistan"
+        fill
+        priority
+        fetchPriority="high"
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 72rem"
+        className={`tm-brand-video-poster${videoReady ? " is-hidden" : ""}`}
+      />
       {armed ? (
         <video
           ref={videoRef}
@@ -95,7 +132,7 @@ function BrandVideo() {
           loop
           playsInline
           autoPlay
-          preload="metadata"
+          preload="none"
           aria-label="TrendsMart brand promo"
           onLoadedData={() => setVideoReady(true)}
           onCanPlay={() => setVideoReady(true)}

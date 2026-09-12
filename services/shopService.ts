@@ -318,6 +318,36 @@ export async function fetchShops(opts?: {
 }
 
 /**
+ * Lightweight geo rows for exact shop IDs (deals/products nearby).
+ * Does not depend on the capped public marketplace shop list.
+ */
+export async function fetchShopsGeoByIds(
+  shopIds: string[],
+): Promise<ServiceResult<Shop[]>> {
+  const unique = [...new Set(shopIds.filter(Boolean))].slice(0, 150);
+  if (!unique.length) return { success: true, data: [] };
+
+  const supabase = createClient();
+  try {
+    const { data, error } = await supabase
+      .from("shops")
+      .select(
+        "id, name, category, location, whatsapp_number, latitude, longitude, service_radius_km, delivery_zones, is_live, verification_status, logo_url, slug",
+      )
+      .in("id", unique);
+
+    if (error) throw error;
+    return { success: true, data: (data as unknown as Shop[]) ?? [] };
+  } catch (err) {
+    logError(err, {
+      module: "shopService.fetchShopsGeoByIds",
+      meta: { count: unique.length },
+    });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
  * Fetch a single shop by its UUID, including all of its products.
  */
 export async function fetchShopById(

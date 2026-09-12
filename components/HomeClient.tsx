@@ -29,6 +29,7 @@ import {
   filterShopsByProximity,
   filterStoriesByCoverage,
   getCustomerArea,
+  haversineDistance,
 } from "@/services/geoRadiusService";
 import type { ShopWithDistance } from "@/services/geoRadiusService";
 import { useLocation } from "@/context/LocationContext";
@@ -38,7 +39,7 @@ import { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { type Coupon } from "@/services/couponService";
 import { type ShopDeal } from "@/lib/dealSchedule";
 import { dealCommerceId } from "@/lib/dealCommerce";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useShopsInfinite, useStories, useDeals, useShopCoupons, useMyShop, useFavorites, queryKeys } from "@/lib/queries";
 import { useConnection } from "@/lib/connection";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE } from "@/lib/fuzzySearch";
@@ -50,10 +51,13 @@ import LazyMount from "@/components/LazyMount";
 import { ShopCardGridSkeleton } from "@/components/Skeletons";
 import {
   PUBLIC_SHOP_PAGE_SIZE,
+  GEO_SHOP_CANDIDATE_LIMIT,
   getFeedSentinelRootMargin,
   getLazyMountRootMargin,
   shouldSkipHeavyMedia,
 } from "@/lib/mobilePerf";
+import { fetchShops } from "@/services/shopService";
+import { sortWithNearbyBoost } from "@/lib/nearbyBoost";
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
 });
@@ -288,14 +292,16 @@ function MyStoryRingButton({
             aria-label="Add your store story"
             title="Add your store story"
           >
-            <span className="tm-story-ring tm-story-ring--add">
+            <span className="tm-story-ring tm-story-ring--add" aria-hidden="true">
               <span className="tm-story-ring-avatar">
                 <svg
                   className="tm-story-add-icon"
                   viewBox="0 0 24 24"
+                  width="19"
+                  height="19"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.4"
+                  strokeWidth="2.6"
                   strokeLinecap="round"
                   aria-hidden="true"
                 >
@@ -538,6 +544,13 @@ function HomeClient({
   const stories = useMemo(() => {
     void storiesVersion; // re-sort when a story gets marked as seen
     let base = sortStoriesUnseenFirst(storiesQuery.data ?? EMPTY_STORIES, viewedStoryIds);
+    // Hide offline / unapproved shop stories (null join = keep for legacy rows).
+    base = base.filter(
+      (s) =>
+        s.shop_is_live !== false &&
+        (s.shop_verification_status == null ||
+          s.shop_verification_status === "approved"),
+    );
     if (myShopId) base = base.filter((s) => s.shop_id !== myShopId);
     if (!geoVisibleShopIds) return base;
     return base.filter((s) => geoVisibleShopIds.has(s.shop_id));
@@ -659,8 +672,26 @@ function HomeClient({
   const [geoFilter, setGeoFilter] = useState<GeoFilterState>({
     coordinates: null,
     maxDistanceKm: 0,
-    locationAvailable: false,
-    scope: "radius",
+    locationAvailable: true,
+    scope: "pakistan",
+  });
+
+  const needsGeoCandidates =
+    geoFilter.scope !== "pakistan" &&
+    Boolean(geoFilter.coordinates ?? globalCoords);
+
+  const geoCandidatesQuery = useQuery({
+    queryKey: ["shops-geo-candidates", GEO_SHOP_CANDIDATE_LIMIT] as const,
+    queryFn: async () => {
+      const res = await fetchShops({
+        publicOnly: true,
+        limit: GEO_SHOP_CANDIDATE_LIMIT,
+      });
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: needsGeoCandidates,
+    staleTime: 60_000,
   });
 
   /* Invalidate cached queries when merchants publish/update in other tabs. */
@@ -695,6 +726,14 @@ function HomeClient({
     ).map((r) => r.item);
   }, [shops, searchQuery, activeCategory]);
 
+  const geoCandidateShops = useMemo(() => {
+    const pool = geoCandidatesQuery.data ?? shops;
+    const base = myShopId ? pool.filter((s) => s.id !== myShopId) : pool;
+    return base.filter(
+      (shop) => activeCategory === "All" || shop.category === activeCategory,
+    );
+  }, [geoCandidatesQuery.data, shops, myShopId, activeCategory]);
+
   /* Geo filter — Near me (range) / This city / All Pakistan */
   useEffect(() => {
     let cancelled = false;
@@ -710,23 +749,21 @@ function HomeClient({
           return;
         }
 
-        // Radius mode needs a pin — never fall back to the full unfiltered list
-        // (that silently bypassed the customer's "Near me" choice).
+        // Radius / city without a usable pin: keep browsing (don't blank the grid).
+        // User can still tap GPS / Area to enable Nearest properly.
         if (scope === "radius" && !coords) {
-          setProximityActive(true);
+          setProximityActive(false);
           setGeoFilteredShops([]);
           return;
         }
-
-        // City mode without a city/pin also stays empty until location is set.
         if (scope === "city" && !coords && !globalLocation?.city) {
-          setProximityActive(true);
+          setProximityActive(false);
           setGeoFilteredShops([]);
           return;
         }
 
         try {
-          const result = await filterShopsByProximity(filteredShops, {
+          const result = await filterShopsByProximity(geoCandidateShops, {
             coordinates: coords,
             maxDistanceKm: scope === "radius" ? geoFilter.maxDistanceKm : 0,
             enforceServiceRadius: true,
@@ -737,13 +774,24 @@ function HomeClient({
             customerArea: getCustomerArea(globalLocation),
           });
           if (!cancelled) {
-            setGeoFilteredShops(result.shops);
+            // Apply search on the geo-ranked candidate pool
+            const q = searchQuery.trim();
+            const ranked = q
+              ? fuzzyFilterAndRank(
+                  result.shops,
+                  q,
+                  (shop) => [shop.name, shop.category, shop.location, shop.store_bio],
+                  { minScore: FUZZY_MIN_SCORE, weights: [1, 0.7, 0.55, 0.45] },
+                ).map((r) => r.item)
+              : result.shops;
+            setGeoFilteredShops(ranked as ShopWithDistance[]);
             setProximityActive(true);
           }
         } catch {
           if (!cancelled) {
+            // Keep last list; stay proximityActive so UI doesn't silently show all.
             setGeoFilteredShops([]);
-            setProximityActive(false);
+            setProximityActive(true);
           }
         }
       }
@@ -754,7 +802,13 @@ function HomeClient({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [filteredShops, geoFilter, globalCoords, globalLocation]);
+  }, [
+    geoCandidateShops,
+    geoFilter,
+    globalCoords,
+    globalLocation,
+    searchQuery,
+  ]);
 
   /* Hyper-local story gating: only shops whose delivery coverage includes the
      customer appear in the story tray — driven by the customer's saved location,
@@ -783,17 +837,51 @@ function HomeClient({
     storiesQuery.data,
   ]);
 
-  const displayShops = proximityActive ? geoFilteredShops : filteredShops;
+  const displayShops = useMemo(() => {
+    const base = proximityActive ? geoFilteredShops : filteredShops;
+    const coords = geoFilter.coordinates ?? globalCoords ?? null;
+
+    // All Pakistan (or any list without hard geo filter): still annotate + soft-boost
+    // nearby so Islamabad top-rated doesn't bury Gujranwala shops for a local user.
+    if (!proximityActive && coords) {
+      const annotated = base.map((shop) => {
+        const existing = (shop as ShopWithDistance).distance_km;
+        if (existing != null && Number.isFinite(existing)) {
+          return shop as ShopWithDistance;
+        }
+        const lat = shop.latitude;
+        const lng = shop.longitude;
+        const dist =
+          typeof lat === "number" &&
+          typeof lng === "number" &&
+          Number.isFinite(lat) &&
+          Number.isFinite(lng)
+            ? haversineDistance(coords.latitude, coords.longitude, lat, lng)
+            : null;
+        return { ...shop, distance_km: dist } as ShopWithDistance;
+      });
+      return sortWithNearbyBoost(annotated, (s) => s.distance_km ?? null);
+    }
+    return base;
+  }, [
+    proximityActive,
+    geoFilteredShops,
+    filteredShops,
+    geoFilter.coordinates,
+    globalCoords,
+  ]);
+
   const needsLocationForGeo =
     proximityActive &&
     displayShops.length === 0 &&
     ((geoFilter.scope === "radius" && !(globalCoords || geoFilter.coordinates)) ||
       (geoFilter.scope === "city" && !globalCoords && !globalLocation?.city));
-  const showProximityBadges =
-    proximityActive &&
-    (geoFilter.scope === "radius"
-      ? !!globalCoords || !!geoFilter.coordinates
-      : geoFilter.scope === "city" || geoFilter.scope === "pakistan");
+
+  // Show km badge whenever we know the customer's pin (not only in Nearest mode).
+  const showProximityBadges = Boolean(
+    (geoFilter.coordinates ?? globalCoords) &&
+      displayShops.some((s) => (s as ShopWithDistance).distance_km != null),
+  );
   const handleCategoryChange = useCallback((category: ShopCategory) => {
     setActiveCategory(category);
     const params = new URLSearchParams();
@@ -851,11 +939,14 @@ function HomeClient({
   );
 
   /* Auto-load the next page of shops when the sentinel scrolls into view —
-     infinite marketplace scroll instead of clicking "Show more". */
+     infinite marketplace scroll instead of clicking "Show more".
+     Nearby / city mode uses a dedicated geo candidate pool — don't page the
+     alphabetical infinite list underneath. */
   const feedSentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = feedSentinelRef.current;
     if (!el) return;
+    if (proximityActive) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (
@@ -871,7 +962,7 @@ function HomeClient({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMoreShops, loadingMoreShops, offline, shopsQuery]);
+  }, [hasMoreShops, loadingMoreShops, offline, shopsQuery, proximityActive]);
 
   // Coupons from catalog pages (not geo-filtered visible set) so proximity
   // reorders don't churn the React Query key.
@@ -1294,7 +1385,7 @@ function HomeClient({
                   {/* Low-end: only the first two rails — shop grids stay (virtualized). */}
                   {(!lowEndFeed || ci < 2) && (
                     <LazyMount
-                      eager={ci === 0}
+                      eager={false}
                       minHeight={ci % 3 === 2 ? 120 : 200}
                       rootMargin={getLazyMountRootMargin()}
                     >
@@ -1310,11 +1401,11 @@ function HomeClient({
               ref={feedSentinelRef}
               className="tm-live-shops-sentinel flex min-h-[3rem] flex-col items-center justify-center gap-3"
             >
-              {loadingMoreShops ? (
+              {loadingMoreShops && !proximityActive ? (
                 <div className="w-full" aria-busy="true" aria-label="Loading more shops">
                   <ShopCardGridSkeleton count={4} />
                 </div>
-              ) : hasMoreShops ? (
+              ) : hasMoreShops && !proximityActive ? (
                 <button
                   type="button"
                   onClick={() => void shopsQuery.fetchNextPage()}

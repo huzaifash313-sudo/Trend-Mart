@@ -24,7 +24,7 @@ const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] 
   {
     heading: "Sell on TrendsMart",
     links: [
-      { href: "/dashboard", label: "Merchant Dashboard" },
+      { href: "/account/become-merchant", label: "Open a Store" },
       { href: "/faq#merchant", label: "New Merchant Guide" },
       { href: "/legal/merchant-guidelines", label: "Merchant Security Guidelines" },
     ],
@@ -84,7 +84,7 @@ export default function Footer() {
           TrendsMart
         </Link>
         <p className="mt-1.5 max-w-sm text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-          Your neighborhood, delivered. Local shops via WhatsApp.
+          TrendsMart — local shopping across Pakistan. Nearby shops, WhatsApp orders.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">
@@ -133,7 +133,7 @@ export default function Footer() {
               TrendsMart
             </Link>
             <p className="mt-2 max-w-[16rem] text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              Your neighborhood, delivered. Discover local shops and order directly via WhatsApp.
+              TrendsMart — local shopping across Pakistan. Discover nearby shops and order via WhatsApp.
             </p>
           </div>
           {FOOTER_LINKS.map((group) => (

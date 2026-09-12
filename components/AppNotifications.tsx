@@ -17,6 +17,7 @@ import {
 import ChatIncomingBanner from "@/components/ChatIncomingBanner";
 import { isViewingConversation } from "@/lib/activeChat";
 import { isChatNotification } from "@/lib/chatNotifications";
+import PermissionNudge from "@/components/PermissionNudge";
 
 function BrowserNotifyBridge() {
   const { notifications, isMuted } = useNotifications();
@@ -211,9 +212,15 @@ function AutoSubscribeWebPush() {
       void trySync();
     });
 
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void trySync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
@@ -279,6 +286,7 @@ function NotificationChrome() {
       <BrowserNotifyBridge />
       <AutoRegisterUserNotifications />
       <AutoSubscribeWebPush />
+      <PermissionNudge />
       <ChatIncomingBanner />
       <NotificationPanel isOpen={isPanelOpen} onClose={closePanel} />
     </>

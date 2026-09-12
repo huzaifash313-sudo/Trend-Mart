@@ -10,15 +10,15 @@
 /*  settings, finances, ads…) is one tap away.                                 */
 /* -------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { scopedKey } from "@/lib/clientScope";
 import type { Shop, Order, AnalyticsSummary, Product } from "@/types";
 import { isShopPubliclyVisible, isDineInCategory } from "@/types";
 import type { ShopDeal } from "@/lib/dealSchedule";
-import { fetchMyShops } from "@/services/shopService";
+import { fetchMyShop } from "@/services/shopService";
+import { getShopPath } from "@/lib/shopSlug";
 import { fetchProductsByShopId } from "@/services/productService";
 import { fetchDealsByShopId } from "@/services/dealService";
 import { fetchOrdersByShopId } from "@/services/orderService";
@@ -28,7 +28,6 @@ import { formatRupees } from "@/lib/formatters";
 import { getProductImages, getDealImages } from "@/lib/productImages";
 import { getSafeImageUrl } from "@/services/storageService";
 import { useToast } from "@/components/Toast";
-import CustomSelect from "@/components/CustomSelect";
 import { isPaidFeaturesEnabled } from "@/lib/softLaunch";
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
@@ -169,6 +168,16 @@ export default function DashboardOverviewPage() {
 
   const activeShop = shops.find((s) => s.id === activeShopId) ?? null;
 
+  /* Soft notice when a non-admin was bounced from /admin */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("notice") !== "admin_only") return;
+    addToast("Admin panel is only available to Super-Admins.", "info");
+    url.searchParams.delete("notice");
+    window.history.replaceState({}, "", url.pathname + (url.search || ""));
+  }, [addToast]);
+
   /* Auth check */
   useEffect(() => {
     let cancelled = false;
@@ -187,34 +196,30 @@ export default function DashboardOverviewPage() {
     };
   }, [supabase.auth, router]);
 
-  /* Load shops */
+  /* Load the merchant's single shop (one store per account). */
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    const loadShops = async () => {
-      const result = await fetchMyShops();
+    const loadShop = async () => {
+      const result = await fetchMyShop();
       if (cancelled) return;
       if (result.success) {
-        setShops(result.data);
-        setActiveShopId((current) => {
-          if (result.data.length === 0) return null;
-          const saved =
-            typeof window !== "undefined"
-              ? localStorage.getItem(scopedKey("trendsmart_active_shop"))
-              : null;
-          const match = saved ? result.data.find((s) => s.id === saved) : null;
-          if (current && result.data.some((s) => s.id === current)) return current;
-          return match?.id ?? result.data[0].id;
-        });
+        if (result.data) {
+          setShops([result.data]);
+          setActiveShopId(result.data.id);
+        } else {
+          setShops([]);
+          setActiveShopId(null);
+        }
       } else {
-        addToast(result.error ?? "Could not load your shops.", "error");
+        addToast(result.error ?? "Could not load your store.", "error");
       }
       setShopsLoaded(true);
     };
     setShopsLoaded(false);
-    void loadShops();
+    void loadShop();
     const onShopsUpdated = () => {
-      void loadShops();
+      void loadShop();
     };
     window.addEventListener("trendsmart:shops-updated", onShopsUpdated);
     return () => {
@@ -243,15 +248,18 @@ export default function DashboardOverviewPage() {
         ]);
       if (cancelled) return;
       if (productResult.success) setProducts(productResult.data);
+      else addToast(productResult.error || "Could not load products.", "error");
       if (dealResult.success) setDeals(dealResult.data);
+      else addToast(dealResult.error || "Could not load deals.", "error");
       if (orderResult.success) setOrders(orderResult.data);
+      else addToast(orderResult.error || "Could not load orders.", "error");
       if (analyticsResult.success) setAnalytics(analyticsResult.data);
       setShopDataReady(true);
     })();
     return () => {
       cancelled = true;
     };
-      }, [activeShopId]);
+  }, [activeShopId, addToast]);
 
   /* Live order board on the overview — pending count updates without refresh. */
   useEffect(() => {
@@ -273,13 +281,6 @@ export default function DashboardOverviewPage() {
       unsub?.();
     };
   }, [activeShopId]);
-
-  const selectShop = useCallback((id: string) => {
-    setActiveShopId(id);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(scopedKey("trendsmart_active_shop"), id);
-    }
-  }, []);
 
   /* Derived KPIs */
   const pendingOrders = useMemo(
@@ -308,7 +309,7 @@ export default function DashboardOverviewPage() {
     [deals],
   );
 
-  const storefrontUrl = activeShop ? `/shop/${activeShop.id}` : "#";
+  const storefrontUrl = activeShop ? getShopPath(activeShop) : "#";
 
   const quickActions = useMemo<QuickAction[]>(() => {
     if (!activeShop) return [];
@@ -480,17 +481,6 @@ export default function DashboardOverviewPage() {
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {shops.length > 1 && (
-              <CustomSelect
-                value={activeShopId ?? ""}
-                onChange={selectShop}
-                options={shops.map((s) => ({ value: s.id, label: s.name }))}
-                ariaLabel="Switch shop"
-                pill
-                size="sm"
-                fullWidth={false}
-              />
-            )}
             {activeShop && (
               <Link
                 href={storefrontUrl}
@@ -530,7 +520,7 @@ export default function DashboardOverviewPage() {
                     {isShopPubliclyVisible(activeShop)
                       ? "Your store is live and discoverable"
                       : (activeShop.verification_status ?? "approved") === "pending"
-                        ? "Pending admin approval"
+                        ? "Store visibility under review"
                         : (activeShop.verification_status ?? "approved") === "rejected"
                           ? "Store was not approved"
                           : "Your store is hidden"}
@@ -539,12 +529,10 @@ export default function DashboardOverviewPage() {
                     {isShopPubliclyVisible(activeShop)
                       ? "Customers can browse and place orders right now."
                       : (activeShop.verification_status ?? "approved") === "pending"
-                        ? "You can add products now — customers will see the store after TrendsMart approves it."
+                        ? "You can keep adding products. Soft launch stores usually go live after email verification — turn Live on in Settings when ready."
                         : (activeShop.verification_status ?? "approved") === "rejected"
                           ? "Contact support if you believe this was a mistake, or update your store details."
-                          : activeShop.is_live
-                            ? "Waiting for admin approval before it goes public."
-                            : "Turn it on in Store settings when you're ready."}
+                          : "Turn Live on in Settings when you are ready for customers."}
                   </p>
                 </div>
                 <Link
@@ -684,7 +672,7 @@ export default function DashboardOverviewPage() {
                             Deals
                           </p>
                           <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                            Pin, edit, pause &amp; schedule offers
+                            Add &amp; edit offers — or use + on the bottom bar
                           </p>
                         </div>
                       </div>

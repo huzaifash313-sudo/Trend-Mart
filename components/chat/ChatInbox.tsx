@@ -167,6 +167,31 @@ export default function ChatInbox({
     );
   }
 
+  /* Missing / stale deep-link (?c=…) */
+  if (selectedId && !selected) {
+    return (
+      <FullScreenChatShell>
+        <ChatShellHeader
+          title="Conversation not found"
+          subtitle="This chat may have been removed or you don’t have access."
+          onBack={clearSelection}
+        />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Open another conversation from your inbox.
+          </p>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            Back to inbox
+          </button>
+        </div>
+      </FullScreenChatShell>
+    );
+  }
+
   /* Thread view — full screen like WhatsApp */
   if (selectedId && selected) {
     return (

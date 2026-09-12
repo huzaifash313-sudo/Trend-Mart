@@ -105,7 +105,7 @@ export default function ServicePortfolioPage() {
   // ── Dashboard Layout ───────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 pb-safe-nav">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-zinc-500">
         <button
@@ -114,14 +114,6 @@ export default function ServicePortfolioPage() {
           className="hover:text-zinc-700 dark:hover:text-zinc-300"
         >
           Dashboard
-        </button>
-        <span>/</span>
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard/services")}
-          className="hover:text-zinc-700 dark:hover:text-zinc-300"
-        >
-          Services
         </button>
         <span>/</span>
         <span className="font-semibold text-zinc-900 dark:text-zinc-100">Portfolio</span>

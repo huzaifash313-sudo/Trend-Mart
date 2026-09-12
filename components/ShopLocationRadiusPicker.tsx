@@ -7,6 +7,7 @@ import {
   reverseGeocode,
   encodeDeliveryZones,
   parseCoverageFromZones,
+  CITY_CENTROIDS,
   type GeoCoordinates,
   type ServiceCoverageMode,
 } from "@/services/geoRadiusService";
@@ -128,6 +129,42 @@ export default function ShopLocationRadiusPicker({
   const serviceCity = coverage.city || value.location?.trim() || "";
 
   const hasPin = value.latitude != null && value.longitude != null;
+
+  const mapCenter = useMemo(() => {
+    if (hasPin && value.latitude != null && value.longitude != null) {
+      return { latitude: value.latitude, longitude: value.longitude };
+    }
+    const cityKey =
+      Object.keys(CITY_CENTROIDS).find(
+        (c) =>
+          serviceCity.toLowerCase() === c.toLowerCase() ||
+          serviceCity.toLowerCase().includes(c.toLowerCase()),
+      ) || "Gujranwala";
+    const c = CITY_CENTROIDS[cityKey] || CITY_CENTROIDS.Gujranwala;
+    return { latitude: c.lat, longitude: c.lng };
+  }, [hasPin, value.latitude, value.longitude, serviceCity]);
+
+  const openMapWithoutGps = useCallback(() => {
+    setError(null);
+    setMapOpen(true);
+    // Seed a provisional pin at city center so the map has a real marker to drag.
+    if (!hasPin) {
+      onChange({
+        latitude: mapCenter.latitude,
+        longitude: mapCenter.longitude,
+      });
+      void (async () => {
+        try {
+          const geocode = await reverseGeocode(mapCenter.latitude, mapCenter.longitude);
+          const address =
+            geocode.address?.trim() || geocode.displayName?.trim() || "";
+          if (address) onChange({ address_display: address });
+        } catch {
+          /* pin coords are enough */
+        }
+      })();
+    }
+  }, [hasPin, mapCenter.latitude, mapCenter.longitude, onChange]);
 
   const applyMode = useCallback(
     (nextMode: ServiceCoverageMode, city?: string) => {
@@ -277,32 +314,41 @@ export default function ShopLocationRadiusPicker({
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={handleDetect}
-          disabled={detecting}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-zinc-300 px-4 py-2.5 text-xs font-semibold text-zinc-600 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
-        >
-          {detecting ? (
-            <>
-              <CrosshairIcon /> Detecting your location…
-            </>
-          ) : (
-            <>
-              <CrosshairIcon /> Use My Current Location as Store Pin
-            </>
-          )}
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleDetect}
+            disabled={detecting}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-zinc-300 px-4 py-2.5 text-xs font-semibold text-zinc-600 transition-colors hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
+          >
+            {detecting ? (
+              <>
+                <CrosshairIcon /> Detecting your location…
+              </>
+            ) : (
+              <>
+                <CrosshairIcon /> Use My Current Location as Store Pin
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={openMapWithoutGps}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            <PinIcon /> Pick exact pin on map
+          </button>
+        </div>
       )}
       {error && <p className="text-[0.65rem] text-red-500">{error}</p>}
 
-      {/* Manual pin adjust — a GPS reading taken inside a shop can sit on the
-          wrong side of the street, and every distance/radius rule keys off it. */}
-      {hasPin && mapOpen && (
+      {/* Manual pin adjust — GPS or city-seeded map both work; distance rules
+          key off this pin, so merchants should place it on the shop doorway. */}
+      {mapOpen && (
         <div className="space-y-1.5">
           <LocationMiniMap
-            latitude={value.latitude!}
-            longitude={value.longitude!}
+            latitude={mapCenter.latitude}
+            longitude={mapCenter.longitude}
             onPick={handlePinAdjust}
             mode="compact"
             heightClassName="h-56"

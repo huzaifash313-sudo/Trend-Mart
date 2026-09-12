@@ -114,15 +114,19 @@ export default function MerchantAuditLogsPage() {
             <ChevronLeftIcon />
           </Link>
           <div className="min-w-0">
-            <h1 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Audit Logs</h1>
+            <h1 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+              Product activity
+            </h1>
             <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-              {shopName ? `${shopName} · Settings & Preferences` : "Settings & Preferences"}
+              {shopName
+                ? `${shopName} · recently added products`
+                : "Recently added products"}
             </p>
           </div>
         </div>
       </header>
 
-      <main className="page-stack mx-auto max-w-5xl px-3 py-4">
+      <main className="page-stack mx-auto max-w-5xl px-3 py-4 pb-safe-nav">
         <section className="mb-3">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>

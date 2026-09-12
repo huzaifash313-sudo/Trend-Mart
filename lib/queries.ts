@@ -110,8 +110,12 @@ export function useMyShop(options?: { enabled?: boolean }) {
     queryKey: queryKeys.myShop,
     queryFn: async (): Promise<Shop | null> => {
       const result = await fetchMyShop();
-      // "Not authenticated" / fetch errors are not UI errors here — just no shop.
-      return result.success ? result.data : null;
+      if (!result.success) {
+        // Guest → no shop; real failures should surface to Settings.
+        if (result.error === "Not authenticated.") return null;
+        throw new Error(result.error || "Could not load your store.");
+      }
+      return result.data;
     },
     enabled: options?.enabled !== false,
     retry: false,
@@ -157,19 +161,28 @@ export function useDeals(limit = 48, options?: { initialData?: ShopDeal[] }) {
 /** Paginated deals for the /deals page — infinite scroll, 24 per page. */
 export const DEALS_PAGE_SIZE = 24;
 
-export function useDealsInfinite(options?: { initialData?: ShopDeal[] }) {
+export function useDealsInfinite(options?: {
+  initialData?: ShopDeal[];
+  /** When set, pages prefer deals live on this YYYY-MM-DD (Asia/Karachi). */
+  liveOnDate?: string | null;
+}) {
+  const liveOnDate = options?.liveOnDate ?? null;
   return useInfiniteQuery({
-    queryKey: ["deals", "infinite"] as const,
+    queryKey: ["deals", "infinite", liveOnDate ?? "all"] as const,
     queryFn: ({ pageParam }) =>
-      unwrap(fetchActiveDeals(DEALS_PAGE_SIZE, pageParam as number)),
+      unwrap(
+        fetchActiveDeals(DEALS_PAGE_SIZE, pageParam as number, {
+          liveOnDate,
+        }),
+      ),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
-      const fetched = allPages.reduce((n, p) => n + p.length, 0);
-      return lastPage.length >= DEALS_PAGE_SIZE ? fetched : undefined;
+      if (lastPage.length < DEALS_PAGE_SIZE) return undefined;
+      return allPages.length * DEALS_PAGE_SIZE;
     },
     staleTime: 2 * 60_000,
     placeholderData: keepPreviousData,
-    ...(options?.initialData !== undefined
+    ...(options?.initialData !== undefined && !liveOnDate
       ? {
           initialData: {
             pages: [options.initialData],
@@ -286,9 +299,14 @@ export function useMarketplaceProducts(filters: MarketplaceProductFilters) {
  */
 export function useMarketplaceProductsInfinite(
   filters: MarketplaceProductFilters,
-  options?: { initialData?: MarketplaceProduct[] },
+  options?: { initialData?: MarketplaceProduct[]; enabled?: boolean },
 ) {
   const pageSize = filters.limit ?? 48;
+  const shopIdsKey = Array.isArray(filters.shopIds)
+    ? filters.shopIds.slice().sort().join(",")
+    : filters.shopIds === null
+      ? "null"
+      : "unset";
   const queryKey = [
     "marketplace-products-infinite",
     filters.query ?? "",
@@ -297,6 +315,7 @@ export function useMarketplaceProductsInfinite(
     filters.sort ?? "for_you",
     pageSize,
     filters.availableOnly ?? true,
+    shopIdsKey,
   ] as const;
 
   return useInfiniteQuery({
@@ -305,12 +324,13 @@ export function useMarketplaceProductsInfinite(
       unwrap(fetchMarketplaceProducts({ ...filters, offset: pageParam as number })),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
-      const fetched = allPages.reduce((n, p) => n + p.length, 0);
-      // A full page means there may be more rows to fetch.
-      return lastPage.length >= pageSize ? fetched : undefined;
+      // Offset = pages * pageSize (stable DB cursor). Never use inflated lengths.
+      if (lastPage.length < pageSize) return undefined;
+      return allPages.length * pageSize;
     },
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+    enabled: options?.enabled !== false,
     ...(options?.initialData !== undefined
       ? {
           initialData: {

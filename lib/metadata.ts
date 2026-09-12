@@ -5,19 +5,21 @@
 import type { Metadata } from "next";
 import { getPublicAppUrl, getPublicAppHostname } from "@/lib/appUrl";
 
-export const SITE_NAME = "Trends Mart";
+export const SITE_NAME = "TrendsMart";
 export const SITE_DOMAIN = "trendsmart.pk";
 
 /** Alternate spellings indexed naturally for search discovery. */
 export const BRAND_ALT_NAMES = [
+  "Trends Mart",
+  "TrendSmart",
+  "Trends Mart Pakistan",
   "Trend Mart",
-  "TrendsMart",
   "trendsmart",
   "Trend Smart",
 ] as const;
 
 const SITE_DESCRIPTION =
-  "Trends Mart (trendsmart.pk) — discover local shops across Pakistan. Browse products & deals in Gujranwala, Lahore & beyond. Order via WhatsApp and support small businesses near you.";
+  "TrendsMart (Trends Mart Pakistan · trendsmart.pk) — discover local shops across Pakistan. Browse products & deals in Gujranwala, Lahore & beyond. Order via WhatsApp and support small businesses near you.";
 
 export const SITE_BASE_URL = getPublicAppUrl();
 const OG_IMAGE_DEFAULT = `${SITE_BASE_URL}/og-default.png`;

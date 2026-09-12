@@ -612,7 +612,7 @@ export async function filterShopsByProximity(
       const { data, error } = await supabase
         .from("shops")
         .select(
-          "id, name, slug, category, location, logo_url, banner_url, is_live, verification_status, latitude, longitude, delivery_radius_km, delivery_zones, free_delivery_radius_km",
+          "id, name, slug, category, location, logo_url, banner_url, is_live, verification_status, latitude, longitude, delivery_radius_km, delivery_zones, free_delivery_radius_km, whatsapp_number, service_radius_km",
         )
         .eq("is_live", true)
         .eq("verification_status", "approved")
@@ -620,7 +620,7 @@ export async function filterShopsByProximity(
         .limit(Math.min(PUBLIC_SHOP_LIMIT, GEO_SHOP_FETCH_CAP));
 
       if (error) throw error;
-      allShops = (data as Shop[]) ?? [];
+      allShops = (data as unknown as Shop[]) ?? [];
     } catch (err) {
       logError(err, { module: "geoRadiusService.filterShopsByProximity" });
       return {
@@ -1017,15 +1017,21 @@ export function clearSavedLocation(): void {
 
 /**
  * Return the currently valid saved location, respecting GPS cache age.
- * Manual/cached selections never expire. GPS-detected locations expire after
- * GPS_CACHE_MAX_AGE_MS (30 minutes).
+ * Manual / pin / cached selections never expire. GPS-detected locations expire
+ * after GPS_CACHE_MAX_AGE_MS (30 minutes).
  */
 export function getValidSavedLocation(): UserLocation | null {
   const saved = loadSavedLocation();
   if (!saved) return null;
 
-  // Manual or explicitly cached selections persist indefinitely
-  if (saved.source === "manual" || saved.source === "cached") return saved;
+  // User choices (city list, map pin) and profile restores persist indefinitely
+  if (
+    saved.source === "manual" ||
+    saved.source === "pin" ||
+    saved.source === "cached"
+  ) {
+    return saved;
+  }
 
   // GPS-based locations expire after the TTL
   if (saved.source === "gps") {

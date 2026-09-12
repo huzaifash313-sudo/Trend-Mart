@@ -30,9 +30,7 @@ function parseUrlState(
   const filter =
     filterRaw && ["today", "featured", "upcoming", "all"].includes(filterRaw)
       ? (filterRaw as DealsUrlState["filter"])
-      : q.trim()
-        ? "all"
-        : "today";
+      : "all";
   const dayRaw = pickParam(params.day) ?? null;
   const day = dayRaw && /^\d{4}-\d{2}-\d{2}$/.test(dayRaw) ? dayRaw : null;
   const categoryRaw = pickParam(params.category) as ShopCategory | undefined;

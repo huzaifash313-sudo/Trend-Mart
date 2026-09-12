@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Shop } from "@/types";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { fetchMyShop } from "@/services/shopService";
 import {
   fetchLeadsByShopId,
   markLeadConverted,
@@ -289,23 +290,21 @@ export default function LeadsPage() {
     return () => { cancelled = true; };
   }, [supabase.auth, router]);
 
-  // ── Load shop ─────────────────────────────────────────────────────────────
+  // ── Load shop (one store per account) ───────────────────────────────────
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     async function loadShop() {
-      const { data, error } = await supabase
-        .from("shops")
-        .select("*")
-        .eq("owner_id", userId)
-        .maybeSingle();
-      if (!cancelled && !error && data) {
-        setShop(data as Shop);
-      }
+      const result = await fetchMyShop();
+      if (cancelled) return;
+      if (result.success && result.data) setShop(result.data);
+      else if (!result.success) addToast(result.error || "Could not load your store.", "error");
     }
-    loadShop();
-    return () => { cancelled = true; };
-  }, [userId, supabase]);
+    void loadShop();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, addToast]);
 
   // ── Load stats & leads ────────────────────────────────────────────────────
   useEffect(() => {

@@ -66,6 +66,7 @@ export default function BecomeMerchantPage() {
   const { addToast } = useToast();
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [form, setForm] = useState<ShopFormData>(emptyShopForm);
   const [agreed, setAgreed] = useState(false);
   const [confirmSwitch, setConfirmSwitch] = useState(false);
@@ -100,6 +101,7 @@ export default function BecomeMerchantPage() {
         return;
       }
       setEmail(user.email ?? null);
+      setEmailVerified(!!user.email_confirmed_at);
       setChecking(false);
     })();
     return () => {
@@ -116,6 +118,14 @@ export default function BecomeMerchantPage() {
     if (!form.location.trim() || form.location.trim().length < 2) {
       next.location = "City / area is required.";
     }
+    if (
+      typeof form.latitude !== "number" ||
+      typeof form.longitude !== "number" ||
+      !Number.isFinite(form.latitude) ||
+      !Number.isFinite(form.longitude)
+    ) {
+      next.pin = "Set your store pin on the map so customers can find you.";
+    }
     if (!form.whatsapp_number.trim()) {
       next.whatsapp_number = "WhatsApp number is required for orders.";
     } else if (!isValidPkMobile(form.whatsapp_number)) {
@@ -131,6 +141,10 @@ export default function BecomeMerchantPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!emailVerified) {
+      addToast("Verify your email before opening a store.", "error");
+      return;
+    }
     if (!validate()) {
       addToast("Please fix the highlighted fields.", "error");
       return;
@@ -188,7 +202,7 @@ export default function BecomeMerchantPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
+    <div className="min-h-screen bg-zinc-50 pb-safe-nav dark:bg-[color:var(--tm-surface)]">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-4">
           <div>
@@ -212,12 +226,29 @@ export default function BecomeMerchantPage() {
       </header>
 
       <main className="mx-auto max-w-xl space-y-5 px-4 py-6">
+        {!emailVerified ? (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-950/30">
+            <p className="font-semibold text-amber-900 dark:text-amber-200">
+              Verify your email first
+            </p>
+            <p className="mt-1 text-xs text-amber-800/90 dark:text-amber-300/90">
+              Store setup needs a verified email. Finish verification, then come back here.
+            </p>
+            <Link
+              href="/auth/verify-notice?redirect=/account/become-merchant"
+              className="mt-2 inline-block text-xs font-semibold text-emerald-700 underline dark:text-emerald-400"
+            >
+              Verify email →
+            </Link>
+          </section>
+        ) : null}
+
         <section className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
           <p className="font-semibold text-zinc-900 dark:text-zinc-100">How this works</p>
           <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-zinc-600 dark:text-zinc-400">
-            <li>Fill in your store details (required fields marked *).</li>
+            <li>Verify your email, then fill in your store details (required fields marked *).</li>
             <li>Accept merchant guidelines.</li>
-            <li>We create your store and open the merchant dashboard. After email verification it is live for customers.</li>
+            <li>We create your store and open the merchant dashboard.</li>
           </ol>
         </section>
 
@@ -264,7 +295,7 @@ export default function BecomeMerchantPage() {
 
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Store pin &amp; delivery area
+              Store pin &amp; delivery area *
             </label>
             <ShopLocationRadiusPicker
               value={{
@@ -277,6 +308,7 @@ export default function BecomeMerchantPage() {
               }}
               onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
             />
+            {errors.pin ? <p className="mt-1 text-xs text-red-500">{errors.pin}</p> : null}
           </div>
 
           <div>
@@ -360,10 +392,14 @@ export default function BecomeMerchantPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !emailVerified}
             className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
           >
-            {submitting ? "Creating store…" : "Create store & open dashboard"}
+            {submitting
+              ? "Creating store…"
+              : !emailVerified
+                ? "Verify email to continue"
+                : "Create store & open dashboard"}
           </button>
         </form>
       </main>

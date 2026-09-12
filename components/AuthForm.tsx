@@ -782,17 +782,21 @@ export default function AuthForm({
               I agree to TrendsMart&apos;s{" "}
               <Link href="/legal/terms" target="_blank" className="font-medium text-emerald-600 underline underline-offset-2 hover:text-emerald-700 dark:text-emerald-400">
                 Terms &amp; Conditions
-              </Link>{" "}
-              and{" "}
+              </Link>
+              ,{" "}
               <Link href="/legal/privacy" target="_blank" className="font-medium text-emerald-600 underline underline-offset-2 hover:text-emerald-700 dark:text-emerald-400">
                 Privacy Policy
+              </Link>
+              , and{" "}
+              <Link href="/legal/merchant-guidelines" target="_blank" className="font-medium text-emerald-600 underline underline-offset-2 hover:text-emerald-700 dark:text-emerald-400">
+                Merchant Security Guidelines
               </Link>
               .
             </span>
           </label>
           {termsTouched && !agreedToTerms && (
             <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">
-              You must agree to the Terms &amp; Privacy Policy to create an account.
+              You must agree to the Terms, Privacy Policy, and Merchant Guidelines to create an account.
             </p>
           )}
         </motion.div>

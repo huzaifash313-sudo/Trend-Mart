@@ -196,7 +196,8 @@ export default function GeoRadiusFilter({
   } = useLocation();
 
   const [maxDistanceKm, setMaxDistanceKm] = useState<number>(0);
-  const [scope, setScope] = useState<GeoScope>("radius");
+  // Default All Pakistan so first visit shows shops without a pin (Nearest needs GPS).
+  const [scope, setScope] = useState<GeoScope>("pakistan");
   const [locationError, setLocationError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [cityQuery, setCityQuery] = useState("");

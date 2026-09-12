@@ -23,28 +23,26 @@ import { type ShopDeliveryMeta } from "@/services/shopDeliveryMeta";
 import { SHOP_CATEGORIES, type Shop, type ShopCategory } from "@/types";
 import {
   useDealsInfinite,
-  useShops,
   useShopCoupons,
   useShopDeliveryMeta,
   useMyShop,
 } from "@/lib/queries";
-import { filterShopsByProximity, getCustomerArea } from "@/services/geoRadiusService";
+import { filterShopsByProximity, getCustomerArea, haversineDistance } from "@/services/geoRadiusService";
 import { type GeoFilterState } from "@/components/GeoRadiusFilter";
 import { useLocation } from "@/context/LocationContext";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { buildShopTickerTags } from "@/lib/shopOfferLabels";
 import { fuzzyFilterAndRank, FUZZY_MIN_SCORE, suggestSearchCorrections } from "@/lib/fuzzySearch";
 import { trackProductView } from "@/lib/behavior";
+import { getDealSeoPath } from "@/lib/seo/dealSlug";
 import DealDayDateFilter from "@/components/DealDayDateFilter";
 import {
   fetchAllSubCategoriesGrouped,
   fetchSubCategories,
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
-
-const DealQuickView = dynamic(() => import("@/components/DealQuickView"), {
-  ssr: false,
-});
+import { fetchShopsGeoByIds } from "@/services/shopService";
+import { locationHintLabel, sortWithNearbyBoost } from "@/lib/nearbyBoost";
 
 const GeoRadiusFilter = dynamic(() => import("@/components/GeoRadiusFilter"), {
   ssr: false,
@@ -99,7 +97,6 @@ function DealsInner({
   // Full taxonomy (grouped by main category) so the global search box can match
   // sub-category names even before a specific category is selected.
   const [allSubGroups, setAllSubGroups] = useState<Record<string, SubCategoryWithMeta[]>>({});
-  const [quickViewDeal, setQuickViewDeal] = useState<ShopDeal | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -112,14 +109,22 @@ function DealsInner({
   const [geoFilter, setGeoFilter] = useState<GeoFilterState>({
     coordinates: null,
     maxDistanceKm: 0,
-    locationAvailable: false,
-    scope: "radius",
+    locationAvailable: true,
+    scope: "pakistan",
   });
   const [geoVisibleShopIds, setGeoVisibleShopIds] = useState<Set<string> | null>(null);
 
-  const dealsQuery = useDealsInfinite(
-    initialDeals && initialDeals.length > 0 ? { initialData: initialDeals } : undefined,
-  );
+  const todayKey = toPkDateKey();
+  const liveOnDate =
+    dayKey ||
+    (filter === "today" || filter === "featured" ? todayKey : null);
+
+  const dealsQuery = useDealsInfinite({
+    liveOnDate,
+    ...(initialDeals && initialDeals.length > 0 && !liveOnDate
+      ? { initialData: initialDeals }
+      : {}),
+  });
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Trigger next page when sentinel enters viewport.
@@ -145,14 +150,24 @@ function DealsInner({
   const loading = dealsQuery.isLoading;
   const error = dealsQuery.error ? (dealsQuery.error as Error).message : null;
 
-  // Real shop rows (with coordinates) to reuse the proximity engine for deals.
-  const shopsQuery = useShops();
-  const shops = shopsQuery.data ?? EMPTY_SHOPS;
-
   const dealShopIds = useMemo(
     () => [...new Set(deals.map((d) => d.shop_id).filter(Boolean))],
     [deals],
   );
+
+  // Exact coords for deal shops — not limited to the 48-shop marketplace list.
+  const dealShopsQuery = useQuery({
+    queryKey: ["deal-shops-geo", dealShopIds.slice().sort().join(",")] as const,
+    queryFn: async () => {
+      const res = await fetchShopsGeoByIds(dealShopIds);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: dealShopIds.length > 0,
+    staleTime: 60_000,
+  });
+  const shops = dealShopsQuery.data ?? EMPTY_SHOPS;
+
   const couponsQuery = useShopCoupons(dealShopIds);
   const shopCoupons: Record<string, Coupon[]> = couponsQuery.data ?? EMPTY_COUPONS;
   const deliveryQuery = useShopDeliveryMeta(dealShopIds);
@@ -368,8 +383,6 @@ function DealsInner({
     };
   }, [queryClient]);
 
-  const todayKey = toPkDateKey();
-
   const syncUrl = useCallback(
     (next: {
       q?: string;
@@ -430,6 +443,14 @@ function DealsInner({
 
   const filtered = useMemo(() => {
     let list = deals.filter((d) => d.is_active);
+
+    // Never show past date_range deals in "All" (order would be blocked anyway).
+    list = list.filter((d) => {
+      if (d.schedule_type === "date_range" && d.ends_on) {
+        return d.ends_on.slice(0, 10) >= todayKey;
+      }
+      return true;
+    });
 
     if (dayKey) {
       list = list.filter((d) => isDealActiveOnDate(d, dayKey));
@@ -514,6 +535,33 @@ function DealsInner({
       list = list.filter((d) => geoVisibleShopIds.has(d.shop_id));
     }
 
+    // Soft nearby boost when customer has a pin (far deals stay visible).
+    const coords = geoFilter.coordinates ?? globalCoords ?? null;
+    if (coords && !q) {
+      const distByShop = new Map<string, number | null>();
+      for (const s of dealShops) {
+        if (
+          typeof s.latitude === "number" &&
+          typeof s.longitude === "number" &&
+          Number.isFinite(s.latitude) &&
+          Number.isFinite(s.longitude)
+        ) {
+          distByShop.set(
+            s.id,
+            haversineDistance(
+              coords.latitude,
+              coords.longitude,
+              s.latitude,
+              s.longitude,
+            ),
+          );
+        } else {
+          distByShop.set(s.id, null);
+        }
+      }
+      list = sortWithNearbyBoost(list, (d) => distByShop.get(d.shop_id) ?? null);
+    }
+
     return list;
   }, [
     deals,
@@ -532,7 +580,33 @@ function DealsInner({
     subNameById,
     allSubNameById,
     shopCategoryById,
+    dealShops,
+    geoFilter.coordinates,
+    globalCoords,
   ]);
+
+  const dealLocationHints = useMemo(() => {
+    const map = new Map<string, string>();
+    const coords = geoFilter.coordinates ?? globalCoords ?? null;
+    for (const s of dealShops) {
+      const dist =
+        coords &&
+        typeof s.latitude === "number" &&
+        typeof s.longitude === "number" &&
+        Number.isFinite(s.latitude) &&
+        Number.isFinite(s.longitude)
+          ? haversineDistance(
+              coords.latitude,
+              coords.longitude,
+              s.latitude,
+              s.longitude,
+            )
+          : null;
+      const hint = locationHintLabel(dist, s.location);
+      if (hint) map.set(s.id, hint);
+    }
+    return map;
+  }, [dealShops, geoFilter.coordinates, globalCoords]);
 
   const getOfferTags = useCallback(
     (shopId: string) => {
@@ -781,17 +855,30 @@ function DealsInner({
             </div>
           ) : null}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {filter !== "all" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilter("all");
+                  setDayKey(null);
+                  syncUrl({ filter: "all", day: null });
+                }}
+                className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
+                Show all deals
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
                 setQuery("");
-                setFilter("today");
+                setFilter("all");
                 setDayKey(null);
                 setActiveCategory("All");
                 setActiveSubCategoryId(null);
-                syncUrl({ q: "", filter: "today", day: null, category: "All", sub: null });
+                syncUrl({ q: "", filter: "all", day: null, category: "All", sub: null });
               }}
-              className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
             >
               Clear filters
             </button>
@@ -815,8 +902,8 @@ function DealsInner({
                 deal={deal}
                 priority={i < 2}
                 offerTags={getOfferTags(deal.shop_id)}
+                locationHint={dealLocationHints.get(deal.shop_id) ?? null}
                 onOpen={() => {
-                  setQuickViewDeal(deal);
                   const p = dealToProduct(deal);
                   trackProductView({
                     id: p.id,
@@ -827,6 +914,7 @@ function DealsInner({
                     shopName: deal.shop_name,
                     category: null,
                   });
+                  router.push(getDealSeoPath(deal.title, deal.id));
                 }}
               />
             )}
@@ -847,10 +935,6 @@ function DealsInner({
             </div>
           )}
         </>
-      )}
-
-      {quickViewDeal && (
-        <DealQuickView deal={quickViewDeal} onClose={() => setQuickViewDeal(null)} />
       )}
     </div>
   );

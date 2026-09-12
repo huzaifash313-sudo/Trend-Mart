@@ -355,7 +355,10 @@ export default function AnalyticsDashboard() {
             <ChevronLeftIcon />
           </Link>
           <h1 className="tm-font-display text-lg font-extrabold text-zinc-900 dark:text-zinc-50 sm:text-xl">Analytics</h1>
-          <span className="ml-auto min-w-0 truncate text-xs text-zinc-400 dark:text-zinc-500">{shop.name}</span>
+          <span className="ml-auto min-w-0 truncate text-right text-xs text-zinc-400 dark:text-zinc-500">
+            {shop.name}
+            <span className="mt-0.5 block text-[0.65rem]">Charts use latest 400 orders · 200 products</span>
+          </span>
         </div>
       </header>
 

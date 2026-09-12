@@ -5,7 +5,7 @@ import { SHOP_CATEGORIES } from "@/types";
 import HomeClient from "@/components/HomeClient";
 import { fetchHomeInitialData } from "@/lib/homeData";
 import { generateHomepageMetadata } from "@/lib/metadata";
-import { getSafeImageUrl } from "@/services/storageService";
+import { logError } from "@/services/errorService";
 
 const EMPTY_SHOPS: Shop[] = [];
 const EMPTY_STORIES: Story[] = [];
@@ -73,35 +73,21 @@ export default async function Home({
   };
   try {
     initial = await fetchHomeInitialData();
-  } catch {
-    // Non-fatal — client queries will fetch as before.
-  }
-
-  const bannerPreloads: string[] = [];
-  for (const shop of initial.shops) {
-    const raw = shop.banner_url?.trim();
-    if (!raw) continue;
-    const src = getSafeImageUrl(raw, "shop", "banner");
-    if (!src || src.startsWith("data:")) continue;
-    if (!bannerPreloads.includes(src)) bannerPreloads.push(src);
-    if (bannerPreloads.length >= 2) break;
+  } catch (err) {
+    // Non-fatal — client queries refill the page; log so SSR empty isn't silent.
+    logError(err, { module: "Home.ssr" });
   }
 
   return (
-    <>
-      {bannerPreloads.map((href) => (
-        <link key={href} as="image" rel="preload" href={href} fetchPriority="high" />
-      ))}
-      <HomeClient
-        initialShops={initial.shops}
-        initialStories={initial.stories}
-        initialDeals={initial.deals}
-        initialMyShopId={initial.myShopId}
-        initialCategory={
-          SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All"
-        }
-        initialQuery=""
-      />
-    </>
+    <HomeClient
+      initialShops={initial.shops}
+      initialStories={initial.stories}
+      initialDeals={initial.deals}
+      initialMyShopId={initial.myShopId}
+      initialCategory={
+        SHOP_CATEGORIES.includes(initialCategory) ? initialCategory : "All"
+      }
+      initialQuery=""
+    />
   );
 }

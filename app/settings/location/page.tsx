@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import LocationPicker from "@/components/LocationPicker";
 import { useLocation } from "@/context/LocationContext";
+import { locationErrorMessage } from "@/services/geoRadiusService";
 
 function ChevronLeftIcon() {
   return (
@@ -22,13 +24,22 @@ function PinIcon() {
 }
 
 export default function LocationSettingsPage() {
-  const { location, isDetecting, detectLocation } = useLocation();
+  const { location, isDetecting, detectLocationDetailed } = useLocation();
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
   const summary =
     location?.address ||
     location?.deliveryZone ||
     location?.city ||
-    "Not set yet — GPS runs automatically on first visit";
+    "Not set yet — tap GPS or open the map to set your pin";
+
+  const handleGps = async () => {
+    setGpsError(null);
+    const result = await detectLocationDetailed();
+    if (!result.location) {
+      setGpsError(locationErrorMessage(result.error));
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-bg)]">
@@ -69,20 +80,23 @@ export default function LocationSettingsPage() {
           </div>
 
           <p className="rounded-lg bg-teal-50/80 px-3 py-2 text-[0.7rem] leading-relaxed text-teal-800 dark:bg-teal-950/40 dark:text-teal-300">
-            Location detects automatically in the background on first visit. Change it anytime here — it stays off the main header so the app stays clean.
+            GPS Allow browser prompt tabhi aayega jab aap GPS / map button dabayein. Map se exact pin save bhi kar sakte ho — ye reload ke baad bhi rehta hai.
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
             <LocationPicker />
             <button
               type="button"
-              onClick={() => void detectLocation()}
+              onClick={() => void handleGps()}
               disabled={isDetecting}
               className="inline-flex h-9 items-center justify-center rounded-xl border border-teal-200 bg-white px-3 text-xs font-semibold text-teal-800 transition-colors hover:bg-teal-50 disabled:opacity-50 dark:border-teal-800 dark:bg-[color:var(--tm-elevated)] dark:text-teal-300 dark:hover:bg-teal-950/40"
             >
               {isDetecting ? "Detecting…" : "Use my GPS"}
             </button>
           </div>
+          {gpsError ? (
+            <p className="text-[0.7rem] text-amber-700 dark:text-amber-400">{gpsError}</p>
+          ) : null}
         </section>
       </main>
     </div>

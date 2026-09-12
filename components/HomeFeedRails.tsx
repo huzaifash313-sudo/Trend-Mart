@@ -4,8 +4,8 @@
 /*  TrendsMart — Home compact shelves (deals / top products / sponsored)      */
 /*                                                                            */
 /*  Daraz-style MINI tiles: image + title + price only — no wishlist heart,   */
-/*  no Add/Order buttons on the card. The whole tile opens the same quick     */
-/*  view where Order / Add to Cart / Wishlist live.                           */
+/*  no Add/Order buttons on the card. Whole tile opens the full product/deal  */
+/*  page (Option B) where Order / Add to Cart / Wishlist live.                */
 /*                                                                            */
 /*  Phones: swipeable shelf — 2 cards per row, rest scrolls horizontally so   */
 /*  the shelf stays short. Tablet/laptop: fixed 5-col × 3 rows, 15 tiles,     */
@@ -13,11 +13,10 @@
 /*  so the same deals/products never show twice on one page.                  */
 /* -------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import type { MarketplaceProduct, Product, Shop } from "@/types";
 import { isDealActiveOnDate, toPkDateKey, type ShopDeal } from "@/lib/dealSchedule";
 import { dealCommerceId } from "@/lib/dealCommerce";
 import { getDealImages } from "@/lib/productImages";
@@ -27,20 +26,14 @@ import {
   PRODUCT_CARD_IMAGE_SIZES,
 } from "@/lib/imageSizes";
 import { formatPrice, getProductDiscount } from "@/lib/formatters";
-import { useToast } from "@/components/Toast";
 import { shouldSkipHeavyMedia } from "@/lib/mobilePerf";
-import { useCart } from "@/context/CartContext";
-import { useMarketplaceProducts, useFavorites, queryKeys } from "@/lib/queries";
-import { toggleFavorite } from "@/services/wishlistService";
-import { useQueryClient } from "@tanstack/react-query";
-import { fetchShopById } from "@/services/shopService";
+import { useMarketplaceProducts } from "@/lib/queries";
 import { trackProductView, trackCategoryInterest } from "@/lib/behavior";
 import { logProductClick } from "@/services/analyticsService";
 import { dealToProduct } from "@/lib/dealCommerce";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
+import { getDealSeoPath } from "@/lib/seo/dealSlug";
 
-const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), { ssr: false });
-const ProductOrderModal = dynamic(() => import("@/components/ProductOrderModal"), { ssr: false });
-const DealQuickView = dynamic(() => import("@/components/DealQuickView"), { ssr: false });
 const PromoAdsCarousel = dynamic(() => import("@/components/PromoAdsCarousel"), {
   ssr: false,
   loading: () => null,
@@ -117,7 +110,8 @@ function MiniTile({
   price,
   originalPrice,
   badge,
-  onOpen,
+  href,
+  onNavigate,
 }: {
   imageUrl: string | null | undefined;
   title: string;
@@ -125,7 +119,8 @@ function MiniTile({
   originalPrice?: number | null;
   /** Extra corner chip (e.g. deal badge). Falls back to % off chip. */
   badge?: string | null;
-  onOpen: () => void;
+  href: string;
+  onNavigate?: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const safeSrc =
@@ -135,9 +130,9 @@ function MiniTile({
   const showBadge = badge?.trim() ? badge.trim() : null;
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
+    <Link
+      href={href}
+      onClick={() => onNavigate?.()}
       className="tm-mini-tile"
       aria-label={`View ${title}`}
     >
@@ -176,7 +171,7 @@ function MiniTile({
           ) : null}
         </span>
       </span>
-    </button>
+    </Link>
   );
 }
 
@@ -299,8 +294,6 @@ interface DealsRailProps {
 }
 
 function DealsRailInner({ deals, title = "Top Deals", moreHref = "/deals", slot = 0 }: DealsRailProps) {
-  const [openDeal, setOpenDeal] = useState<ShopDeal | null>(null);
-
   const visible = useMemo(() => {
     const today = toPkDateKey();
     const live = deals.filter(
@@ -363,8 +356,8 @@ function DealsRailInner({ deals, title = "Top Deals", moreHref = "/deals", slot 
               originalPrice={
                 Number(deal.original_price ?? discount.originalPrice) || null
               }
-              onOpen={() => {
-                setOpenDeal(deal);
+              href={getDealSeoPath(deal.title, deal.id)}
+              onNavigate={() => {
                 trackProductView({
                   id: product.id,
                   name: deal.title,
@@ -379,7 +372,6 @@ function DealsRailInner({ deals, title = "Top Deals", moreHref = "/deals", slot 
           );
         })}
       </div>
-      {openDeal ? <DealQuickView deal={openDeal} onClose={() => setOpenDeal(null)} /> : null}
     </section>
   );
 }
@@ -397,13 +389,6 @@ interface ProductsRailProps {
   excludeProductIds?: ReadonlySet<string>;
 }
 
-interface ProductOrderIntent {
-  product: Product;
-  variant?: string;
-  quantity: number;
-  notes?: string;
-}
-
 function ProductsRailInner({
   myShopId,
   title = "For You",
@@ -411,9 +396,6 @@ function ProductsRailInner({
   slot = 0,
   excludeProductIds,
 }: ProductsRailProps) {
-  const { addToast } = useToast();
-  const { addItem } = useCart();
-
   // "for_you" uses the personalization engine (behavior signals + shop diversity)
   // so the shelf adapts to each user's browsing/wishlist category affinity.
   const productsQuery = useMarketplaceProducts({
@@ -443,195 +425,43 @@ function ProductsRailInner({
     return rotateWindow(ordered, RAIL_LIMIT, getDailySlot() * 3 + slot);
   }, [productsQuery.data, myShopId, slot, excludeProductIds]);
 
-  const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
-  const [quickView, setQuickView] = useState<MarketplaceProduct | null>(null);
-  const [orderIntent, setOrderIntent] = useState<ProductOrderIntent | null>(null);
-  const [orderShop, setOrderShop] = useState<Shop | null>(null);
-  const queryClient = useQueryClient();
-  const favoritesQuery = useFavorites();
-
-  useEffect(() => {
-    const items = favoritesQuery.data;
-    if (!items) return;
-    setFavorites(new Set(items.filter((i) => i.type === "product").map((i) => i.id)));
-  }, [favoritesQuery.data]);
-
-  useEffect(() => {
-    const refresh = () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.favorites });
-    };
-    window.addEventListener("favoritesUpdated", refresh);
-    return () => window.removeEventListener("favoritesUpdated", refresh);
-  }, [queryClient]);
-
-  const fullFor = useCallback(
-    (product: Product): MarketplaceProduct =>
-      (products.find((p) => p.id === product.id) ?? product) as MarketplaceProduct,
-    [products],
-  );
-
-  const openQuickView = useCallback(
-    (product: Product) => {
-      const full = fullFor(product);
-      setQuickView(full);
-      trackProductView({
-        id: full.id,
-        name: full.name,
-        price: full.price,
-        imageUrl: full.image_url,
-        shopId: full.shop_id,
-        shopName: full.shop_name,
-        category: full.shop_category ?? full.category_id ?? null,
-      });
-      trackCategoryInterest(full.shop_category ?? full.category_id, "click");
-      void logProductClick(full.shop_id, full.id);
-    },
-    [fullFor],
-  );
-
-  /** Direct order — resolve the full shop first, then open WhatsApp checkout. */
-  const handleOrder = useCallback(
-    async (intent: ProductOrderIntent) => {
-      const full = fullFor(intent.product);
-      if (full.is_available === false) {
-        addToast("This product is unavailable.", "error");
-        return;
-      }
-      const shopPick: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
-        id: full.shop_id,
-        name: full.shop_name || "Store",
-        whatsapp_number: full.shop_whatsapp || "",
-      };
-      addItem(full, shopPick, intent.quantity, intent.variant, intent.notes);
-      trackProductView({
-        id: full.id,
-        name: full.name,
-        price: full.price,
-        imageUrl: full.image_url,
-        shopId: full.shop_id,
-        shopName: full.shop_name,
-        category: full.shop_category ?? full.category_id ?? null,
-      });
-      const fallback: Shop = {
-        id: full.shop_id,
-        name: shopPick.name,
-        whatsapp_number: shopPick.whatsapp_number,
-        category: full.shop_category ?? "",
-        location: full.shop_location ?? "",
-        is_live: true,
-        latitude: full.shop_latitude ?? null,
-        longitude: full.shop_longitude ?? null,
-        service_radius_km: full.shop_service_radius_km ?? null,
-        delivery_zones: full.shop_delivery_zones ?? null,
-        free_delivery_threshold: full.shop_free_delivery_threshold ?? null,
-        free_delivery_radius_km: full.shop_free_delivery_radius_km ?? null,
-        delivery_fee_flat: full.shop_delivery_fee_flat ?? null,
-        delivery_fee_per_km: full.shop_delivery_fee_per_km ?? null,
-      };
-      setOrderShop(fallback);
-      setOrderIntent(intent);
-      try {
-        const res = await fetchShopById(full.shop_id);
-        if (res.success && res.data.shop) {
-          setOrderShop({
-            ...res.data.shop,
-            whatsapp_number: res.data.shop.whatsapp_number || shopPick.whatsapp_number,
-            name: res.data.shop.name || shopPick.name,
-          });
-        }
-      } catch {
-        /* keep fallback */
-      }
-    },
-    [addItem, addToast, fullFor],
-  );
-
-  const handleFavorite = useCallback(
-    async (product: { id: string; name?: string; image_url?: string | null }, next: boolean) => {
-      setFavorites((prev) => {
-        const n = new Set(prev);
-        if (next) n.add(product.id);
-        else n.delete(product.id);
-        return n;
-      });
-      try {
-        await toggleFavorite(product.id, "product", product.name || "Product", product.image_url ?? undefined);
-      } catch {
-        setFavorites((prev) => {
-          const n = new Set(prev);
-          if (next) n.delete(product.id);
-          else n.add(product.id);
-          return n;
-        });
-        addToast("Could not update wishlist", "error");
-      }
-    },
-    [addToast],
-  );
-
   const railRef = useMiniRailAutoLoop(products.length);
   if (productsQuery.isLoading || products.length === 0) return null;
 
-  const quickViewShop = quickView
-    ? { id: quickView.shop_id, name: quickView.shop_name || "Store", whatsapp_number: quickView.shop_whatsapp || "" }
-    : null;
-
   return (
-    <>
-      <section aria-label={title} className="tm-rail">
-        <RailHeading icon={<span aria-hidden>✨</span>} title={title} moreLabel="More products" moreHref={moreHref} />
-        <div className="tm-mini-grid" ref={railRef}>
-          {products.map((product) => {
-            const discount = getProductDiscount(product);
-            return (
-              <MiniTile
-                key={product.id}
-                imageUrl={product.image_url}
-                title={product.name}
-                price={product.price}
-                originalPrice={discount.originalPrice}
-                onOpen={() => {
-                  if (product.is_available === false) return;
-                  openQuickView(product);
-                }}
-              />
-            );
-          })}
-        </div>
-      </section>
-
-      {quickView && quickViewShop && (
-        <QuickViewModal
-          product={quickView}
-          shop={quickViewShop}
-          onClose={() => setQuickView(null)}
-          isWishlisted={favorites.has(quickView.id)}
-          onWishlistToggle={() => void handleFavorite(quickView, !favorites.has(quickView.id))}
-          onOrder={(order) => {
-            setQuickView(null);
-            void handleOrder(order);
-          }}
-        />
-      )}
-
-      {orderIntent && orderShop && (
-        <ProductOrderModal
-          shop={orderShop}
-          product={orderIntent.product}
-          variant={orderIntent.variant}
-          quantity={orderIntent.quantity}
-          notes={orderIntent.notes}
-          onClose={() => {
-            setOrderIntent(null);
-            setOrderShop(null);
-          }}
-          onOrderPlaced={() => {
-            setOrderIntent(null);
-            setOrderShop(null);
-          }}
-        />
-      )}
-    </>
+    <section aria-label={title} className="tm-rail">
+      <RailHeading icon={<span aria-hidden>✨</span>} title={title} moreLabel="More products" moreHref={moreHref} />
+      <div className="tm-mini-grid" ref={railRef}>
+        {products.map((product) => {
+          const discount = getProductDiscount(product);
+          const href = getProductSeoPath(product.name, product.short_code, product.id);
+          return (
+            <MiniTile
+              key={product.id}
+              imageUrl={product.image_url}
+              title={product.name}
+              price={product.price}
+              originalPrice={discount.originalPrice}
+              href={product.is_available === false ? moreHref : href}
+              onNavigate={() => {
+                if (product.is_available === false) return;
+                trackProductView({
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  imageUrl: product.image_url,
+                  shopId: product.shop_id,
+                  shopName: product.shop_name,
+                  category: product.shop_category ?? product.category_id ?? null,
+                });
+                trackCategoryInterest(product.shop_category ?? product.category_id, "click");
+                void logProductClick(product.shop_id, product.id);
+              }}
+            />
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

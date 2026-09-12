@@ -160,6 +160,7 @@ export default function AuditLogsPage() {
   } | null>(null);
 
   // Filters
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<AuditSeverity | "all">("all");
   const [eventTypeFilter, setEventTypeFilter] = useState<string>("");
@@ -168,6 +169,15 @@ export default function AuditLogsPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   const pageSize = 30;
+
+  // Debounce search so every keystroke doesn't refetch.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
 
   // ── Auth check ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -240,10 +250,9 @@ export default function AuditLogsPage() {
     return () => { cancelled = true; };
   }, [isAdmin, page, pageSize, severityFilter, eventTypeFilter, search, addToast]);
 
-  // ── Search handler with debounce ──────────────────────────────────────────
+  // ── Search handler (input only; fetch is debounced above) ─────────────────
   const handleSearchChange = useCallback((value: string) => {
-    setSearch(value);
-    setPage(1);
+    setSearchInput(value);
   }, []);
 
   // ── Loading state ─────────────────────────────────────────────────────────
@@ -313,7 +322,7 @@ export default function AuditLogsPage() {
             </span>
             <input
               type="text"
-              value={search}
+              value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search events"
               className="w-full rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-4 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"

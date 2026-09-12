@@ -279,7 +279,9 @@ export default function StoriesViewer({
       if (typeof count !== "number") return;
       setViewCounts((prev) => ({ ...prev, [story.id]: count }));
       patchStoryViewCount(story.id, count);
-      window.dispatchEvent(new Event("trendsmart:stories-updated"));
+      // Do NOT invalidate ["stories"] here — that re-fetches the full tray on
+      // every view. Local patch + ring state is enough; create/delete still
+      // dispatch trendsmart:stories-updated elsewhere.
     });
   }, [stories, currentIndex, myShopId]);
 
@@ -594,9 +596,9 @@ export default function StoriesViewer({
             </div>
           </div>
 
-          {/* Media */}
-          <div className="flex flex-1 items-center justify-center px-2 pb-28 pt-24">
-            <div className="flex h-full max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40">
+          {/* Media — consistent rounded frame on phone / tablet / desktop */}
+          <div className="flex flex-1 items-center justify-center px-2 pb-28 pt-24 sm:px-3">
+            <div className="flex h-full max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-2xl bg-zinc-950/40 shadow-lg ring-1 ring-white/10">
               <StoryImage story={current} />
             </div>
           </div>

@@ -75,7 +75,7 @@ export default function MerchantOrdersPage() {
         const supabase = createClient();
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          window.location.replace("/login?redirect=/dashboard/orders");
+          window.location.replace("/auth?redirect=/dashboard/orders");
           return;
         }
 
@@ -92,8 +92,9 @@ export default function MerchantOrdersPage() {
         setShop(shopResult.data);
 
         const ordersResult = await fetchOrdersByShopId(shopResult.data.id);
-        if (!cancelled && ordersResult.success) {
-          setOrders(ordersResult.data);
+        if (!cancelled) {
+          if (ordersResult.success) setOrders(ordersResult.data);
+          else addToast(ordersResult.error || "Could not load orders.", "error");
         }
 
         unsub = subscribeToOrders(
@@ -286,7 +287,7 @@ export default function MerchantOrdersPage() {
             {shop?.name ?? "Your store"} — Orders
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Update status, reply on WhatsApp, and keep fulfillment moving.
+            Update status, reply on WhatsApp, and keep fulfillment moving. Latest 200 orders shown.
           </p>
         </div>
         <Link
