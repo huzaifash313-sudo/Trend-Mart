@@ -214,6 +214,15 @@ export default function PosApp() {
     return m;
   }, [products]);
 
+  /* Immersive shell: drop storefront navbar / bottom-nav / body offset. */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("tm-pos-immersive");
+    return () => {
+      root.classList.remove("tm-pos-immersive");
+    };
+  }, []);
+
   const refresh = useCallback(async (shopId: string) => {
     const res = await loadPosWorkspace(shopId);
     if (res.success) {
@@ -1033,7 +1042,7 @@ export default function PosApp() {
 
   if (boot) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center bg-zinc-100 text-sm text-zinc-500 dark:bg-zinc-950">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-100 text-sm text-zinc-500 dark:bg-zinc-950">
         Loading POS…
       </div>
     );
@@ -1043,7 +1052,7 @@ export default function PosApp() {
 
   if (needsPin) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center bg-zinc-900 px-4 text-zinc-100">
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-zinc-900 px-4 text-zinc-100">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
           TrendsMart POS
         </p>
@@ -1115,11 +1124,17 @@ export default function PosApp() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-zinc-100 dark:bg-zinc-950 lg:flex-row">
+    <div className="flex min-h-[100dvh] flex-col bg-zinc-100 dark:bg-zinc-950 lg:flex-row">
       {/* Desktop left nav */}
       <aside className="hidden w-52 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 text-zinc-100 lg:flex">
-        <div className="border-b border-zinc-800 px-3 py-4">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400">
+        <div className="border-b border-zinc-800 px-3 py-3">
+          <Link
+            href="/dashboard"
+            className="mb-2 inline-flex text-[11px] font-semibold text-emerald-400 hover:text-emerald-300"
+          >
+            ← Dashboard
+          </Link>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400/80">
             TrendsMart POS
           </p>
           <p className="mt-1 truncate text-sm font-bold">{shop.name}</p>
@@ -1137,11 +1152,19 @@ export default function PosApp() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ERP header */}
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900 px-3 py-2.5 text-zinc-100 sm:px-4">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900 px-3 py-2 text-zinc-100 sm:px-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400 lg:hidden">
-              TrendsMart POS
-            </p>
+            <div className="mb-0.5 flex items-center gap-2 lg:hidden">
+              <Link
+                href="/dashboard"
+                className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300"
+              >
+                ← Dashboard
+              </Link>
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                POS
+              </span>
+            </div>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <h1 className="truncate text-sm font-bold sm:text-base">{shop.name}</h1>
               <span className="text-[11px] text-zinc-400">{posPackLabel(settings.pack)}</span>

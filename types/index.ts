@@ -809,6 +809,7 @@ export type ShopCategory =
   | "Toys & Baby Care"
   | "Automotive Accessories"
   | "Handmade & Crafts"
+  | "Sanitary and Fittings"
   | "Home Maintenance & Repair"
   | "Security & Surveillance"
   | "Tech & IT Services"
@@ -833,6 +834,7 @@ export const SHOP_CATEGORIES: readonly ShopCategory[] = [
   "Toys & Baby Care",
   "Automotive Accessories",
   "Handmade & Crafts",
+  "Sanitary and Fittings",
   "Home Maintenance & Repair",
   "Security & Surveillance",
   "Tech & IT Services",
@@ -858,6 +860,7 @@ export const PRODUCT_CATEGORIES: readonly string[] = [
   "Toys & Baby Care",
   "Automotive Accessories",
   "Handmade & Crafts",
+  "Sanitary and Fittings",
   "Home Maintenance & Repair",
   "Security & Surveillance",
   "Tech & IT Services",
@@ -925,6 +928,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   "Toys & Baby Care": "🧸",
   "Automotive Accessories": "🚗",
   "Handmade & Crafts": "🎨",
+  "Sanitary and Fittings": "🚿",
   "Home Maintenance & Repair": "🔧",
   "Security & Surveillance": "📹",
   "Tech & IT Services": "💻",
@@ -950,6 +954,7 @@ export const CATEGORY_GRADIENTS: Record<string, string> = {
   "Toys & Baby Care": "from-yellow-400 to-pink-400",
   "Automotive Accessories": "from-slate-500 to-zinc-600",
   "Handmade & Crafts": "from-fuchsia-400 to-purple-500",
+  "Sanitary and Fittings": "from-sky-400 to-cyan-600",
   "Home Maintenance & Repair": "from-orange-500 to-amber-600",
   "Security & Surveillance": "from-slate-600 to-slate-800",
   "Tech & IT Services": "from-cyan-500 to-blue-600",

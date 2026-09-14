@@ -359,6 +359,7 @@ export function categoryDisplay(category: string): { emoji: string; label: strin
     "Toys & Baby Care": "🧸",
     "Automotive Accessories": "🚗",
     "Handmade & Crafts": "🎨",
+    "Sanitary and Fittings": "🚿",
     "Home Maintenance & Repair": "🔧",
     "Security & Surveillance": "📹",
     "Tech & IT Services": "💻",

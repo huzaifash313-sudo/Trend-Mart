@@ -113,6 +113,7 @@ export function categoryVariantHint(category?: string | null): string {
     "Toys & Baby Care": "Age, diaper size, ya color — kids items.",
     "Automotive Accessories": "Vehicle fit, size, ya oil volume.",
     "Handmade & Crafts": "Size, color, ya set — handmade pieces.",
+    "Sanitary and Fittings": "Size, finish, ya set — taps & fittings.",
     "Home Maintenance & Repair": "Duration ya package — service plans.",
     "Security & Surveillance": "Camera pack ya package.",
     "Tech & IT Services": "Package ya duration — service tiers.",
@@ -419,6 +420,33 @@ const BY_CATEGORY: Record<string, VariantTemplatePack[]> = {
       label: "Size only",
       hint: "Custom sized pieces",
       groups: [HOME_SIZE()],
+    },
+  ),
+
+  "Sanitary and Fittings": packs(
+    {
+      id: "sanitary-size-finish",
+      label: "Size + Finish",
+      hint: "Taps, showers, fittings",
+      groups: [HOME_SIZE(), COLOR()],
+    },
+    {
+      id: "sanitary-finish",
+      label: "Finish / Color",
+      hint: "Chrome, gold, matt black…",
+      groups: [COLOR()],
+    },
+    {
+      id: "sanitary-size",
+      label: "Size / Diameter",
+      hint: "Pipe diameter or basin size",
+      groups: [HOME_SIZE()],
+    },
+    {
+      id: "sanitary-set",
+      label: "Set / Pieces",
+      hint: "Bathroom sets",
+      groups: [PIECES()],
     },
   ),
 

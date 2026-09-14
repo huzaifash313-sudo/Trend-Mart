@@ -422,7 +422,7 @@ export default function ProductDetailClient({ code }: { code: string }) {
   const canTilt = images.length >= 2 && Boolean(images[0]) && Boolean(images[1]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl pb-10 md:px-4 md:pt-5">
+    <div className="mx-auto w-full max-w-6xl pb-8 md:px-4 md:pt-3">
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-8 lg:gap-10">
         {/* ── Gallery ─────────────────────────────────────────────────── */}
         <div className="md:sticky md:top-20">
@@ -553,7 +553,7 @@ export default function ProductDetailClient({ code }: { code: string }) {
         </div>
 
         {/* ── Details ───────────────────────────────────────────────────── */}
-        <div className="space-y-4 px-3 pt-4 md:px-0 md:pt-1">
+        <div className="space-y-2.5 px-3 pt-2.5 md:px-0 md:pt-1">
         <div>
           <div className="flex items-start justify-between gap-3">
             <h1 className="min-w-0 flex-1 text-[1.15rem] font-bold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -617,7 +617,7 @@ export default function ProductDetailClient({ code }: { code: string }) {
             </button>
           </div>
 
-          <div className="mt-2 space-y-1.5">
+          <div className="mt-1.5 space-y-1">
             <button
               type="button"
               onClick={() => {
@@ -652,17 +652,17 @@ export default function ProductDetailClient({ code }: { code: string }) {
             <button
               type="button"
               onClick={() => setRatingOpen(true)}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100 active:scale-95 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-800/60"
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100 active:scale-95 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-800/60"
             >
               Write a review
             </button>
           ) : ratingCtx?.signedIn && !ratingCtx.isOwner && ratingCtx.alreadyReviewed ? (
-            <p className="mt-2 text-[0.7rem] font-medium text-emerald-700 dark:text-emerald-400">
+            <p className="mt-1 text-[0.65rem] font-medium text-emerald-700 dark:text-emerald-400">
               You rated this product
             </p>
           ) : ratingCtx?.signedIn && !ratingCtx.isOwner ? (
-            <p className="mt-2 text-[0.7rem] text-zinc-400">
-              Rate it after your order for this product is delivered.
+            <p className="mt-1 text-[0.65rem] text-zinc-400">
+              Rate after delivery
             </p>
           ) : null}
         </div>
@@ -826,8 +826,8 @@ export default function ProductDetailClient({ code }: { code: string }) {
         </div>
       </div>
 
-      <div className="mt-5 space-y-4 px-3 md:mt-6 md:space-y-5 md:px-0">
-        <BuyerProtectionStrip />
+      <div className="mt-3 space-y-3 px-3 md:mt-4 md:space-y-3.5 md:px-0">
+        <BuyerProtectionStrip compact />
         {product ? (
           <ProductReviews
             productId={product.id}

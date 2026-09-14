@@ -318,7 +318,9 @@ export default function BottomNav() {
   if (
     pathname === "/offline" ||
     pathname.startsWith("/admin") ||
-    pathname.startsWith("/t/")
+    pathname.startsWith("/t/") ||
+    pathname === "/dashboard/pos" ||
+    pathname.startsWith("/dashboard/pos/")
   ) {
     return null;
   }

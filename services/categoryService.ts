@@ -135,6 +135,12 @@ const CATEGORY_META: Record<Exclude<ShopCategory, "All">, CategoryMeta> = {
     icon: "🎨",
     description: "Handcrafted goods, art supplies, and DIY products",
   },
+  "Sanitary and Fittings": {
+    key: "Sanitary and Fittings",
+    label: "Sanitary and Fittings",
+    icon: "🚿",
+    description: "Taps, pipes, bathroom fittings, toilets, and sanitary hardware",
+  },
   "Home Maintenance & Repair": {
     key: "Home Maintenance & Repair",
     label: "Home Maintenance & Repair",

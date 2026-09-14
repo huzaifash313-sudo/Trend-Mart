@@ -11,7 +11,14 @@ import { getDealSeoPath } from "@/lib/seo/dealSlug";
 import { getDealImages } from "@/lib/productImages";
 import type { ShopDeal } from "@/lib/dealSchedule";
 
-export default function DealDetailClient({ dealId }: { dealId: string }) {
+export default function DealDetailClient({
+  dealId,
+  /** When true, SEO page already rendered image + title — only actions/related. */
+  hideCard = false,
+}: {
+  dealId: string;
+  hideCard?: boolean;
+}) {
   const [deal, setDeal] = useState<ShopDeal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +73,7 @@ export default function DealDetailClient({ dealId }: { dealId: string }) {
 
   if (loading) {
     return (
-      <div className="mt-4">
+      <div className={hideCard ? "mt-3" : "mt-4"}>
         <ProductDetailSkeleton />
       </div>
     );
@@ -90,10 +97,10 @@ export default function DealDetailClient({ dealId }: { dealId: string }) {
   }
 
   return (
-    <div className="mt-4">
-      <DealCard deal={deal} priority />
+    <div className={hideCard ? "mt-3 space-y-3" : "mt-4 space-y-3"}>
+      {!hideCard ? <DealCard deal={deal} priority /> : null}
       <RelatedItemsRail title="More deals from this shop" items={related} />
-      <div className="mt-4 text-center">
+      <div className="pb-2 text-center">
         <Link
           href="/deals"
           className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"

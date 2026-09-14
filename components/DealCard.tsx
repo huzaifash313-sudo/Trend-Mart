@@ -21,7 +21,6 @@ import { getShopPath, isUuid } from "@/lib/shopSlug";
 import { getDealSeoPath } from "@/lib/seo/dealSlug";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
-import { OfferTickerMarquee } from "@/components/OfferTickerMarquee";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
 import { useCart } from "@/context/CartContext";
 import { toggleFavorite, isFavorited } from "@/services/wishlistService";
@@ -36,7 +35,6 @@ import {
 import type { Shop } from "@/types";
 import { useToast } from "@/components/Toast";
 import { trackProductView } from "@/lib/behavior";
-import FlashCountdown from "@/components/FlashCountdown";
 
 // Re-exported so existing call sites (`/deals`) keep a stable import surface.
 export { dealToProduct };
@@ -501,26 +499,12 @@ function DealCard({
           </span>
 
           {hasDiscount && discountPercent > 0 ? (
-            <span className="tm-badge-discount absolute left-1.5 top-7 z-10">
+            <span className="tm-badge-discount absolute right-1.5 top-1.5 z-10">
               {discountPercent}% OFF
             </span>
-          ) : null}
-
-          {deal.ends_on ? (
-            <span className="absolute bottom-7 left-1.5 z-10">
-              <FlashCountdown
-                endsAt={`${deal.ends_on}T23:59:59`}
-              />
-            </span>
-          ) : (
-            <span className="absolute bottom-7 left-1.5 z-10 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
-              Limited time
-            </span>
-          )}
-
-          {locationHint ? (
+          ) : locationHint ? (
             <span
-              className="absolute right-1.5 top-1.5 z-10 rounded-full bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white shadow-sm"
+              className="absolute right-1.5 top-1.5 z-10 rounded-full bg-zinc-900/75 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
               title={locationHint}
             >
               {locationHint}
@@ -528,7 +512,7 @@ function DealCard({
           ) : null}
 
           {gallery.length > 1 ? (
-            <span className="absolute bottom-7 right-1.5 z-10 rounded bg-zinc-950/75 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+            <span className="absolute bottom-1.5 right-1.5 z-10 rounded bg-zinc-950/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
               {Math.min(imgIndex, gallery.length - 1) + 1}/{gallery.length}
             </span>
           ) : null}
@@ -553,14 +537,18 @@ function DealCard({
               </button>
             </>
           ) : null}
-
-          {tickerTags.length > 0 ? <OfferTickerMarquee tags={tickerTags} /> : null}
         </div>
 
         <div className="tm-product-body">
           <h3 className={`tm-product-title ${titleClass}`} title={deal.title}>
             {deal.title}
           </h3>
+          {whenTag ? (
+            <p className="truncate text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+              {whenTag}
+              {deal.ends_on ? " · limited" : ""}
+            </p>
+          ) : null}
 
           <button
             type="button"

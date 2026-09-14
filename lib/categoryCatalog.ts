@@ -222,6 +222,16 @@ export const SUBCATEGORY_CATALOG: Record<string, CatalogSubCategory[]> = {
     { name: "Resin & Clay", slug: "resin-clay", description: "Resin art, clay crafts, and keychains", icon: "🪨", sort_order: 5 },
     others("Handmade & Crafts"),
   ],
+  "Sanitary and Fittings": [
+    { name: "Taps & Mixers", slug: "taps-mixers", description: "Basin, kitchen, and shower mixers", icon: "🚰", sort_order: 1 },
+    { name: "Pipes & Connectors", slug: "pipes-connectors", description: "PVC, PPR, elbows, and joints", icon: "🔧", sort_order: 2 },
+    { name: "Bathroom Accessories", slug: "bathroom-accessories", description: "Soap dishes, towel rails, and mirrors", icon: "🪞", sort_order: 3 },
+    { name: "Toilet & Cistern", slug: "toilet-cistern", description: "Commodes, seats, and flush tanks", icon: "🚽", sort_order: 4 },
+    { name: "Showers & Bath", slug: "showers-bath", description: "Shower heads, hand showers, and baths", icon: "🚿", sort_order: 5 },
+    { name: "Valves & Hardware", slug: "valves-hardware", description: "Ball valves, gate valves, and fittings", icon: "⚙️", sort_order: 6 },
+    { name: "Sinks & Basins", slug: "sinks-basins", description: "Wash basins, kitchen sinks, and pedestals", icon: "🧼", sort_order: 7 },
+    others("Sanitary and Fittings"),
+  ],
   "Home Maintenance & Repair": [
     { name: "Plumbing", slug: "plumbing", description: "Plumbers and water-line repair", icon: "🔧", sort_order: 1 },
     { name: "Electrical", slug: "electrical", description: "Electricians and wiring work", icon: "⚡", sort_order: 2 },

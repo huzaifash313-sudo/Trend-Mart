@@ -362,6 +362,26 @@ export const CATEGORY_THEMES: Record<string, StoreTheme> = {
     categoryDescription:
       "Handmade décor, jewelry, custom gifts, resin art, and crafts.",
   },
+  "Sanitary and Fittings": {
+    label: "Sanitary and Fittings",
+    icon: "🚿",
+    bannerGradient: "from-sky-400 via-cyan-500 to-teal-600",
+    accentColor: "cyan",
+    accentHex: "#06b6d4",
+    secondaryHex: "#ecfeff",
+    cardGradient:
+      "from-sky-50 to-cyan-100 dark:from-sky-950 dark:to-cyan-900",
+    badgeClass:
+      "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+    priceColor: "text-cyan-700 dark:text-cyan-400",
+    buttonClass:
+      "bg-cyan-600 hover:bg-cyan-700 focus:ring-cyan-500 text-white",
+    productColumns: "3",
+    showVariantsProminent: true,
+    useGalleryLayout: false,
+    categoryDescription:
+      "Taps, pipes, bathroom fittings, toilets, showers, and sanitary hardware.",
+  },
   "Home Maintenance & Repair": {
     label: "Home Maintenance",
     icon: "🔧",

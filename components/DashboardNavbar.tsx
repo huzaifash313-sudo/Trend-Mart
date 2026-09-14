@@ -132,7 +132,7 @@ export default function DashboardNavbar() {
   /** Class for a desktop nav link — highlights the currently active page */
   const navLinkClass = useCallback((href: string) => {
     const active = isActive(href);
-    return `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+    return `shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
       active
         ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
         : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -221,7 +221,7 @@ export default function DashboardNavbar() {
 
         {/* Desktop nav links — scrollable when too many fit */}
         <nav
-          className="hidden md:flex items-center gap-0.5 overflow-x-auto scrollbar-none"
+          className="hidden max-w-[min(52vw,40rem)] items-center gap-0.5 overflow-x-auto scrollbar-none md:flex"
           aria-label="Dashboard navigation"
           style={{ scrollbarWidth: "none" }}
         >

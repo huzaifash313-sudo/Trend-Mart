@@ -160,14 +160,14 @@ export default function ProductReviews({
   return (
     <section
       id="product-reviews"
-      className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
+      className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-3.5"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
+          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
             Product reviews
           </h2>
-          <p className="mt-0.5 text-[11px] text-zinc-500">
+          <p className="mt-0.5 text-[10px] text-zinc-500">
             Ratings for <span className="font-medium text-zinc-700 dark:text-zinc-300">{productName}</span>
             {" · "}
             <Link
@@ -189,9 +189,9 @@ export default function ProductReviews({
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-4">
+      <div className="mt-2.5 flex flex-wrap items-center gap-3">
         <div className="text-center">
-          <p className="text-3xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">
+          <p className="text-2xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">
             {displayCount > 0 ? displayAvg.toFixed(1) : "—"}
           </p>
           <Stars rating={displayAvg} />
@@ -293,7 +293,7 @@ export default function ProductReviews({
         </p>
       ) : null}
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-2.5 space-y-2">
         {loading ? (
           Array.from({ length: 2 }).map((_, i) => (
             <div

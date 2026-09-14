@@ -4719,17 +4719,17 @@ html.dark .tm-product-title {
   right: 0;
   bottom: 0;
   z-index: 12;
-  height: 1.5rem;
+  height: 1.15rem;
   overflow: hidden;
   pointer-events: none;
   background: linear-gradient(
     90deg,
-    rgba(9, 9, 11, 0.94) 0%,
-    rgba(24, 24, 27, 0.9) 55%,
-    rgba(9, 9, 11, 0.94) 100%
+    rgba(9, 9, 11, 0.88) 0%,
+    rgba(24, 24, 27, 0.82) 55%,
+    rgba(9, 9, 11, 0.88) 100%
   );
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.18);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: none;
   /* Fade text at both edges so mid-animation cuts look intentional, not clipped */
   mask-image: linear-gradient(90deg, transparent 0, #000 0.8rem, #000 calc(100% - 0.8rem), transparent 100%);
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 0.8rem, #000 calc(100% - 0.8rem), transparent 100%);
@@ -6892,6 +6892,31 @@ html.dark .recharts-label-line {
 .tm-main:has(.tm-dine-in-shell) {
   padding-top: 0;
   padding-bottom: 0;
+}
+
+/* ── Immersive POS (no storefront navbar / bottom nav / dual chrome) ─────── */
+html.tm-pos-immersive {
+  --tm-navbar-sticky-offset: 0px;
+  --tm-navbar-content-height: 0px;
+}
+
+html.tm-pos-immersive body {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+html.tm-pos-immersive .tm-navbar-wrap,
+html.tm-pos-immersive .bottom-nav,
+html.tm-pos-immersive .tm-cartbar-root,
+html.tm-pos-immersive .tm-site-footer,
+html.tm-pos-immersive .tm-sidebar-persistent,
+html.tm-pos-immersive .tm-sidebar-reopen {
+  display: none !important;
+}
+
+html.tm-pos-immersive .tm-main {
+  padding-bottom: 0 !important;
+  min-height: 100dvh;
 }
 
 .tm-dine-in-shell {
