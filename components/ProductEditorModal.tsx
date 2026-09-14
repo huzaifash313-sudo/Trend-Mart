@@ -56,6 +56,7 @@ export default function ProductEditorModal({
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
+  const [costPrice, setCostPrice] = useState("");
   const [gallery, setGallery] = useState<string[]>([]);
   const [isAvailable, setIsAvailable] = useState(true);
   const [acceptsDelivery, setAcceptsDelivery] = useState(true);
@@ -76,6 +77,7 @@ export default function ProductEditorModal({
       setOriginalPrice(
         product.original_price != null ? String(product.original_price) : "",
       );
+      setCostPrice(product.cost_price != null ? String(product.cost_price) : "");
       setGallery(images);
       setIsAvailable(product.is_available !== false);
       setAcceptsDelivery(product.accepts_delivery !== false);
@@ -88,6 +90,7 @@ export default function ProductEditorModal({
       setDescription("");
       setPrice("");
       setOriginalPrice("");
+      setCostPrice("");
       setGallery([]);
       setIsAvailable(true);
       setAcceptsDelivery(true);
@@ -145,6 +148,9 @@ export default function ProductEditorModal({
       const normalized = normalizeProductGallery(gallery);
       const original = originalPrice.trim() ? Number(originalPrice) : null;
       const hasDeal = original != null && Number.isFinite(original) && original > parsedPrice;
+      const costRaw = costPrice.trim() ? Number(costPrice) : null;
+      const cost =
+        costRaw != null && Number.isFinite(costRaw) && costRaw >= 0 ? costRaw : null;
       const cleanTiers = normalizeTiers(priceTiers);
 
       const payload = {
@@ -152,6 +158,7 @@ export default function ProductEditorModal({
         description: description.trim(),
         price: parsedPrice,
         original_price: hasDeal ? original : null,
+        cost_price: cost,
         image_url: normalized.image_url,
         images: normalized.images,
         is_available: isAvailable,
@@ -183,6 +190,7 @@ export default function ProductEditorModal({
       description,
       price,
       originalPrice,
+      costPrice,
       gallery,
       isAvailable,
       acceptsDelivery,
@@ -287,6 +295,22 @@ export default function ProductEditorModal({
             </div>
           </div>
 
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Cost price (Rs.)
+              <span className="ml-1 font-normal text-zinc-400">(optional · for profit)</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              value={costPrice}
+              onChange={(e) => setCostPrice(e.target.value)}
+              placeholder="What you paid / COGS"
+              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+          </div>
+
           {originalPrice && price && Number(originalPrice) > Number(price) && (
             <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
               Badge: -{Math.round(((Number(originalPrice) - Number(price)) / Number(originalPrice)) * 100)}% OFF
@@ -314,15 +338,6 @@ export default function ProductEditorModal({
             label="Product photos"
           />
 
-          <VariantEditor
-            variants={variants}
-            onChange={setVariants}
-            basePrice={Number(price) || 0}
-            shopCategory={shopCategory}
-          />
-
-          <PriceTierEditor tiers={priceTiers} onChange={setPriceTiers} basePrice={Number(price) || 0} />
-
           <ToggleSwitch
             checked={isAvailable}
             onChange={setIsAvailable}
@@ -330,23 +345,56 @@ export default function ProductEditorModal({
             visibleLabel={isAvailable ? "In stock — available for ordering" : "Out of stock"}
           />
 
-          <ToggleSwitch
-            checked={acceptsDelivery}
-            onChange={setAcceptsDelivery}
-            label="Accept delivery for this product"
-            visibleLabel={
-              acceptsDelivery ? "Delivery on — home orders allowed" : "Delivery paused — pickup only"
-            }
-          />
+          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+            <p className="mb-1 text-xs font-bold text-emerald-900 dark:text-emerald-200">
+              Options / variants
+            </p>
+            <p className="mb-2 text-[11px] leading-snug text-emerald-800/80 dark:text-emerald-300/80">
+              Size, colour, portion — customers pick before order. Skip if one fixed item.
+            </p>
+            <VariantEditor
+              variants={variants}
+              onChange={setVariants}
+              basePrice={Number(price) || 0}
+              shopCategory={shopCategory}
+            />
+          </div>
 
-          <ToggleSwitch
-            checked={acceptsPickup}
-            onChange={setAcceptsPickup}
-            label="Accept pickup for this product"
-            visibleLabel={
-              acceptsPickup ? "Pickup on — customers can collect" : "Pickup paused"
-            }
-          />
+          <details className="group rounded-xl border border-zinc-200 open:pb-2 dark:border-zinc-700">
+            <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-semibold text-zinc-600 marker:content-none dark:text-zinc-300 [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center justify-between gap-2">
+                More options
+                <span className="text-[10px] font-normal text-zinc-400 group-open:hidden">
+                  Bulk price · delivery
+                </span>
+              </span>
+            </summary>
+            <div className="space-y-3 border-t border-zinc-100 px-3 pt-3 dark:border-zinc-800">
+              <PriceTierEditor
+                tiers={priceTiers}
+                onChange={setPriceTiers}
+                basePrice={Number(price) || 0}
+              />
+              <ToggleSwitch
+                checked={acceptsDelivery}
+                onChange={setAcceptsDelivery}
+                label="Accept delivery for this product"
+                visibleLabel={
+                  acceptsDelivery
+                    ? "Delivery on — home orders allowed"
+                    : "Delivery paused — pickup only"
+                }
+              />
+              <ToggleSwitch
+                checked={acceptsPickup}
+                onChange={setAcceptsPickup}
+                label="Accept pickup for this product"
+                visibleLabel={
+                  acceptsPickup ? "Pickup on — customers can collect" : "Pickup paused"
+                }
+              />
+            </div>
+          </details>
 
           <div className="flex gap-2 pt-1">
             <button

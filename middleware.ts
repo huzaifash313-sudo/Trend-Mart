@@ -768,6 +768,18 @@ export async function middleware(request: NextRequest) {
 
   authDebug(">>> REQUEST", { pathname, method: request.method });
 
+  // PWA / static public assets must never hit auth or rate limits — browsers
+  // poll /sw.js aggressively; a 429 breaks ServiceWorker registration.
+  if (
+    pathname === "/sw.js" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/manifest.json" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml"
+  ) {
+    return NextResponse.next();
+  }
+
   // ── 0. Redirect-loop detection ──────────────────────────────────────────
   //    If the browser has been redirected 3+ times in quick succession,
   //    short-circuit all redirect logic and serve the requested page.
@@ -1121,6 +1133,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    /*
+     * Skip Next internals, favicon, PWA worker, and static public assets.
+     * Especially /sw.js — rate-limiting it returns 429 and breaks SW updates.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|manifest\\.json|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff2?|ttf|mp4|webm|txt)$).*)",
   ],
 };

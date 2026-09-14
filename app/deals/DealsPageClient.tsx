@@ -43,6 +43,7 @@ import {
 } from "@/services/subCategoryService";
 import { fetchShopsGeoByIds } from "@/services/shopService";
 import { locationHintLabel, sortWithNearbyBoost } from "@/lib/nearbyBoost";
+import { useLocale } from "@/context/LocaleContext";
 
 const GeoRadiusFilter = dynamic(() => import("@/components/GeoRadiusFilter"), {
   ssr: false,
@@ -74,6 +75,7 @@ function DealsInner({
   initialDeals?: ShopDeal[];
   urlState: DealsUrlState;
 }) {
+  const { t } = useLocale();
   const router = useRouter();
   const qParam = urlState.q;
   const filterParam = urlState.filter;
@@ -633,10 +635,10 @@ function DealsInner({
   };
 
   const FILTERS: { value: FilterMode; label: string }[] = [
-    { value: "today", label: "Live today" },
-    { value: "featured", label: "Featured" },
-    { value: "upcoming", label: "Upcoming" },
-    { value: "all", label: "All active" },
+    { value: "today", label: t("deals.liveToday") },
+    { value: "featured", label: t("deals.featured") },
+    { value: "upcoming", label: t("deals.upcoming") },
+    { value: "all", label: t("deals.allActive") },
   ];
 
   const subLabel = activeSubCategoryId
@@ -663,7 +665,7 @@ function DealsInner({
     <div className="mx-auto w-full max-w-6xl flex-1 page-stack px-3 py-2 pb-safe-nav md:px-4 md:py-4 md:pb-8">
       <header className="mb-0">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-[1.65rem]">
-          Deals for you
+          {t("deals.forYou")}
         </h1>
       </header>
 
@@ -671,15 +673,15 @@ function DealsInner({
         value={query}
         onChange={setQuery}
         onSubmit={handleSearch}
-        placeholder="Search deals"
-        ariaLabel="Search deals"
+        placeholder={t("deals.searchPlaceholder")}
+        ariaLabel={t("deals.searchAria")}
         className="mb-0"
       />
 
       {/* Category strip — reserved min-height so late data doesn't shift layout */}
       <div className="min-h-[2.75rem]">
       {availableCategories.length > 0 ? (
-        <section aria-label="Filter deals by category" className="tm-cat-bar -mx-3 sm:-mx-4">
+        <section aria-label={t("deals.filterCategory")} className="tm-cat-bar -mx-3 sm:-mx-4">
           <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
             <button
               type="button"
@@ -687,7 +689,7 @@ function DealsInner({
               className={`tm-cat-tab${activeCategory === "All" ? " is-active" : ""}`}
               aria-pressed={activeCategory === "All"}
             >
-              <span className="tm-cat-tab-label">All deals</span>
+              <span className="tm-cat-tab-label">{t("deals.allDeals")}</span>
               <span className="tm-cat-tab-line" aria-hidden="true" />
             </button>
             {availableCategories.map((category) => {
@@ -713,7 +715,7 @@ function DealsInner({
       {/* Sub-category drill-down for the selected main category. */}
       {activeCategory !== "All" && (subsLoading || visibleSubs.length > 0) ? (
         <section
-          aria-label={`Filter deals by sub-category in ${activeCategory}`}
+          aria-label={`${t("deals.filterSub")} · ${activeCategory}`}
           className="tm-cat-bar tm-cat-bar--sub -mx-3 sm:-mx-4"
         >
           <FadeScrollX fadeColor="var(--tm-bg)" className="tm-cat-scroll px-2 sm:px-3">
@@ -723,7 +725,7 @@ function DealsInner({
               className={`tm-cat-tab${!activeSubCategoryId ? " is-active" : ""}`}
               aria-pressed={!activeSubCategoryId}
             >
-              <span className="tm-cat-tab-label">All</span>
+              <span className="tm-cat-tab-label">{t("search.all")}</span>
               <span className="tm-cat-tab-line" aria-hidden="true" />
             </button>
             {visibleSubs.map((sub) => {
@@ -745,7 +747,7 @@ function DealsInner({
             })}
             {subsLoading ? (
               <span className="shrink-0 self-center px-2 text-[0.65rem] text-zinc-400 animate-pulse">
-                Loading…
+                {t("common.loading")}
               </span>
             ) : null}
           </FadeScrollX>
@@ -791,7 +793,7 @@ function DealsInner({
 
       <p className="mb-2 text-[11px] text-zinc-600 dark:text-zinc-400">
         {loading ? (
-          "Loading deals…"
+          t("deals.loading")
         ) : (
           <span className="tm-live-count">
             {(filter === "today" || resultHint.includes("live")) && (

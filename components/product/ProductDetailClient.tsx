@@ -4,12 +4,17 @@
 /*  TrendsMart — Shared product detail UI (`/p/[code]` & `/products/[slug]`)    */
 /* -------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MarketplaceProduct, Product, Shop } from "@/types";
-import { fetchProductByReference, fetchRelatedMarketplaceProducts } from "@/services/productService";
+import {
+  fetchProductByReference,
+  fetchRelatedMarketplaceProducts,
+  fetchCrossShopRelatedProducts,
+  fetchAlsoBoughtProducts,
+} from "@/services/productService";
 import { fetchShopById } from "@/services/shopService";
 import { fetchProductReviewContext, type ProductReviewContext } from "@/services/reviewService";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
@@ -17,10 +22,16 @@ import { getProductImages } from "@/lib/productImages";
 import { hasPriceTiers, priceForQuantity, tierPreviewLabels } from "@/lib/priceTiers";
 import { getSafeImageUrl } from "@/services/storageService";
 import { getShopPath } from "@/lib/shopSlug";
+import { trackProductView } from "@/lib/behavior";
+import { toggleCompare, isInCompare, resolveCompareCategoryKey } from "@/lib/compare";
+import BuyerProtectionStrip from "@/components/BuyerProtectionStrip";
+import FlashCountdown from "@/components/FlashCountdown";
+import { useLocale } from "@/context/LocaleContext";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import ProductOrderModal from "@/components/ProductOrderModal";
 import ProductRatingModal from "@/components/ProductRatingModal";
+import ProductReviews from "@/components/ProductReviews";
 import RelatedItemsRail, { type RelatedRailItem } from "@/components/RelatedItemsRail";
 import VariantSelector, { type SelectedVariant } from "@/components/VariantSelector";
 import { computeVariantPricing, customerVariantGroups } from "@/lib/variantPricing";
@@ -30,6 +41,7 @@ import { useToast } from "@/components/Toast";
 import { ErrorState } from "@/components/ErrorState";
 import { ProductDetailSkeleton } from "@/components/Skeletons";
 import CompactRating from "@/components/CompactRating";
+import DualImageTilt from "@/components/DualImageTilt";
 import { createClient } from "@/lib/supabase/client";
 
 function BackIcon() {
@@ -85,14 +97,7 @@ function stubShopFromProduct(p: MarketplaceProduct): Shop {
   } as Shop;
 }
 
-export default function ProductDetailClient({
-  code,
-  suppressHeading = false,
-}: {
-  code: string;
-  /** When true, parent already rendered an SSR <h1> for crawlers. */
-  suppressHeading?: boolean;
-}) {
+export default function ProductDetailClient({ code }: { code: string }) {
   const router = useRouter();
   const { addItem, items: cartItems, updateQuantity, removeItem } = useCart();
   const { addToast } = useToast();
@@ -111,7 +116,15 @@ export default function ProductDetailClient({
   const [orderOpen, setOrderOpen] = useState(false);
   const [ratingOpen, setRatingOpen] = useState(false);
   const [ratingCtx, setRatingCtx] = useState<ProductReviewContext | null>(null);
-  const [related, setRelated] = useState<RelatedRailItem[]>([]);
+  const [reviewsRefreshKey, setReviewsRefreshKey] = useState(0);
+  const [fromShop, setFromShop] = useState<RelatedRailItem[]>([]);
+  const [relatedOther, setRelatedOther] = useState<RelatedRailItem[]>([]);
+  const [alsoBought, setAlsoBought] = useState<RelatedRailItem[]>([]);
+  const [inCompare, setInCompare] = useState(false);
+  const { t } = useLocale();
+  /** Light dual-photo tilt (client-only) when merchant has 2+ images */
+  const [tiltMode, setTiltMode] = useState(false);
+  const galleryRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +132,9 @@ export default function ProductDetailClient({
     setError(null);
     setProduct(null);
     setShop(null);
-    setRelated([]);
+    setFromShop([]);
+    setRelatedOther([]);
+    setAlsoBought([]);
     setActiveIndex(0);
     setBroken(new Set());
     setSelectedVariants([]);
@@ -128,6 +143,7 @@ export default function ProductDetailClient({
     setAdded(false);
     setRatingOpen(false);
     setRatingCtx(null);
+    setTiltMode(false);
 
     (async () => {
       const res = await fetchProductByReference(code);
@@ -143,27 +159,61 @@ export default function ProductDetailClient({
         return;
       }
       setProduct(res.data);
+      setInCompare(isInCompare(res.data.id));
+      trackProductView({
+        id: res.data.id,
+        name: res.data.name,
+        price: res.data.price,
+        imageUrl: res.data.image_url,
+        shopId: res.data.shop_id,
+        shopName: res.data.shop_name,
+        category: res.data.shop_category ?? res.data.category_id,
+      });
       void fetchProductReviewContext(res.data.id).then((ctx) => {
         if (!cancelled) setRatingCtx(ctx);
       });
-      void fetchRelatedMarketplaceProducts({
-        shopId: res.data.shop_id,
-        excludeId: res.data.id,
-        categoryId: res.data.category_id,
-        subCategoryId: res.data.sub_category_id,
-        limit: 8,
-      }).then((rel) => {
-        if (cancelled || !rel.success) return;
-        setRelated(
-          rel.data.map((p) => ({
-            id: p.id,
-            href: getProductSeoPath(p.name, p.short_code, p.id),
-            title: p.name,
-            price: p.price,
-            originalPrice: p.original_price ?? p.compare_at_price ?? null,
-            imageUrl: p.image_url,
-          })),
-        );
+
+      const toRail = (p: MarketplaceProduct): RelatedRailItem => ({
+        id: p.id,
+        href: getProductSeoPath(p.name, p.short_code, p.id),
+        title: p.name,
+        price: p.price,
+        originalPrice: p.original_price ?? p.compare_at_price ?? null,
+        imageUrl: p.image_url,
+        shopName: p.shop_name,
+      });
+
+      void Promise.all([
+        fetchRelatedMarketplaceProducts({
+          shopId: res.data.shop_id,
+          excludeId: res.data.id,
+          categoryId: res.data.category_id,
+          subCategoryId: res.data.sub_category_id,
+          limit: 8,
+        }),
+        fetchCrossShopRelatedProducts({
+          excludeShopId: res.data.shop_id,
+          excludeId: res.data.id,
+          categoryId: res.data.category_id,
+          subCategoryId: res.data.sub_category_id,
+          shopCategory: res.data.shop_category,
+          seedName: res.data.name,
+          limit: 10,
+        }),
+        fetchAlsoBoughtProducts({
+          excludeId: res.data.id,
+          excludeShopId: res.data.shop_id,
+          categoryId: res.data.category_id,
+          subCategoryId: res.data.sub_category_id,
+          shopCategory: res.data.shop_category,
+          seedName: res.data.name,
+          limit: 8,
+        }),
+      ]).then(([sameShop, otherShops, bought]) => {
+        if (cancelled) return;
+        if (sameShop.success) setFromShop(sameShop.data.map(toRail));
+        if (otherShops.success) setRelatedOther(otherShops.data.map(toRail));
+        if (bought.success) setAlsoBought(bought.data.map(toRail));
       });
 
       const shopRes = await fetchShopById(res.data.shop_id);
@@ -206,6 +256,7 @@ export default function ProductDetailClient({
   /** After a successful rating: refresh the shown stars/count + context. */
   const handleRated = useCallback(() => {
     setRatingOpen(false);
+    setReviewsRefreshKey((k) => k + 1);
     if (!product) return;
     void fetchProductReviewContext(product.id).then(setRatingCtx);
     // Reload product meta so avg_rating / review_count on this page update.
@@ -216,18 +267,8 @@ export default function ProductDetailClient({
 
   const images = useMemo(() => getProductImages(product), [product]);
   const safeIndex = images.length ? Math.min(activeIndex, images.length - 1) : 0;
-  const currentUrl = images[safeIndex];
   const productLocation =
     shop?.location?.trim() || product?.shop_location?.trim() || null;
-
-  const imageAltOptions = useMemo(
-    () => ({
-      location: productLocation,
-      index: safeIndex,
-      total: images.length,
-    }),
-    [productLocation, safeIndex, images.length],
-  );
 
   const customerGroups = useMemo(
     () => customerVariantGroups(product?.variants),
@@ -327,9 +368,28 @@ export default function ProductDetailClient({
     setOrderOpen(true);
   }, [product, shop, variantsReady, comboSoldOut, addToast, mixBag, addItem, cartItem, quantity, variantLabel, itemNotes, hasVariants]);
 
+  const scrollToSlide = useCallback((index: number) => {
+    const el = galleryRef.current;
+    if (!el) {
+      setActiveIndex(index);
+      return;
+    }
+    const width = el.clientWidth || 1;
+    el.scrollTo({ left: index * width, behavior: "smooth" });
+    setActiveIndex(index);
+  }, []);
+
+  const onGalleryScroll = useCallback(() => {
+    const el = galleryRef.current;
+    if (!el) return;
+    const width = el.clientWidth || 1;
+    const next = Math.round(el.scrollLeft / width);
+    setActiveIndex((prev) => (prev === next ? prev : next));
+  }, []);
+
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-lg px-3 py-5">
+      <div className="mx-auto w-full max-w-6xl px-3 py-5 md:px-4">
         <ProductDetailSkeleton />
       </div>
     );
@@ -337,7 +397,7 @@ export default function ProductDetailClient({
 
   if (error || !product) {
     return (
-      <div className="mx-auto w-full max-w-lg px-3 py-10">
+      <div className="mx-auto w-full max-w-6xl px-3 py-10 md:px-4">
         <ErrorState
           title="Product unavailable"
           message={error ?? "This product could not be found."}
@@ -355,296 +415,455 @@ export default function ProductDetailClient({
   const shopHref = getShopPath({
     id: shop?.id ?? product.shop_id,
     name: shop?.name ?? product.shop_name ?? "Shop",
+    slug: shop?.slug,
   });
-  const mainImageAlt = buildProductImageAlt(product.name, imageAltOptions);
+
+  const gallery = images.length > 0 ? images : [null];
+  const canTilt = images.length >= 2 && Boolean(images[0]) && Boolean(images[1]);
 
   return (
-    <div className="mx-auto w-full max-w-lg px-3 py-3 pb-8">
-      <div className="mb-3 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => {
-            if (window.history.length > 1) router.back();
-            else router.push("/products");
-          }}
-          className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-        >
-          <BackIcon /> Back
-        </button>
-        <Link
-          href={shopHref}
-          className="truncate text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
-        >
-          Visit {shop?.name ?? product.shop_name ?? "store"} →
-        </Link>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="relative aspect-square bg-gradient-to-br from-teal-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-700">
-          {currentUrl && !broken.has(safeIndex) ? (
-            <Image
-              key={`${product.id}-${safeIndex}`}
-              src={getSafeImageUrl(currentUrl, "product")}
-              alt={mainImageAlt}
-              fill
-              priority
-              className="object-contain"
-              sizes="(max-width: 640px) 100vw, 32rem"
-              onError={() => setBroken((prev) => new Set(prev).add(safeIndex))}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <span className="text-6xl text-zinc-300 dark:text-zinc-600">📦</span>
-            </div>
-          )}
-
-          {showDiscount && discount?.discountPercent != null && (
-            <span className="absolute left-3 top-3 rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white">
-              -{discount.discountPercent}% OFF
-            </span>
-          )}
-        </div>
-
-        {images.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto border-t border-zinc-100 px-3 py-2 scrollbar-none dark:border-zinc-800">
-            {images.map((url, i) => (
-              <button
-                key={`${url}-${i}`}
-                type="button"
-                onClick={() => setActiveIndex(i)}
-                aria-label={buildProductImageAlt(product.name, {
+    <div className="mx-auto w-full max-w-6xl pb-10 md:px-4 md:pt-5">
+      <div className="md:grid md:grid-cols-2 md:items-start md:gap-8 lg:gap-10">
+        {/* ── Gallery ─────────────────────────────────────────────────── */}
+        <div className="md:sticky md:top-20">
+          <div className="relative overflow-hidden bg-zinc-100 dark:bg-zinc-900 md:rounded-2xl md:ring-1 md:ring-zinc-200/80 dark:md:ring-zinc-800">
+            {tiltMode && canTilt ? (
+              <DualImageTilt
+                frontUrl={images[0]!}
+                backUrl={images[1]!}
+                alt={buildProductImageAlt(product.name, {
                   location: productLocation,
-                  index: i,
+                  index: 0,
                   total: images.length,
                 })}
-                className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
-                  i === safeIndex ? "border-emerald-500" : "border-transparent opacity-70 hover:opacity-100"
-                }`}
+                className="aspect-square w-full md:aspect-[4/3]"
+              />
+            ) : (
+              <div
+                ref={galleryRef}
+                onScroll={onGalleryScroll}
+                className="flex aspect-square snap-x snap-mandatory overflow-x-auto scroll-smooth md:aspect-[4/3] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={getSafeImageUrl(url, "product")}
-                  alt={buildProductImageAlt(product.name, {
+                {gallery.map((url, i) => (
+                  <div
+                    key={`${product.id}-slide-${i}`}
+                    className="relative h-full w-full min-w-full shrink-0 snap-center bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-800"
+                  >
+                    {url && !broken.has(i) ? (
+                      <Image
+                        src={getSafeImageUrl(url, "product")}
+                        alt={buildProductImageAlt(product.name, {
+                          location: productLocation,
+                          index: i,
+                          total: gallery.length,
+                        })}
+                        fill
+                        priority={i === 0}
+                        unoptimized
+                        className="object-contain"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        onError={() => setBroken((prev) => new Set(prev).add(i))}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <span className="text-5xl text-zinc-300 dark:text-zinc-600">
+                          {product.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (window.history.length > 1) router.back();
+                else router.push("/products");
+              }}
+              className="absolute left-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-zinc-800 shadow-md backdrop-blur-sm transition hover:bg-white dark:bg-zinc-900/90 dark:text-zinc-100"
+              aria-label="Go back"
+            >
+              <BackIcon />
+            </button>
+
+            {canTilt ? (
+              <button
+                type="button"
+                onClick={() => setTiltMode((v) => !v)}
+                className={`absolute right-3 top-14 z-20 rounded-full px-3 py-1.5 text-[11px] font-bold shadow-lg ring-1 backdrop-blur-sm transition ${
+                  tiltMode
+                    ? "bg-emerald-600 text-white ring-emerald-400"
+                    : "bg-white text-emerald-800 ring-emerald-200 dark:bg-zinc-900 dark:text-emerald-300 dark:ring-emerald-800"
+                }`}
+                aria-pressed={tiltMode}
+                aria-label={tiltMode ? "Exit tilt view" : "Open light 3D tilt"}
+              >
+                {tiltMode ? "✕ Close 3D" : "✨ 3D tilt"}
+              </button>
+            ) : null}
+
+            {showDiscount && discount?.discountPercent != null ? (
+              <span className="absolute right-3 top-3 z-10 flex flex-col items-end gap-1">
+                <span className="rounded-full bg-rose-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                  {discount.discountPercent}% OFF
+                </span>
+                <FlashCountdown endsAt={product.deal_expires_at} />
+              </span>
+            ) : product.deal_expires_at ? (
+              <span className="absolute right-3 top-3 z-10">
+                <FlashCountdown endsAt={product.deal_expires_at} />
+              </span>
+            ) : null}
+          </div>
+
+          {images.length > 1 ? (
+            <div className="flex gap-2 overflow-x-auto border-b border-zinc-100 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950 md:mt-3 md:rounded-xl md:border md:border-zinc-100 md:px-2.5 dark:md:border-zinc-800">
+              {images.map((url, i) => (
+                <button
+                  key={`thumb-${url}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    setTiltMode(false);
+                    scrollToSlide(i);
+                  }}
+                  aria-label={buildProductImageAlt(product.name, {
                     location: productLocation,
                     index: i,
                     total: images.length,
                   })}
-                  loading="lazy"
-                  className="h-full w-full object-contain bg-zinc-50 dark:bg-zinc-800"
-                />
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="space-y-2.5 p-4">
-          <div>
-            {suppressHeading ? (
-              <p className="text-lg font-bold leading-snug text-zinc-900 dark:text-zinc-100">
-                {product.name}
-              </p>
-            ) : (
-              <h1 className="text-lg font-bold leading-snug text-zinc-900 dark:text-zinc-100">
-                {product.name}
-              </h1>
-            )}
-            <div className="mt-1.5">
-              <CompactRating
-                average={
-                  Number(product.avg_rating) > 0
-                    ? product.avg_rating
-                    : product.shop_avg_rating
-                }
-                count={
-                  Number(product.review_count) > 0
-                    ? product.review_count
-                    : product.shop_review_count
-                }
-                size="sm"
-              />
-              {/* Verified-purchase review gate — only the account with a
-                  delivered order for this product can open the form. */}
-              {ratingCtx?.signedIn && !ratingCtx.isOwner && ratingCtx.canSubmit ? (
-                <button
-                  type="button"
-                  onClick={() => setRatingOpen(true)}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100 active:scale-95 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-800/60 dark:hover:bg-amber-900/40"
+                  className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 transition ${
+                    i === safeIndex
+                      ? "border-emerald-500"
+                      : "border-transparent opacity-70 hover:opacity-100"
+                  }`}
                 >
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                  Rate this product
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getSafeImageUrl(url, "product")}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover bg-zinc-50 dark:bg-zinc-800"
+                  />
                 </button>
-              ) : ratingCtx?.signedIn && !ratingCtx.isOwner && ratingCtx.alreadyReviewed ? (
-                <p className="mt-2 inline-flex items-center gap-1 text-[0.7rem] font-medium text-emerald-700 dark:text-emerald-400">
-                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  You rated this product
-                </p>
-              ) : ratingCtx?.signedIn && !ratingCtx.isOwner ? (
-                <p className="mt-2 text-[0.7rem] text-zinc-400 dark:text-zinc-500">
-                  Rate it after your order for this product is delivered.
-                </p>
-              ) : null}
-            </div>
-            {product.description && (
-              <p className="mt-1 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-                {product.description}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatRupees(lineTotal)}
-            </span>
-            {quantity > 1 && (
-              <span className="text-xs text-zinc-400">
-                ({formatRupees(Math.round(lineTotal / quantity))} each)
-              </span>
-            )}
-            {showDiscount && discount?.originalPrice != null && (
-              <>
-                <span className="text-sm text-zinc-400 line-through">
-                  {formatRupees(discount.originalPrice * quantity)}
-                </span>
-                <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                  Save {formatRupees(discount.originalPrice * quantity - lineTotal)}
-                </span>
-              </>
-            )}
-          </div>
-
-          {tierLabels.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {tierLabels.map((label) => (
-                <span key={label} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
-                  {label}
-                </span>
-              ))}
-              <span className="rounded-full bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-400 dark:bg-zinc-800">
-                bulk price
-              </span>
-            </div>
-          )}
-
-          {mixBag.length > 0 ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-              <p className="mb-1.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
-                Your mix ({mixBag.reduce((n, i) => n + i.quantity, 0)} items)
-              </p>
-              {mixBag.map((line) => (
-                <div key={line.id} className="flex items-center gap-2 py-0.5">
-                  <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
-                    {line.variant || line.name}
-                  </p>
-                  <button type="button" className="h-6 w-6 rounded-full border text-xs" onClick={() => updateQuantity(line.id, line.quantity - 1)}>−</button>
-                  <span className="w-4 text-center text-[11px] font-bold">{line.quantity}</span>
-                  <button type="button" className="h-6 w-6 rounded-full border text-xs" onClick={() => updateQuantity(line.id, line.quantity + 1)}>+</button>
-                  <button type="button" className="text-[10px] font-semibold text-red-500" onClick={() => removeItem(line.id)}>Remove</button>
-                </div>
               ))}
             </div>
           ) : null}
+        </div>
 
-          {hasVariants && product.variants ? (
-            <VariantSelector
-              variants={product.variants}
-              basePrice={product.price}
-              baseOriginalPrice={product.original_price ?? product.compare_at_price ?? null}
-              onSelectionChange={setSelectedVariants}
-              compact
-            />
-          ) : null}
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Special instructions (optional)
-            </label>
-            <textarea
-              value={itemNotes}
-              onChange={(e) => setItemNotes(e.target.value.slice(0, 200))}
-              rows={2}
-              maxLength={200}
-              placeholder="Any special instructions"
-              className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Qty:</span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                disabled={quantity <= 1}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                aria-label="Decrease quantity"
-              >
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              </button>
-              <span className="w-8 text-center text-sm font-semibold text-zinc-900 dark:text-zinc-100">{quantity}</span>
-              <button
-                type="button"
-                onClick={() => setQuantity(Math.min(99, quantity + 1))}
-                disabled={quantity >= 99}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                aria-label="Increase quantity"
-              >
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-1">
+        {/* ── Details ───────────────────────────────────────────────────── */}
+        <div className="space-y-4 px-3 pt-4 md:px-0 md:pt-1">
+        <div>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="min-w-0 flex-1 text-[1.15rem] font-bold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
+              {product.name}
+            </h1>
+            <Link
+              href={shopHref}
+              className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              {t("common.visitShop")}
+            </Link>
             <button
               type="button"
-              onClick={handleAddToCart}
-              disabled={!product.is_available || !variantsReady || comboSoldOut}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
-                added
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-                  : "border-teal-300 text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/30"
+              onClick={() => {
+                const res = toggleCompare({
+                  id: product.id,
+                  name: product.name,
+                  price: product.price,
+                  originalPrice: product.original_price,
+                  imageUrl: product.image_url,
+                  shopId: product.shop_id,
+                  shopName: product.shop_name,
+                  avgRating: product.avg_rating,
+                  reviewCount: product.review_count,
+                  category: product.shop_category ?? product.category_id,
+                  categoryKey: resolveCompareCategoryKey({
+                    categoryId: product.category_id,
+                    subCategoryId: product.sub_category_id,
+                    shopCategory: product.shop_category,
+                    category: product.category_id,
+                  }),
+                  href: getProductSeoPath(product.name, product.short_code, product.id),
+                });
+                if (!res.ok) {
+                  const err = res.error || "";
+                  addToast(
+                    err.includes("same category")
+                      ? t("compare.sameCategory")
+                      : err.includes("max")
+                        ? t("compare.full")
+                        : err || t("compare.full"),
+                    "info",
+                  );
+                  return;
+                }
+                setInCompare(res.items.some((x) => x.id === product.id));
+                addToast(
+                  res.items.some((x) => x.id === product.id)
+                    ? t("compare.added")
+                    : t("compare.removed"),
+                  "success",
+                );
+              }}
+              className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                inCompare
+                  ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                  : "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
               }`}
             >
-              {added ? <><CheckIcon /> Added</> : <><CartPlusIcon /> {hasVariants ? "Add this option" : "Add to Cart"}</>}
-            </button>
-            <button
-              type="button"
-              onClick={handleOrder}
-              disabled={
-                !product.is_available ||
-                !shop?.whatsapp_number ||
-                (mixBag.length === 0 && (!variantsReady || comboSoldOut))
-              }
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <WhatsAppIcon /> {mixBag.length > 1 ? "Order mix" : "Order"}
+              {inCompare ? t("compare.remove") : t("compare.add")}
             </button>
           </div>
 
-          {!product.is_available && (
-            <p className="text-center text-xs font-semibold text-red-500">
-              This item is currently out of stock.
+          <div className="mt-2 space-y-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById("product-reviews")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              }}
+              className="text-left"
+            >
+              <CompactRating
+                average={Number(product.avg_rating) > 0 ? product.avg_rating : null}
+                count={Number(product.review_count) > 0 ? product.review_count : 0}
+                size="sm"
+              />
+            </button>
+            {!(Number(product.review_count) > 0) && Number(product.shop_avg_rating) > 0 ? (
+              <p className="text-[0.65rem] text-zinc-400">
+                Store {Number(product.shop_avg_rating).toFixed(1)}★ · no product reviews yet
+              </p>
+            ) : null}
+            <Link
+              href={shopHref}
+              className="block min-w-0 max-w-full truncate text-[11px] font-medium leading-snug text-emerald-700 hover:underline dark:text-emerald-400"
+            >
+              {shop?.name ?? product.shop_name ?? "Store"}
+              {productLocation ? ` · ${productLocation}` : ""}
+            </Link>
+          </div>
+
+          {ratingCtx?.signedIn && !ratingCtx.isOwner && ratingCtx.canSubmit ? (
+            <button
+              type="button"
+              onClick={() => setRatingOpen(true)}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100 active:scale-95 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-800/60"
+            >
+              Write a review
+            </button>
+          ) : ratingCtx?.signedIn && !ratingCtx.isOwner && ratingCtx.alreadyReviewed ? (
+            <p className="mt-2 text-[0.7rem] font-medium text-emerald-700 dark:text-emerald-400">
+              You rated this product
             </p>
-          )}
-          {product.is_available && product.accepts_delivery === false ? (
-            <p className="text-center text-xs font-semibold text-sky-600 dark:text-sky-400">
-              Pickup only — home delivery is paused for this item.
+          ) : ratingCtx?.signedIn && !ratingCtx.isOwner ? (
+            <p className="mt-2 text-[0.7rem] text-zinc-400">
+              Rate it after your order for this product is delivered.
             </p>
           ) : null}
+        </div>
 
-          <p className="text-center text-[0.65rem] text-zinc-400 dark:text-zinc-500">
-            From <span className="font-medium text-zinc-500 dark:text-zinc-400">{shop?.name ?? product.shop_name}</span>
-            {" · "}order directly via WhatsApp
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="whitespace-nowrap text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+            {formatRupees(lineTotal)}
+          </span>
+          {quantity > 1 ? (
+            <span className="text-xs text-zinc-400">
+              ({formatRupees(Math.round(lineTotal / quantity))} each)
+            </span>
+          ) : null}
+          {showDiscount && discount?.originalPrice != null ? (
+            <>
+              <span className="whitespace-nowrap text-sm text-zinc-400 line-through tabular-nums">
+                {formatRupees(discount.originalPrice * quantity)}
+              </span>
+              <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-600 dark:bg-rose-950/30 dark:text-rose-300">
+                Save {formatRupees(discount.originalPrice * quantity - lineTotal)}
+              </span>
+            </>
+          ) : null}
+        </div>
+
+        {product.description ? (
+          <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+            {product.description}
           </p>
+        ) : null}
+
+        {tierLabels.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {tierLabels.map((label) => (
+              <span
+                key={label}
+                className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+              >
+                {label}
+              </span>
+            ))}
+            <span className="rounded-full bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-400 dark:bg-zinc-800">
+              bulk price
+            </span>
+          </div>
+        ) : null}
+
+        {mixBag.length > 0 ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+            <p className="mb-1.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+              Your mix ({mixBag.reduce((n, i) => n + i.quantity, 0)} items)
+            </p>
+            {mixBag.map((line) => (
+              <div key={line.id} className="flex items-center gap-2 py-0.5">
+                <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
+                  {line.variant || line.name}
+                </p>
+                <button type="button" className="h-6 w-6 rounded-full border text-xs" onClick={() => updateQuantity(line.id, line.quantity - 1)}>−</button>
+                <span className="w-4 text-center text-[11px] font-bold">{line.quantity}</span>
+                <button type="button" className="h-6 w-6 rounded-full border text-xs" onClick={() => updateQuantity(line.id, line.quantity + 1)}>+</button>
+                <button type="button" className="text-[10px] font-semibold text-red-500" onClick={() => removeItem(line.id)}>Remove</button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {hasVariants && product.variants ? (
+          <VariantSelector
+            variants={product.variants}
+            basePrice={product.price}
+            baseOriginalPrice={product.original_price ?? product.compare_at_price ?? null}
+            onSelectionChange={setSelectedVariants}
+            compact
+          />
+        ) : null}
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+            Special instructions (optional)
+          </label>
+          <textarea
+            value={itemNotes}
+            onChange={(e) => setItemNotes(e.target.value.slice(0, 200))}
+            rows={2}
+            maxLength={200}
+            placeholder="Any special instructions"
+            className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">{t("pdp.quantity")}:</span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              disabled={quantity <= 1}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              aria-label="Decrease quantity"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            </button>
+            <span className="w-8 text-center text-sm font-semibold text-zinc-900 dark:text-zinc-100">{quantity}</span>
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.min(99, quantity + 1))}
+              disabled={quantity >= 99}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-30 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              aria-label="Increase quantity"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            disabled={!product.is_available || !variantsReady || comboSoldOut}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 py-3 text-sm font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+              added
+                ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                : "border-teal-300 text-teal-800 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/30"
+            }`}
+          >
+            {added ? <><CheckIcon /> {t("common.done")}</> : <><CartPlusIcon /> {hasVariants ? t("pdp.variants") : t("common.addToCart")}</>}
+          </button>
+          <button
+            type="button"
+            onClick={handleOrder}
+            disabled={
+              !product.is_available ||
+              !shop?.whatsapp_number ||
+              (mixBag.length === 0 && (!variantsReady || comboSoldOut))
+            }
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <WhatsAppIcon /> {t("common.orderNow")}
+          </button>
+        </div>
+
+        {!product.is_available ? (
+          <p className="text-center text-xs font-semibold text-red-500">
+            {t("common.outOfStock")}
+          </p>
+        ) : null}
+        {product.is_available && product.accepts_delivery === false ? (
+          <p className="text-center text-xs font-semibold text-sky-600 dark:text-sky-400">
+            Pickup only — home delivery is paused for this item.
+          </p>
+        ) : null}
+
+        <p className="pb-1 text-center text-[0.65rem] text-zinc-400 dark:text-zinc-500 md:text-left">
+          From{" "}
+          <Link href={shopHref} className="font-medium text-zinc-500 hover:underline dark:text-zinc-300">
+            {shop?.name ?? product.shop_name}
+          </Link>
+          {" · "}order via WhatsApp
+        </p>
         </div>
       </div>
 
-      <RelatedItemsRail title="More from this shop" items={related} />
+      <div className="mt-5 space-y-4 px-3 md:mt-6 md:space-y-5 md:px-0">
+        <BuyerProtectionStrip />
+        {product ? (
+          <ProductReviews
+            productId={product.id}
+            shopId={product.shop_id}
+            productName={product.name}
+            avgRating={product.avg_rating}
+            reviewCount={product.review_count}
+            refreshKey={reviewsRefreshKey}
+            onRequestRate={() => setRatingOpen(true)}
+            onReviewsChanged={() => {
+              setReviewsRefreshKey((k) => k + 1);
+              void fetchProductReviewContext(product.id).then(setRatingCtx);
+              void fetchProductByReference(code).then((res) => {
+                if (res.success && res.data) setProduct(res.data);
+              });
+            }}
+          />
+        ) : null}
+        <RelatedItemsRail
+          title={t("recs.alsoBought")}
+          subtitle="Popular nearby picks"
+          items={alsoBought}
+        />
+        <RelatedItemsRail
+          title={t("recs.fromShop")}
+          subtitle="Same store"
+          items={fromShop}
+        />
+        <RelatedItemsRail
+          title={t("recs.similar")}
+          subtitle="Similar nearby"
+          items={relatedOther}
+        />
+      </div>
 
-      {ratingOpen && product && (
+      {ratingOpen && product ? (
         <ProductRatingModal
           productId={product.id}
           shopId={product.shop_id}
@@ -654,9 +873,9 @@ export default function ProductDetailClient({
           onClose={() => setRatingOpen(false)}
           onRated={handleRated}
         />
-      )}
+      ) : null}
 
-      {orderOpen && shop && (
+      {orderOpen && shop ? (
         <ProductOrderModal
           shop={shop}
           cartLines={mixBag.length > 0 ? mixBag : undefined}
@@ -675,7 +894,7 @@ export default function ProductDetailClient({
           onClose={() => setOrderOpen(false)}
           onOrderPlaced={() => setOrderOpen(false)}
         />
-      )}
+      ) : null}
     </div>
   );
 }

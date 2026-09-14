@@ -577,7 +577,6 @@ export default function DashboardOverviewPage() {
                 </div>
               ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {/* Products card → inventory manager */}
                 <Link
                   href="/dashboard/products"
                   className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-700"
@@ -735,6 +734,26 @@ export default function DashboardOverviewPage() {
               </div>
               )}
             </section>
+
+            <Link
+              href="/dashboard/pos"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3.5 transition hover:border-emerald-400 dark:border-emerald-900/50 dark:from-emerald-950/40 dark:to-teal-950/30"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-lg text-white">
+                  🧾
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-emerald-950 dark:text-emerald-100">
+                    Open POS
+                  </p>
+                  <p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
+                    Counter billing · online queue · stock · today&apos;s report
+                  </p>
+                </div>
+              </div>
+              <span className="text-emerald-700 dark:text-emerald-300">→</span>
+            </Link>
 
             {/* ── KPI cards ────────────────────────────────────────────── */}
             <section aria-label="Store overview">

@@ -1,0 +1,371 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 11 0 R >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+3 0 obj
+<< /Length 1999 >>
+stream
+BT
+/F1 10 Tf
+48 802 Td
+13 TL
+/F1 9 Tf
+(TRENDSMART ROADMAP) Tj
+/F1 10 Tf
+T*
+/F1 14 Tf
+(Industry-Level Local Commerce OS) Tj
+/F1 10 Tf
+T*
+() Tj
+T*
+(Sirf delivery app nahi — qareebi business ka full OS:) Tj
+T*
+(order, visit, sit, book, experience.) Tj
+T*
+(Har category apni business logic ke mutabiq.) Tj
+T*
+(Tagline: Har qareebi business — order, visit, sit, book.) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(1. VISION) Tj
+/F1 10 Tf
+T*
+(Aaj: Hyper-local multi-vendor + WhatsApp orders.) Tj
+T*
+(Kal: Local Commerce OS — delivery, pickup, sitting,) Tj
+T*
+(store info, booking, experience — ek hi app.) Tj
+T*
+(- Customer order \(delivery / pickup\)) Tj
+T*
+(- Baith ke khaye \(sitting / table QR\)) Tj
+T*
+(- Info / discovery \(hours, menu, map\)) Tj
+T*
+(- Experience \(cafe, salon, repair, watching\)) Tj
+T*
+(- Merchant = category-specific modules) Tj
+T*
+(Principle: Platform = rails. Category = pack.) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(2. SHOP CAPABILITY MODES) Tj
+/F1 10 Tf
+T*
+(Delivery — ghar pe | radius, fees, slabs) Tj
+T*
+(Pickup — counter | ready-in-X, slots) Tj
+T*
+(Sitting — table order | QR tables, kitchen) Tj
+T*
+(Info — hours/menu/map | rich profile) Tj
+T*
+(Book/Visit — appointment | slots, packages) Tj
+T*
+(Experience — sit/watch/event | capacity, cover) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(3. PHASE 0 — FOUNDATION \(PEHLE\)) Tj
+/F1 10 Tf
+T*
+(- Category themes align \(old names -> new\)) Tj
+T*
+(- Modes = source of truth) Tj
+T*
+(- Service shops auto shop_type=service) Tj
+T*
+(- Sitting expand \(Bakery / cafe\)) Tj
+T*
+(- One schedule engine \(all channels\)) Tj
+T*
+(- Register: Products / Food / Services / Venue) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(4. UNIVERSAL RAILS \(HAR CATEGORY\)) Tj
+/F1 10 Tf
+T*
+(1\) Mode chips: Delivery/Pickup/Sitting/Book/Open) Tj
+T*
+(2\) Trust: verified, license, hygiene/warranty) Tj
+T*
+(3\) Digital passport: shop/table/deal QR) Tj
+T*
+(4\) Live hours + emergency close + busy/quiet) Tj
+T*
+(5\) Order: Pending>Confirmed>Preparing>Done) Tj
+T*
+(6\) SME / city analytics \(later\)) Tj
+ET
+endstream
+endobj
+4 0 obj
+<< /Length 1757 >>
+stream
+BT
+/F1 10 Tf
+48 802 Td
+13 TL
+(7\) Urdu-first + large fonts + low bandwidth) Tj
+T*
+(8\) TrendBot grounded on real catalog) Tj
+T*
+(9\) Safety: report shop, Rx, underage blocks) Tj
+T*
+(10\) PWA offline menu/hours) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(5. CATEGORY BUSINESS PACKS) Tj
+/F1 10 Tf
+T*
+() Tj
+T*
+/F1 11 Tf
+(A. Daily essentials) Tj
+/F1 10 Tf
+T*
+(\(Grocery, Fruits, Bakery, Pharmacy\)) Tj
+T*
+(- Units kg/dozen, substitutes, Rx upload) Tj
+T*
+(- Freshness, morning-bake slots) Tj
+T*
+(- Wow: rashta list, cold-chain, expiry alerts) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(B. Food & hospitality) Tj
+/F1 10 Tf
+T*
+(\(Fast Food & Restaurants, later Cafe\)) Tj
+T*
+(- Sitting + kitchen KDS + table QR + combos) Tj
+T*
+(- Wow: wait time, hygiene score, festival thali) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(C. Fashion & lifestyle) Tj
+/F1 10 Tf
+T*
+(\(Fashion, Beauty, Handmade, Toys, Sports\)) Tj
+T*
+(- Size/color, exchange, lookbook, salon book) Tj
+T*
+(- Wow: same-day mall pickup, tailor card) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(D. Hard goods) Tj
+/F1 10 Tf
+T*
+(\(Electronics, Home, Books, Automotive\)) Tj
+T*
+(- Warranty, IMEI, install add-on, specs) Tj
+T*
+(- Wow: genuine parts, nearby repair link) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(E. Field services) Tj
+/F1 10 Tf
+T*
+(\(Maintenance, CCTV, Tech IT, Personal\)) Tj
+T*
+(- Job tickets, photos, call-out, service radius) Tj
+T*
+(- Wow: tech ETA, survey checklist, salon queue) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(F. Later verticals) Tj
+/F1 10 Tf
+T*
+(Cafe, Banquet, Coaching, Gym,) Tj
+T*
+(Entertainment/Watching, Agri/Dairy) Tj
+T*
+(Watching = Experience mode \(screening cafe\),) Tj
+T*
+(NOT the CCTV security category.) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(6. AWARD / GOVT DIFFERENTIATORS) Tj
+/F1 10 Tf
+T*
+(1\) SME Digitalization Index) Tj
+T*
+(2\) Structured WhatsApp commerce \(PK-fit\)) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Length 1661 >>
+stream
+BT
+/F1 10 Tf
+48 802 Td
+13 TL
+(3\) Hyperlocal GPS + radius + channel hours) Tj
+T*
+(4\) Multi-modal one shop) Tj
+T*
+(5\) Category OS packs \(plumber != pharmacy\)) Tj
+T*
+(6\) Citizen safety + verified shops) Tj
+T*
+(7\) Youth employment layer \(later\)) Tj
+T*
+(8\) Open-hours city map) Tj
+T*
+(9\) Urdu AI shop assistant \(grounded\)) Tj
+T*
+(10\) PWA without Play Store) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(7. ROADMAP PHASES) Tj
+/F1 10 Tf
+T*
+(Phase 0 Foundation — pehle) Tj
+T*
+(Phase 1 Soft-launch — 4-6 weeks) Tj
+T*
+(  chips, order status, sitting, trust) Tj
+T*
+(Phase 2 Packs v1 — 6-14 weeks) Tj
+T*
+(  grocery, Rx, variants, tickets, booking) Tj
+T*
+(Phase 3 Experience — 3-5 months) Tj
+T*
+(  venue/watching, kitchen scale, busy) Tj
+T*
+(Phase 4 Institutional — 6-12 months) Tj
+T*
+(  payments optional, analytics, licenses) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(8. MONETIZATION) Tj
+/F1 10 Tf
+T*
+(- Merchant subscription) Tj
+T*
+(- Sponsored ads / spotlight) Tj
+T*
+(- Pack upgrades \(Kitchen Pro, Booking Pro\)) Tj
+T*
+(- Verified badge \(optional\)) Tj
+T*
+(- Do NOT force payment escrow yet) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(9. SUCCESS METRICS) Tj
+/F1 10 Tf
+T*
+(- % shops with 2+ modes) Tj
+T*
+(- Pickup + sitting share vs delivery-only) Tj
+T*
+(- Time-to-first-product \(new merchant\)) Tj
+T*
+(- Order completion \(WA confirm -> done\)) Tj
+T*
+(- Active SMEs / city; trust score) Tj
+T*
+() Tj
+T*
+/F1 11 Tf
+(10. NON-GOALS \(ABHI\)) Tj
+/F1 10 Tf
+T*
+(- Full escrow marketplace payments) Tj
+T*
+(- Nation-wide logistics fleet) Tj
+T*
+(- Social / reels clone) Tj
+T*
+(- Open-domain entertainment AI) Tj
+T*
+() Tj
+T*
+(RULE: Pehle Local Commerce OS jeeto,) Tj
+T*
+(phir naye verticals add karo.) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Length 133 >>
+stream
+BT
+/F1 10 Tf
+48 802 Td
+13 TL
+() Tj
+T*
+(TrendsMart — Industry Expansion Plan) Tj
+T*
+(Soft-launch -> Industry OS | WhatsApp OK) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 595 842] /Contents 3 0 R /Resources << /Font << /F1 2 0 R >> >> >>
+endobj
+8 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 2 0 R >> >> >>
+endobj
+9 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 2 0 R >> >> >>
+endobj
+10 0 obj
+<< /Type /Page /Parent 11 0 R /MediaBox [0 0 595 842] /Contents 6 0 R /Resources << /Font << /F1 2 0 R >> >> >>
+endobj
+11 0 obj
+<< /Type /Pages /Kids [7 0 R 8 0 R 9 0 R 10 0 R] /Count 4 >>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000009 00000 n 
+0000000059 00000 n 
+0000000129 00000 n 
+0000002180 00000 n 
+0000003989 00000 n 
+0000005702 00000 n 
+0000005886 00000 n 
+0000006013 00000 n 
+0000006140 00000 n 
+0000006267 00000 n 
+0000006395 00000 n 
+trailer
+<< /Size 12 /Root 1 0 R >>
+startxref
+6472
+%%EOF

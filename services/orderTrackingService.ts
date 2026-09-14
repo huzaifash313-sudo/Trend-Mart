@@ -260,9 +260,18 @@ async function fetchTrackedOrders(params: {
     const res = await fetch(`/api/orders/track?${query.toString()}`);
     const json = (await res.json()) as {
       success?: boolean;
+      needsAuth?: boolean;
       orders?: TrackedOrderRow[];
       error?: string;
     };
+    if (json.needsAuth || res.status === 401) {
+      return {
+        success: false,
+        error:
+          json.error ||
+          "Sign in to track your orders. Use the same account you checked out with.",
+      };
+    }
     if (!res.ok || !json.success) {
       return {
         success: false,

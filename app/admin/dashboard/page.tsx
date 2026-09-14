@@ -359,7 +359,7 @@ export default function AdminDashboardPage() {
             shop_id: shopId,
             owner_id: (shop.owner_id as string) ?? null,
             shop_name: (shop.name as string) ?? "Unknown",
-            category: (shop.category as string) ?? "Boutique",
+            category: (shop.category as string) ?? "Fashion & Apparel",
             location: (shop.location as string) ?? "",
             is_live: (shop.is_live as boolean) ?? false,
             verified: verificationStatus === "approved",
@@ -949,7 +949,7 @@ export default function AdminDashboardPage() {
     const nextBanned = !user.is_banned;
     const ok = await confirm(
       nextBanned
-        ? `Ban ${user.full_name || user.email || "this user"}? Marks them banned for moderation (soft launch: full sign-in lockout not enforced yet).`
+        ? `Ban ${user.full_name || user.email || "this user"}? They will be blocked from the app (banned accounts go to /banned).`
         : `Unban ${user.full_name || user.email || "this user"}?`,
     );
     if (!ok) {

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import LegalPageLayout from "@/components/LegalPageLayout";
+import { useLocale } from "@/context/LocaleContext";
 import {
-  CUSTOMER_FAQS,
-  MERCHANT_FAQS,
+  getCustomerFaqs,
+  getMerchantFaqs,
   type FaqItem,
 } from "@/lib/content/faq";
 
@@ -12,7 +13,15 @@ import {
 /*  TrendsMart — FAQ & New Merchant Guide                                     */
 /* -------------------------------------------------------------------------- */
 
-function FaqAccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: boolean; onToggle: () => void }) {
+function FaqAccordionItem({
+  item,
+  isOpen,
+  onToggle,
+}: {
+  item: FaqItem;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
       <button
@@ -33,10 +42,18 @@ function FaqAccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: b
   );
 }
 
-function FaqGroup({ title, items }: { title: string; items: FaqItem[] }) {
+function FaqGroup({
+  title,
+  items,
+  id,
+}: {
+  title: string;
+  items: FaqItem[];
+  id?: string;
+}) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   return (
-    <section>
+    <section id={id}>
       <h2 className="mb-3 text-lg font-bold text-zinc-900 dark:text-zinc-100">{title}</h2>
       <div className="space-y-2">
         {items.map((item, i) => (
@@ -53,14 +70,29 @@ function FaqGroup({ title, items }: { title: string; items: FaqItem[] }) {
 }
 
 export default function FaqPage() {
+  const { t, locale } = useLocale();
+  const customerFaqs = getCustomerFaqs(locale);
+  const merchantFaqs = getMerchantFaqs(locale);
+
   return (
-    <LegalPageLayout title="FAQ & Merchant Guide" icon="❓" lastUpdated="August 13, 2026">
+    <LegalPageLayout
+      title={t("faq.title")}
+      icon="❓"
+      lastUpdated={t("faq.lastUpdated")}
+      activeHref="/faq"
+    >
       <div className="space-y-8">
-        <FaqGroup title="For Customers" items={CUSTOMER_FAQS} />
-        <FaqGroup title="For Merchants — New Business Owner Guide" items={MERCHANT_FAQS} />
+        <FaqGroup title={t("faq.customers")} items={customerFaqs} />
+        <FaqGroup
+          id="merchant"
+          title={t("faq.merchants")}
+          items={merchantFaqs}
+        />
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-          Still stuck? Our team is happy to help — visit the{" "}
-          <a href="/support" className="font-semibold underline">Support Desk</a> and we&apos;ll get back to you.
+          {t("faq.stillStuck")}{" "}
+          <a href="/support" className="font-semibold underline">
+            {t("faq.supportDesk")}
+          </a>
         </div>
       </div>
     </LegalPageLayout>

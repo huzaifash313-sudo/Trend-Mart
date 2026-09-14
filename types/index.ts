@@ -3,6 +3,37 @@
 /*  Matches Supabase schema: shops, products, auth.users                      */
 /* -------------------------------------------------------------------------- */
 
+// ─── Shop schedule (structured hours) ───────────────────────────────────────
+/** 0 = Sunday … 6 = Saturday */
+export interface ShopDayWindow {
+  day: number;
+  open: boolean;
+  open_at: string;
+  close_at: string;
+}
+
+export interface ShopChannelWindow {
+  same_as_store: boolean;
+  open_at: string;
+  close_at: string;
+}
+
+/** One-day special hours (event late night / busy early close). */
+export interface ShopTodayOverride {
+  date: string;
+  close_at?: string | null;
+  extend_close_at?: string | null;
+}
+
+export interface ShopSchedule {
+  timezone?: string;
+  days: ShopDayWindow[];
+  delivery: ShopChannelWindow;
+  pickup: ShopChannelWindow;
+  dine_in: ShopChannelWindow;
+  today_override?: ShopTodayOverride | null;
+}
+
 // ─── Shop (public.shops table) ──────────────────────────────────────────────
 export interface Shop {
   id: string;
@@ -28,6 +59,11 @@ export interface Shop {
   business_hours?: string | null;
   /** Optional operational status text (e.g., 'Open Today: 9 AM - 10 PM', 'Temporarily Closed'). */
   operating_status?: string | null;
+  /**
+   * Structured weekly hours + delivery / pickup / dine-in windows.
+   * See `lib/shopHours.ts` (`ShopSchedule`).
+   */
+  shop_schedule?: ShopSchedule | null;
   /** Optional accent color for store branding (e.g., '#10b981'). */
   accent_color?: string | null;
   /** Optional store bio / description for the shop profile. */
@@ -127,10 +163,12 @@ export interface ShopFormData {
   /** TikTok username or profile URL — saved as bare handle. */
   tiktok_handle: string;
   secondary_phone: string;
-  /** Business hours (e.g., 'Mon-Sat: 9 AM - 10 PM') */
+  /** Business hours (e.g., 'Mon-Sat: 9 AM - 10 PM') — auto-filled from schedule when set */
   business_hours: string;
   /** Operating status (e.g., 'Open Today: 9 AM - 10 PM', 'Temporarily Closed') */
   operating_status: string;
+  /** Structured weekly + channel hours (null = not configured yet). */
+  shop_schedule: ShopSchedule | null;
   /** Accent color hex code for store branding (e.g., '#10b981') */
   accent_color: string;
   /** Store bio / description for the shop profile */
@@ -373,6 +411,11 @@ export interface Product {
    */
   original_price?: number | null;
   /**
+   * Optional unit cost (purchase / COGS) for POS profit reports.
+   * Null / omitted = not tracked.
+   */
+  cost_price?: number | null;
+  /**
    * @deprecated Legacy alias for `original_price` from an earlier schema
    * revision. No longer written by the app; kept only so pre-existing rows
    * that have this set (but not `original_price`) still render a discount
@@ -419,6 +462,24 @@ export interface Product {
    * short-code migration was applied (links fall back to the product id).
    */
   short_code?: string | null;
+  /**
+   * Optional EAN/UPC/custom barcode for POS scan. Null when unused.
+   * Unique per shop when set (see pos barcode migration).
+   */
+  barcode?: string | null;
+  /** When true, product appears in POS counter favourites strip. */
+  pos_favourite?: boolean | null;
+  /**
+   * Optional on-hand units for POS inventory. Null = untracked
+   * (use is_available / stock_status only).
+   */
+  stock_qty?: number | null;
+  /** Optional expiry date (YYYY-MM-DD) for pharmacy / grocery POS alerts */
+  expiry_date?: string | null;
+  /** Optional batch / lot code */
+  batch_no?: string | null;
+  /** Per-SKU reorder level; null = shop low_stock_threshold */
+  reorder_level?: number | null;
   /** Optional product variants (sizes, colors, etc.) stored as JSON */
   variants?: VariantGroup[] | null;
   /** Optional quantity-based bulk pricing (e.g. 1 = 200, pack of 6 = 1100). */
@@ -478,6 +539,8 @@ export interface ProductFormData {
   price: number;
   /** Original ("before discount") price. Set > `price` to show a markdown badge. */
   original_price?: number | null;
+  /** Optional purchase/COGS cost for POS profit (leave empty to skip). */
+  cost_price?: number | null;
   /** When the deal/% OFF ends (ISO string or empty). */
   deal_expires_at?: string | null;
   image_url: string;
@@ -492,6 +555,8 @@ export interface ProductFormData {
   category_id?: string | null;
   /** FK to sub_category UUID */
   sub_category_id?: string | null;
+  /** Optional EAN/UPC or internal POS scan code (e.g. TMG-0001 for loose goods). */
+  barcode?: string | null;
   /** Optional product variants (sizes, colors, etc.) */
   variants?: VariantGroup[] | null;
   /** Optional quantity-based bulk pricing (e.g. 1 = 200, pack of 6 = 1100). */
@@ -503,6 +568,10 @@ export interface Review {
   id: string;
   shop_id: string;
   product_id?: string | null;
+  /** Joined product title when this is a product review */
+  product_name?: string | null;
+  /** Joined product short_code for SEO links */
+  product_short_code?: string | null;
   customer_name: string;
   rating: number; // 1-5
   comment: string;
@@ -652,6 +721,19 @@ export interface Order {
   customer_user_id?: string | null;
   /** Optional customer/order-level notes (sanitized on the server). */
   notes?: string;
+  /**
+   * Channel: online (WhatsApp/app), pos (counter), dine_in.
+   * Older rows may omit — treat as online unless notes contain [POS].
+   */
+  source?: "online" | "pos" | "dine_in" | null;
+  /** POS / counter payment label when set. */
+  payment_method?: string | null;
+  /** Optional split tender amounts for POS bills. */
+  payment_split?: Record<string, number> | null;
+  /** Amount refunded on this order (POS void/return). */
+  refunded_amount?: number | null;
+  /** When the POS bill was voided. */
+  voided_at?: string | null;
   /** Fulfilment mode — 'dine_in' for QR table orders. */
   order_type?: OrderType;
   /** Linked dine-in table (dine_in_tables.id) when order_type = 'dine_in'. */
@@ -713,8 +795,10 @@ export type ShopCategory =
   | "All"
   | "Grocery & Kiryana"
   | "Fruits & Vegetables"
+  | "Meat & Seafood"
   | "Bakery & Sweets"
   | "Fast Food & Restaurants"
+  | "Cafe & Beverages"
   | "Pharmacy & Medical"
   | "Fashion & Apparel"
   | "Electronics & Gadgets"
@@ -735,8 +819,10 @@ export const SHOP_CATEGORIES: readonly ShopCategory[] = [
   "All",
   "Grocery & Kiryana",
   "Fruits & Vegetables",
+  "Meat & Seafood",
   "Bakery & Sweets",
   "Fast Food & Restaurants",
+  "Cafe & Beverages",
   "Pharmacy & Medical",
   "Fashion & Apparel",
   "Electronics & Gadgets",
@@ -758,8 +844,10 @@ export const SHOP_CATEGORIES: readonly ShopCategory[] = [
 export const PRODUCT_CATEGORIES: readonly string[] = [
   "Grocery & Kiryana",
   "Fruits & Vegetables",
+  "Meat & Seafood",
   "Bakery & Sweets",
   "Fast Food & Restaurants",
+  "Cafe & Beverages",
   "Pharmacy & Medical",
   "Fashion & Apparel",
   "Electronics & Gadgets",
@@ -787,25 +875,46 @@ export const SERVICE_CATEGORIES: ReadonlySet<string> = new Set([
 
 /** Check if a category is a service-provider type. */
 export function isServiceCategory(category?: string): boolean {
-  return category ? SERVICE_CATEGORIES.has(category) : false;
+  if (!category) return false;
+  if (SERVICE_CATEGORIES.has(category)) return true;
+  // Lazy alias resolve without circular import weight — mirror common legacy keys.
+  const legacy: Record<string, string> = {
+    Repair: "Home Maintenance & Repair",
+    CCTV: "Security & Surveillance",
+    IT: "Tech & IT Services",
+  };
+  const mapped = legacy[category];
+  return mapped ? SERVICE_CATEGORIES.has(mapped) : false;
 }
 
-/** Food categories that should get the QR table dining feature. */
+/** Food / cafe categories eligible for QR table dining. */
 export const DINE_IN_CATEGORIES: ReadonlySet<string> = new Set([
   "Fast Food & Restaurants",
+  "Cafe & Beverages",
+  "Bakery & Sweets",
 ]);
 
 /** Check if a shop category is eligible for QR table ordering. */
 export function isDineInCategory(category?: string | null): boolean {
-  return category ? DINE_IN_CATEGORIES.has(category) : false;
+  if (!category) return false;
+  if (DINE_IN_CATEGORIES.has(category)) return true;
+  const legacy: Record<string, string> = {
+    Food: "Fast Food & Restaurants",
+    Cafe: "Cafe & Beverages",
+    Bakery: "Bakery & Sweets",
+  };
+  const mapped = legacy[category];
+  return mapped ? DINE_IN_CATEGORIES.has(mapped) : false;
 }
 
 /** Professional icons for each shop category (used in sidebar, search, etc.) */
 export const CATEGORY_ICONS: Record<string, string> = {
   "Grocery & Kiryana": "🛒",
   "Fruits & Vegetables": "🥬",
+  "Meat & Seafood": "🥩",
   "Bakery & Sweets": "🧁",
   "Fast Food & Restaurants": "🍔",
+  "Cafe & Beverages": "☕",
   "Pharmacy & Medical": "💊",
   "Fashion & Apparel": "👗",
   "Electronics & Gadgets": "📱",
@@ -827,8 +936,10 @@ export const CATEGORY_ICONS: Record<string, string> = {
 export const CATEGORY_GRADIENTS: Record<string, string> = {
   "Grocery & Kiryana": "from-lime-400 to-green-600",
   "Fruits & Vegetables": "from-green-400 to-emerald-600",
+  "Meat & Seafood": "from-rose-500 to-red-700",
   "Bakery & Sweets": "from-amber-300 to-orange-500",
   "Fast Food & Restaurants": "from-orange-400 to-red-500",
+  "Cafe & Beverages": "from-amber-600 to-stone-700",
   "Pharmacy & Medical": "from-teal-400 to-cyan-600",
   "Fashion & Apparel": "from-pink-400 to-rose-500",
   "Electronics & Gadgets": "from-blue-400 to-cyan-500",

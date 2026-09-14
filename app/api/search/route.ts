@@ -14,6 +14,7 @@ import {
   FUZZY_MIN_SCORE,
   normalizeSearchText,
   scoreTextMatch,
+  suggestSearchCorrections,
 } from "@/lib/fuzzySearch";
 import { scoreProductPopularity } from "@/lib/marketplaceDiversity";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
@@ -118,19 +119,37 @@ async function searchProducts(
   q: string,
   limit: number,
   offset = 0,
+  filters?: {
+    minPrice?: number;
+    maxPrice?: number;
+    minRating?: number;
+    shopCategory?: string;
+  },
 ) {
   // Real columns only — products.category does not exist (use name/title/description).
   const ilike = buildFuzzyIlikeOr(q, ["name", "title", "description"], 12);
   if (!ilike) return { items: [], hasMore: false };
 
-  const pool = clamp(Math.max(limit + offset, limit) * 4, 24, 120);
-  const { data, error } = await supabase
+  const pool = clamp(Math.max(limit + offset, limit) * 5, 24, 160);
+  let query = supabase
     .from("products")
     .select(PRODUCT_SELECT)
     .eq("is_available", true)
     .eq("shops.is_live", true)
     .eq("shops.verification_status", "approved")
-    .or(ilike)
+    .or(ilike);
+
+  if (filters?.minPrice != null && filters.minPrice > 0) {
+    query = query.gte("price", filters.minPrice);
+  }
+  if (filters?.maxPrice != null && filters.maxPrice > 0) {
+    query = query.lte("price", filters.maxPrice);
+  }
+  if (filters?.shopCategory) {
+    query = query.eq("shops.category", filters.shopCategory);
+  }
+
+  const { data, error } = await query
     .order("orders_count", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(pool);
@@ -140,7 +159,12 @@ async function searchProducts(
     return { items: [], hasMore: false };
   }
 
-  const rows = (data as unknown as Record<string, unknown>[]) ?? [];
+  let rows = (data as unknown as Record<string, unknown>[]) ?? [];
+
+  if (filters?.minRating != null && filters.minRating > 0) {
+    const minR = filters.minRating;
+    rows = rows.filter((p) => (Number(p.avg_rating) || 0) >= minR);
+  }
 
   const ranked = fuzzyFilterAndRank(
     rows,
@@ -208,6 +232,9 @@ function mapProductHit(
     shop_id: String(p.shop_id ?? ""),
     shop_name: String(shop.name ?? ""),
     shop_slug: shop.slug ? String(shop.slug) : null,
+    shop_category: shop.category ? String(shop.category) : null,
+    avg_rating: Number(p.avg_rating) || 0,
+    review_count: Number(p.review_count) || 0,
     short_code: shortCode,
     path: getProductSeoPath(name, shortCode, id),
     score: blended,
@@ -326,12 +353,17 @@ export async function GET(req: NextRequest) {
   const type = searchParams.get("type") ?? "all";
   const limit = clamp(Number(searchParams.get("limit") ?? "10"), 4, 24);
   const offset = Math.max(0, Math.floor(Number(searchParams.get("offset") ?? "0") || 0));
+  const minPrice = Math.max(0, Number(searchParams.get("minPrice") ?? "") || 0);
+  const maxPrice = Math.max(0, Number(searchParams.get("maxPrice") ?? "") || 0);
+  const minRating = Math.min(5, Math.max(0, Number(searchParams.get("minRating") ?? "") || 0));
+  const shopCategory = (searchParams.get("category") ?? "").trim().slice(0, 60);
 
   if (!q) {
     return NextResponse.json({
       query: "",
       results: [],
       related: [],
+      suggestions: [],
       counts: { products: 0, shops: 0, deals: 0 },
       hasMore: false,
       nextOffset: 0,
@@ -339,11 +371,17 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = await createServerClient();
+  const productFilters = {
+    minPrice: minPrice > 0 ? minPrice : undefined,
+    maxPrice: maxPrice > 0 ? maxPrice : undefined,
+    minRating: minRating > 0 ? minRating : undefined,
+    shopCategory: shopCategory || undefined,
+  };
 
   const [productsRes, shops, dealsRes] = await Promise.all([
     type === "shops" || type === "deals"
       ? { items: [], hasMore: false }
-      : searchProducts(supabase, q, limit, type === "products" ? offset : 0),
+      : searchProducts(supabase, q, limit, type === "products" ? offset : 0, productFilters),
     type === "products" || type === "deals" ? [] : searchShops(supabase, q, limit),
     type === "products" || type === "shops"
       ? { items: [], hasMore: false }
@@ -397,6 +435,13 @@ export async function GET(req: NextRequest) {
       query: rawQ,
       results: primary.length > 0 ? primary : mixed,
       related: primary.length > 0 ? related : [],
+      suggestions: suggestSearchCorrections(rawQ, 5),
+      filters: {
+        minPrice: minPrice || null,
+        maxPrice: maxPrice || null,
+        minRating: minRating || null,
+        category: shopCategory || null,
+      },
       counts: {
         products: products.length,
         shops: shops.length,

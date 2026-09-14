@@ -40,38 +40,24 @@ export default async function ProductSeoPage({ params }: PageProps) {
   return (
     <>
       <ProductStructuredData product={product} />
-      {/* Indexable HTML for crawlers — compact so it doesn't fight the client UI. */}
-      <div className="mx-auto w-full max-w-lg px-3 pt-3">
-        <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-          {product.name}
-        </h1>
-        {product.description ? (
-          <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-            {product.description}
-          </p>
-        ) : null}
-        <p className="mt-1.5 text-base font-bold text-emerald-600 dark:text-emerald-400">
+      {/* Crawlable copy — visually hidden so it doesn't duplicate the client UI. */}
+      <div className="sr-only">
+        <h1>{product.name}</h1>
+        {product.description ? <p>{product.description}</p> : null}
+        <p>
           {formatRupees(product.price)}
-          {typeof original === "number" && original > product.price ? (
-            <span className="ml-2 text-sm font-normal text-zinc-400 line-through">
-              {formatRupees(original)}
-            </span>
-          ) : null}
+          {typeof original === "number" && original > product.price
+            ? ` (was ${formatRupees(original)})`
+            : ""}
         </p>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p>
           From{" "}
-          <Link
-            href={shopHref}
-            className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
-          >
-            {product.shop.name}
-          </Link>
+          <Link href={shopHref}>{product.shop.name}</Link>
           {product.shop.location ? ` · ${product.shop.location}` : ""}
-          {" · "}
-          <span className="text-zinc-400">TrendsMart</span>
+          {" · TrendsMart"}
         </p>
       </div>
-      <ProductDetailClient code={lookupCode} suppressHeading />
+      <ProductDetailClient code={lookupCode} />
     </>
   );
 }

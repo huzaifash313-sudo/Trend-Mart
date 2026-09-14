@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { isValidCategory } from "@/services/categoryService";
 import { sanitizeLight, truncate, isValidUUID } from "@/lib/sanitization";
+import {
+  normalizeShopCategory,
+  SUBCATEGORY_CATALOG,
+} from "@/lib/categoryCatalog";
 import type { SubCategory } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,14 +37,37 @@ function toError(err: unknown): string {
 function sanitizeCategoryParam(category: string): string {
   if (!category || typeof category !== "string") return "";
   const clean = sanitizeLight(category);
-  if (!isValidCategory(clean)) {
-    logError(`Rejected invalid category in subCategoryService: "${category}"`, {
-      module: "subCategoryService.sanitizeCategoryParam",
-      meta: { raw: category, clean },
-    });
-    return "";
+  const normalized = normalizeShopCategory(clean);
+  if (!normalized || normalized === "All") {
+    if (!isValidCategory(clean)) {
+      logError(`Rejected invalid category in subCategoryService: "${category}"`, {
+        module: "subCategoryService.sanitizeCategoryParam",
+        meta: { raw: category, clean },
+      });
+      return "";
+    }
+    return clean;
   }
-  return clean;
+  return normalized;
+}
+
+/** Soft catalog rows when DB is empty / not yet migrated. */
+function catalogFallback(category: string): SubCategory[] {
+  const rows = SUBCATEGORY_CATALOG[category];
+  if (!rows?.length) return [];
+  return rows.map((s, i) => ({
+    id: `catalog-${category}-${s.slug}`,
+    category,
+    name: s.name,
+    slug: s.slug,
+    description: s.description,
+    icon: s.icon,
+    is_active: true,
+    sort_order: s.sort_order ?? i + 1,
+    is_others: s.is_others ?? false,
+    created_at: undefined,
+    updated_at: undefined,
+  })) as SubCategory[];
 }
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
@@ -71,7 +98,10 @@ export async function fetchSubCategories(
 
     if (error) throw error;
 
-        const merged = (data as SubCategory[]) ?? [];
+    let merged = (data as SubCategory[]) ?? [];
+    if (merged.length === 0) {
+      merged = catalogFallback(safeCategory);
+    }
 
     const result: SubCategoryWithMeta[] = merged.map((s) => ({
       ...s,

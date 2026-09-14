@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import {
   requestUserLocation,
@@ -119,7 +119,8 @@ export default function ShopLocationRadiusPicker({
 }: ShopLocationRadiusPickerProps) {
   const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mapOpen, setMapOpen] = useState(false);
+  /** Map is always available — start open so merchants actually see the pin UI. */
+  const [mapOpen, setMapOpen] = useState(true);
 
   const coverage = useMemo(
     () => parseCoverageFromZones(value.delivery_zones),
@@ -165,6 +166,13 @@ export default function ShopLocationRadiusPicker({
       })();
     }
   }, [hasPin, mapCenter.latitude, mapCenter.longitude, onChange]);
+
+  // First visit: seed a city-center pin so the always-visible map is immediately usable.
+  useEffect(() => {
+    if (hasPin) return;
+    openMapWithoutGps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first mount when no pin
+  }, []);
 
   const applyMode = useCallback(
     (nextMode: ServiceCoverageMode, city?: string) => {
@@ -266,6 +274,38 @@ export default function ShopLocationRadiusPicker({
 
   return (
     <div className="space-y-3">
+      {/* Always-visible map so merchants can drop / drag a pin without hunting for a toggle */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+            Store pin on map
+          </p>
+          <button
+            type="button"
+            onClick={() => setMapOpen((v) => !v)}
+            className="text-[0.65rem] font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-300"
+          >
+            {mapOpen ? "Hide map" : "Show map"}
+          </button>
+        </div>
+        {mapOpen ? (
+          <>
+            <LocationMiniMap
+              latitude={mapCenter.latitude}
+              longitude={mapCenter.longitude}
+              onPick={handlePinAdjust}
+              mode="compact"
+              heightClassName="h-64 sm:h-72"
+              resizeKey={`${mapOpen}-${mapCenter.latitude.toFixed(4)}-${mapCenter.longitude.toFixed(4)}`}
+            />
+            <p className="text-[0.65rem] leading-relaxed text-zinc-500 dark:text-zinc-400">
+              Map par tap karein ya pin drag karein — customers ka distance isi point se
+              naapa jata hai, is liye ise apni dukan ke darwazay par rakhein.
+            </p>
+          </>
+        ) : null}
+      </div>
+
       {/* GPS pin status / detect button */}
       {hasPin ? (
         <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-900/20">
@@ -282,19 +322,12 @@ export default function ShopLocationRadiusPicker({
               </p>
             ) : (
               <p className="mt-0.5 text-[0.65rem] text-emerald-700 dark:text-emerald-300">
-                Address lookup pending — tap Update to refresh.
+                Address lookup pending — tap Update GPS to refresh.
               </p>
             )}
             <p className="mt-1 text-[0.6rem] text-emerald-600/90 dark:text-emerald-400/90">
               Lat: {value.latitude?.toFixed(5)} · Lng: {value.longitude?.toFixed(5)}
             </p>
-            <button
-              type="button"
-              onClick={() => setMapOpen((v) => !v)}
-              className="mt-1.5 text-[0.65rem] font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-300"
-            >
-              {mapOpen ? "Map band karein" : "Map par pin adjust karein"}
-            </button>
           </div>
           <button
             type="button"
@@ -302,7 +335,7 @@ export default function ShopLocationRadiusPicker({
             disabled={detecting}
             className="shrink-0 rounded-full px-2 py-1 text-[0.65rem] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
           >
-            {detecting ? "Updating…" : "Update"}
+            {detecting ? "Updating…" : "GPS"}
           </button>
           <button
             type="button"
@@ -327,39 +360,20 @@ export default function ShopLocationRadiusPicker({
               </>
             ) : (
               <>
-                <CrosshairIcon /> Use My Current Location as Store Pin
+                <CrosshairIcon /> Use my GPS as store pin
               </>
             )}
           </button>
           <button
             type="button"
             onClick={openMapWithoutGps}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
           >
-            <PinIcon /> Pick exact pin on map
+            <PinIcon /> Seed pin at city center (then drag on map)
           </button>
         </div>
       )}
       {error && <p className="text-[0.65rem] text-red-500">{error}</p>}
-
-      {/* Manual pin adjust — GPS or city-seeded map both work; distance rules
-          key off this pin, so merchants should place it on the shop doorway. */}
-      {mapOpen && (
-        <div className="space-y-1.5">
-          <LocationMiniMap
-            latitude={mapCenter.latitude}
-            longitude={mapCenter.longitude}
-            onPick={handlePinAdjust}
-            mode="compact"
-            heightClassName="h-56"
-            resizeKey={mapOpen}
-          />
-          <p className="text-[0.65rem] text-zinc-500 dark:text-zinc-400">
-            Pin ko drag karein ya map par tap karein — customers ka distance isi
-            point se naapa jata hai, is liye ise apni dukan ke darwazay par rakhein.
-          </p>
-        </div>
-      )}
 
       {/* Coverage mode */}
       <div>

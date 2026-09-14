@@ -8,6 +8,17 @@ import { buildBreadcrumbJsonLd } from "@/utils/seo";
 const SITE_NAME = "TrendsMart";
 
 const CATEGORY_TO_SCHEMA_TYPE: Record<string, string> = {
+  "Fast Food & Restaurants": "Restaurant",
+  "Cafe & Beverages": "CafeOrCoffeeShop",
+  "Bakery & Sweets": "Bakery",
+  "Grocery & Kiryana": "GroceryStore",
+  "Fruits & Vegetables": "GroceryStore",
+  "Meat & Seafood": "Butcher",
+  "Fashion & Apparel": "ClothingStore",
+  "Electronics & Gadgets": "ElectronicsStore",
+  "Health & Beauty": "HealthAndBeautyBusiness",
+  "Pharmacy & Medical": "Pharmacy",
+  "Home & Living": "HomeGoodsStore",
   Food: "Restaurant",
   Grocery: "GroceryStore",
   Boutique: "ClothingStore",

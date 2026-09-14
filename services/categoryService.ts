@@ -8,6 +8,7 @@ import { logError } from "@/services/errorService";
 import type { ShopCategory } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import { sanitizeLight, validateEnum } from "@/lib/sanitization";
+import { normalizeShopCategory } from "@/lib/categoryCatalog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,12 @@ const CATEGORY_META: Record<Exclude<ShopCategory, "All">, CategoryMeta> = {
     icon: "🥬",
     description: "Fresh sabzi, fruit stalls, and produce markets",
   },
+  "Meat & Seafood": {
+    key: "Meat & Seafood",
+    label: "Meat & Seafood",
+    icon: "🥩",
+    description: "Chicken, mutton, beef, fish, and marinated packs",
+  },
   "Bakery & Sweets": {
     key: "Bakery & Sweets",
     label: "Bakery & Sweets",
@@ -60,7 +67,13 @@ const CATEGORY_META: Record<Exclude<ShopCategory, "All">, CategoryMeta> = {
     key: "Fast Food & Restaurants",
     label: "Fast Food & Restaurants",
     icon: "🍔",
-    description: "Restaurants, dhabas, cafés, and quick bites",
+    description: "Restaurants, dhabas, and quick bites",
+  },
+  "Cafe & Beverages": {
+    key: "Cafe & Beverages",
+    label: "Cafe & Beverages",
+    icon: "☕",
+    description: "Coffee, chai, juices, shakes, and cafe snacks",
   },
   "Pharmacy & Medical": {
     key: "Pharmacy & Medical",
@@ -168,6 +181,8 @@ export const ALL_CATEGORY_META: CategoryMeta = {
  * Prevents broken queries from malformed category parameters.
  */
 export function validateCategory(value: string | null | undefined): ShopCategory {
+  const normalized = normalizeShopCategory(value);
+  if (normalized) return normalized;
   return validateEnum(value, ALL_CATEGORIES, "All");
 }
 
@@ -187,7 +202,8 @@ export function getCategoryMeta(key: string | ShopCategory): CategoryMeta {
  */
 export function isValidCategory(value: string | null | undefined): boolean {
   if (!value || typeof value !== "string") return false;
-  return (ALL_CATEGORIES as readonly string[]).includes(value);
+  if ((ALL_CATEGORIES as readonly string[]).includes(value)) return true;
+  return normalizeShopCategory(value) !== null;
 }
 
 // ─── Dynamic Counts from Supabase ────────────────────────────────────────────
@@ -219,7 +235,7 @@ export async function fetchCategoryCounts(): Promise<
     // Count per category
     const countMap = new Map<string, number>();
     for (const shop of shops) {
-      const cat = shop.category;
+      const cat = normalizeShopCategory(shop.category) ?? shop.category;
       countMap.set(cat, (countMap.get(cat) ?? 0) + 1);
     }
 

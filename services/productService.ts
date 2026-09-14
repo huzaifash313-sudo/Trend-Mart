@@ -14,6 +14,7 @@ import {
   buildFuzzyIlikeOr,
   fuzzyFilterAndRank,
   FUZZY_MIN_SCORE,
+  scoreTextMatch,
 } from "@/lib/fuzzySearch";
 import { sanitizeVariantGroups } from "@/lib/variantTemplates";
 
@@ -129,6 +130,13 @@ function buildProductRow(
   if (!opts?.coreOnly) {
     row.title = sanitized.title?.trim() || sanitized.name?.trim() || null;
     row.original_price = sanitized.original_price ?? null;
+    if ("cost_price" in sanitized) {
+      const c = sanitized.cost_price;
+      row.cost_price =
+        c == null || c === ("" as unknown) || !Number.isFinite(Number(c)) || Number(c) < 0
+          ? null
+          : Math.round(Number(c) * 100) / 100;
+    }
     if ("accepts_delivery" in sanitized) {
       row.accepts_delivery = sanitized.accepts_delivery !== false;
     }
@@ -180,6 +188,12 @@ function buildProductRow(
     const subId = sanitized.sub_category_id;
     row.sub_category_id =
       typeof subId === "string" && isValidUUID(subId) ? subId : null;
+
+    if ("barcode" in sanitized) {
+      const bc = sanitized.barcode;
+      row.barcode =
+        typeof bc === "string" && bc.trim() ? bc.trim().slice(0, 64) : null;
+    }
   }
 
   return row;
@@ -238,6 +252,13 @@ function sanitizeProductPricing<T extends Partial<ProductFormData>>(form: T): T 
     (out as Partial<ProductFormData>).original_price = sanitizeOptionalPriceValue(
       form.original_price,
     );
+  }
+  if ("cost_price" in form) {
+    const c = form.cost_price;
+    (out as Partial<ProductFormData>).cost_price =
+      c == null || c === ("" as unknown)
+        ? null
+        : sanitizeOptionalPriceValue(c) ?? (Number(c) === 0 ? 0 : null);
   }
   return out;
 }
@@ -354,6 +375,22 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     sub_category_id: (row.sub_category_id as string | null) ?? null,
     created_at: (row.created_at as string | undefined) ?? undefined,
     short_code: (row.short_code as string | null) ?? null,
+    barcode: (row.barcode as string | null) ?? null,
+    pos_favourite: row.pos_favourite === true,
+    stock_qty:
+      row.stock_qty == null || row.stock_qty === ""
+        ? null
+        : Number.isFinite(Number(row.stock_qty))
+          ? Number(row.stock_qty)
+          : null,
+    expiry_date: (row.expiry_date as string | null) ?? null,
+    batch_no: (row.batch_no as string | null) ?? null,
+    reorder_level:
+      row.reorder_level == null || row.reorder_level === ""
+        ? null
+        : Number.isFinite(Number(row.reorder_level))
+          ? Number(row.reorder_level)
+          : null,
     shop_name: String(shop.name),
     shop_logo_url: shop.logo_url ?? null,
     shop_whatsapp: shop.whatsapp_number ?? null,
@@ -966,6 +1003,304 @@ export async function fetchRelatedMarketplaceProducts(opts: {
   }
 }
 
+/**
+ * Light "related from other shops" rail.
+ * Rank: subcategory → category → name keywords → popularity.
+ * Same shop may contribute multiple items when they truly match
+ * (soft cap ~3 per shop so one store doesn't flood the rail).
+ */
+export async function fetchCrossShopRelatedProducts(opts: {
+  excludeShopId: string;
+  excludeId: string;
+  categoryId?: string | null;
+  subCategoryId?: string | null;
+  shopCategory?: string | null;
+  /** Current product name — used for light keyword relevance. */
+  seedName?: string | null;
+  limit?: number;
+}): Promise<ServiceResult<MarketplaceProduct[]>> {
+  const excludeShopId = opts.excludeShopId?.trim();
+  const excludeId = opts.excludeId?.trim();
+  if (
+    !excludeShopId ||
+    !excludeId ||
+    !isValidUUID(excludeShopId) ||
+    !isValidUUID(excludeId)
+  ) {
+    return { success: true, data: [] };
+  }
+  const limit = Math.min(Math.max(opts.limit ?? 10, 1), 14);
+  const perShopCap = 3;
+  const seedName = (opts.seedName ?? "").trim();
+  const supabase = createClient();
+
+  try {
+    const build = (select: string, mode: "sub" | "cat" | "shopCat" | "any") => {
+      let q = supabase
+        .from("products")
+        .select(select)
+        .neq("shop_id", excludeShopId)
+        .neq("id", excludeId)
+        .eq("is_available", true)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .order("orders_count", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(Math.min(limit * 4, 48));
+
+      if (mode === "sub" && opts.subCategoryId) {
+        q = q.eq("sub_category_id", opts.subCategoryId);
+      } else if (mode === "cat" && opts.categoryId) {
+        q = q.eq("category_id", opts.categoryId);
+      } else if (mode === "shopCat" && opts.shopCategory) {
+        q = q.eq("shops.category", opts.shopCategory);
+      }
+      return q;
+    };
+
+    const modes: Array<"sub" | "cat" | "shopCat" | "any"> = [];
+    if (opts.subCategoryId) modes.push("sub");
+    if (opts.categoryId) modes.push("cat");
+    if (opts.shopCategory) modes.push("shopCat");
+    // Only fall back to open catalog when we have a name to match against.
+    if (seedName.length >= 3) modes.push("any");
+
+    let mapped: MarketplaceProduct[] = [];
+    let lastError: unknown = null;
+
+    for (const mode of modes) {
+      if (mode !== "any" && mapped.length >= limit) break;
+      let res = await build(MARKETPLACE_SELECT, mode);
+      if (res.error && isMissingRatingColumnError(res.error)) {
+        res = await build(MARKETPLACE_SELECT_LEGACY, mode);
+      }
+      if (res.error) {
+        lastError = res.error;
+        continue;
+      }
+      const batch = ((res.data as unknown as Record<string, unknown>[]) ?? [])
+        .map(mapMarketplaceRow)
+        .filter((p): p is MarketplaceProduct => p != null);
+      if (batch.length === 0) continue;
+
+      const seen = new Set(mapped.map((p) => p.id));
+      for (const p of batch) {
+        if (seen.has(p.id)) continue;
+        seen.add(p.id);
+        mapped.push(p);
+      }
+      // Subcategory hit is enough — don't dilute with weaker pools.
+      if (mode === "sub" && mapped.length >= Math.min(4, limit)) break;
+      if (mapped.length >= limit * 2) break;
+    }
+
+    if (mapped.length === 0 && lastError) throw lastError;
+
+    // Soft rank: taxonomy match + keyword overlap + popularity.
+    const scored = mapped.map((p, index) => {
+      let score = 0;
+      if (opts.subCategoryId && p.sub_category_id === opts.subCategoryId) score += 120;
+      else if (opts.categoryId && p.category_id === opts.categoryId) score += 70;
+      else if (
+        opts.shopCategory &&
+        (p.shop_category ?? "").toLowerCase() === opts.shopCategory.toLowerCase()
+      ) {
+        score += 35;
+      }
+
+      if (seedName) {
+        const nameHit = scoreTextMatch(seedName, p.name);
+        const titleHit = p.title ? scoreTextMatch(seedName, p.title) : 0;
+        score += Math.max(nameHit, titleHit) * 0.9;
+      }
+
+      score += Math.min(30, (Number(p.orders_count) || 0) * 0.4);
+      score += Math.min(15, (Number(p.click_count) || 0) * 0.15);
+      score += Math.min(12, (Number(p.avg_rating) || 0) * 2);
+      // Stable tie-break
+      score += (mapped.length - index) * 0.001;
+      return { p, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    // Drop weak "any"-pool filler that barely matches the product.
+    const filtered = scored.filter((row) => {
+      const sameSub =
+        opts.subCategoryId && row.p.sub_category_id === opts.subCategoryId;
+      const sameCat =
+        opts.categoryId && row.p.category_id === opts.categoryId;
+      const sameShopCat =
+        opts.shopCategory &&
+        (row.p.shop_category ?? "").toLowerCase() ===
+          opts.shopCategory.toLowerCase();
+      if (sameSub || sameCat || sameShopCat) return true;
+      return row.score >= 45;
+    });
+
+    const perShop = new Map<string, number>();
+    const picked: MarketplaceProduct[] = [];
+    for (const row of filtered) {
+      const count = perShop.get(row.p.shop_id) ?? 0;
+      const strong = row.score >= 70;
+      const cap = strong ? perShopCap : 1;
+      if (count >= cap) continue;
+      perShop.set(row.p.shop_id, count + 1);
+      picked.push(row.p);
+      if (picked.length >= limit) break;
+    }
+
+    return { success: true, data: picked };
+  } catch (err) {
+    logError(err, {
+      module: "productService.fetchCrossShopRelatedProducts",
+      meta: { excludeShopId, excludeId },
+    });
+    return { success: false, error: toError(err) };
+  }
+}
+
+/**
+ * "Customers also bought" — local marketplace rules (not heavy ML):
+ * same subcategory / category, ranked by orders_count + rating + discount.
+ */
+export async function fetchAlsoBoughtProducts(opts: {
+  excludeId: string;
+  excludeShopId?: string | null;
+  categoryId?: string | null;
+  subCategoryId?: string | null;
+  shopCategory?: string | null;
+  /** Current product name — boosts truly related titles. */
+  seedName?: string | null;
+  limit?: number;
+}): Promise<ServiceResult<MarketplaceProduct[]>> {
+  const excludeId = opts.excludeId?.trim();
+  if (!excludeId || !isValidUUID(excludeId)) {
+    return { success: true, data: [] };
+  }
+  const limit = Math.min(Math.max(opts.limit ?? 8, 1), 12);
+  const supabase = createClient();
+
+  try {
+    let q = supabase
+      .from("products")
+      .select(MARKETPLACE_SELECT)
+      .neq("id", excludeId)
+      .eq("is_available", true)
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved")
+      .order("orders_count", { ascending: false, nullsFirst: false })
+      .limit(48);
+
+    const excludeShop = (opts.excludeShopId ?? "").trim();
+    if (excludeShop && isValidUUID(excludeShop)) {
+      q = q.neq("shop_id", excludeShop);
+    }
+
+    // Require a real taxonomy signal — never dump random popular products.
+    const hasTaxonomy = Boolean(opts.subCategoryId || opts.categoryId || opts.shopCategory);
+    if (!hasTaxonomy) {
+      return { success: true, data: [] };
+    }
+
+    if (opts.subCategoryId) q = q.eq("sub_category_id", opts.subCategoryId);
+    else if (opts.categoryId) q = q.eq("category_id", opts.categoryId);
+    else if (opts.shopCategory) q = q.eq("shops.category", opts.shopCategory);
+
+    let { data, error } = await q;
+    if (error && isMissingRatingColumnError(error)) {
+      let legacyQ = supabase
+        .from("products")
+        .select(MARKETPLACE_SELECT_LEGACY)
+        .neq("id", excludeId)
+        .eq("is_available", true)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .limit(48);
+      if (excludeShop && isValidUUID(excludeShop)) {
+        legacyQ = legacyQ.neq("shop_id", excludeShop);
+      }
+      if (opts.subCategoryId) legacyQ = legacyQ.eq("sub_category_id", opts.subCategoryId);
+      else if (opts.categoryId) legacyQ = legacyQ.eq("category_id", opts.categoryId);
+      else if (opts.shopCategory) legacyQ = legacyQ.eq("shops.category", opts.shopCategory);
+      const legacy = await legacyQ;
+      data = legacy.data;
+      error = legacy.error;
+    }
+    if (error) throw error;
+
+    let rows = ((data as Record<string, unknown>[]) || [])
+      .map(mapMarketplaceRow)
+      .filter((p): p is MarketplaceProduct => !!p);
+
+    // Pad only when we filtered by sub/cat and need more — same shop category.
+    if (rows.length < 4 && opts.shopCategory && (opts.subCategoryId || opts.categoryId)) {
+      let moreQ = supabase
+        .from("products")
+        .select(MARKETPLACE_SELECT)
+        .neq("id", excludeId)
+        .eq("is_available", true)
+        .eq("shops.is_live", true)
+        .eq("shops.verification_status", "approved")
+        .eq("shops.category", opts.shopCategory)
+        .order("orders_count", { ascending: false, nullsFirst: false })
+        .limit(40);
+      if (excludeShop && isValidUUID(excludeShop)) {
+        moreQ = moreQ.neq("shop_id", excludeShop);
+      }
+      const more = await moreQ;
+      if (!more.error && more.data) {
+        const extra = (more.data as Record<string, unknown>[])
+          .map(mapMarketplaceRow)
+          .filter((p): p is MarketplaceProduct => !!p);
+        const seen = new Set(rows.map((r) => r.id));
+        for (const p of extra) {
+          if (seen.has(p.id)) continue;
+          rows.push(p);
+          seen.add(p.id);
+        }
+      }
+    }
+
+    const seedName = (opts.seedName ?? "").trim();
+    rows.sort((a, b) => {
+      const score = (p: MarketplaceProduct) => {
+        let s =
+          (Number(p.orders_count) || 0) * 2.5 +
+          (Number(p.avg_rating) || 0) * 12 +
+          (Number(p.click_count) || 0) * 0.4 +
+          (p.original_price && p.original_price > p.price ? 6 : 0);
+        if (opts.subCategoryId && p.sub_category_id === opts.subCategoryId) s += 40;
+        else if (opts.categoryId && p.category_id === opts.categoryId) s += 22;
+        if (seedName) {
+          s += Math.max(
+            scoreTextMatch(seedName, p.name),
+            p.title ? scoreTextMatch(seedName, p.title) : 0,
+          ) * 0.7;
+        }
+        return s;
+      };
+      return score(b) - score(a);
+    });
+
+    // Soft diversity: max 2 from same shop
+    const perShop = new Map<string, number>();
+    const picked: MarketplaceProduct[] = [];
+    for (const p of rows) {
+      const n = perShop.get(p.shop_id) ?? 0;
+      if (n >= 2) continue;
+      perShop.set(p.shop_id, n + 1);
+      picked.push(p);
+      if (picked.length >= limit) break;
+    }
+
+    return { success: true, data: picked };
+  } catch (err) {
+    logError(err, { module: "productService.fetchAlsoBoughtProducts", meta: { excludeId } });
+    return { success: true, data: [] };
+  }
+}
+
 /** Single marketplace product by id (deep-links / recently viewed). */
 export async function fetchMarketplaceProductById(
   productId: string,
@@ -1139,7 +1474,9 @@ export async function createProduct(
       if (/deal_expires_at/i.test(msg)) delete stripped.deal_expires_at;
       if (/images/i.test(msg)) delete stripped.images;
       if (/original_price/i.test(msg)) delete stripped.original_price;
+      if (/cost_price/i.test(msg)) delete stripped.cost_price;
       if (/price_tiers/i.test(msg)) delete stripped.price_tiers;
+      if (/barcode/i.test(msg)) delete stripped.barcode;
       ({ data, error } = await supabase
         .from("products")
         .insert(stripped)
@@ -1320,6 +1657,7 @@ export async function updateProduct(
       if (/deal_expires_at/i.test(msg)) delete stripped.deal_expires_at;
       if (/images/i.test(msg)) delete stripped.images;
       if (/original_price/i.test(msg)) delete stripped.original_price;
+      if (/cost_price/i.test(msg)) delete stripped.cost_price;
       if (/price_tiers/i.test(msg)) delete stripped.price_tiers;
       ({ data, error } = await supabase
         .from("products")
@@ -1385,7 +1723,10 @@ export async function bulkUpdateAvailability(
   try {
     const { error } = await supabase
       .from("products")
-      .update({ is_available: isAvailable })
+      .update({
+        is_available: isAvailable,
+        stock_status: isAvailable ? "in_stock" : "out_of_stock",
+      })
       .in("id", productIds);
 
     if (error) throw error;

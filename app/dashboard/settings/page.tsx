@@ -31,7 +31,11 @@ import type { Shop, ShopFormData } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
+import { ShopHoursEditor } from "@/components/ShopHoursEditor";
 import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
+import {
+  parseShopSchedule,
+} from "@/lib/shopHours";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -154,6 +158,7 @@ const INITIAL_FORM: ShopFormData = {
   secondary_phone: "",
   business_hours: "",
   operating_status: "Open",
+  shop_schedule: null,
   accent_color: THEME_ACCENT,
   store_bio: "",
   announcement: "",
@@ -194,6 +199,7 @@ function shopToForm(source: Shop): ShopFormData {
     secondary_phone: formatPkPhoneDisplay(source.secondary_phone ?? ""),
     business_hours: source.business_hours ?? "",
     operating_status: source.operating_status?.trim() || "Open",
+    shop_schedule: parseShopSchedule(source.shop_schedule),
     accent_color: THEME_ACCENT,
     store_bio: source.store_bio ?? "",
     announcement: source.announcement ?? "",
@@ -507,6 +513,7 @@ export default function DashboardSettingsPage() {
         secondary_phone: form.secondary_phone,
         business_hours: form.business_hours,
         operating_status: form.operating_status,
+        shop_schedule: form.shop_schedule,
         accent_color: THEME_ACCENT,
         store_bio: form.store_bio,
         announcement: form.announcement,
@@ -733,15 +740,19 @@ export default function DashboardSettingsPage() {
             </div>
           </div>
 
-          <div>
-            <FieldLabel optional>Business hours</FieldLabel>
-            <TextInput
-              type="text"
-              value={form.business_hours}
-              maxLength={150}
-              onChange={(e) => setForm((current) => ({ ...current, business_hours: e.target.value }))}
-              placeholder="Mon–Sat 9 AM – 10 PM"
-            />
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-950/40">
+            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Hours & windows</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              Set store days, then optional delivery / pickup / sitting windows. These actually control when orders are accepted.
+            </p>
+            <div className="mt-3">
+              <ShopHoursEditor
+                value={form.shop_schedule}
+                onChange={(shop_schedule) =>
+                  setForm((current) => ({ ...current, shop_schedule }))
+                }
+              />
+            </div>
           </div>
 
           <div className="flex items-start justify-between gap-4 rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-900/70">
@@ -749,8 +760,8 @@ export default function DashboardSettingsPage() {
               <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Store open</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
                 {!(form.operating_status ?? "Open").toLowerCase().includes("closed")
-                  ? "Customers can place orders now."
-                  : "Store is marked closed on your storefront."}
+                  ? "Emergency override off — schedule above decides when orders are accepted."
+                  : "Emergency closed — all channels paused until you reopen."}
               </p>
             </div>
             <ToggleSwitch

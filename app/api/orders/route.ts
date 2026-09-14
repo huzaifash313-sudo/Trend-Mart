@@ -87,6 +87,7 @@ interface ShopRow {
   location: string | null;
   business_hours: string | null;
   operating_status: string | null;
+  shop_schedule: unknown | null;
   accepts_delivery: boolean | null;
   accepts_pickup: boolean | null;
 }
@@ -288,7 +289,7 @@ export async function POST(request: Request) {
   const { data: shopRaw, error: shopErr } = await admin
     .from("shops")
     .select(
-      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, free_delivery_radius_km, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, free_delivery_areas, location, business_hours, operating_status, accepts_delivery, accepts_pickup",
+      "id, owner_id, name, is_live, verification_status, min_order_amount, free_delivery_threshold, free_delivery_radius_km, delivery_fee_flat, delivery_fee_per_km, latitude, longitude, service_radius_km, delivery_zones, free_delivery_areas, location, business_hours, operating_status, shop_schedule, accepts_delivery, accepts_pickup",
     )
     .eq("id", shopId)
     .maybeSingle();
@@ -340,10 +341,17 @@ export async function POST(request: Request) {
   const hours = getShopHoursSummary({
     business_hours: shopRow.business_hours as string | null,
     operating_status: shopRow.operating_status as string | null,
+    shop_schedule: shopRow.shop_schedule,
+    channel: orderType === "pickup" ? "pickup" : "delivery",
   });
   if (hours.state === "closed") {
     return NextResponse.json(
-      { success: false, error: `This shop is closed right now (${hours.hoursText}).` },
+      {
+        success: false,
+        error:
+          hours.reason ||
+          `This shop is closed right now (${hours.hoursText}).`,
+      },
       { status: 409 },
     );
   }

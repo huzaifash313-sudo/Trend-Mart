@@ -10,6 +10,7 @@ import {
   useMerchantQuickAdd,
   type QuickAddTab,
 } from "@/context/MerchantQuickAddContext";
+import { useLocale } from "@/context/LocaleContext";
 import type { User } from "@supabase/supabase-js";
 
 /* -------------------------------------------------------------------------- */
@@ -112,46 +113,46 @@ function CloseSmallIcon() {
   );
 }
 
-/** WhatsApp-style quick actions shown when a merchant taps the + button. */
+/** WhatsApp-style quick actions — labels translated at render via t(). */
 const MERCHANT_QUICK_ACTIONS: {
   tab: QuickAddTab;
-  label: string;
-  hint: string;
+  labelKey: string;
+  hintKey: string;
   icon: ReactNode;
   iconClass: string;
 }[] = [
   {
     tab: "story",
-    label: "New Story",
-    hint: "Post a photo update for 24h",
+    labelKey: "merchant.quickStory",
+    hintKey: "merchant.quickStoryHint",
     icon: <StoryIcon />,
     iconClass: "bg-gradient-to-br from-emerald-500 to-teal-600 text-white",
   },
   {
     tab: "product",
-    label: "Add Product",
-    hint: "List a single item fast",
+    labelKey: "merchant.quickProduct",
+    hintKey: "merchant.quickProductHint",
     icon: <PlusIcon />,
     iconClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   },
   {
     tab: "bulk",
-    label: "Bulk Add",
-    hint: "Upload many products at once",
+    labelKey: "merchant.quickBulk",
+    hintKey: "merchant.quickBulkHint",
     icon: <LayersIcon />,
     iconClass: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
   },
   {
     tab: "deal",
-    label: "Add Deal",
-    hint: "Offer a discount / deal",
+    labelKey: "merchant.quickDeal",
+    hintKey: "merchant.quickDealHint",
     icon: <TagIcon />,
     iconClass: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
   },
   {
     tab: "coupon",
-    label: "Add Coupon",
-    hint: "Create a promo code",
+    labelKey: "merchant.quickCoupon",
+    hintKey: "merchant.quickCouponHint",
     icon: <TicketIcon />,
     iconClass: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   },
@@ -165,6 +166,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { openQuickAdd } = useMerchantQuickAdd();
+  const { t } = useLocale();
 
   // `null` = auth still resolving. Don't flash "Sign In" to a signed-in user.
   const [session, setSession] = useState<boolean | null>(null);
@@ -336,14 +338,14 @@ export default function BottomNav() {
           ? "/dashboard"
           : "/account";
   const accountLabel = isGuest
-    ? "Sign In"
+    ? t("nav.signIn")
     : authPending
       ? "…"
       : role === "admin"
-        ? "Admin"
+        ? t("nav.admin")
         : isMerchant
-          ? "Dashboard"
-          : "Account";
+          ? t("nav.dashboard")
+          : t("nav.account");
 
   const isHomeActive = pathname === "/";
   const isDealsActive = pathname === "/deals" || pathname.startsWith("/deals/");
@@ -353,8 +355,8 @@ export default function BottomNav() {
   // 4th tab is always Products (signed in or guest). Wishlist lives in the navbar.
   const productsTabHref = "/products";
   const productsTabActive = isProductsActive;
-  const productsTabLabel = "Products";
-  const productsTabAria = "Products";
+  const productsTabLabel = t("nav.products");
+  const productsTabAria = t("nav.products");
   // When auth is still resolving (authPending), never mark any tab as active
   // for the account position — avoids the "…" appearing active on the homepage
   // because authHref temporarily falls back to "/" (which always matches pathname).
@@ -395,21 +397,21 @@ export default function BottomNav() {
   // While auth resolves (session === null), default to the most common label so the
   // button never flips Store → Post → Add on every load/refresh.
   const centerLabel = merchantShop
-    ? "Add"
+    ? t("nav.add")
     : session === null
-      ? "Add"
+      ? t("nav.add")
       : session && isMerchant
-        ? "Post"
-        : "Store";
+        ? t("nav.post")
+        : t("nav.store");
   const centerAria = merchantShop
-    ? "Open store quick actions (story, product, deal, coupon)"
+    ? t("nav.centerAriaQuick")
     : session === null
-      ? "Add product"
+      ? t("nav.centerAriaAdd")
       : session && isMerchant
-        ? "Open product tools"
+        ? t("nav.centerAriaPost")
         : session
-          ? "Open your store on TrendsMart"
-          : "Sign in to open a store";
+          ? t("nav.centerAriaStore")
+          : t("nav.centerAriaSignIn");
 
   const sideTabClass = (active: boolean) =>
     `flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[11px] font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 ${
@@ -421,22 +423,22 @@ export default function BottomNav() {
   return (
     <nav
       className={`bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden${keyboardOpen ? " hidden" : ""}`}
-      aria-label="Main navigation"
+      aria-label={t("nav.mainNav")}
     >
       <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-end px-1 pb-1">
-        <Link href="/" className={sideTabClass(isHomeActive)} aria-label="Home" aria-current={isHomeActive ? "page" : undefined}>
+        <Link href="/" className={sideTabClass(isHomeActive)} aria-label={t("nav.home")} aria-current={isHomeActive ? "page" : undefined}>
           <HomeIcon active={isHomeActive} />
-          <span>Home</span>
+          <span>{t("nav.home")}</span>
         </Link>
 
         <Link
           href="/deals"
           className={sideTabClass(isDealsActive)}
-          aria-label="Deals"
+          aria-label={t("nav.deals")}
           aria-current={isDealsActive ? "page" : undefined}
         >
           <DealsTabIcon active={isDealsActive} />
-          <span>Deals</span>
+          <span>{t("nav.deals")}</span>
         </Link>
 
         <div className="flex flex-col items-center justify-end">
@@ -467,7 +469,7 @@ export default function BottomNav() {
           <a
             href="/login"
             className={sideTabClass(isAccountActive)}
-            aria-label="Sign In"
+            aria-label={t("nav.signIn")}
             onClick={(e) => {
               // Full navigation — soft client routing to /login after logout
               // often flashes the global loading spinner / redirect bounce.
@@ -509,17 +511,17 @@ export default function BottomNav() {
           <div
             className="fixed bottom-[5.5rem] left-1/2 z-[120] w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
             role="dialog"
-            aria-label="Store quick actions"
+            aria-label={t("nav.quickActionsAria")}
           >
             <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-800">
               <span className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                Add to your store
+                {t("nav.quickActionsTitle")}
               </span>
               <button
                 type="button"
                 onClick={() => setShowQuickActions(false)}
                 className="rounded-full p-1 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
-                aria-label="Close quick actions"
+                aria-label={t("nav.closeQuickActions")}
               >
                 <CloseSmallIcon />
               </button>
@@ -539,10 +541,10 @@ export default function BottomNav() {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                      {action.label}
+                      {t(action.labelKey)}
                     </span>
                     <span className="block truncate text-[0.68rem] text-zinc-400 dark:text-zinc-500">
-                      {action.hint}
+                      {t(action.hintKey)}
                     </span>
                   </span>
                 </button>

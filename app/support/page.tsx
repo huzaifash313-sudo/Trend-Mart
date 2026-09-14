@@ -1,27 +1,26 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import LegalPageLayout from "@/components/LegalPageLayout";
 import MySupportRequests from "@/components/MySupportRequests";
 import { useToast } from "@/components/Toast";
 import CustomSelect from "@/components/CustomSelect";
+import { useLocale } from "@/context/LocaleContext";
 import { createSupportTicket } from "@/services/supportService";
 import type { SupportTicketCategory, SupportTicketFormData } from "@/types";
 import { formatPkPhoneInput, PK_PHONE_PLACEHOLDER } from "@/lib/phoneFormat";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Platform Support Desk                                        */
-/*  Public contact/ticket form for customers & merchants to reach the        */
-/*  TrendsMart team directly (distinct from per-shop WhatsApp inquiries).      */
 /* -------------------------------------------------------------------------- */
 
-const CATEGORY_OPTIONS: { value: SupportTicketCategory; label: string }[] = [
-  { value: "general", label: "General Question" },
-  { value: "order", label: "Order Issue" },
-  { value: "merchant", label: "Merchant / Store Support" },
-  { value: "technical", label: "Technical Problem" },
-  { value: "billing", label: "Account / payments" },
-  { value: "other", label: "Other" },
+const CATEGORY_KEYS: { value: SupportTicketCategory; labelKey: string }[] = [
+  { value: "general", labelKey: "support.cat.general" },
+  { value: "order", labelKey: "support.cat.order" },
+  { value: "merchant", labelKey: "support.cat.merchant" },
+  { value: "technical", labelKey: "support.cat.technical" },
+  { value: "billing", labelKey: "support.cat.billing" },
+  { value: "other", labelKey: "support.cat.other" },
 ];
 
 const INITIAL_FORM: SupportTicketFormData = {
@@ -34,10 +33,16 @@ const INITIAL_FORM: SupportTicketFormData = {
 };
 
 export default function SupportPage() {
+  const { t } = useLocale();
   const { addToast } = useToast();
   const [form, setForm] = useState<SupportTicketFormData>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  const categoryOptions = useMemo(
+    () => CATEGORY_KEYS.map((opt) => ({ value: opt.value, label: t(opt.labelKey) })),
+    [t],
+  );
 
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
@@ -47,17 +52,22 @@ export default function SupportPage() {
       if (result.success) {
         setSubmitted(true);
         setForm(INITIAL_FORM);
-        addToast("Your message has been sent. Our team will get back to you soon.", "success");
+        addToast(t("support.toastSent"), "success");
       } else {
         addToast(result.error, "error");
       }
       setSubmitting(false);
     },
-    [form, addToast],
+    [form, addToast, t],
   );
 
   return (
-    <LegalPageLayout title="Contact Support" icon="💬" lastUpdated="August 8, 2026">
+    <LegalPageLayout
+      title={t("support.title")}
+      icon="💬"
+      lastUpdated={t("support.lastUpdated")}
+      activeHref="/support"
+    >
       <div className="mb-6">
         <MySupportRequests />
       </div>
@@ -65,31 +75,39 @@ export default function SupportPage() {
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
           <p className="mb-4 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Have a question about an order, your store, or the platform in general? Send us a
-            message and our team will respond by email. For shop-specific questions (e.g. &quot;is
-            this in stock?&quot;), message the merchant directly via their storefront&apos;s WhatsApp
-            button instead — it&apos;s faster.
+            {t("support.intro")}
           </p>
 
           <div className="space-y-3">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                How it works
+                {t("support.howTitle")}
               </p>
               <p className="mt-2 text-sm text-zinc-800 dark:text-zinc-200">
-                Submit the form — your ticket reaches the TrendsMart team and Admin Support Inbox.
-                We keep staff contacts private (no public email or phone on this page).
+                {t("support.howBody")}
               </p>
             </div>
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Response time</p>
-              <p className="mt-1 text-sm font-medium text-zinc-800 dark:text-zinc-200">Usually within 24–48 hours</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                {t("support.responseTitle")}
+              </p>
+              <p className="mt-1 text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                {t("support.responseBody")}
+              </p>
             </div>
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Before you write in</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                {t("support.beforeTitle")}
+              </p>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                Check the <a href="/faq" className="font-medium text-emerald-600 underline dark:text-emerald-400">FAQ &amp; Merchant Guide</a> — most
-                common questions are answered there instantly.
+                {t("support.beforeBody")}{" "}
+                <a
+                  href="/faq"
+                  className="font-medium text-emerald-600 underline dark:text-emerald-400"
+                >
+                  {t("support.beforeFaq")}
+                </a>
+                {t("support.beforeSuffix")}
               </p>
             </div>
           </div>
@@ -99,23 +117,30 @@ export default function SupportPage() {
           {submitted ? (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center dark:border-emerald-800 dark:bg-emerald-900/20">
               <div className="mb-2 text-3xl">✅</div>
-              <p className="font-semibold text-emerald-700 dark:text-emerald-400">Message sent!</p>
+              <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                {t("support.sentTitle")}
+              </p>
               <p className="mt-1 text-sm text-emerald-600 dark:text-emerald-500">
-                We&apos;ll get back to you at the email you provided.
+                {t("support.sentBody")}
               </p>
               <button
                 type="button"
                 onClick={() => setSubmitted(false)}
                 className="mt-4 text-sm font-medium text-emerald-700 underline dark:text-emerald-400"
               >
-                Send another message
+                {t("support.sendAnother")}
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+            >
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Name *</label>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    {t("support.name")} *
+                  </label>
                   <input
                     type="text"
                     required
@@ -125,7 +150,9 @@ export default function SupportPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Email *</label>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    {t("support.email")} *
+                  </label>
                   <input
                     type="email"
                     required
@@ -138,7 +165,9 @@ export default function SupportPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Phone (optional)</label>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    {t("support.phone")}
+                  </label>
                   <input
                     type="tel"
                     inputMode="numeric"
@@ -151,36 +180,44 @@ export default function SupportPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Category</label>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    {t("support.category")}
+                  </label>
                   <CustomSelect
                     value={form.category}
-                    onChange={(val) => setForm((f) => ({ ...f, category: val as SupportTicketCategory }))}
-                    options={CATEGORY_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+                    onChange={(val) =>
+                      setForm((f) => ({ ...f, category: val as SupportTicketCategory }))
+                    }
+                    options={categoryOptions}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Subject *</label>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  {t("support.subject")} *
+                </label>
                 <input
                   type="text"
                   required
                   value={form.subject}
                   onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-                  placeholder="Subject"
+                  placeholder={t("support.subjectPlaceholder")}
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Message *</label>
+                <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                  {t("support.message")} *
+                </label>
                 <textarea
                   required
                   rows={5}
                   minLength={10}
                   value={form.message}
                   onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                  placeholder="Describe your issue"
+                  placeholder={t("support.messagePlaceholder")}
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
@@ -190,7 +227,7 @@ export default function SupportPage() {
                 disabled={submitting}
                 className="w-full rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"
               >
-                {submitting ? "Sending…" : "Send Message"}
+                {submitting ? t("support.sending") : t("support.send")}
               </button>
             </form>
           )}

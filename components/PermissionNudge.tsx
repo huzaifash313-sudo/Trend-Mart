@@ -4,6 +4,10 @@
  * Soft in-app banners for notifications + location.
  * Never auto-calls the browser permission APIs (that causes blocked/error UX).
  * Tapping Enable triggers the real OS prompt on a user gesture.
+ *
+ * Location tip is ONLY shown when the browser would still prompt (permission
+ * "prompt" / unknown) AND we have no pin yet. If geolocation is already
+ * granted or denied, this card stays hidden.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -42,8 +46,22 @@ function markDismissed(key: string) {
   }
 }
 
+async function readGeoPermission(): Promise<PermissionState | "unknown"> {
+  if (typeof navigator === "undefined") return "unknown";
+  try {
+    if (!navigator.permissions?.query) return "unknown";
+    const status = await navigator.permissions.query({
+      name: "geolocation" as PermissionName,
+    });
+    return status.state;
+  } catch {
+    return "unknown";
+  }
+}
+
 export default function PermissionNudge() {
-  const { location, detectLocationDetailed } = useLocation();
+  const { location, coordinates, isInitialized, detectLocationDetailed } =
+    useLocation();
   const { addToast } = useToast();
   const [signedIn, setSignedIn] = useState(false);
   const [showPush, setShowPush] = useState(false);
@@ -91,13 +109,74 @@ export default function PermissionNudge() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (wasDismissed(DISMISS_LOC)) {
-      setShowLoc(false);
-      return;
-    }
-    // Soft tip when we have no pin yet — GPS Allow happens only on tap.
-    setShowLoc(!location?.coordinates);
-  }, [location?.coordinates]);
+    let cancelled = false;
+
+    const evaluate = async () => {
+      if (wasDismissed(DISMISS_LOC)) {
+        if (!cancelled) setShowLoc(false);
+        return;
+      }
+
+      // Already have a pin (GPS / map / city centroid) — never nag.
+      if (coordinates || location?.coordinates) {
+        if (!cancelled) setShowLoc(false);
+        return;
+      }
+
+      // Wait until LocationContext has finished its first hydrate so we don't
+      // flash the banner for a frame before saved coords load from storage.
+      if (!isInitialized) {
+        if (!cancelled) setShowLoc(false);
+        return;
+      }
+
+      const perm = await readGeoPermission();
+      if (cancelled) return;
+
+      // Already allowed — LocationContext silent sync handles GPS; no banner.
+      if (perm === "granted") {
+        setShowLoc(false);
+        return;
+      }
+
+      // Hard-blocked — "Allow" button can't help; hide (map path is in Settings).
+      if (perm === "denied") {
+        setShowLoc(false);
+        return;
+      }
+
+      // Still "prompt" (or unknown on Safari): soft tip is OK.
+      setShowLoc(true);
+    };
+
+    void evaluate();
+
+    // Re-check if the user grants/denies from another tab / browser UI.
+    let permStatus: PermissionStatus | null = null;
+    const onPermChange = () => {
+      void evaluate();
+    };
+    void (async () => {
+      try {
+        if (!navigator.permissions?.query) return;
+        permStatus = await navigator.permissions.query({
+          name: "geolocation" as PermissionName,
+        });
+        permStatus.addEventListener("change", onPermChange);
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        permStatus?.removeEventListener("change", onPermChange);
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [coordinates, location?.coordinates, isInitialized]);
 
   const enablePush = useCallback(async () => {
     setPushBusy(true);
@@ -192,7 +271,8 @@ export default function PermissionNudge() {
             Apni location allow karein
           </p>
           <p className="mt-0.5 text-[0.7rem] leading-snug text-zinc-600 dark:text-zinc-400">
-            Nearby shops aur exact delivery pin ke liye. Deny hone par Settings → Location se map pin laga sakte ho.
+            Nearby shops aur exact delivery pin ke liye. Deny hone par Settings →
+            Location se map pin laga sakte ho.
           </p>
           <div className="mt-2 flex items-center gap-2">
             <button

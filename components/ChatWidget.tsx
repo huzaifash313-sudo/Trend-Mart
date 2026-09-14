@@ -54,7 +54,8 @@ export default function ChatWidget({
       {!open ? (
         <TrendBotLauncher
           side="right"
-          bottomOffset={totalItems > 0 ? "cart" : "raised"}
+          // WhatsApp float sits on the LEFT on shop pages — keep AI at default height.
+          bottomOffset={totalItems > 0 ? "cart" : "default"}
           shopName={shopName}
           onOpen={() => setOpen(true)}
         />

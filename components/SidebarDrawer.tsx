@@ -8,6 +8,10 @@ import { signOut } from "@/services/authService";
 import { SHOP_CATEGORIES, CATEGORY_ICONS, isDineInCategory } from "@/types";
 import PwaInstallTip from "@/components/PwaInstallTip";
 import { useTheme } from "@/context/ThemeContext";
+import { useLocale } from "@/context/LocaleContext";
+import { useMerchantQuickAdd } from "@/context/MerchantQuickAddContext";
+import type { LocaleCode } from "@/lib/i18n/dictionaries";
+import { LOCALE_LABEL } from "@/lib/i18n/dictionaries";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons                                                          */
@@ -204,6 +208,8 @@ interface SidebarDrawerProps {
 export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: SidebarDrawerProps) {
   const isPersistent = variant === "persistent";
   const { resolved, toggleTheme } = useTheme();
+  const { locale, setLocale, t } = useLocale();
+  const { openQuickAdd } = useMerchantQuickAdd();
   const [session, setSession] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<"customer" | "merchant" | "admin" | null>(null);
   const [merchantShopId, setMerchantShopId] = useState<string | null>(null);
@@ -534,7 +540,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                 onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               >
-                <HomeSidebarIcon /> Home
+                <HomeSidebarIcon /> {t("nav.home")}
               </Link>
             </li>
 
@@ -545,7 +551,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                 onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
               >
-                <SearchIconMenu /> Products
+                <SearchIconMenu /> {t("nav.products")}
               </Link>
             </li>
 
@@ -556,7 +562,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                 onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-amber-50 hover:text-amber-700 dark:text-zinc-300 dark:hover:bg-amber-900/20 dark:hover:text-amber-400"
               >
-                <TagDealIcon /> Deals
+                <TagDealIcon /> {t("nav.deals")}
               </Link>
             </li>
 
@@ -567,7 +573,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                 onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-rose-50 hover:text-rose-600 dark:text-zinc-300 dark:hover:bg-rose-900/20 dark:hover:text-rose-400"
               >
-                <HeartIcon /> Wishlist
+                <HeartIcon /> {t("nav.wishlist")}
               </Link>
             </li>
 
@@ -585,7 +591,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                 onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                <OrdersIcon /> My Orders
+                <OrdersIcon /> {t("account.orders")}
               </Link>
             </li>
 
@@ -602,7 +608,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                 aria-controls="sidebar-categories-list"
               >
                 <span className="flex items-center gap-3.5">
-                  <CategoryIcon /> Categories
+                  <CategoryIcon /> {t("sidebar.categories")}
                 </span>
                 <ChevronDownIcon expanded={categoriesExpanded} />
               </button>
@@ -639,8 +645,38 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                 onClick={handleNavClick}
                 className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
-                <CogIcon /> Settings
+                <CogIcon /> {t("sidebar.settings")}
               </Link>
+            </li>
+            <li>
+              <Link
+                href="/compare"
+                onClick={handleNavClick}
+                className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-zinc-700 transition-all hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                {t("sidebar.compare")}
+              </Link>
+            </li>
+            <li className="px-4 py-2">
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+                {t("lang.switch")}
+              </p>
+              <div className="flex gap-1.5">
+                {(["en", "ur"] as LocaleCode[]).map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setLocale(code)}
+                    className={`flex-1 rounded-lg py-2 text-xs font-bold ${
+                      locale === code
+                        ? "bg-emerald-600 text-white"
+                        : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                    }`}
+                  >
+                    {LOCALE_LABEL[code]}
+                  </button>
+                ))}
+              </div>
             </li>
 
             {/* Divider */}
@@ -660,7 +696,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                         aria-controls="sidebar-merchant-list"
                       >
                         <span className="flex items-center gap-3.5">
-                          <DashboardIcon /> Merchant
+                          <DashboardIcon /> {t("sidebar.merchant")}
                         </span>
                         <ChevronDownIcon expanded={merchantExpanded} />
                       </button>
@@ -675,7 +711,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                               onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
                             >
-                              <DashboardIcon /> Dashboard
+                              <DashboardIcon /> {t("nav.dashboard")}
                             </Link>
                           </li>
                           <li>
@@ -693,7 +729,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                               onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
-                              <OrdersIcon /> Orders
+                              <OrdersIcon /> {t("nav.orders")}
                             </Link>
                           </li>
                           <li>
@@ -702,9 +738,54 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                               onClick={handleNavClick}
                               className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
                             >
-                              <span aria-hidden="true">📦</span> Products
+                              <span aria-hidden="true">📦</span> {t("nav.products")}
                             </Link>
                           </li>
+                          <li>
+                            <Link
+                              href="/dashboard/pos"
+                              onClick={handleNavClick}
+                              className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-emerald-700 transition-all hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                            >
+                              <span aria-hidden="true">🧾</span> POS / Counter
+                            </Link>
+                          </li>
+                          {merchantShopId ? (
+                            <>
+                              <li>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openQuickAdd({
+                                      shopId: merchantShopId,
+                                      shopCategory: merchantShopCategory || undefined,
+                                      tab: "story",
+                                    });
+                                    handleNavClick();
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                                >
+                                  <span aria-hidden="true">📸</span> {t("home.stories")}
+                                </button>
+                              </li>
+                              <li>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openQuickAdd({
+                                      shopId: merchantShopId,
+                                      shopCategory: merchantShopCategory || undefined,
+                                      tab: "deal",
+                                    });
+                                    handleNavClick();
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-zinc-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                                >
+                                  <span aria-hidden="true">🏷️</span> {t("nav.deals")}
+                                </button>
+                              </li>
+                            </>
+                          ) : null}
                           {isDineInCategory(merchantShopCategory) && (
                             <>
                               <li>
@@ -802,7 +883,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                         onClick={handleNavClick}
                         className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
                       >
-                        <DashboardIcon /> My Account
+                        <DashboardIcon /> {t("sidebar.myAccount")}
                       </Link>
                       <Link
                         href="/account/assistant"
@@ -820,7 +901,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                     onClick={handleSignOut}
                     className="mt-1 flex w-full items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-red-500 transition-all hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                   >
-                    <SignOutIcon /> Sign Out
+                    <SignOutIcon /> {t("account.logout")}
                   </button>
                 </>
               ) : session === false ? (
@@ -830,7 +911,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                     onClick={handleNavClick}
                     className="mb-2 flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-300"
                   >
-                    <span aria-hidden="true" className="text-base">🤖</span> AI Shopping Assistant
+                    <span aria-hidden="true" className="text-base">🤖</span> {t("account.assistant")}
                   </Link>
                   <a
                     href="/login"
@@ -841,12 +922,12 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
                     }}
                     className="flex items-center gap-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-xl hover:shadow-emerald-500/40"
                   >
-                    <UserIcon /> Sign In / Register
+                    <UserIcon /> {t("sidebar.signInRegister")}
                   </a>
                 </>
               ) : (
                 <div className="flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 dark:text-zinc-500">
-                  <UserIcon /> Loading…
+                  <UserIcon /> {t("common.loading")}
                 </div>
               )}
             </li>
@@ -854,10 +935,10 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
             {/* Footer branding */}
             <li className="pt-6">
               <p className="text-center text-[0.65rem] font-medium text-zinc-400 dark:text-zinc-500">
-                TrendsMart — Local Shopping Platform
+                {t("sidebar.branding")}
               </p>
               <p className="mt-0.5 text-center text-[0.6rem] text-zinc-300 dark:text-zinc-600">
-                © {new Date().getFullYear()} All rights reserved
+                © {new Date().getFullYear()} {t("footer.rights")}
               </p>
             </li>
           </ul>

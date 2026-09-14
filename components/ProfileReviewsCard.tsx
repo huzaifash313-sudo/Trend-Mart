@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import {
+  deleteReview,
   fetchMyReviews,
   submitReview,
   type MyReviewsPayload,
 } from "@/services/reviewService";
 import { getAppReview, saveAppReview, type AppReview } from "@/services/appReviewService";
 import { formatRelativeTime } from "@/lib/formatters";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
+import { getShopPath } from "@/lib/shopSlug";
 
 /* -------------------------------------------------------------------------- */
 /*  Star helpers                                                               */
@@ -433,9 +437,27 @@ function MyReviewsModal({
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {review.product_name
-                        ? `${review.product_name} · ${review.shop_name}`
-                        : review.shop_name}
+                      {review.product_id && review.product_name ? (
+                        <Link
+                          href={getProductSeoPath(
+                            review.product_name,
+                            review.product_short_code ?? null,
+                            review.product_id,
+                          )}
+                          className="hover:underline"
+                        >
+                          {review.product_name}
+                        </Link>
+                      ) : (
+                        review.product_name || null
+                      )}
+                      {review.product_name ? " · " : null}
+                      <Link
+                        href={getShopPath({ id: review.shop_id, name: review.shop_name })}
+                        className="text-emerald-700 hover:underline dark:text-emerald-400"
+                      >
+                        {review.shop_name}
+                      </Link>
                     </p>
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
                       {review.created_at ? formatRelativeTime(review.created_at) : ""}
@@ -459,6 +481,22 @@ function MyReviewsModal({
                       </p>
                     </div>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!window.confirm("Delete this review?")) return;
+                      const res = await deleteReview(review.id);
+                      if (!res.success) {
+                        addToast(res.error, "error");
+                        return;
+                      }
+                      addToast("Review deleted", "success");
+                      void load();
+                    }}
+                    className="mt-2 text-[11px] font-semibold text-red-600 hover:underline dark:text-red-400"
+                  >
+                    Delete
+                  </button>
                 </div>
               ))}
             </section>

@@ -25,7 +25,9 @@ export default function ChunkReloadGuard() {
       return (
         name === "ChunkLoadError" ||
         /Loading chunk [\w.-]+ failed/i.test(msg) ||
-        /Failed to fetch dynamically imported module/i.test(msg)
+        /Failed to fetch dynamically imported module/i.test(msg) ||
+        /module factory is not available/i.test(msg) ||
+        /was instantiated because it was required/i.test(msg)
       );
     };
 

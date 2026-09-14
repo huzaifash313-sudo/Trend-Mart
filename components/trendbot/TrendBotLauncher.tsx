@@ -22,7 +22,7 @@ interface TrendBotLauncherProps {
 
 const FAB_BOTTOM = {
   default: "calc(5.2rem + env(safe-area-inset-bottom, 0px))",
-  raised: "calc(6.7rem + env(safe-area-inset-bottom, 0px))",
+  raised: "calc(5.2rem + env(safe-area-inset-bottom, 0px))",
   /** Raised above the CartBar strip that appears when the user has items in cart. */
   cart: "calc(9rem + env(safe-area-inset-bottom, 0px))",
 } as const;

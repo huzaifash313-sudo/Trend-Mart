@@ -58,6 +58,7 @@ import {
 } from "@/lib/mobilePerf";
 import { fetchShops } from "@/services/shopService";
 import { sortWithNearbyBoost } from "@/lib/nearbyBoost";
+import { useLocale } from "@/context/LocaleContext";
 const StoriesViewer = dynamic(() => import("@/components/StoriesViewer"), {
   ssr: false,
 });
@@ -438,6 +439,7 @@ function HomeClient({
 }: HomeClientProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useLocale();
 
   // A merchant must never see (or order from) their own store in the public
   // marketplace — shops, deals, and stories are all filtered by owner id.
@@ -1030,7 +1032,7 @@ function HomeClient({
                     </svg>
                   </div>
                   <span className="tm-story-ring-label">
-                    {geoDetecting ? "Detecting…" : "Nearby"}
+                    {geoDetecting ? t("home.detecting") : t("home.nearby")}
                   </span>
                 </button>
               ) : null}
@@ -1102,7 +1104,7 @@ function HomeClient({
                 </svg>
               </div>
               <span className="tm-story-ring-label">
-                {geoDetecting ? "Detecting…" : "Nearby"}
+                {geoDetecting ? t("home.detecting") : t("home.nearby")}
               </span>
             </button>
           ) : !myShop ? (
@@ -1245,11 +1247,10 @@ function HomeClient({
               <>
                 <p className="text-4xl" aria-hidden="true">📡</p>
                 <p className="mt-3 text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                  You&apos;re offline
+                  {t("offline.title")}
                 </p>
                 <p className="mx-auto mt-1.5 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-                  Nothing is saved for this page yet. Connect to the internet and
-                  try again — shops you visit will then open instantly, even offline.
+                  {t("offline.hint")}
                 </p>
               </>
             ) : (
@@ -1258,7 +1259,7 @@ function HomeClient({
               </>
             )}
             <button type="button" onClick={() => void shopsQuery.refetch()} className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-5 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700">
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         )}
@@ -1269,15 +1270,15 @@ function HomeClient({
             <span className="tm-home-refresh-dot" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">
               {offline
-                ? "You're offline — showing saved shops from your last visit."
-                : "Couldn't refresh — showing saved shops."}
+                ? t("home.offlineBanner")
+                : t("home.refreshFail")}
             </span>
             <button
               type="button"
               onClick={() => void shopsQuery.refetch()}
               className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-600/10 dark:text-emerald-400"
             >
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         )}
@@ -1295,11 +1296,11 @@ function HomeClient({
             <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
               {needsLocationForGeo
                 ? geoFilter.scope === "city"
-                  ? "City / location chahiye"
-                  : "Location pin chahiye"
+                  ? t("home.needCity")
+                  : t("home.needLocation")
                 : searchQuery || activeCategory !== "All"
-                  ? "No shops match"
-                  : "No shops nearby yet"}
+                  ? t("home.noShopsMatch")
+                  : t("home.noShopsNearby")}
             </h3>
             <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
               {needsLocationForGeo
@@ -1319,7 +1320,7 @@ function HomeClient({
                   disabled={geoDetecting}
                   className="tm-btn-primary rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60"
                 >
-                  {geoDetecting ? "Detecting…" : "Share my location"}
+                  {geoDetecting ? t("home.detecting") : t("home.shareLocation")}
                 </button>
               )}
               {(searchQuery || activeCategory !== "All") && (
@@ -1412,7 +1413,7 @@ function HomeClient({
                   className="tm-btn-secondary rounded-full px-6 py-2 text-xs font-semibold disabled:opacity-60"
                   disabled={offline || loadingMoreShops || !hasMoreShops}
                 >
-                  Show more shops
+                  {t("home.showMoreShops")}
                 </button>
               ) : (
                 <p className="tm-live-shops-end" role="status">

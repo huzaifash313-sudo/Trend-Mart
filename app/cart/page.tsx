@@ -24,6 +24,7 @@ import WhatsAppCheckoutModal, {
 import type { Shop } from "@/types";
 import { fetchShopById } from "@/services/shopService";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useLocale } from "@/context/LocaleContext";
 
 /* ── Icons ─────────────────────────────────────────────────────────────────── */
 
@@ -164,6 +165,7 @@ function itemNeedsVariant(
 export default function CartPage() {
   const router = useRouter();
   const { confirm } = useConfirm();
+  const { t } = useLocale();
   const {
     items,
     removeItem,
@@ -290,12 +292,12 @@ export default function CartPage() {
             type="button"
             onClick={() => router.back()}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            aria-label="Go back"
+            aria-label={t("common.back")}
           >
             <ChevronLeftIcon />
           </button>
           <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-            Your Cart{totalItems > 0 ? ` (${totalItems})` : ""}
+            {t("cart.yourCart")}{totalItems > 0 ? ` (${totalItems})` : ""}
           </h1>
           {items.length > 0 && (
             <button
@@ -303,7 +305,7 @@ export default function CartPage() {
               onClick={handleClear}
               className="ml-auto rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
             >
-              Clear all
+              {t("cart.clearAll")}
             </button>
           )}
         </div>
@@ -317,16 +319,16 @@ export default function CartPage() {
               <CartIcon />
             </div>
             <p className="text-base font-semibold text-zinc-700 dark:text-zinc-300">
-              Your cart is empty
+              {t("cart.empty")}
             </p>
             <p className="mt-1 max-w-xs text-sm text-zinc-400 dark:text-zinc-500">
-              Browse shops, deals and products, then add items to build your order.
+              {t("cart.emptyHint")}
             </p>
             <Link
               href="/"
               className="mt-6 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
             >
-              Start shopping
+              {t("cart.startShopping")}
             </Link>
           </div>
         ) : (
@@ -362,7 +364,7 @@ export default function CartPage() {
                       onClick={() => void handleClearShop(group.shopId, group.shopName)}
                       className="shrink-0 rounded-lg px-2 py-1 text-[0.65rem] font-semibold text-zinc-500 hover:bg-zinc-200 hover:text-red-600 dark:hover:bg-zinc-700 dark:hover:text-red-400"
                     >
-                      Clear
+                      {t("common.clear")}
                     </button>
                   ) : null}
                 </div>
@@ -413,7 +415,7 @@ export default function CartPage() {
                                 {item.variant ? "Change options" : "Select options"}
                                 {itemNeedsVariant(item, variantData) && (
                                   <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[0.6rem] font-semibold text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                                    Required
+                                    {t("common.required")}
                                   </span>
                                 )}
                               </button>
@@ -499,7 +501,7 @@ export default function CartPage() {
                 {/* Shop checkout */}
                 <div className="flex items-center justify-between gap-3 border-t border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/40">
                   <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Subtotal:{" "}
+                    {t("cart.subtotal")}:{" "}
                     <span className="font-bold text-zinc-800 dark:text-zinc-200">
                       {formatRupees(group.subtotal)}
                     </span>
@@ -511,8 +513,8 @@ export default function CartPage() {
                     className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {group.items.some((i) => itemNeedsVariant(i, variantData))
-                      ? "Select options first"
-                      : "Order via WhatsApp"}
+                      ? t("pdp.variants")
+                      : t("cart.orderWhatsApp")}
                   </button>
                 </div>
               </section>
@@ -522,7 +524,7 @@ export default function CartPage() {
             <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Total ({totalItems} item{totalItems === 1 ? "" : "s"})
+                  {t("cart.total")} ({totalItems} {t("cart.items")})
                 </span>
                 <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
                   {formatRupees(totalAmount)}

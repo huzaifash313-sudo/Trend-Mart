@@ -10,6 +10,7 @@ import { isCustomerDeliveryProfileComplete } from "@/lib/customerProfile";
 import { useToast } from "@/components/Toast";
 import type { Order } from "@/types";
 import ProfileReviewsCard from "@/components/ProfileReviewsCard";
+import { useLocale } from "@/context/LocaleContext";
 
 function StatCard({
   label,
@@ -36,6 +37,7 @@ function StatCard({
 
 export default function CustomerAccountPage() {
   const { addToast } = useToast();
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
@@ -193,7 +195,7 @@ export default function CustomerAccountPage() {
             <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400">
               Customer portal
             </p>
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">My Account</h1>
+            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{t("account.myAccount")}</h1>
             {email ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">{email}</p>
             ) : null}
@@ -202,7 +204,7 @@ export default function CustomerAccountPage() {
             href="/"
             className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
           >
-            Browse shops
+            {t("footer.browseShops")}
           </Link>
         </div>
       </header>
@@ -301,19 +303,19 @@ export default function CustomerAccountPage() {
         {/* Quick stats */}
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard
-            label="Orders"
+            label={t("nav.orders")}
             value={orderCount}
             href="/orders"
             hint={liveOrders ? "From your account" : "Local + synced"}
           />
           <StatCard
-            label="In progress"
+            label={t("orders.filterActive")}
             value={pendingCount}
             href="/orders/tracking"
             hint={liveOrders ? "Pending → delivered" : "Recent (7 days)"}
           />
           <StatCard
-            label="Wishlist"
+            label={t("account.wishlist")}
             value={wishlistCount ?? "…"}
             href="/wishlist"
             hint="Shops & products"
@@ -322,15 +324,15 @@ export default function CustomerAccountPage() {
 
         {/* Main actions */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Your shopping</h2>
+          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{t("account.yourShopping")}</h2>
           {[
-            { href: "/orders", title: "My Orders", desc: "Past orders & details" },
-            { href: "/orders/tracking", title: "Live Order Tracking", desc: "Pending → Delivered timeline" },
+            { href: "/orders", title: t("account.orders"), desc: "Past orders & details" },
+            { href: "/orders/tracking", title: t("account.tracking"), desc: "Pending → Delivered timeline" },
             { href: "/account/inquiries", title: "My Chats", desc: "In-app chat with shops" },
-            { href: "/account/assistant", title: "TrendBot", desc: "Free AI — orders, deals & product links" },
-            { href: "/wishlist", title: "Wishlist", desc: "Saved shops & products (separate tabs)" },
-            { href: "/account/addresses", title: "Delivery Addresses", desc: "Saved checkout addresses" },
-            { href: "/auth/settings", title: "Account Settings", desc: "Password & profile" },
+            { href: "/account/assistant", title: "TrendBot", desc: t("account.assistant") },
+            { href: "/wishlist", title: t("account.wishlist"), desc: "Saved shops & products (separate tabs)" },
+            { href: "/account/addresses", title: t("account.addresses"), desc: "Saved checkout addresses" },
+            { href: "/auth/settings", title: t("account.settings"), desc: "Password & profile" },
           ].map((item) => (
             <Link
               key={item.href}
@@ -351,7 +353,7 @@ export default function CustomerAccountPage() {
         {/* Become merchant — proper store registration (not instant role flip) */}
         <section className="rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
           <h2 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
-            Want to sell on TrendsMart?
+            {t("account.wantToSell")}
           </h2>
           <p className="mt-1 text-xs text-emerald-800/80 dark:text-emerald-300/80">
             Register your store with name, category, and WhatsApp — then open the merchant dashboard.
@@ -360,7 +362,7 @@ export default function CustomerAccountPage() {
             href="/account/become-merchant"
             className="mt-3 inline-flex rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
           >
-            Become a Merchant →
+            {t("account.becomeMerchantCta")} →
           </Link>
         </section>
       </main>

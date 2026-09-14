@@ -1,0 +1,557 @@
+"use client";
+
+/**
+ * POS Catalog Setup — online products already power billing.
+ * Fill optional POS fields (barcode, cost, stock…) by subcategory.
+ * Save one row or all changed rows; leave blanks for later.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  setProductPosFavourite,
+  stocktakeSetQty,
+  updateProductBarcode,
+  updateProductCostPrice,
+  updateProductInventoryMeta,
+} from "@/services/posService";
+import { fetchSubCategories } from "@/services/subCategoryService";
+import { formatRupees } from "@/lib/formatters";
+import { useToast } from "@/components/Toast";
+import type { Product } from "@/types";
+
+type Draft = {
+  barcode: string;
+  cost: string;
+  stock: string;
+  reorder: string;
+  batch: string;
+  expiry: string;
+  favourite: boolean;
+};
+
+function emptyDraft(p: Product): Draft {
+  return {
+    barcode: p.barcode || "",
+    cost: p.cost_price != null ? String(p.cost_price) : "",
+    stock: p.stock_qty != null ? String(p.stock_qty) : "",
+    reorder: p.reorder_level != null ? String(p.reorder_level) : "",
+    batch: p.batch_no || "",
+    expiry: (p.expiry_date || "").slice(0, 10),
+    favourite: Boolean(p.pos_favourite),
+  };
+}
+
+function isMissingPosFields(p: Product): boolean {
+  return (
+    !p.barcode?.trim() ||
+    p.cost_price == null ||
+    p.stock_qty == null
+  );
+}
+
+function draftChanged(p: Product, d: Draft): boolean {
+  const base = emptyDraft(p);
+  return (
+    d.barcode.trim() !== base.barcode.trim() ||
+    d.cost.trim() !== base.cost.trim() ||
+    d.stock.trim() !== base.stock.trim() ||
+    d.reorder.trim() !== base.reorder.trim() ||
+    d.batch.trim() !== base.batch.trim() ||
+    d.expiry.trim() !== base.expiry.trim() ||
+    d.favourite !== base.favourite
+  );
+}
+
+export interface PosCatalogSetupPanelProps {
+  shopId: string;
+  shopCategory: string;
+  products: Product[];
+  onProductsChange: (updater: (prev: Product[]) => Product[]) => void;
+}
+
+export default function PosCatalogSetupPanel({
+  shopId,
+  shopCategory,
+  products,
+  onProductsChange,
+}: PosCatalogSetupPanelProps) {
+  const { addToast } = useToast();
+  const [q, setQ] = useState("");
+  const [subFilter, setSubFilter] = useState<string>("all");
+  const [onlyMissing, setOnlyMissing] = useState(true);
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [subNames, setSubNames] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE = 40;
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSubCategories(shopCategory).then((res) => {
+      if (cancelled || !res.success) return;
+      const map: Record<string, string> = {};
+      for (const s of res.data) map[s.id] = s.name;
+      setSubNames(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [shopCategory]);
+
+  useEffect(() => {
+    setDrafts((prev) => {
+      const next = { ...prev };
+      for (const p of products) {
+        if (!next[p.id]) next[p.id] = emptyDraft(p);
+      }
+      return next;
+    });
+  }, [products]);
+
+  const subOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      const key = p.sub_category_id || "__none__";
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const opts = [...counts.entries()].map(([id, count]) => ({
+      id,
+      label:
+        id === "__none__"
+          ? "Uncategorized"
+          : subNames[id] || "Sub-category",
+      count,
+    }));
+    opts.sort((a, b) => a.label.localeCompare(b.label));
+    return opts;
+  }, [products, subNames]);
+
+  const missingCount = useMemo(
+    () => products.filter(isMissingPosFields).length,
+    [products],
+  );
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    let rows = products;
+    if (subFilter !== "all") {
+      rows = rows.filter((p) =>
+        subFilter === "__none__"
+          ? !p.sub_category_id
+          : p.sub_category_id === subFilter,
+      );
+    }
+    if (onlyMissing) rows = rows.filter(isMissingPosFields);
+    if (needle) {
+      rows = rows.filter(
+        (p) =>
+          p.name.toLowerCase().includes(needle) ||
+          (p.barcode || "").toLowerCase().includes(needle) ||
+          (p.short_code || "").toLowerCase().includes(needle),
+      );
+    }
+    return rows;
+  }, [products, q, subFilter, onlyMissing]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE));
+  const pageSafe = Math.min(page, pageCount - 1);
+  const pageRows = filtered.slice(pageSafe * PAGE, pageSafe * PAGE + PAGE);
+
+  const dirtyIds = useMemo(() => {
+    return products
+      .filter((p) => {
+        const d = drafts[p.id];
+        return d && draftChanged(p, d);
+      })
+      .map((p) => p.id);
+  }, [products, drafts]);
+
+  function patchDraft(id: string, patch: Partial<Draft>) {
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] || emptyDraft(products.find((x) => x.id === id)!)), ...patch },
+    }));
+  }
+
+  async function saveOne(p: Product): Promise<boolean> {
+    const d = drafts[p.id] || emptyDraft(p);
+    const barcode = d.barcode.trim() || null;
+    const costRaw = d.cost.trim();
+    const cost =
+      costRaw === "" ? null : Math.max(0, Math.round(Number(costRaw) * 100) / 100);
+    const stockRaw = d.stock.trim();
+    const stock =
+      stockRaw === "" ? null : Math.max(0, Math.round(Number(stockRaw) * 100) / 100);
+    const reorderRaw = d.reorder.trim();
+    const reorder =
+      reorderRaw === ""
+        ? null
+        : Math.max(0, Math.round(Number(reorderRaw)));
+
+    const r1 = await updateProductBarcode(shopId, p.id, barcode);
+    if (!r1.success) {
+      addToast(r1.error || "Barcode save failed", "error");
+      return false;
+    }
+    const r2 = await updateProductCostPrice(shopId, p.id, cost);
+    if (!r2.success) {
+      addToast(r2.error || "Cost save failed", "error");
+      return false;
+    }
+    const r3 = await updateProductInventoryMeta(shopId, p.id, {
+      batch_no: d.batch.trim() || null,
+      expiry_date: d.expiry.trim() || null,
+      reorder_level: reorder,
+    });
+    if (!r3.success) {
+      addToast(r3.error || "Inventory meta failed", "error");
+      return false;
+    }
+    if (stock != null) {
+      const r4 = await stocktakeSetQty(shopId, p.id, stock, "Catalog setup");
+      if (!r4.success) {
+        addToast(r4.error || "Stock save failed", "error");
+        return false;
+      }
+    }
+    if (Boolean(p.pos_favourite) !== d.favourite) {
+      await setProductPosFavourite(shopId, p.id, d.favourite);
+    }
+
+    onProductsChange((prev) =>
+      prev.map((x) =>
+        x.id === p.id
+          ? {
+              ...x,
+              barcode,
+              cost_price: cost,
+              stock_qty: stock != null ? stock : x.stock_qty,
+              batch_no: d.batch.trim() || null,
+              expiry_date: d.expiry.trim() || null,
+              reorder_level: reorder,
+              pos_favourite: d.favourite,
+            }
+          : x,
+      ),
+    );
+    setDrafts((prev) => ({
+      ...prev,
+      [p.id]: {
+        barcode: barcode || "",
+        cost: cost != null ? String(cost) : "",
+        stock: stock != null ? String(stock) : "",
+        reorder: reorder != null ? String(reorder) : "",
+        batch: d.batch.trim(),
+        expiry: d.expiry.trim(),
+        favourite: d.favourite,
+      },
+    }));
+    return true;
+  }
+
+  async function saveAllDirty() {
+    if (dirtyIds.length === 0) {
+      addToast("No changes to save", "info");
+      return;
+    }
+    setBusy(true);
+    let ok = 0;
+    for (const id of dirtyIds) {
+      const p = products.find((x) => x.id === id);
+      if (!p) continue;
+      if (await saveOne(p)) ok += 1;
+    }
+    setBusy(false);
+    addToast(`Saved ${ok} product${ok === 1 ? "" : "s"}`, "success");
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+        <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
+          Online catalog = POS products
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-emerald-800/90 dark:text-emerald-200/90">
+          All {products.length} products listed on your store are already available
+          for billing. Fill barcode, cost, or stock when you need them — leave blank
+          and complete later.
+        </p>
+        <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+          {missingCount} with optional POS fields still empty
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(0);
+          }}
+          placeholder="Search name, barcode, SKU"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+        <select
+          value={subFilter}
+          onChange={(e) => {
+            setSubFilter(e.target.value);
+            setPage(0);
+          }}
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          <option value="all">All sub-categories ({products.length})</option>
+          {subOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label} ({o.count})
+            </option>
+          ))}
+        </select>
+        <label className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-xs font-semibold dark:border-zinc-700 dark:bg-zinc-900">
+          <input
+            type="checkbox"
+            checked={onlyMissing}
+            onChange={(e) => {
+              setOnlyMissing(e.target.checked);
+              setPage(0);
+            }}
+            className="rounded border-zinc-300 text-emerald-600"
+          />
+          Missing fields only
+        </label>
+        <button
+          type="button"
+          disabled={busy || dirtyIds.length === 0}
+          onClick={() => void saveAllDirty()}
+          className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+        >
+          {busy ? "Saving…" : `Save changed (${dirtyIds.length})`}
+        </button>
+      </div>
+
+      <p className="text-[11px] text-zinc-500">
+        Showing {pageRows.length} of {filtered.length}
+        {filtered.length !== products.length ? ` (filtered)` : ""}
+      </p>
+
+      {/* Mobile cards */}
+      <ul className="space-y-2 sm:hidden">
+        {pageRows.map((p) => {
+          const d = drafts[p.id] || emptyDraft(p);
+          const subLabel = p.sub_category_id
+            ? subNames[p.sub_category_id] || "Sub-category"
+            : "Uncategorized";
+          return (
+            <li
+              key={p.id}
+              className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                    {p.name}
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    {subLabel} · {formatRupees(p.price)}
+                  </p>
+                </div>
+                <label className="shrink-0 text-[10px] font-bold text-zinc-500">
+                  <input
+                    type="checkbox"
+                    checked={d.favourite}
+                    onChange={(e) => patchDraft(p.id, { favourite: e.target.checked })}
+                    className="mr-1"
+                  />
+                  Fav
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field
+                  label="Barcode"
+                  value={d.barcode}
+                  onChange={(v) => patchDraft(p.id, { barcode: v })}
+                />
+                <Field
+                  label="Cost"
+                  value={d.cost}
+                  onChange={(v) => patchDraft(p.id, { cost: v })}
+                  inputMode="decimal"
+                />
+                <Field
+                  label="Stock qty"
+                  value={d.stock}
+                  onChange={(v) => patchDraft(p.id, { stock: v })}
+                  inputMode="decimal"
+                />
+                <Field
+                  label="Reorder"
+                  value={d.reorder}
+                  onChange={(v) => patchDraft(p.id, { reorder: v })}
+                  inputMode="numeric"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={busy || !draftChanged(p, d)}
+                onClick={() => void saveOne(p).then((ok) => ok && addToast("Saved", "success"))}
+                className="mt-2 w-full rounded-xl border border-emerald-200 bg-emerald-50 py-2 text-xs font-bold text-emerald-800 disabled:opacity-40 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
+              >
+                Save row
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800 sm:block">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
+              <th className="whitespace-nowrap px-3 py-2.5">Product</th>
+              <th className="whitespace-nowrap px-3 py-2.5">Sub-category</th>
+              <th className="whitespace-nowrap px-3 py-2.5">Price</th>
+              <th className="whitespace-nowrap px-3 py-2.5">Barcode</th>
+              <th className="whitespace-nowrap px-3 py-2.5">Cost</th>
+              <th className="whitespace-nowrap px-3 py-2.5">Stock</th>
+              <th className="whitespace-nowrap px-3 py-2.5">Reorder</th>
+              <th className="whitespace-nowrap px-3 py-2.5">Fav</th>
+              <th className="whitespace-nowrap px-3 py-2.5" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
+            {pageRows.map((p) => {
+              const d = drafts[p.id] || emptyDraft(p);
+              const subLabel = p.sub_category_id
+                ? subNames[p.sub_category_id] || "—"
+                : "Uncategorized";
+              return (
+                <tr key={p.id} className="align-middle">
+                  <td className="max-w-[14rem] truncate px-3 py-2 font-semibold text-zinc-900 dark:text-zinc-50">
+                    {p.name}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
+                    {subLabel}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
+                    {formatRupees(p.price)}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      value={d.barcode}
+                      onChange={(e) => patchDraft(p.id, { barcode: e.target.value })}
+                      className="w-28 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                      placeholder="Optional"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      value={d.cost}
+                      onChange={(e) => patchDraft(p.id, { cost: e.target.value })}
+                      inputMode="decimal"
+                      className="w-20 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                      placeholder="—"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      value={d.stock}
+                      onChange={(e) => patchDraft(p.id, { stock: e.target.value })}
+                      inputMode="decimal"
+                      className="w-20 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                      placeholder="—"
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      value={d.reorder}
+                      onChange={(e) => patchDraft(p.id, { reorder: e.target.value })}
+                      inputMode="numeric"
+                      className="w-16 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                      placeholder="—"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <input
+                      type="checkbox"
+                      checked={d.favourite}
+                      onChange={(e) => patchDraft(p.id, { favourite: e.target.checked })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <button
+                      type="button"
+                      disabled={busy || !draftChanged(p, d)}
+                      onClick={() =>
+                        void saveOne(p).then((ok) => ok && addToast("Saved", "success"))
+                      }
+                      className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="py-8 text-center text-sm text-zinc-500">
+          {onlyMissing
+            ? "No products with missing POS fields in this filter."
+            : "No products match."}
+        </p>
+      ) : null}
+
+      {pageCount > 1 ? (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            disabled={pageSafe <= 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-bold disabled:opacity-40 dark:border-zinc-700"
+          >
+            Previous
+          </button>
+          <span className="text-xs text-zinc-500">
+            {pageSafe + 1} / {pageCount}
+          </span>
+          <button
+            type="button"
+            disabled={pageSafe >= pageCount - 1}
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-bold disabled:opacity-40 dark:border-zinc-700"
+          >
+            Next
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  inputMode,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  inputMode?: "decimal" | "numeric";
+}) {
+  return (
+    <label className="block text-[10px] font-semibold text-zinc-500">
+      {label}
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode={inputMode}
+        placeholder="Optional"
+        className="mt-0.5 h-9 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+      />
+    </label>
+  );
+}

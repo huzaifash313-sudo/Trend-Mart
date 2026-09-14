@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLocale } from "@/context/LocaleContext";
 
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Global Footer                                                 */
@@ -12,43 +13,48 @@ import { usePathname } from "next/navigation";
 /** Stable across SSR/CSR — avoids hydration mismatch from Date() edge cases. */
 const COPYRIGHT_YEAR = 2026;
 
-const FOOTER_LINKS: { heading: string; links: { href: string; label: string }[] }[] = [
+const FOOTER_LINKS: {
+  headingKey: string;
+  links: { href: string; labelKey: string }[];
+}[] = [
   {
-    heading: "Shop",
+    headingKey: "footer.shop",
     links: [
-      { href: "/", label: "Browse Shops" },
-      { href: "/products", label: "Products" },
-      { href: "/wishlist", label: "Wishlist" },
+      { href: "/", labelKey: "footer.browseShops" },
+      { href: "/products", labelKey: "footer.products" },
+      { href: "/wishlist", labelKey: "footer.wishlist" },
     ],
   },
   {
-    heading: "Sell on TrendsMart",
+    headingKey: "footer.sell",
     links: [
-      { href: "/account/become-merchant", label: "Open a Store" },
-      { href: "/faq#merchant", label: "New Merchant Guide" },
-      { href: "/legal/merchant-guidelines", label: "Merchant Security Guidelines" },
+      { href: "/account/become-merchant", labelKey: "footer.openStore" },
+      { href: "/faq#merchant", labelKey: "footer.merchantGuide" },
+      { href: "/legal/merchant-guidelines", labelKey: "footer.merchantGuidelines" },
     ],
   },
   {
-    heading: "Help",
+    headingKey: "footer.help",
     links: [
-      { href: "/faq", label: "FAQ" },
-      { href: "/support", label: "Contact Support" },
-      { href: "/orders/tracking", label: "Track an Order" },
+      { href: "/faq", labelKey: "footer.faq" },
+      { href: "/support", labelKey: "footer.support" },
+      { href: "/orders/tracking", labelKey: "footer.trackOrder" },
     ],
   },
   {
-    heading: "Legal",
+    headingKey: "footer.legal",
     links: [
-      { href: "/legal/terms", label: "Terms & Conditions" },
-      { href: "/legal/privacy", label: "Privacy Policy" },
-      { href: "/legal/refund-policy", label: "Refund & Order Policy" },
+      { href: "/legal/terms", labelKey: "footer.terms" },
+      { href: "/legal/privacy", labelKey: "footer.privacy" },
+      { href: "/legal/reviews", labelKey: "footer.reviewsPolicy" },
+      { href: "/legal/refund-policy", labelKey: "footer.refund" },
     ],
   },
 ];
 
 export default function Footer() {
   const pathname = usePathname();
+  const { t } = useLocale();
   // Standalone flows — admin console and QR dine-in scan pages bring their own chrome.
   if (
     pathname === "/offline" ||
@@ -84,14 +90,14 @@ export default function Footer() {
           TrendsMart
         </Link>
         <p className="mt-1.5 max-w-sm text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-          TrendsMart — local shopping across Pakistan. Nearby shops, WhatsApp orders.
+          {t("footer.tagline")}
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">
           {FOOTER_LINKS.map((group) => (
-            <div key={group.heading}>
+            <div key={group.headingKey}>
               <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                {group.heading}
+                {t(group.headingKey)}
               </p>
               <ul className="space-y-1.5">
                 {group.links.map((link) => (
@@ -100,7 +106,7 @@ export default function Footer() {
                       href={link.href}
                       className="text-xs text-zinc-600 transition-colors hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
                     >
-                      {link.label}
+                      {t(link.labelKey)}
                     </Link>
                   </li>
                 ))}
@@ -110,7 +116,7 @@ export default function Footer() {
         </div>
 
         <p className="mt-4 border-t border-zinc-100 pt-3 text-[10px] text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-          &copy; {COPYRIGHT_YEAR} TrendsMart. All rights reserved.
+          &copy; {COPYRIGHT_YEAR} TrendsMart. {t("footer.rights")}
         </p>
       </div>
 
@@ -133,13 +139,13 @@ export default function Footer() {
               TrendsMart
             </Link>
             <p className="mt-2 max-w-[16rem] text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              TrendsMart — local shopping across Pakistan. Discover nearby shops and order via WhatsApp.
+              {t("footer.tagline")}
             </p>
           </div>
           {FOOTER_LINKS.map((group) => (
-            <div key={group.heading}>
+            <div key={group.headingKey}>
               <p className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                {group.heading}
+                {t(group.headingKey)}
               </p>
               <ul className="space-y-2">
                 {group.links.map((link) => (
@@ -148,7 +154,7 @@ export default function Footer() {
                       href={link.href}
                       className="text-sm text-zinc-600 transition-colors hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
                     >
-                      {link.label}
+                      {t(link.labelKey)}
                     </Link>
                   </li>
                 ))}
@@ -157,7 +163,7 @@ export default function Footer() {
           ))}
         </div>
         <div className="mt-6 border-t border-zinc-100 pt-4 text-xs text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
-          &copy; {COPYRIGHT_YEAR} TrendsMart. All rights reserved.
+          &copy; {COPYRIGHT_YEAR} TrendsMart. {t("footer.rights")}
         </div>
       </div>
     </footer>

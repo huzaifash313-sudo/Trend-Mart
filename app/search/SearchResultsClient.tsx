@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import SearchInput from "@/components/SearchInput";
+import { useLocale } from "@/context/LocaleContext";
 import { getSafeImageUrl } from "@/services/storageService";
 import { formatRupees } from "@/lib/formatters";
 import { getShopPath } from "@/lib/shopSlug";
@@ -74,6 +75,7 @@ interface SearchResponse {
   query: string;
   results: SearchResult[];
   related?: SearchResult[];
+  suggestions?: string[];
   counts: { products: number; shops: number; deals: number };
   hasMore?: boolean;
   nextOffset?: number;
@@ -274,12 +276,13 @@ function SectionHeader({
 
 type Tab = "all" | "products" | "shops" | "deals";
 
-const TABS: { value: Tab; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "products", label: "Products" },
-  { value: "shops", label: "Shops" },
-  { value: "deals", label: "Deals" },
-];
+const TAB_VALUES: Tab[] = ["all", "products", "shops", "deals"];
+const TAB_LABEL_KEYS: Record<Tab, string> = {
+  all: "search.all",
+  products: "search.products",
+  shops: "search.shops",
+  deals: "search.deals",
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Main client                                                                */
@@ -293,12 +296,13 @@ export default function SearchResultsClient({
   initialType?: Tab;
 }) {
   const router = useRouter();
+  const { t } = useLocale();
   const qParam = initialQ;
   const typeParam = initialType;
 
   const [query, setQuery]       = useState(qParam);
   const [activeTab, setActiveTab] = useState<Tab>(
-    TABS.some((t) => t.value === typeParam) ? typeParam : "all",
+    TAB_VALUES.includes(typeParam) ? typeParam : "all",
   );
   const [data, setData]         = useState<SearchResponse | null>(null);
   const [related, setRelated]   = useState<SearchResult[]>([]);
@@ -307,6 +311,10 @@ export default function SearchResultsClient({
   const [hasMore, setHasMore]   = useState(false);
   const [nextOffset, setNextOffset] = useState(0);
   const [error, setError]       = useState<string | null>(null);
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [minRating, setMinRating] = useState("0");
+  const [showFilters, setShowFilters] = useState(false);
   const abortRef                = useRef<AbortController | null>(null);
   const debounceRef             = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadMoreRef             = useRef<HTMLDivElement | null>(null);
@@ -345,6 +353,9 @@ export default function SearchResultsClient({
         offset: String(offset),
       });
       if (type !== "all") params.set("type", type);
+      if (minPrice.trim()) params.set("minPrice", minPrice.trim());
+      if (maxPrice.trim()) params.set("maxPrice", maxPrice.trim());
+      if (minRating && Number(minRating) > 0) params.set("minRating", minRating);
       const res  = await fetch(`/api/search?${params}`, { signal: ctrl.signal });
       if (!res.ok) throw new Error("Search failed");
       const json = (await res.json()) as SearchResponse;
@@ -379,13 +390,13 @@ export default function SearchResultsClient({
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [minPrice, maxPrice, minRating]);
 
   /* ── Run when URL param changes (Enter / tab change) ────────────────── */
   useEffect(() => {
     void doSearch(qParam, activeTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qParam, activeTab]);
+  }, [qParam, activeTab, minPrice, maxPrice, minRating]);
 
   /* ── Live / debounced search as user types (400 ms) ─────────────────── */
   useEffect(() => {
@@ -486,7 +497,7 @@ export default function SearchResultsClient({
 
   // Keep tab in sync with browser back/forward on ?type=
   useEffect(() => {
-    if (TABS.some((t) => t.value === typeParam)) {
+    if (TAB_VALUES.includes(typeParam)) {
       setActiveTab(typeParam);
     }
   }, [typeParam]);
@@ -508,15 +519,15 @@ export default function SearchResultsClient({
         value={query}
         onChange={setQuery}
         onSubmit={handleSubmit}
-        placeholder="Search products, shops, deals…"
-        ariaLabel="Global search"
+        placeholder={t("search.placeholder")}
+        ariaLabel={t("common.search")}
         showClearButton
         className="mb-2"
       />
 
       {liveCorrections.length > 0 && !data && query.trim().length >= 3 ? (
         <div className="mb-3 flex flex-wrap items-center gap-1.5 px-0.5">
-          <span className="text-[11px] text-zinc-400">Try:</span>
+          <span className="text-[11px] text-zinc-400">{t("search.try")}:</span>
           {liveCorrections.map((s) => (
             <button
               key={s}
@@ -536,23 +547,23 @@ export default function SearchResultsClient({
       {/* Tab strip */}
       <div className="tm-cat-bar -mx-3 sm:-mx-4 mb-3">
         <div className="tm-cat-scroll flex gap-1.5 px-3 sm:px-4">
-          {TABS.map((tab) => (
+          {TAB_VALUES.map((value) => (
             <button
-              key={tab.value}
+              key={value}
               type="button"
-              onClick={() => handleTabChange(tab.value)}
+              onClick={() => handleTabChange(value)}
               className={`shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition ${
-                activeTab === tab.value
+                activeTab === value
                   ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
               }`}
             >
-              {tab.label}
-              {data && tab.value !== "all" ? (
+              {t(TAB_LABEL_KEYS[value])}
+              {data && value !== "all" ? (
                 <span className="ml-1 text-[10px] opacity-70">
-                  {tab.value === "products"
+                  {value === "products"
                     ? data.counts.products
-                    : tab.value === "shops"
+                    : value === "shops"
                       ? data.counts.shops
                       : data.counts.deals}
                 </span>
@@ -560,6 +571,64 @@ export default function SearchResultsClient({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-[11px] font-semibold text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+        >
+          {showFilters ? t("search.hideFilters") : t("search.filters")}
+        </button>
+        {showFilters ? (
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-zinc-200 bg-white p-3 sm:grid-cols-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <label className="text-[10px] font-semibold text-zinc-500">
+              {t("search.minPrice")}
+              <input
+                type="number"
+                min={0}
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+              />
+            </label>
+            <label className="text-[10px] font-semibold text-zinc-500">
+              {t("search.maxPrice")}
+              <input
+                type="number"
+                min={0}
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+              />
+            </label>
+            <label className="text-[10px] font-semibold text-zinc-500">
+              {t("search.minRating")}
+              <select
+                value={minRating}
+                onChange={(e) => setMinRating(e.target.value)}
+                className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+              >
+                <option value="0">{t("search.any")}</option>
+                <option value="3">3+</option>
+                <option value="4">4+</option>
+                <option value="4.5">4.5+</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setMinPrice("");
+                setMaxPrice("");
+                setMinRating("0");
+              }}
+              className="self-end rounded-lg bg-zinc-100 py-2 text-[11px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            >
+              {t("search.clear")}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* Loading skeletons */}
@@ -593,7 +662,7 @@ export default function SearchResultsClient({
             <span className="text-2xl">🔍</span>
           </div>
           <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
-            No results for &ldquo;{displayQ}&rdquo;
+            {t("search.noResults")} &ldquo;{displayQ}&rdquo;
           </h3>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
             Try different keywords or check the spelling.
@@ -602,7 +671,7 @@ export default function SearchResultsClient({
           {/* "Did you mean" suggestions */}
           {suggestions.length > 0 && (
             <div className="mt-4">
-              <p className="mb-2 text-xs text-zinc-400 dark:text-zinc-500">Did you mean?</p>
+              <p className="mb-2 text-xs text-zinc-400 dark:text-zinc-500">{t("search.didYouMean")}?</p>
               <div className="flex flex-wrap justify-center gap-2">
                 {suggestions.map((s) => (
                   <button
@@ -626,13 +695,13 @@ export default function SearchResultsClient({
               href="/products"
               className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
             >
-              Browse Products
+              Browse {t("search.products")}
             </Link>
             <Link
               href="/deals"
               className="rounded-full border border-zinc-200 px-4 py-2 text-xs font-semibold text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
             >
-              View Deals
+              {t("search.deals")}
             </Link>
           </div>
         </div>
@@ -658,10 +727,10 @@ export default function SearchResultsClient({
         <div className="space-y-8">
           {/* Products section */}
           {products.length > 0 && (activeTab === "all" || activeTab === "products") && (
-            <section aria-label="Products">
+            <section aria-label={t("search.products")}>
               <SectionHeader
                 icon="🛍️"
-                label="Products"
+                label={t("search.products")}
                 count={data!.counts.products}
                 href={`/products?q=${encodeURIComponent(qParam)}`}
               />
@@ -675,10 +744,10 @@ export default function SearchResultsClient({
 
           {/* Shops section */}
           {shops.length > 0 && (activeTab === "all" || activeTab === "shops") && (
-            <section aria-label="Shops">
+            <section aria-label={t("search.shops")}>
               <SectionHeader
                 icon="🏪"
-                label="Shops"
+                label={t("search.shops")}
                 count={data!.counts.shops}
                 href={`/search?q=${encodeURIComponent(qParam)}&type=shops`}
               />
@@ -692,10 +761,10 @@ export default function SearchResultsClient({
 
           {/* Deals section */}
           {deals.length > 0 && (activeTab === "all" || activeTab === "deals") && (
-            <section aria-label="Deals">
+            <section aria-label={t("search.deals")}>
               <SectionHeader
                 icon="🔥"
-                label="Deals"
+                label={t("search.deals")}
                 count={data!.counts.deals}
                 href={`/deals?q=${encodeURIComponent(qParam)}&filter=all`}
               />
@@ -710,9 +779,9 @@ export default function SearchResultsClient({
           {/* Soft matches — related after exact hits */}
           {(relatedProducts.length > 0 || relatedDeals.length > 0) &&
             (activeTab === "all" || activeTab === "products" || activeTab === "deals") && (
-            <section aria-label="Related results" className="border-t border-zinc-100 pt-6 dark:border-zinc-800">
+            <section aria-label={t("search.related")} className="border-t border-zinc-100 pt-6 dark:border-zinc-800">
               <h2 className="mb-3 text-[15px] font-bold text-zinc-900 dark:text-zinc-100">
-                Related
+                {t("search.related")}
               </h2>
               {relatedProducts.length > 0 && (activeTab === "all" || activeTab === "products") ? (
                 <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">

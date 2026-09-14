@@ -6,8 +6,7 @@
 export const BRAND_PROMO_VIDEO = "/media/brand/promo-reel.mp4?v=3";
 
 /**
- * Lightweight poster for LCP — paints immediately via next/image.
- * Prefer a dedicated WebP in /public/media/brand when available; og-default
- * is already optimized for social + hero fallback.
+ * First frame of the promo reel — matches playback after intro skip.
+ * No query string: next/image localPatterns reject `?v=` on local paths.
  */
-export const BRAND_PROMO_POSTER = "/og-default.png";
+export const BRAND_PROMO_POSTER = "/media/brand/promo-poster.webp";

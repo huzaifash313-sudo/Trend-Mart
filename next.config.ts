@@ -98,6 +98,8 @@ const nextConfig: NextConfig = {
 
   // ── Image Configuration ────────────────────────────────────────────────────
   images: {
+    // Next 16: local `src` with `?v=` needs localPatterns (omit `search` = any query OK).
+    localPatterns: [{ pathname: "/**" }],
     // Restrict remote patterns to known sources instead of wildcard
     remotePatterns: [
       {

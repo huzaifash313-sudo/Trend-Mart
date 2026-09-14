@@ -6,6 +6,7 @@ import {
   fetchReviewsByShopId,
   submitReview,
   replyToReview,
+  deleteReview,
   computeRatingStats,
   fetchReviewSessionContext,
   type ReviewSessionContext,
@@ -13,7 +14,16 @@ import {
 import type { Review } from "@/types";
 import { formatRelativeTime } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
-import { paginateReviews, REVIEW_PAGE_SIZE } from "@/lib/reviewRules";
+import {
+  paginateReviews,
+  REVIEW_PAGE_SIZE,
+  REVIEW_POLICY_POINTS,
+  filterReviewsByStars,
+  sortReviews,
+  type ReviewSortMode,
+} from "@/lib/reviewRules";
+import { createClient } from "@/lib/supabase/client";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
 
 /* -------------------------------------------------------------------------- */
 /*  Star Rating                                                                */
@@ -123,11 +133,15 @@ function RatingDistributionBar({
 function ReviewCard({
   review,
   isOwner,
+  currentUserId,
   onReplied,
+  onDeleted,
 }: {
   review: Review;
   isOwner: boolean;
+  currentUserId?: string | null;
   onReplied: (updated: Review) => void;
+  onDeleted?: (id: string) => void;
 }) {
   const { addToast } = useToast();
   const [reply, setReply] = useState("");
@@ -149,6 +163,17 @@ function ReviewCard({
     setSaving(false);
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Delete your review?")) return;
+    const res = await deleteReview(review.id);
+    if (!res.success) {
+      addToast(res.error, "error");
+      return;
+    }
+    addToast("Review deleted", "success");
+    onDeleted?.(review.id);
+  };
+
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-start justify-between gap-2">
@@ -160,6 +185,22 @@ function ReviewCard({
                 Verified order
               </span>
             ) : null}
+            {review.product_id ? (
+              <Link
+                href={getProductSeoPath(
+                  review.product_name || "Product",
+                  review.product_short_code ?? null,
+                  review.product_id,
+                )}
+                className="rounded-full bg-zinc-100 px-2 py-0.5 text-[0.6rem] font-bold text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                {review.product_name || "Product review"}
+              </Link>
+            ) : (
+              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                Store
+              </span>
+            )}
           </div>
           <StarRating rating={review.rating} size="sm" />
         </div>
@@ -216,6 +257,15 @@ function ReviewCard({
           </button>
         )
       ) : null}
+      {currentUserId && review.user_id === currentUserId ? (
+        <button
+          type="button"
+          onClick={() => void handleDelete()}
+          className="mt-2 text-[11px] font-semibold text-red-600 hover:underline dark:text-red-400"
+        >
+          Delete my review
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -236,12 +286,17 @@ function ReviewForm({
   const { addToast } = useToast();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [agreePolicy, setAgreePolicy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating < 1) {
       addToast("Please select a star rating.", "error");
+      return;
+    }
+    if (!agreePolicy) {
+      addToast("Please confirm the review policy.", "info");
       return;
     }
     setSubmitting(true);
@@ -251,6 +306,7 @@ function ReviewForm({
       onSubmitted(result.data);
       setRating(0);
       setComment("");
+      setAgreePolicy(false);
     } else {
       addToast(result.error, "error");
     }
@@ -262,7 +318,12 @@ function ReviewForm({
       onSubmit={handleSubmit}
       className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
     >
-      <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Write a review</h3>
+      <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+        Overall store experience
+      </h3>
+      <p className="text-[11px] text-zinc-500">
+        For a specific item, rate it on the product page. This form is for the shop overall.
+      </p>
       <div>
         <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Your name</label>
         <input
@@ -292,9 +353,23 @@ function ReviewForm({
           className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />
       </div>
+      <label className="flex items-start gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+        <input
+          type="checkbox"
+          checked={agreePolicy}
+          onChange={(e) => setAgreePolicy(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          Honest review of a delivered order.{" "}
+          <Link href="/legal/reviews" className="font-semibold text-emerald-600 hover:underline">
+            Policy
+          </Link>
+        </span>
+      </label>
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || !agreePolicy}
         className="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
       >
         {submitting ? "Submitting…" : "Submit review"}
@@ -381,6 +456,10 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [session, setSession] = useState<ReviewSessionContext | null>(null);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [starFilter, setStarFilter] = useState<number | null>(null);
+  const [sort, setSort] = useState<ReviewSortMode>("newest");
+  const [showPolicy, setShowPolicy] = useState(false);
 
   const loadReviews = useCallback(async () => {
     const result = await fetchReviewsByShopId(shopId);
@@ -395,15 +474,18 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([fetchReviewsByShopId(shopId), fetchReviewSessionContext(shopId, ownerId)]).then(
-      ([reviewResult, ctx]) => {
-        if (cancelled) return;
-        if (reviewResult.success) setReviews(reviewResult.data);
-        else setError(reviewResult.error);
-        setSession(ctx);
-        setLoading(false);
-      },
-    );
+    Promise.all([
+      fetchReviewsByShopId(shopId),
+      fetchReviewSessionContext(shopId, ownerId),
+      createClient().auth.getUser(),
+    ]).then(([reviewResult, ctx, auth]) => {
+      if (cancelled) return;
+      if (reviewResult.success) setReviews(reviewResult.data);
+      else setError(reviewResult.error);
+      setSession(ctx);
+      setViewerId(auth.data.user?.id ?? null);
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -427,7 +509,18 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
   }, [shopId]);
 
   const stats = useMemo(() => computeRatingStats(reviews), [reviews]);
-  const paged = useMemo(() => paginateReviews(reviews, page, REVIEW_PAGE_SIZE), [reviews, page]);
+  const filtered = useMemo(() => {
+    const byStar = filterReviewsByStars(reviews, starFilter);
+    return sortReviews(byStar, sort);
+  }, [reviews, starFilter, sort]);
+  const paged = useMemo(
+    () => paginateReviews(filtered, page, REVIEW_PAGE_SIZE),
+    [filtered, page],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [starFilter, sort]);
 
   useEffect(() => {
     if (page > paged.totalPages) setPage(paged.totalPages);
@@ -479,12 +572,61 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
         </div>
       ) : null}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as ReviewSortMode)}
+          className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] font-semibold dark:border-zinc-700 dark:bg-zinc-800"
+        >
+          <option value="newest">Newest</option>
+          <option value="highest">Highest</option>
+          <option value="lowest">Lowest</option>
+        </select>
+        {[5, 4, 3, 2, 1].map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStarFilter((f) => (f === s ? null : s))}
+            className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+              starFilter === s
+                ? "bg-amber-500 text-white"
+                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            }`}
+          >
+            {s}★
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setShowPolicy((v) => !v)}
+          className="ml-auto text-[10px] font-semibold text-zinc-500 underline-offset-2 hover:underline"
+        >
+          Policy
+        </button>
+      </div>
+
+      {showPolicy ? (
+        <ul className="space-y-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
+          {REVIEW_POLICY_POINTS.map((p) => (
+            <li key={p}>· {p}</li>
+          ))}
+          <li>
+            ·{" "}
+            <Link href="/legal/reviews" className="font-semibold text-emerald-600 hover:underline">
+              Full review policy
+            </Link>
+          </li>
+        </ul>
+      ) : null}
+
       {isOwner ? (
         <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
           You can read customer reviews and reply. Store owners cannot review their own shop.
         </p>
       ) : session?.alreadyReviewed ? (
-        <p className="text-xs text-zinc-500">You already reviewed this store. Thank you.</p>
+        <p className="text-xs text-zinc-500">
+          You already left an overall store review. You can still rate individual products on their pages.
+        </p>
       ) : session?.signedIn && session.canSubmit ? (
         <ReviewForm
           shopId={shopId}
@@ -497,11 +639,10 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
         />
       ) : (
         <p className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-          Reviews are for customers who received a delivered order from this store.{" "}
+          Overall store reviews are for customers with a delivered order. Product ratings go on each
+          product page.{" "}
           {session?.signedIn ? (
-            <span className="font-medium">
-              Only the account that placed the order can review it.
-            </span>
+            <span className="font-medium">Only the account that placed the order can review.</span>
           ) : (
             <>
               <Link href="/login" className="font-semibold text-emerald-600 hover:underline dark:text-emerald-400">
@@ -520,9 +661,17 @@ export default function StoreReviews({ shopId, ownerId, onReviewSubmitted }: Sto
               key={review.id}
               review={review}
               isOwner={isOwner}
+              currentUserId={viewerId}
               onReplied={(updated) =>
                 setReviews((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)))
               }
+              onDeleted={(id) => {
+                const was = reviews.find((r) => r.id === id);
+                setReviews((prev) => prev.filter((r) => r.id !== id));
+                if (was && !was.product_id) {
+                  void fetchReviewSessionContext(shopId, ownerId).then(setSession);
+                }
+              }}
             />
           ))}
         </div>

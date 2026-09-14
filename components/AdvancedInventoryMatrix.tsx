@@ -870,14 +870,14 @@ export default function AdvancedInventoryMatrix({
                   aria-label="Select all"
                 />
               </th>
-              <th className="px-3 py-2.5 text-left">Variant</th>
-              <th className="px-3 py-2.5 text-center">SKU</th>
-              <th className="px-3 py-2.5 text-center">Stock</th>
-              <th className="px-3 py-2.5 text-center">Threshold</th>
-              <th className="px-3 py-2.5 text-right">Price (PKR)</th>
-              <th className="px-3 py-2.5 text-center">Adj</th>
-              <th className="px-3 py-2.5 text-center">Status</th>
-              <th className="px-3 py-2.5 text-right">Actions</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left">Variant</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-center">SKU</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-center">Stock</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-center">Threshold</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right">Price (PKR)</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-center">Adj</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-center">Status</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
 

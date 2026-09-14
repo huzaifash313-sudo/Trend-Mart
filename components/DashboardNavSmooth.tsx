@@ -23,6 +23,7 @@ const DASHBOARD_PREFETCH = [
   "/dashboard/leads",
   "/dashboard/kitchen",
   "/dashboard/tables",
+  "/dashboard/pos",
 ] as const;
 
 export default function DashboardNavSmooth() {

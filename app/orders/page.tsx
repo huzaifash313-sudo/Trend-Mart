@@ -10,6 +10,7 @@ import { fetchOrdersByPhone, fetchOrdersForCurrentUser } from "@/services/orderS
 import { fetchShops } from "@/services/shopService";
 import { getOrderHistory } from "@/services/orderHistoryService";
 import type { Shop } from "@/types";
+import { useLocale } from "@/context/LocaleContext";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                      */
@@ -63,27 +64,28 @@ function PhoneIcon() {
 function getStatusConfig(status: string) {
   switch (status) {
     case "Pending":
-      return { label: "Pending", bg: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", dot: "bg-amber-500" };
+      return { statusKey: "orders.status.Pending", bg: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", dot: "bg-amber-500" };
     case "Processing":
-      return { label: "Processing", bg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", dot: "bg-blue-500" };
+      return { statusKey: "orders.status.Processing", bg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", dot: "bg-blue-500" };
     case "Dispatched":
-      return { label: "Dispatched", bg: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400", dot: "bg-purple-500" };
+      return { statusKey: "orders.status.Dispatched", bg: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400", dot: "bg-purple-500" };
     case "Delivered":
     case "Completed": // legacy status value from pre-tracking-module orders
-      return { label: status === "Completed" ? "Completed" : "Delivered", bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", dot: "bg-emerald-500" };
+      return { statusKey: status === "Completed" ? "orders.status.Completed" : "orders.status.Delivered", bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", dot: "bg-emerald-500" };
     case "Cancelled":
-      return { label: "Cancelled", bg: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", dot: "bg-red-500" };
+      return { statusKey: "orders.status.Cancelled", bg: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", dot: "bg-red-500" };
     default:
-      return { label: status, bg: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300", dot: "bg-zinc-400" };
+      return { statusKey: "", bg: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300", dot: "bg-zinc-400" };
   }
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLocale();
   const cfg = getStatusConfig(status);
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.bg}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} aria-hidden="true" />
-      {cfg.label}
+      {cfg.statusKey ? t(cfg.statusKey) : status}
     </span>
   );
 }
@@ -103,6 +105,7 @@ function OrderCard({
   userId?: string | null;
   onOrderPatch?: (orderId: string, patch: Partial<Order>) => void;
 }) {
+  const { t } = useLocale();
   const shop = shopMap.get(order.shop_id);
   const items: OrderItem[] = order.items_json ?? [];
 
@@ -128,7 +131,7 @@ function OrderCard({
       {/* Items */}
       <div className="px-4 py-3 space-y-2">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Items ({items.length})
+          {t("orders.items")} ({items.length})
         </h4>
         {items.length === 0 ? (
           <p className="text-sm text-zinc-400 dark:text-zinc-500">No items listed</p>
@@ -162,21 +165,21 @@ function OrderCard({
       <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/50">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            Total: Rs. {order.total_amount.toLocaleString()}
+            {t("cart.total")}: Rs. {order.total_amount.toLocaleString()}
           </p>
           <div className="flex items-center gap-2">
             <Link
-              href={`/orders/tracking?orderId=${encodeURIComponent(order.id)}`}
+              href={`/orders/${encodeURIComponent(order.id)}`}
               className="text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
             >
-              Track →
+              {t("orders.details")} →
             </Link>
             {shop && (
               <Link
                 href={`/shop/${shop.id}`}
                 className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
               >
-                View Shop ↗
+                {t("orders.viewShop")} ↗
               </Link>
             )}
           </div>
@@ -188,6 +191,50 @@ function OrderCard({
           userId={userId}
           onUpdated={(patch) => onOrderPatch?.(order.id, patch)}
         />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {shop ? (
+            <Link
+              href={`/shop/${shop.id}`}
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+            >
+              {t("orders.buyAgain")}
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              const w = window.open("", "_blank", "noopener,noreferrer,width=420,height=640");
+              if (!w) return;
+              const lines = items
+                .map(
+                  (it) =>
+                    `<tr><td>${it.name}${it.variant ? ` (${it.variant})` : ""}</td><td>${it.quantity ?? 1}</td><td>Rs ${((it.price || 0) * (it.quantity ?? 1)).toLocaleString()}</td></tr>`,
+                )
+                .join("");
+              w.document.write(`<!doctype html><html><head><title>Invoice</title>
+                <style>body{font-family:system-ui;padding:16px;font-size:13px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left}</style>
+                </head><body>
+                <h1>${shop?.name || "Order"} invoice</h1>
+                <p>#${order.id.slice(0, 8)} · ${new Date(order.created_at).toLocaleString()}</p>
+                <table><thead><tr><th>Item</th><th>Qty</th><th>Amt</th></tr></thead><tbody>${lines}</tbody></table>
+                <p><strong>Total: Rs ${order.total_amount.toLocaleString()}</strong></p>
+                <p style="color:#666;font-size:11px">TrendsMart — pay shop directly (COD / WhatsApp)</p>
+                <script>window.print()</script></body></html>`);
+              w.document.close();
+            }}
+            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-bold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          >
+            {t("orders.invoice")}
+          </button>
+          {(order.status === "Delivered" || order.status === "Completed") && (
+            <Link
+              href={`/orders/${encodeURIComponent(order.id)}?rate=1`}
+              className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+            >
+              {t("orders.rate")}
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -238,6 +285,7 @@ function getLocalOrders(): LocalOrder[] {
 function OrdersInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
 
   const initialPhone = searchParams.get("phone") ?? "";
   const [phone, setPhone] = useState(initialPhone);
@@ -335,6 +383,18 @@ function OrdersInner() {
 
   const localOrders = getLocalOrders();
   const hasResults = dbOrders.length > 0 || localOrders.length > 0;
+  const [statusTab, setStatusTab] = useState<"all" | "active" | "done" | "cancel">("all");
+
+  const filteredDb = dbOrders.filter((o) => {
+    if (statusTab === "all") return true;
+    if (statusTab === "active") {
+      return o.status === "Pending" || o.status === "Processing" || o.status === "Dispatched";
+    }
+    if (statusTab === "done") {
+      return o.status === "Delivered" || o.status === "Completed";
+    }
+    return o.status === "Cancelled";
+  });
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
@@ -345,37 +405,60 @@ function OrdersInner() {
             type="button"
             onClick={() => router.back()}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            aria-label="Go back"
+            aria-label={t("common.back")}
           >
             <ChevronLeftIcon />
           </button>
-          <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Orders</h1>
+          <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{t("orders.title")}</h1>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-5">
+        {dbOrders.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                ["all", "orders.filterAll"],
+                ["active", "orders.filterActive"],
+                ["done", "orders.filterDone"],
+                ["cancel", "orders.filterCancel"],
+              ] as const
+            ).map(([id, labelKey]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setStatusTab(id)}
+                className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${
+                  statusTab === id
+                    ? "bg-emerald-600 text-white"
+                    : "bg-white text-zinc-600 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700"
+                }`}
+              >
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {/* Search Form */}
         <section>
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">
-              Track Your Orders
+              {t("orders.track")}
             </h2>
             <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
-              {userId
-                ? "Your account orders load automatically below. You can also search by the phone used at checkout."
-                : (
-                  <>
-                    Enter the phone number you used when placing orders. For the best
-                    results,{" "}
-                    <a
-                      href="/login"
-                      className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
-                    >
-                      sign in
-                    </a>{" "}
-                    with the same account you checked out with.
-                  </>
-                )}
+              {userId ? (
+                t("orders.trackHint")
+              ) : (
+                <>
+                  {t("orders.trackHint")}{" "}
+                  <a
+                    href="/login"
+                    className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                  >
+                    {t("account.login")}
+                  </a>
+                </>
+              )}
             </p>
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -390,7 +473,7 @@ function OrdersInner() {
                   onChange={(e) => setPhone(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleSearch(phone); }}
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-300/50 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  aria-label="Phone number"
+                  aria-label={t("checkout.phone")}
                 />
               </div>
               <button
@@ -400,7 +483,7 @@ function OrdersInner() {
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-zinc-900"
               >
                 <SearchIcon />
-                {searching ? "Searching..." : "Search"}
+                {searching ? t("orders.searching") : t("common.search")}
               </button>
             </div>
           </div>
@@ -431,9 +514,9 @@ function OrdersInner() {
               <div className="mb-3 flex justify-center text-zinc-300 dark:text-zinc-600">
                 <PackageIcon />
               </div>
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No orders found</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t("orders.noOrdersFound")}</p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                Try a different phone number or place an order first.
+                {t("orders.empty")}
               </p>
             </div>
           )}
@@ -444,10 +527,10 @@ function OrdersInner() {
                 <PackageIcon />
               </div>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                Enter your phone number to track orders
+                {t("orders.trackHint")}
               </p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                We will show all your orders and their current status.
+                {t("orders.empty")}
               </p>
             </div>
           )}
@@ -456,9 +539,9 @@ function OrdersInner() {
           {!searching && dbOrders.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                Orders ({dbOrders.length})
+                {t("nav.orders")} ({dbOrders.length})
               </h3>
-              {dbOrders.map((order) => (
+              {filteredDb.map((order) => (
                 <OrderCard
                   key={order.id}
                   order={order}
@@ -502,7 +585,7 @@ function OrdersInner() {
                       href={`/shop/${localOrder.shopId}`}
                       className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
                     >
-                      View Shop ↗
+                      {t("orders.viewShop")} ↗
                     </Link>
                   </div>
                 </div>

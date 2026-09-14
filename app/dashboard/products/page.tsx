@@ -61,8 +61,10 @@ import {
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
-import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
-import { sanitizeVariantGroups } from "@/lib/variantTemplates";
+import {
+  importGroceryStarterPack,
+  groceryStarterPackCount,
+} from "@/services/catalogImportService";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -169,6 +171,8 @@ export default function ProductsDashboardPage() {
 
   // CSV import
   const [csvImporting, setCsvImporting] = useState(false);
+  const [packImporting, setPackImporting] = useState(false);
+  const [packProgress, setPackProgress] = useState("");
 
   // Sub-categories for active shop
   const [subCategories, setSubCategories] = useState<SubCategoryWithMeta[]>([]);
@@ -690,6 +694,44 @@ export default function ProductsDashboardPage() {
     e.target.value = "";
   }, [activeShopId, addToast]);
 
+  const handleGroceryPackImport = useCallback(async () => {
+    if (!activeShopId) return;
+    const total = groceryStarterPackCount();
+    const ok = await confirm({
+      title: "Import grocery starter pack?",
+      message: `Adds ~${total} loose staples (daal, chawal, spices…) plus common kiryana items with internal scan codes TMG-0001…. Suggested prices — edit later. Skips names/codes you already have. Images are stock food photos (not scraped brand packs).`,
+      confirmLabel: "Import pack",
+    });
+    if (!ok) return;
+
+    setPackImporting(true);
+    setPackProgress(`0 / ${total}`);
+    try {
+      const res = await importGroceryStarterPack(activeShopId, {
+        onProgress: (p) =>
+          setPackProgress(`${p.done} / ${p.total} · +${p.created} · skip ${p.skipped}`),
+      });
+      if (!res.success) {
+        addToast(res.error, "error");
+        return;
+      }
+      addToast(
+        `Grocery pack: ${res.data.created} added, ${res.data.skipped} skipped, ${res.data.failed} failed.`,
+        res.data.created > 0 ? "success" : "info",
+      );
+      if (res.data.created > 0) {
+        emitProductsChanged();
+        const refreshed = await fetchProductsByShopId(activeShopId);
+        if (refreshed.success) setProducts(refreshed.data);
+      }
+    } catch {
+      addToast("Grocery pack import failed.", "error");
+    } finally {
+      setPackImporting(false);
+      setPackProgress("");
+    }
+  }, [activeShopId, addToast, confirm]);
+
   // ── CSV Export ──────────────────────────────────────────────────────────
 
   const handleExportCsv = useCallback(() => {
@@ -1188,6 +1230,14 @@ export default function ProductsDashboardPage() {
 
               {/* Import/Export Actions */}
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleGroceryPackImport()}
+                  disabled={packImporting || !activeShopId}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  Import grocery pack ({groceryStarterPackCount()})
+                </button>
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
                   <UploadIcon />
                   Import CSV
@@ -1223,6 +1273,12 @@ export default function ProductsDashboardPage() {
                 <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                   <div className="h-3 w-3 animate-spin rounded-full border border-emerald-500 border-t-transparent" />
                   Importing products from CSV...
+                </div>
+              )}
+              {packImporting && (
+                <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  <div className="h-3 w-3 animate-spin rounded-full border border-emerald-500 border-t-transparent" />
+                  Importing grocery pack… {packProgress}
                 </div>
               )}
             </div>

@@ -96,9 +96,11 @@ export default function LocationMiniMap({
       tapTolerance: 15,
     }).setView([latitude, longitude], STREET_ZOOM);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
-      maxZoom: 19,
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 20,
+      subdomains: "abcd",
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -133,9 +135,13 @@ export default function LocationMiniMap({
     mapRef.current = map;
 
     const t = window.setTimeout(() => map.invalidateSize(), 100);
+    const t2 = window.setTimeout(() => map.invalidateSize(), 350);
+    const t3 = window.setTimeout(() => map.invalidateSize(), 800);
 
     return () => {
       window.clearTimeout(t);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
       map.remove();
       mapRef.current = null;
       markerRef.current = null;

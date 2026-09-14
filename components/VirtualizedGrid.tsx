@@ -117,7 +117,7 @@ export default function VirtualizedGrid<T>({
           /* display:contents lets the item become a real grid child so it
              stretches to the row height (equal-height cards, exactly like
              the deals grid). The wrapper only carries the React key. */
-          <div key={getKey(item, index)} style={{ display: "contents" }}>
+          <div key={`${getKey(item, index)}#${index}`} style={{ display: "contents" }}>
             {renderItem(item, index)}
           </div>
         ))}
@@ -144,7 +144,14 @@ export default function VirtualizedGrid<T>({
           <div
             key={virtualRow.key}
             data-index={virtualRow.index}
-            ref={rowVirtualizer.measureElement}
+            ref={(node) => {
+              // TanStack measureElement uses flushSync — defer so we never call
+              // it during React's commit/layout phase.
+              if (!node) return;
+              queueMicrotask(() => {
+                rowVirtualizer.measureElement(node);
+              });
+            }}
             style={{
               position: "absolute",
               top: 0,
@@ -170,7 +177,10 @@ export default function VirtualizedGrid<T>({
                 return (
                   /* Same display:contents trick as the non-virtual branch —
                      items become real grid children and stretch equal. */
-                  <div key={getKey(item, index)} style={{ display: "contents" }}>
+                  <div
+                    key={`${getKey(item, index)}#${index}`}
+                    style={{ display: "contents" }}
+                  >
                     {renderItem(item, index)}
                   </div>
                 );

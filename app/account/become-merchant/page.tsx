@@ -11,11 +11,13 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
 import CustomSelect from "@/components/CustomSelect";
+import { useLocale } from "@/context/LocaleContext";
 import {
   formatPkPhoneInput,
   isValidPkMobile,
   PK_PHONE_PLACEHOLDER,
 } from "@/lib/phoneFormat";
+import { defaultShopSchedule } from "@/lib/shopHours";
 
 const CATEGORIES = SHOP_CATEGORIES.filter((c) => c !== "All");
 
@@ -34,6 +36,7 @@ function emptyShopForm(): ShopFormData {
     secondary_phone: "",
     business_hours: "",
     operating_status: "Open",
+    shop_schedule: defaultShopSchedule(),
     accent_color: "",
     store_bio: "",
     announcement: "",
@@ -63,6 +66,7 @@ function emptyShopForm(): ShopFormData {
 
 export default function BecomeMerchantPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const { addToast } = useToast();
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState<string | null>(null);
@@ -112,11 +116,11 @@ export default function BecomeMerchantPage() {
   const validate = (): boolean => {
     const next: Record<string, string> = {};
     if (!form.name.trim() || form.name.trim().length < 2) {
-      next.name = "Store name is required (min 2 characters).";
+      next.name = t("merchantOnboard.errName");
     }
-    if (!form.category.trim()) next.category = "Choose a category.";
+    if (!form.category.trim()) next.category = t("merchantOnboard.errCategory");
     if (!form.location.trim() || form.location.trim().length < 2) {
-      next.location = "City / area is required.";
+      next.location = t("merchantOnboard.errLocation");
     }
     if (
       typeof form.latitude !== "number" ||
@@ -124,16 +128,18 @@ export default function BecomeMerchantPage() {
       !Number.isFinite(form.latitude) ||
       !Number.isFinite(form.longitude)
     ) {
-      next.pin = "Set your store pin on the map so customers can find you.";
+      next.pin = t("merchantOnboard.errPin");
     }
     if (!form.whatsapp_number.trim()) {
-      next.whatsapp_number = "WhatsApp number is required for orders.";
+      next.whatsapp_number = t("merchantOnboard.errWhatsapp");
     } else if (!isValidPkMobile(form.whatsapp_number)) {
-      next.whatsapp_number = `Enter a valid Pakistani mobile (e.g. ${PK_PHONE_PLACEHOLDER}).`;
+      next.whatsapp_number = t("merchantOnboard.errWhatsappInvalid", {
+        example: PK_PHONE_PLACEHOLDER,
+      });
     }
-    if (!agreed) next.agreed = "You must accept the merchant guidelines.";
+    if (!agreed) next.agreed = t("merchantOnboard.errAgreed");
     if (!confirmSwitch) {
-      next.confirmSwitch = "Confirm that you want to open a merchant store.";
+      next.confirmSwitch = t("merchantOnboard.errConfirm");
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -142,11 +148,11 @@ export default function BecomeMerchantPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!emailVerified) {
-      addToast("Verify your email before opening a store.", "error");
+      addToast(t("merchantOnboard.toastVerifyEmail"), "error");
       return;
     }
     if (!validate()) {
-      addToast("Please fix the highlighted fields.", "error");
+      addToast(t("merchantOnboard.toastFixFields"), "error");
       return;
     }
 
@@ -182,13 +188,10 @@ export default function BecomeMerchantPage() {
         window.dispatchEvent(new Event("trendsmart:shops-updated"));
       }
 
-      addToast(
-        "Store created! It's live — you can add products now.",
-        "success",
-      );
+      addToast(t("merchantOnboard.toastCreated"), "success");
       window.location.href = "/dashboard";
     } catch {
-      addToast("Something went wrong. Please try again.", "error");
+      addToast(t("merchantOnboard.toastError"), "error");
       setSubmitting(false);
     }
   };
@@ -207,10 +210,10 @@ export default function BecomeMerchantPage() {
         <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-4">
           <div>
             <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-400">
-              Merchant onboarding
+              {t("merchantOnboard.eyebrow")}
             </p>
             <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
-              Register your store
+              {t("merchantOnboard.title")}
             </h1>
             {email ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">{email}</p>
@@ -220,7 +223,7 @@ export default function BecomeMerchantPage() {
             href="/account"
             className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
           >
-            ← Account
+            {t("merchantOnboard.backAccount")}
           </Link>
         </div>
       </header>
@@ -229,39 +232,41 @@ export default function BecomeMerchantPage() {
         {!emailVerified ? (
           <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-950/30">
             <p className="font-semibold text-amber-900 dark:text-amber-200">
-              Verify your email first
+              {t("merchantOnboard.verifyTitle")}
             </p>
             <p className="mt-1 text-xs text-amber-800/90 dark:text-amber-300/90">
-              Store setup needs a verified email. Finish verification, then come back here.
+              {t("merchantOnboard.verifyBody")}
             </p>
             <Link
               href="/auth/verify-notice?redirect=/account/become-merchant"
               className="mt-2 inline-block text-xs font-semibold text-emerald-700 underline dark:text-emerald-400"
             >
-              Verify email →
+              {t("merchantOnboard.verifyLink")}
             </Link>
           </section>
         ) : null}
 
         <section className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="font-semibold text-zinc-900 dark:text-zinc-100">How this works</p>
+          <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+            {t("merchantOnboard.howTitle")}
+          </p>
           <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-zinc-600 dark:text-zinc-400">
-            <li>Verify your email, then fill in your store details (required fields marked *).</li>
-            <li>Accept merchant guidelines.</li>
-            <li>We create your store and open the merchant dashboard.</li>
+            <li>{t("merchantOnboard.how1")}</li>
+            <li>{t("merchantOnboard.how2")}</li>
+            <li>{t("merchantOnboard.how3")}</li>
           </ol>
         </section>
 
         <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Store name *
+              {t("merchantOnboard.storeName")} *
             </label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Store name"
+              placeholder={t("merchantOnboard.storeNamePh")}
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             {errors.name ? <p className="mt-1 text-xs text-red-500">{errors.name}</p> : null}
@@ -269,7 +274,7 @@ export default function BecomeMerchantPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Category *
+              {t("merchantOnboard.category")} *
             </label>
             <CustomSelect
               value={form.category}
@@ -281,13 +286,13 @@ export default function BecomeMerchantPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              City / area *
+              {t("merchantOnboard.cityArea")} *
             </label>
             <input
               type="text"
               value={form.location}
               onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-              placeholder="Store address"
+              placeholder={t("merchantOnboard.cityAreaPh")}
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             {errors.location ? <p className="mt-1 text-xs text-red-500">{errors.location}</p> : null}
@@ -295,7 +300,7 @@ export default function BecomeMerchantPage() {
 
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Store pin &amp; delivery area *
+              {t("merchantOnboard.pinArea")} *
             </label>
             <ShopLocationRadiusPicker
               value={{
@@ -313,7 +318,7 @@ export default function BecomeMerchantPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              WhatsApp number *
+              {t("merchantOnboard.whatsapp")} *
             </label>
             <input
               type="tel"
@@ -332,20 +337,21 @@ export default function BecomeMerchantPage() {
               <p className="mt-1 text-xs text-red-500">{errors.whatsapp_number}</p>
             ) : (
               <p className="mt-1 text-[0.65rem] text-zinc-400">
-                Format: {PK_PHONE_PLACEHOLDER}. Customers&apos; orders go to this WhatsApp.
+                {t("merchantOnboard.whatsappHint", { example: PK_PHONE_PLACEHOLDER })}
               </p>
             )}
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-              Short bio <span className="font-normal text-zinc-400">(optional)</span>
+              {t("merchantOnboard.bio")}{" "}
+              <span className="font-normal text-zinc-400">({t("common.optional")})</span>
             </label>
             <textarea
               rows={2}
               value={form.store_bio}
               onChange={(e) => setForm((f) => ({ ...f, store_bio: e.target.value }))}
-              placeholder="What do you sell?"
+              placeholder={t("merchantOnboard.bioPh")}
               className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
@@ -358,7 +364,7 @@ export default function BecomeMerchantPage() {
               className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-emerald-600"
             />
             <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              I want to open a merchant store on TrendsMart (I can still shop as a customer from the homepage).
+              {t("merchantOnboard.confirmSwitch")}
             </span>
           </label>
           {errors.confirmSwitch ? (
@@ -373,17 +379,17 @@ export default function BecomeMerchantPage() {
               className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-300 text-emerald-600"
             />
             <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              I agree to TrendsMart&apos;s{" "}
+              {t("merchantOnboard.agreePrefix")}{" "}
               <Link href="/legal/merchant-guidelines" target="_blank" className="font-medium text-emerald-600 underline">
-                Merchant Security Guidelines
+                {t("footer.merchantGuidelines")}
               </Link>
               ,{" "}
               <Link href="/legal/terms" target="_blank" className="font-medium text-emerald-600 underline">
-                Terms &amp; Conditions
+                {t("footer.terms")}
               </Link>
-              , and{" "}
+              , {t("merchantOnboard.agreeAnd")}{" "}
               <Link href="/legal/privacy" target="_blank" className="font-medium text-emerald-600 underline">
-                Privacy Policy
+                {t("footer.privacy")}
               </Link>
               .
             </span>
@@ -396,10 +402,10 @@ export default function BecomeMerchantPage() {
             className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             {submitting
-              ? "Creating store…"
+              ? t("merchantOnboard.creating")
               : !emailVerified
-                ? "Verify email to continue"
-                : "Create store & open dashboard"}
+                ? t("merchantOnboard.verifyToContinue")
+                : t("merchantOnboard.submit")}
           </button>
         </form>
       </main>

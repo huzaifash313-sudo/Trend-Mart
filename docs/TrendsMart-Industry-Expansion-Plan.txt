@@ -1,0 +1,136 @@
+TRENDSMART ROADMAP
+Industry-Level Local Commerce OS
+
+Sirf delivery app nahi — qareebi business ka full OS: order, visit, sit, book, experience.
+Har category apni business logic ke mutabiq.
+Tagline: Har qareebi business — order, visit, sit, book.
+
+━━━━━━━━━━━━━━━━━━━━
+1. VISION
+━━━━━━━━━━━━━━━━━━━━
+Aaj: Hyper-local multi-vendor + WhatsApp orders.
+Kal: Local Commerce OS — delivery, pickup, sitting, store info, booking, experience — ek hi app.
+
+• Customer order (delivery / pickup)
+• Baith ke khaye (sitting / table QR)
+• Info / discovery (hours, menu, map)
+• Experience (cafe, salon, repair, watching)
+• Merchant = category-specific modules
+
+Principle: Platform = rails. Category = pack. Har shop modes on/off kare.
+
+━━━━━━━━━━━━━━━━━━━━
+2. SHOP CAPABILITY MODES
+━━━━━━━━━━━━━━━━━━━━
+Delivery — ghar pe | radius, fees, slabs
+Pickup — counter | ready-in-X, slots
+Sitting — table order | QR tables, kitchen
+Info — hours/menu/map | rich profile
+Book/Visit — appointment | slots, packages
+Experience — sit/watch/event | capacity, cover
+
+━━━━━━━━━━━━━━━━━━━━
+3. PHASE 0 — FOUNDATION (PEHLE)
+━━━━━━━━━━━━━━━━━━━━
+• Category themes align (old names → new)
+• Modes = source of truth
+• Service shops auto shop_type=service
+• Sitting expand (Bakery / cafe)
+• One schedule engine (all channels)
+• Register: Products / Food / Services / Venue
+
+━━━━━━━━━━━━━━━━━━━━
+4. UNIVERSAL RAILS (HAR CATEGORY)
+━━━━━━━━━━━━━━━━━━━━
+1) Mode chips: Delivery / Pickup / Sitting / Book / Open
+2) Trust: verified, license, hygiene / warranty
+3) Digital passport: shop / table / deal QR
+4) Live hours + emergency close + busy/quiet
+5) Order: Pending → Confirmed → Preparing → Done
+6) SME / city analytics (later)
+7) Urdu-first + large fonts + low bandwidth
+8) TrendBot grounded on real catalog
+9) Safety: report shop, Rx, underage blocks
+10) PWA offline menu/hours
+
+━━━━━━━━━━━━━━━━━━━━
+5. CATEGORY BUSINESS PACKS
+━━━━━━━━━━━━━━━━━━━━
+
+A. Daily essentials (Grocery, Fruits, Bakery, Pharmacy)
+• Units kg/dozen, substitutes, Rx upload
+• Freshness, morning-bake slots
+• Wow: rashta list, cold-chain, expiry alerts
+
+B. Food & hospitality (Fast Food & Restaurants, later Cafe)
+• Sitting + kitchen KDS + table QR + combos
+• Wow: wait time, hygiene score, festival thali
+
+C. Fashion & lifestyle (Fashion, Beauty, Handmade, Toys, Sports)
+• Size/color, exchange, lookbook, salon book
+• Wow: same-day mall pickup, tailor card
+
+D. Hard goods (Electronics, Home, Books, Automotive)
+• Warranty, IMEI, install add-on, specs
+• Wow: genuine parts, nearby repair link
+
+E. Field services (Maintenance, CCTV, Tech IT, Personal)
+• Job tickets, photos, call-out, service radius
+• Wow: tech ETA, survey checklist, salon queue
+
+F. Later verticals
+Cafe, Banquet, Coaching, Gym, Entertainment/Watching, Agri/Dairy
+Watching = Experience mode (screening cafe) — NOT CCTV category.
+
+━━━━━━━━━━━━━━━━━━━━
+6. AWARD / GOVT DIFFERENTIATORS
+━━━━━━━━━━━━━━━━━━━━
+1) SME Digitalization Index
+2) Structured WhatsApp commerce (Pakistan-fit)
+3) Hyperlocal GPS + radius + channel hours
+4) Multi-modal one shop
+5) Category OS packs (plumber ≠ pharmacy)
+6) Citizen safety + verified shops
+7) Youth employment layer (later)
+8) Open-hours city map
+9) Urdu AI shop assistant (grounded)
+10) PWA without Play Store
+
+━━━━━━━━━━━━━━━━━━━━
+7. ROADMAP PHASES
+━━━━━━━━━━━━━━━━━━━━
+Phase 0 Foundation — pehle
+Phase 1 Soft-launch — 4–6 weeks (chips, status, sitting, trust)
+Phase 2 Packs v1 — 6–14 weeks (grocery, Rx, variants, tickets, booking)
+Phase 3 Experience — 3–5 months (venue/watching, kitchen scale)
+Phase 4 Institutional — 6–12 months (payments optional, analytics, licenses)
+
+━━━━━━━━━━━━━━━━━━━━
+8. MONETIZATION
+━━━━━━━━━━━━━━━━━━━━
+• Merchant subscription
+• Sponsored ads / spotlight
+• Pack upgrades (Kitchen Pro, Booking Pro)
+• Verified badge (optional)
+• Do NOT force payment escrow yet
+
+━━━━━━━━━━━━━━━━━━━━
+9. SUCCESS METRICS
+━━━━━━━━━━━━━━━━━━━━
+• % shops with 2+ modes
+• Pickup + sitting share vs delivery-only
+• Time-to-first-product (new merchant)
+• Order completion (WA confirm → done)
+• Active SMEs / city; trust score
+
+━━━━━━━━━━━━━━━━━━━━
+10. NON-GOALS (ABHI)
+━━━━━━━━━━━━━━━━━━━━
+• Full escrow marketplace payments
+• Nation-wide logistics fleet
+• Social / reels clone
+• Open-domain entertainment AI
+
+RULE: Pehle Local Commerce OS jeeto, phir naye verticals add karo.
+
+— TrendsMart · Industry Expansion Plan · Soft-launch → Industry OS

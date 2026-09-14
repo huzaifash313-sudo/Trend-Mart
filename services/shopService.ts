@@ -14,6 +14,11 @@ import {
   slugifyShopName,
 } from "@/lib/shopSlug";
 import { SHOP_STOREFRONT_PRODUCT_LIMIT } from "@/lib/mobilePerf";
+import {
+  formatScheduleSummary,
+  parseShopSchedule,
+  type ShopSchedule,
+} from "@/lib/shopHours";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -66,6 +71,7 @@ const SHOP_EXTENDED_KEYS = [
     "latitude",
     "longitude",
     "store_bio",
+    "shop_schedule",
     "business_hours",
     "operating_status",
 ] as const;
@@ -873,7 +879,15 @@ function sanitizeShopForm(form: ShopFormData): Omit<
     facebook_url: sanitizeDbFacebook(form.facebook_url),
     tiktok_handle: sanitizeDbTikTok(form.tiktok_handle),
     secondary_phone: sanitizeDbPhone(form.secondary_phone),
-    business_hours: sanitizeDbString(form.business_hours, 150),
+    shop_schedule: (() => {
+      const parsed = parseShopSchedule(form.shop_schedule);
+      return parsed;
+    })() as ShopSchedule | null,
+    business_hours: (() => {
+      const parsed = parseShopSchedule(form.shop_schedule);
+      if (parsed) return sanitizeDbString(formatScheduleSummary(parsed), 150);
+      return sanitizeDbString(form.business_hours, 150);
+    })(),
     operating_status: sanitizeDbString(form.operating_status, 150),
     accent_color: sanitizeDbHexColor(form.accent_color),
     store_bio: sanitizeDbString(form.store_bio, 500),

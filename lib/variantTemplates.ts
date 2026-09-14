@@ -99,6 +99,8 @@ export function categoryVariantHint(category?: string | null): string {
   const hints: Record<string, string> = {
     "Fashion & Apparel": "Size, color, ya shoe size — simple se shuru karo.",
     "Fast Food & Restaurants": "Portion, spice, ya flavour — sirf ek type bhi chalega.",
+    "Cafe & Beverages": "Cup size ya flavour — coffee/chai ke liye simple.",
+    "Meat & Seafood": "Weight ya cut — kg / pack easy.",
     "Grocery & Kiryana": "Weight, pack, ya flavour — mix sirf zarurat pe.",
     "Bakery & Sweets": "Cake size, flavour, ya weight — simple option pehle.",
     "Fruits & Vegetables": "Weight ya dozen — bilkul simple.",
@@ -540,6 +542,42 @@ const BY_CATEGORY: Record<string, VariantTemplatePack[]> = {
       label: "Add-ons",
       hint: "Extras customer can pick",
       groups: [ADDONS()],
+    },
+  ),
+
+  "Cafe & Beverages": packs(
+    {
+      id: "cafe-size",
+      label: "Cup size",
+      hint: "Small / Regular / Large",
+      groups: [PORTION()],
+    },
+    {
+      id: "cafe-flavour",
+      label: "Flavour",
+      hint: "Coffee, chai, juice flavours",
+      groups: [FLAVOUR()],
+    },
+    {
+      id: "cafe-size-flavour",
+      label: "Size + Flavour",
+      hint: "Drinks with options",
+      groups: [PORTION(), FLAVOUR()],
+    },
+  ),
+
+  "Meat & Seafood": packs(
+    {
+      id: "meat-weight",
+      label: "Weight / cut",
+      hint: "Per kg or cut type",
+      groups: [PORTION()],
+    },
+    {
+      id: "meat-pack",
+      label: "Pack size",
+      hint: "Family / BBQ packs",
+      groups: [PACK()],
     },
   ),
 

@@ -39,7 +39,18 @@ export default function RecentlyViewedStrip() {
 
   useEffect(() => {
     const all = getRecentlyViewed();
-    setItems(myShopId ? all.filter((i) => i.shopId !== myShopId) : all);
+    const filtered = myShopId ? all.filter((i) => i.shopId !== myShopId) : all;
+    const now = Date.now();
+    // Fresh views first; older "ignored" views sink to the end of the strip.
+    const ranked = [...filtered].sort((a, b) => {
+      const ageA = now - (a.viewedAt || 0);
+      const ageB = now - (b.viewedAt || 0);
+      const sinkA = ageA > 6 * 3_600_000 ? 1 : 0;
+      const sinkB = ageB > 6 * 3_600_000 ? 1 : 0;
+      if (sinkA !== sinkB) return sinkA - sinkB;
+      return ageA - ageB;
+    });
+    setItems(ranked);
   }, [myShopId, scopeVersion]);
 
   if (items.length === 0) return null;

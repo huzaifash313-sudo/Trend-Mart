@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback, useEffect, memo, type MouseEvent } from
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   formatDealWhenTag,
   isDealOrderableToday,
@@ -16,8 +17,9 @@ import {
   PRODUCT_CARD_IMAGE_QUALITY,
   PRODUCT_CARD_IMAGE_SIZES,
 } from "@/lib/imageSizes";
-import { getShopPath } from "@/lib/shopSlug";
+import { getShopPath, isUuid } from "@/lib/shopSlug";
 import { getDealSeoPath } from "@/lib/seo/dealSlug";
+import { getProductSeoPath } from "@/lib/seo/productSlug";
 import { buildProductImageAlt } from "@/lib/seo/imageAlt";
 import { OfferTickerMarquee } from "@/components/OfferTickerMarquee";
 import { formatRupees, getProductDiscount } from "@/lib/formatters";
@@ -34,6 +36,7 @@ import {
 import type { Shop } from "@/types";
 import { useToast } from "@/components/Toast";
 import { trackProductView } from "@/lib/behavior";
+import FlashCountdown from "@/components/FlashCountdown";
 
 // Re-exported so existing call sites (`/deals`) keep a stable import surface.
 export { dealToProduct };
@@ -100,6 +103,7 @@ function DealCard({
   locationHint = null,
 }: DealCardProps) {
   const isHomeDensity = density === "home";
+  const router = useRouter();
   const { addItem } = useCart();
   const { addToast } = useToast();
   const gallery = useMemo(() => getDealImages(deal), [deal]);
@@ -109,6 +113,19 @@ function DealCard({
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [resolvedShop, setResolvedShop] = useState<Shop | null>(null);
   const [orderBusy, setOrderBusy] = useState(false);
+
+  /** Linked catalog product → pick options on PDP (variants-safe). */
+  const linkedProductHref = useMemo(() => {
+    if (!deal.product_id || !isUuid(deal.product_id)) return null;
+    return getProductSeoPath(deal.title, null, deal.product_id);
+  }, [deal.product_id, deal.title]);
+
+  const openLinkedProduct = useCallback(() => {
+    if (!linkedProductHref) return false;
+    addToast("Choose options on the product page", "info");
+    router.push(linkedProductHref);
+    return true;
+  }, [linkedProductHref, addToast, router]);
 
   // Keep the heart in sync with persisted favorites (not only after a click).
   useEffect(() => {
@@ -183,6 +200,7 @@ function DealCard({
       addToast("This deal needs a price — open the store or ask the merchant.", "info");
       return;
     }
+    if (openLinkedProduct()) return;
     addItem(product, shopPick, 1);
     addToast("Added to cart", "success");
   };
@@ -213,6 +231,7 @@ function DealCard({
       goStore();
       return;
     }
+    if (openLinkedProduct()) return;
     if (!shopPick.whatsapp_number) {
       addToast("Store WhatsApp missing — opening store.", "info");
       goStore();
@@ -331,6 +350,14 @@ function DealCard({
                 −{discountPercent}%
               </span>
             ) : null}
+            {locationHint ? (
+              <span
+                className="absolute right-2.5 top-2.5 z-[2] rounded-full bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white shadow-sm"
+                title={locationHint}
+              >
+                {locationHint}
+              </span>
+            ) : null}
           </div>
 
           <div className="tm-home-deal-body flex min-w-0 flex-1 flex-col justify-between gap-1 p-2.5 sm:gap-1.5 sm:p-3 md:p-3">
@@ -364,11 +391,6 @@ function DealCard({
                   </span>
                 )}
                 <span className="tm-shop-name-inline truncate">{deal.shop_name || "Store"}</span>
-                {locationHint ? (
-                  <span className="shrink-0 text-[9px] font-medium text-zinc-400 dark:text-zinc-500">
-                    · {locationHint}
-                  </span>
-                ) : null}
                 <span className="tm-live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
               </button>
               {tickerTags[0] ? (
@@ -479,8 +501,29 @@ function DealCard({
           </span>
 
           {hasDiscount && discountPercent > 0 ? (
-            <span className="tm-badge-discount absolute right-1.5 top-1.5 z-10">
+            <span className="tm-badge-discount absolute left-1.5 top-7 z-10">
               {discountPercent}% OFF
+            </span>
+          ) : null}
+
+          {deal.ends_on ? (
+            <span className="absolute bottom-7 left-1.5 z-10">
+              <FlashCountdown
+                endsAt={`${deal.ends_on}T23:59:59`}
+              />
+            </span>
+          ) : (
+            <span className="absolute bottom-7 left-1.5 z-10 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+              Limited time
+            </span>
+          )}
+
+          {locationHint ? (
+            <span
+              className="absolute right-1.5 top-1.5 z-10 rounded-full bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white shadow-sm"
+              title={locationHint}
+            >
+              {locationHint}
             </span>
           ) : null}
 
@@ -547,18 +590,13 @@ function DealCard({
             <span className="tm-shop-name-inline truncate text-[10px] leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
               {deal.shop_name || "Store"}
             </span>
-            {locationHint ? (
-              <span className="shrink-0 text-[9px] font-medium leading-none text-zinc-400 dark:text-zinc-500">
-                · {locationHint}
-              </span>
-            ) : null}
             <span className="tm-live-dot h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
           </button>
 
           <div className="tm-product-footer flex flex-col justify-end gap-0.5">
             {hasPrice && priceLabel ? (
               <>
-                {/* Price + % OFF + original all on ONE inline row — consistent card height */}
+                {/* Price + strikethrough — % OFF lives on the image */}
                 <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
                   <p
                     className="whitespace-nowrap text-[13px] font-bold leading-none tracking-tight text-zinc-900 tabular-nums dark:text-zinc-50 sm:text-sm"
@@ -566,11 +604,6 @@ function DealCard({
                   >
                     {priceLabel}
                   </p>
-                  {hasDiscount && discountPercent > 0 ? (
-                    <span className="shrink-0 rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-                      {discountPercent}% OFF
-                    </span>
-                  ) : null}
                   {hasDiscount && originalPrice != null ? (
                     <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] leading-none text-zinc-400 line-through tabular-nums">
                       {formatDealPrice(originalPrice)}

@@ -14,7 +14,7 @@ declare global {
 }
 
 /** Bump together with public/sw.js so the one-time reload guard stays unique. */
-const SW_RELOAD_KEY = "tm_sw_reload_v55";
+const SW_RELOAD_KEY = "tm_sw_reload_v56";
 
 /**
  * Install prompt capture + safe SW update.

@@ -3,14 +3,13 @@
 /* -------------------------------------------------------------------------- */
 /*  TrendsMart — Brand promo (homepage)                                        */
 /*                                                                            */
-/*  LCP strategy: always paint a lightweight poster first (priority Image).   */
-/*  The MP4 only attaches after idle + in-view so it never competes with      */
-/*  splash / first shop paint. Save-Data / 2G / reduced-motion skip video.    */
+/*  Video mounts and plays immediately (muted + playsInline). No static       */
+/*  poster overlay stuck on screen — only a dark slot while the first bytes   */
+/*  buffer. Save-Data / 2G / reduced-motion still skip to nothing.            */
 /* -------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import { BRAND_PROMO_POSTER, BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
+import { BRAND_PROMO_VIDEO } from "@/lib/brandMedia";
 import { shouldSkipHeavyMedia } from "@/lib/mobilePerf";
 
 function BrandVideo() {
@@ -18,79 +17,40 @@ function BrandVideo() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [skipVideo, setSkipVideo] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
-  const [inView, setInView] = useState(false);
-  const [idleOk, setIdleOk] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    if (shouldSkipHeavyMedia()) {
-      setSkipVideo(true);
-      return;
-    }
-    // Never start the reel until the browser is idle — protects mobile LCP.
-    let idleId = 0;
-    let timer = 0;
-    const armIdle = () => setIdleOk(true);
-    const ric = (
-      window as Window & {
-        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-        cancelIdleCallback?: (id: number) => void;
-      }
-    ).requestIdleCallback;
-    if (typeof ric === "function") {
-      idleId = ric(armIdle, { timeout: 2800 });
-    } else {
-      timer = window.setTimeout(armIdle, 2200);
-    }
-    return () => {
-      if (idleId && typeof window.cancelIdleCallback === "function") {
-        window.cancelIdleCallback(idleId);
-      }
-      if (timer) window.clearTimeout(timer);
-    };
+    setSkipVideo(shouldSkipHeavyMedia());
   }, []);
 
   useEffect(() => {
-    if (skipVideo) return;
-    const el = wrapRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") {
-      setInView(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setInView(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: "120px 0px", threshold: 0.01 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [skipVideo]);
-
-  const armed = !skipVideo && !failed && inView && idleOk;
-
-  useEffect(() => {
-    if (!armed || !videoReady) return;
+    if (skipVideo || failed) return;
     const el = wrapRef.current;
     const video = videoRef.current;
     if (!el || !video) return;
 
     const tryPlay = () => {
       if (document.hidden) return;
-      video.play().catch(() => {
-        /* autoplay blocked — poster stays visible */
+      void video.play().then(() => setPlaying(true)).catch(() => {
+        /* autoplay blocked — keep trying on next gesture / visibility */
       });
     };
 
+    const onPlaying = () => setPlaying(true);
+    const onError = () => setFailed(true);
+    const onCanPlay = () => tryPlay();
+
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("error", onError);
+    video.addEventListener("canplay", onCanPlay);
+    video.addEventListener("loadeddata", onCanPlay);
+
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) tryPlay();
+        if (entry?.isIntersecting) tryPlay();
         else video.pause();
       },
-      { threshold: 0.15 },
+      { threshold: 0.08 },
     );
     io.observe(el);
 
@@ -98,47 +58,40 @@ function BrandVideo() {
       if (!document.hidden) tryPlay();
     };
     document.addEventListener("visibilitychange", onVis);
+
+    // Start immediately — no idle deferral.
     tryPlay();
 
     return () => {
       io.disconnect();
       document.removeEventListener("visibilitychange", onVis);
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("error", onError);
+      video.removeEventListener("canplay", onCanPlay);
+      video.removeEventListener("loadeddata", onCanPlay);
       video.pause();
     };
-  }, [armed, videoReady]);
+  }, [skipVideo, failed]);
+
+  if (skipVideo || failed) return null;
 
   return (
     <div
       ref={wrapRef}
-      className={`tm-brand-video is-ready${videoReady ? " tm-brand-video--playing" : ""}`}
-      aria-busy={armed && !videoReady}
+      className={`tm-brand-video is-ready${playing ? " tm-brand-video--playing" : ""}`}
     >
-      {/* Poster is the LCP candidate — always present, never waits on MP4. */}
-      <Image
-        src={BRAND_PROMO_POSTER}
-        alt="TrendsMart — local shopping across Pakistan"
-        fill
-        priority
-        fetchPriority="high"
-        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 72rem"
-        className={`tm-brand-video-poster${videoReady ? " is-hidden" : ""}`}
+      <video
+        ref={videoRef}
+        className="tm-brand-video-el is-ready"
+        src={BRAND_PROMO_VIDEO}
+        muted
+        loop
+        playsInline
+        autoPlay
+        preload="auto"
+        aria-label="TrendsMart brand promo"
+        onError={() => setFailed(true)}
       />
-      {armed ? (
-        <video
-          ref={videoRef}
-          className={`tm-brand-video-el${videoReady ? " is-ready" : ""}`}
-          src={BRAND_PROMO_VIDEO}
-          muted
-          loop
-          playsInline
-          autoPlay
-          preload="none"
-          aria-label="TrendsMart brand promo"
-          onLoadedData={() => setVideoReady(true)}
-          onCanPlay={() => setVideoReady(true)}
-          onError={() => setFailed(true)}
-        />
-      ) : null}
       <div className="tm-brand-video-glow" aria-hidden />
     </div>
   );

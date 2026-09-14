@@ -20,6 +20,10 @@ const ReviewReminderPopup = dynamic(
   () => import("@/components/ReviewReminderPopup"),
   { ssr: false },
 );
+const CompareFloatingBar = dynamic(
+  () => import("@/components/CompareFloatingBar"),
+  { ssr: false },
+);
 
 export default function DeferredAppChrome() {
   const [ready, setReady] = useState(false);
@@ -62,6 +66,7 @@ export default function DeferredAppChrome() {
       <TrendBotHost />
       <OnboardingWizard />
       <ReviewReminderPopup />
+      <CompareFloatingBar />
     </>
   );
 }

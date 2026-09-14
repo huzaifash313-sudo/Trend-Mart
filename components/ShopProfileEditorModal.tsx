@@ -10,7 +10,12 @@ import ImageUpload from "@/components/ImageUpload";
 import ToggleSwitch from "@/components/ToggleSwitch";
 import CustomSelect from "@/components/CustomSelect";
 import ShopLocationRadiusPicker from "@/components/ShopLocationRadiusPicker";
+import { ShopHoursEditor } from "@/components/ShopHoursEditor";
 import { useToast } from "@/components/Toast";
+import {
+  parseShopSchedule,
+  type ShopSchedule,
+} from "@/lib/shopHours";
 
 /* -------------------------------------------------------------------------- */
 /*  ShopProfileEditorModal — edit the store profile right on the storefront.  */
@@ -100,6 +105,7 @@ function shopToFormData(source: Shop): ShopFormData {
     accepts_delivery: source.accepts_delivery ?? true,
     accepts_pickup: source.accepts_pickup ?? true,
     accepts_dine_in: source.accepts_dine_in ?? true,
+    shop_schedule: parseShopSchedule(source.shop_schedule),
   };
 }
 
@@ -115,7 +121,9 @@ export default function ShopProfileEditorModal({
   const [whatsapp, setWhatsapp] = useState(shop.whatsapp_number ?? "");
   const [secondaryPhone, setSecondaryPhone] = useState(shop.secondary_phone ?? "");
   const [location, setLocation] = useState(shop.location ?? "");
-  const [businessHours, setBusinessHours] = useState(shop.business_hours ?? "");
+  const [shopSchedule, setShopSchedule] = useState<ShopSchedule | null>(
+    () => parseShopSchedule(shop.shop_schedule),
+  );
   const [bio, setBio] = useState(shop.store_bio ?? "");
   const [logoUrl, setLogoUrl] = useState(shop.logo_url ?? "");
   const [bannerUrl, setBannerUrl] = useState(shop.banner_url ?? "");
@@ -179,7 +187,7 @@ export default function ShopProfileEditorModal({
         const form = shopToFormData(shop); // carries the ORIGINAL name/numbers
         form.category = category.trim();
         form.location = location.trim();
-        form.business_hours = businessHours.trim();
+        form.shop_schedule = shopSchedule;
         form.store_bio = bio.trim();
         form.operating_status = isOpen ? "Open" : "Closed";
         form.logo_url = logoUrl;
@@ -233,7 +241,7 @@ export default function ShopProfileEditorModal({
       form.whatsapp_number = whatsapp.trim();
       form.secondary_phone = secondaryPhone.trim();
       form.location = location.trim();
-      form.business_hours = businessHours.trim();
+      form.shop_schedule = shopSchedule;
       form.store_bio = bio.trim();
       form.operating_status = isOpen ? "Open" : "Closed";
       form.logo_url = logoUrl;
@@ -263,7 +271,7 @@ export default function ShopProfileEditorModal({
       whatsapp,
       secondaryPhone,
       location,
-      businessHours,
+      shopSchedule,
       bio,
       isOpen,
       logoUrl,
@@ -470,17 +478,11 @@ export default function ShopProfileEditorModal({
               />
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                Business hours
-              </label>
-              <input
-                value={businessHours}
-                onChange={(e) => setBusinessHours(e.target.value)}
-                maxLength={150}
-                placeholder="Opening hours"
-                className={fieldCls}
-              />
+            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-700">
+              <p className="mb-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Hours & windows
+              </p>
+              <ShopHoursEditor value={shopSchedule} onChange={setShopSchedule} />
             </div>
 
             <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-800">
@@ -489,7 +491,9 @@ export default function ShopProfileEditorModal({
                   Store open
                 </p>
                 <p className="text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                  {isOpen ? "Customers can order now" : "Store is closed for now"}
+                  {isOpen
+                    ? "Emergency override off — schedule controls orders"
+                    : "Emergency closed — all channels paused"}
                 </p>
               </div>
               <ToggleSwitch

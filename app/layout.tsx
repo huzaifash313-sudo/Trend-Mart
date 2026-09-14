@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Geist, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -13,6 +14,7 @@ import CartProvider from "@/context/CartContext";
 import QueryProvider from "@/components/QueryProvider";
 import { LocationProvider } from "@/context/LocationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { LocaleProvider } from "@/context/LocaleContext";
 import { MerchantQuickAddProvider } from "@/context/MerchantQuickAddContext";
 import { ShopReviewsProvider } from "@/context/ShopReviewsContext";
 import { ToastProvider } from "@/components/Toast";
@@ -116,12 +118,23 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <style
           dangerouslySetInnerHTML={{ __html: SPLASH_CRITICAL_CSS }}
         />
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
-        <script dangerouslySetInnerHTML={{ __html: SPLASH_BOOTSTRAP }} />
+        {/* beforeInteractive: runs before hydration (avoids React 19 client <script> warning) */}
+        <Script
+          id="tm-theme-bootstrap"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+        />
+        <Script
+          id="tm-splash-bootstrap"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: SPLASH_BOOTSTRAP }}
+        />
         {SITE_JSON_LD.map((block, i) => (
-          <script
+          <Script
             key={`ld-${i}`}
+            id={`tm-ld-${i}`}
             type="application/ld+json"
+            strategy="beforeInteractive"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(block) }}
           />
         ))}
@@ -144,6 +157,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </div>
         <QueryProvider>
         <ThemeProvider>
+        <LocaleProvider>
         <CartProvider>
           <LocationProvider>
             <ToastProvider>
@@ -181,6 +195,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </ToastProvider>
           </LocationProvider>
         </CartProvider>
+        </LocaleProvider>
         </ThemeProvider>
         </QueryProvider>
       </body>

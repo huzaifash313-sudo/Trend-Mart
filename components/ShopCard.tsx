@@ -208,7 +208,11 @@ function ShopCard({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            openShopReviews({ id: shop.id, name: shop.name });
+            openShopReviews({
+              id: shop.id,
+              name: shop.name,
+              ownerId: shop.owner_id,
+            });
           }}
           className={`group/rating mt-px flex min-w-0 w-full items-center rounded-md text-left transition-opacity ${
             hasRating ? "hover:opacity-80" : ""

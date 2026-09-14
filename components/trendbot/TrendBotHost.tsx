@@ -23,11 +23,33 @@ import {
 import { TrendBotLauncher } from "@/components/trendbot/TrendBotLauncher";
 import { TrendBotPanel } from "@/components/trendbot/TrendBotPanel";
 
-const SCROLL_TEASE_MIN_PX = 480;
-const TEASE_COOLDOWN_MS = 65_000;
-const TEASE_VISIBLE_MS = 5_800;
+/** After ✕, no tip bubbles until this TTL (2h). Avatar stroll still OK. */
+const TEASER_DISMISS_KEY = "tm_trendbot_teaser_dismiss_v2";
+const TEASER_DISMISS_TTL_MS = 2 * 60 * 60 * 1000;
+
+const TEASE_VISIBLE_MS = 4_200;
 const STROLL_EVERY_MS = 120_000;
-const ROUTE_TIP_DELAY_MS = 2_200;
+const ROUTE_TIP_DELAY_MS = 2_800;
+
+function isTeaserDismissed(): boolean {
+  try {
+    const raw = localStorage.getItem(TEASER_DISMISS_KEY);
+    if (!raw) return false;
+    const at = Number(raw);
+    if (!Number.isFinite(at)) return false;
+    return Date.now() - at < TEASER_DISMISS_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markTeaserDismissed() {
+  try {
+    localStorage.setItem(TEASER_DISMISS_KEY, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
 
 export default function TrendBotHost() {
   const pathname = usePathname() ?? "/";
@@ -35,8 +57,6 @@ export default function TrendBotHost() {
   const pageCtx = resolveTrendBotPageContext(pathname);
   const pack = useMemo(() => getTrendBotPagePack(pageCtx), [pageCtx]);
 
-  // Raise TrendBot above the CartBar when the user has items in cart,
-  // so the TrendBot FAB and the CartBar trash button never overlap.
   const { totalItems } = useCart();
   const cartVisible = totalItems > 0;
 
@@ -46,16 +66,14 @@ export default function TrendBotHost() {
   const [pose, setPose] = useState<TrendBotPose>("idle");
   const [strolling, setStrolling] = useState(false);
   const [voiceMuted, setVoiceMuted] = useState(false);
+  const [teasersMuted, setTeasersMuted] = useState(true);
 
-  const lastScrollY = useRef(0);
-  const scrollAccum = useRef(0);
-  const lastTeaseAt = useRef(0);
   const teaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const teaserRound = useRef(0);
   const poseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setVoiceMuted(isTrendBotVoiceMuted());
+    setTeasersMuted(isTeaserDismissed());
   }, []);
 
   const flashPose = useCallback((next: TrendBotPose, ms = 800) => {
@@ -64,9 +82,15 @@ export default function TrendBotHost() {
     poseTimer.current = setTimeout(() => setPose("idle"), ms);
   }, []);
 
+  const dismissTeaser = useCallback(() => {
+    setTeaser(null);
+    markTeaserDismissed();
+    setTeasersMuted(true);
+  }, []);
+
   const showTeaser = useCallback(
     (text: string, mood: "wave" | "jump" | "happy" = "wave") => {
-      if (open) return;
+      if (open || teasersMuted || isTeaserDismissed()) return;
       setTeaser(text);
       setWiggle(true);
       flashPose(mood, mood === "jump" ? 850 : 780);
@@ -74,15 +98,19 @@ export default function TrendBotHost() {
       if (teaseTimer.current) clearTimeout(teaseTimer.current);
       teaseTimer.current = setTimeout(() => setTeaser(null), TEASE_VISIBLE_MS);
     },
-    [open, flashPose],
+    [open, teasersMuted, flashPose],
   );
 
-  /* Route enter — soft tip + rare voice (once per route / session). */
+  /* Soft tip once on route — never during dismiss window. */
   useEffect(() => {
-    if (hidden || open) return;
+    if (hidden || open || teasersMuted) return;
     const tip = pack.teasers[0];
     const voice = pack.voiceLines[0];
     const t = setTimeout(() => {
+      if (isTeaserDismissed()) {
+        setTeasersMuted(true);
+        return;
+      }
       if (tip) {
         showTeaser(
           tip,
@@ -94,37 +122,35 @@ export default function TrendBotHost() {
       }
     }, ROUTE_TIP_DELAY_MS);
     return () => clearTimeout(t);
-  }, [hidden, open, pageCtx, pack, showTeaser]);
+  }, [hidden, open, pageCtx, pack, showTeaser, teasersMuted]);
 
-  /* Occasional scroll tease — sparse so it never feels spammy. */
+  /* Scroll: only a tiny avatar wiggle — NO text bubble (was spammy while browsing). */
   useEffect(() => {
-    if (hidden || open) {
-      setTeaser(null);
-      return;
-    }
+    if (hidden || open) return;
+
+    let lastY = window.scrollY;
+    let accum = 0;
+    let lastWiggleAt = 0;
 
     const onScroll = () => {
       const y = window.scrollY;
-      scrollAccum.current += Math.abs(y - lastScrollY.current);
-      lastScrollY.current = y;
-
+      accum += Math.abs(y - lastY);
+      lastY = y;
+      if (accum < 900) return;
+      accum = 0;
       const now = Date.now();
-      if (
-        scrollAccum.current >= SCROLL_TEASE_MIN_PX &&
-        now - lastTeaseAt.current >= TEASE_COOLDOWN_MS
-      ) {
-        scrollAccum.current = 0;
-        lastTeaseAt.current = now;
-        teaserRound.current = (teaserRound.current + 1) % pack.teasers.length;
-        showTeaser(pack.teasers[teaserRound.current]!);
-      }
+      if (now - lastWiggleAt < 90_000) return;
+      lastWiggleAt = now;
+      setWiggle(true);
+      flashPose("wave", 600);
+      window.setTimeout(() => setWiggle(false), 500);
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [hidden, open, pack.teasers, showTeaser]);
+  }, [hidden, open, flashPose]);
 
-  /* Rare stroll across the bottom — walk pose, then settle. */
+  /* Rare stroll — keep; users like the walk, not the tip spam. */
   useEffect(() => {
     if (hidden || open) return;
     let cancelled = false;
@@ -172,22 +198,20 @@ export default function TrendBotHost() {
 
   return (
     <>
-      {teaser && !open ? (
+      {teaser && !open && !teasersMuted ? (
         <div
-          className="tm-trendbot-bubble fixed right-3 z-[119] max-w-[min(210px,calc(100vw-4.5rem))]"
+          className="tm-trendbot-bubble fixed right-3 z-[119] max-w-[min(168px,calc(100vw-5rem))]"
           style={{
             bottom: cartVisible
               ? "calc(11.2rem + env(safe-area-inset-bottom, 0px))"
               : "calc(7.35rem + env(safe-area-inset-bottom, 0px))",
           }}
         >
-          <div className="rounded-xl rounded-br-sm border border-emerald-100 bg-white px-2.5 py-2 text-left shadow-lg dark:border-emerald-900/40 dark:bg-zinc-900">
-            {/* Header row — TrendBot label, voice toggle, close */}
-            <div className="mb-1 flex items-center gap-1">
-              <span className="text-[0.58rem] font-bold uppercase tracking-wide text-emerald-600 flex-1">
+          <div className="rounded-lg rounded-br-sm border border-emerald-100/90 bg-white/95 px-2 py-1.5 text-left shadow-md dark:border-emerald-900/40 dark:bg-zinc-900/95">
+            <div className="mb-0.5 flex items-center gap-0.5">
+              <span className="flex-1 text-[0.52rem] font-bold uppercase tracking-wide text-emerald-600">
                 {TREND_BOT_NAME}
               </span>
-              {/* Voice toggle */}
               <button
                 type="button"
                 onClick={() => {
@@ -195,25 +219,25 @@ export default function TrendBotHost() {
                   setTrendBotVoiceMuted(next);
                   setVoiceMuted(next);
                 }}
-                className="flex h-4 w-4 items-center justify-center rounded-full text-[0.55rem] text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[0.5rem] text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 aria-label={voiceMuted ? "Unmute TrendBot voice" : "Mute TrendBot voice"}
               >
                 {voiceMuted ? "🔇" : "🔊"}
               </button>
-              {/* Close / dismiss bubble */}
               <button
                 type="button"
-                onClick={() => setTeaser(null)}
-                className="flex h-4 w-4 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                aria-label="Dismiss message"
+                onClick={dismissTeaser}
+                className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                aria-label="Dismiss for a while"
+                title="Hide tips for 2 hours"
               >
-                <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                <svg className="h-2 w-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
 
-            {/* Teaser text — tapping opens the full TrendBot panel */}
             <button
               type="button"
               onClick={() => {
@@ -221,16 +245,11 @@ export default function TrendBotHost() {
                 setOpen(true);
                 flashPose("happy", 780);
               }}
-              className="block w-full text-left text-[11px] font-medium leading-snug text-zinc-700 dark:text-zinc-200"
+              className="block w-full text-left text-[10px] font-medium leading-snug text-zinc-700 dark:text-zinc-200"
               aria-label="Open TrendBot chat"
             >
               {teaser}
             </button>
-
-            {/* Tap hint */}
-            <p className="mt-1 text-[9px] text-zinc-400 dark:text-zinc-500">
-              Tap to chat →
-            </p>
           </div>
         </div>
       ) : null}

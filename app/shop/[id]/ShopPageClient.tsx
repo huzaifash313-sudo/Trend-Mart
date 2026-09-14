@@ -36,7 +36,11 @@ import SearchInput from "@/components/SearchInput";
 import StoreReviews from "@/components/StoreReviews";
 import CompactRating from "@/components/CompactRating";
 import { useShopReviews } from "@/context/ShopReviewsContext";
-import { getShopHoursSummary } from "@/lib/shopHours";
+import {
+  formatChannelHoursLine,
+  getShopHoursSummary,
+  parseShopSchedule,
+} from "@/lib/shopHours";
 import { buildShopOfferSlides, formatOfferRemaining } from "@/lib/shopOfferTicker";
 import { type Coupon } from "@/services/couponService";
 import type { ShopDeal } from "@/lib/dealSchedule";
@@ -266,6 +270,8 @@ function ShopDetailInner({
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [deals, setDeals] = useState<ShopDeal[]>([]);
   const [couponsOpen, setCouponsOpen] = useState(false);
+  /** Customer storefront: Products (default) | Deals catalog tab */
+  const [catalogTab, setCatalogTab] = useState<"products" | "deals">("products");
   const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null);
   // Optimistic open/closed override — flips instantly, reconciled on reload.
   const [openStatusOverride, setOpenStatusOverride] = useState<string | null>(null);
@@ -456,6 +462,12 @@ function ShopDetailInner({
     () => liveShopDeals.filter((d) => !d.is_featured),
     [liveShopDeals],
   );
+  /** Deals tab grid: non-featured first; if all are featured, show all so tab isn't empty */
+  const catalogDeals = useMemo(
+    () => (restShopDeals.length > 0 ? restShopDeals : liveShopDeals),
+    [restShopDeals, liveShopDeals],
+  );
+  const showDealsTab = !isOwner && liveShopDeals.length > 0;
 
   // Deep links: #deals | #deal-{id} | #product-{id} (from WhatsApp order links)
   useEffect(() => {
@@ -463,14 +475,19 @@ function ShopDetailInner({
     const hash = window.location.hash.replace(/^#/, "");
     if (!hash) return;
 
+    if (hash === "deals" || hash.startsWith("deal-")) {
+      setCatalogTab("deals");
+    } else if (hash === "products" || hash.startsWith("product-")) {
+      setCatalogTab("products");
+    }
+
     const scrollToHash = () => {
       const el = document.getElementById(hash);
       if (!el) return;
-      // Don't fight an open modal / user interaction — only intentional deep links.
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     };
 
-    const t = window.setTimeout(scrollToHash, 150);
+    const t = window.setTimeout(scrollToHash, 180);
     const onHash = () => scrollToHash();
     window.addEventListener("hashchange", onHash);
     return () => {
@@ -980,9 +997,9 @@ function ShopDetailInner({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 space-y-3 px-3 py-3 pb-3 md:space-y-4 md:px-4 md:py-5 md:pb-6">
+    <div className="mx-auto w-full max-w-6xl flex-1 space-y-3 px-0 pb-3 pt-0 md:space-y-4 md:px-4 md:pb-6 md:pt-5">
       {loading && initialSeo ? (
-        <div className="space-y-4">
+        <div className="space-y-4 md:rounded-2xl md:overflow-hidden">
           <ShopMediaHeader
             shopName={initialSeo.name}
             bannerUrl={initialSeo.banner_url}
@@ -993,25 +1010,34 @@ function ShopDetailInner({
             logoPlacement="overlay"
             priority
           />
-          <ProductGridSkeleton count={4} />
+          <div className="px-3 md:px-0">
+            <ProductGridSkeleton count={4} />
+          </div>
         </div>
       ) : null}
       {loading && !initialSeo ? (
-        <div className="space-y-4">
+        <div className="space-y-4 px-3 md:px-0">
           <ShopBannerSkeleton />
           <ProductGridSkeleton count={4} />
         </div>
       ) : null}
-      {!loading && error && (<ErrorState title="Failed to load shop" message={error} onRetry={() => window.location.reload()} />)}
+      {!loading && error && (
+        <div className="px-3 md:px-0">
+          <ErrorState title="Failed to load shop" message={error} onRetry={() => window.location.reload()} />
+        </div>
+      )}
       {!loading && !error && shop && (<>
-        {/* Hero — banner wide; logo beside shop name */}
-        <section className="trend-card overflow-hidden">
+        {/* Hero first — full-bleed banner on mobile, then shop details */}
+        <section className="trend-card overflow-hidden rounded-none md:rounded-2xl">
           <ShopMediaHeader
             shopName={shop.name}
             bannerUrl={shop.banner_url}
             logoUrl={shop.logo_url}
+            location={shop.location}
+            category={shop.category}
             size="hero"
             logoPlacement="hidden"
+            priority
           >
             {shop.is_live && (
               <span className="absolute left-3 top-3 z-[1] inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[0.65rem] font-semibold text-white shadow">
@@ -1021,17 +1047,19 @@ function ShopDetailInner({
             )}
             <span
               className={`absolute right-3 top-3 z-[1] rounded-full px-2.5 py-0.5 text-[0.65rem] font-semibold text-white backdrop-blur-sm ${
-                shop.category === "Food"
+                theme.accentColor === "amber"
                   ? "bg-amber-500/80"
-                  : shop.category === "Boutique"
+                  : theme.accentColor === "pink"
                     ? "bg-pink-500/80"
-                    : shop.category === "Electronics"
+                    : theme.accentColor === "blue"
                       ? "bg-blue-500/80"
-                      : shop.category === "Grocery"
+                      : theme.accentColor === "emerald"
                         ? "bg-emerald-500/80"
-                        : shop.category === "Cosmetics"
+                        : theme.accentColor === "fuchsia"
                           ? "bg-fuchsia-500/80"
-                          : "bg-zinc-500/80"
+                          : theme.accentColor === "rose"
+                            ? "bg-rose-500/80"
+                            : "bg-zinc-500/80"
               }`}
             >
               {theme.icon} {shop.category}
@@ -1043,15 +1071,26 @@ function ShopDetailInner({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <h2 className="tm-shop-title text-base leading-tight sm:text-xl">
+                    <p className="tm-shop-title text-base leading-tight sm:text-xl">
                       {shop.name}
-                    </h2>
+                    </p>
                     <p className="mt-0.5 text-[0.65rem] font-medium leading-none text-teal-700 dark:text-teal-300">
                       {shop.category}
                     </p>
                     <button
                       type="button"
-                      onClick={() => openShopReviews({ id: shop.id, name: shop.name })}
+                      onClick={() => {
+                        const el = document.getElementById("reviews");
+                        if (el) {
+                          el.scrollIntoView({ behavior: "smooth", block: "start" });
+                          return;
+                        }
+                        openShopReviews({
+                          id: shop.id,
+                          name: shop.name,
+                          ownerId: shop.owner_id,
+                        });
+                      }}
                       className="mt-0.5 inline-flex items-center text-left transition-opacity hover:opacity-80"
                       title="View all reviews or add yours"
                       aria-label={`View reviews for ${shop.name}`}
@@ -1089,12 +1128,36 @@ function ShopDetailInner({
             {/* Store hours — shown on storefront visit (not on homepage cards) */}
             {(() => {
               const operatingStatus = openStatusOverride ?? shop.operating_status;
+              const schedule = parseShopSchedule(shop.shop_schedule);
               const hours = getShopHoursSummary({
                 business_hours: shop.business_hours,
                 operating_status: operatingStatus,
+                shop_schedule: schedule,
+                channel: "store",
               });
+              const deliveryHours =
+                shop.accepts_delivery !== false
+                  ? getShopHoursSummary({
+                      business_hours: shop.business_hours,
+                      operating_status: operatingStatus,
+                      shop_schedule: schedule,
+                      channel: "delivery",
+                    })
+                  : null;
+              const pickupHours =
+                shop.accepts_pickup !== false
+                  ? getShopHoursSummary({
+                      business_hours: shop.business_hours,
+                      operating_status: operatingStatus,
+                      shop_schedule: schedule,
+                      channel: "pickup",
+                    })
+                  : null;
               const hasHours =
-                !!(shop.business_hours?.trim() || operatingStatus?.trim());
+                !!(schedule || shop.business_hours?.trim() || operatingStatus?.trim());
+              const isManuallyOpen = !operatingStatus
+                ?.toLowerCase()
+                .includes("closed");
               const isOpen = hours.state !== "closed";
               return (
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-teal-100 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 px-3 py-1.5 dark:border-teal-900/40 dark:from-emerald-950/30 dark:to-teal-950/20">
@@ -1106,25 +1169,61 @@ function ShopDetailInner({
                     <p className="text-xs leading-snug text-zinc-700 dark:text-zinc-300">
                       {hasHours ? hours.hoursText : "Hours not set by merchant yet"}
                     </p>
-                    {operatingStatus?.trim() &&
-                    operatingStatus.trim() !== hours.hoursText ? (
+                    {hours.reason ? (
                       <p className="mt-0.5 text-[0.7rem] text-zinc-500 dark:text-zinc-400">
-                        {operatingStatus}
+                        {hours.reason}
                       </p>
+                    ) : null}
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {deliveryHours ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[0.6rem] font-bold ${
+                            deliveryHours.state === "closed"
+                              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          }`}
+                        >
+                          Delivery {deliveryHours.state === "closed" ? "closed" : "open"}
+                        </span>
+                      ) : null}
+                      {pickupHours ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[0.6rem] font-bold ${
+                            pickupHours.state === "closed"
+                              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                              : "bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
+                          }`}
+                        >
+                          Pickup {pickupHours.state === "closed" ? "closed" : "open"}
+                        </span>
+                      ) : null}
+                    </div>
+                    {schedule ? (
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.65rem] text-zinc-500 dark:text-zinc-400">
+                        {shop.accepts_delivery !== false ? (
+                          <span>Delivery: {formatChannelHoursLine(schedule, "delivery")}</span>
+                        ) : null}
+                        {shop.accepts_pickup !== false ? (
+                          <span>Pickup: {formatChannelHoursLine(schedule, "pickup")}</span>
+                        ) : null}
+                        {shop.accepts_dine_in !== false ? (
+                          <span>Sitting: {formatChannelHoursLine(schedule, "dine_in")}</span>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                   {isOwner ? (
                     <ToggleSwitch
-                      checked={isOpen}
+                      checked={isManuallyOpen}
                       onChange={(open) => handleToggleOpen(open)}
                       label="Store open or closed"
                       size="sm"
-                      visibleLabel={isOpen ? "Open" : "Closed"}
+                      visibleLabel={isManuallyOpen ? "Open" : "Closed"}
                     />
                   ) : (
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-semibold ${
-                        hours.state === "open"
+                        isOpen
                           ? "bg-emerald-600 text-white"
                           : hours.state === "closed"
                             ? "bg-rose-500 text-white"
@@ -1251,6 +1350,7 @@ function ShopDetailInner({
           </div>
         </section>
 
+        <div className="space-y-3 px-3 md:space-y-4 md:px-0">
         {/* Promo strip — offer + free delivery + coupons in one marquee */}
         {displayPrefs.showAnnouncementBanner && promoBannerSegments.length > 0 && (
           <section className="-mx-3 md:-mx-4">
@@ -1355,13 +1455,13 @@ function ShopDetailInner({
             )}
           </section>
         ) : liveShopDeals.length > 0 ? (
-          <section id="deals" aria-label="Store deals" className="scroll-mt-20 space-y-6">
+          <section id="deals" aria-label="Store deals" className="scroll-mt-20 space-y-4">
             {/* Zero-height anchors keep WhatsApp #deal-{id} deep links working. */}
             {liveShopDeals.map((d) => (
               <div key={`deal-anchor-${d.id}`} id={`deal-${d.id}`} className="h-0 overflow-hidden" aria-hidden="true" />
             ))}
 
-            {/* ── Featured / pinned spotlight strip ──────────────────────── */}
+            {/* Featured spotlight stays above Products / Deals toggle */}
             {featuredShopDeals.length > 0 && (
               <FeaturedDealsStrip
                 deals={featuredShopDeals}
@@ -1372,29 +1472,6 @@ function ShopDetailInner({
                 limit={featuredShopDeals.length}
                 getOfferTags={() => shopDealOfferTags}
               />
-            )}
-
-            {/* ── All remaining deals — full visible grid ─────────────────── */}
-            {restShopDeals.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
-                    {featuredShopDeals.length > 0 ? "More Deals" : "All Deals"}
-                  </h2>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[0.65rem] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                    {restShopDeals.length} deal{restShopDeals.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-                  {restShopDeals.map((deal) => (
-                    <DealCard
-                      key={deal.id}
-                      deal={deal}
-                      offerTags={shopDealOfferTags}
-                    />
-                  ))}
-                </div>
-              </div>
             )}
           </section>
         ) : null}
@@ -1468,7 +1545,7 @@ function ShopDetailInner({
           </section>
         )}
 
-        {/* Catalog — retail always; service shops also when they have products */}
+        {/* Catalog — Products (default) | Deals toggle after categories */}
         {showProductCatalog && (
           <section className="space-y-3">
             <PromoAdsCarousel
@@ -1480,30 +1557,73 @@ function ShopDetailInner({
             <SubCategoryPills
               mainCategory={shop.category}
               selectedId={activeSubCategoryId}
-              onSelect={(id) => setActiveSubCategoryId(id)}
+              onSelect={(id) => {
+                setActiveSubCategoryId(id);
+                setCatalogTab("products");
+              }}
               availableIds={productSubCategoryIds.size > 0 ? productSubCategoryIds : null}
               label="Browse by sub-category"
             />
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search products"
-                ariaLabel="Search products"
-                radius="rounded-full"
-                showSubmitButton={false}
-                showClearButton
-                className="min-w-0 flex-1"
-              />
-              <div className="flex shrink-0 items-center gap-1.5">
-                <CustomSelect value={priceSort} onChange={(val) => setPriceSort(val as "default" | "low" | "high")} options={[{ value: "default", label: "All Items" }, { value: "low", label: "Price: Low to High" }, { value: "high", label: "Price: High to Low" }]} size="sm" pill fullWidth={false} ariaLabel="Sort products" />
-                {priceSort !== "default" && (<button type="button" onClick={() => setPriceSort("default")} className="rounded-full px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" aria-label="Reset sort">✕</button>)}
+
+            {showDealsTab ? (
+              <div
+                role="tablist"
+                aria-label="Products or deals"
+                className="flex gap-1 rounded-full border border-zinc-200/90 bg-zinc-100/80 p-1 dark:border-zinc-700 dark:bg-zinc-900/80"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={catalogTab === "products"}
+                  onClick={() => setCatalogTab("products")}
+                  className={`flex-1 rounded-full px-3 py-2 text-center text-xs font-bold transition ${
+                    catalogTab === "products"
+                      ? "bg-white text-teal-800 shadow-sm dark:bg-zinc-800 dark:text-teal-200"
+                      : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  Products
+                  <span className="ml-1 font-semibold opacity-70">({filteredProducts.length})</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={catalogTab === "deals"}
+                  onClick={() => setCatalogTab("deals")}
+                  className={`flex-1 rounded-full px-3 py-2 text-center text-xs font-bold transition ${
+                    catalogTab === "deals"
+                      ? "bg-white text-teal-800 shadow-sm dark:bg-zinc-800 dark:text-teal-200"
+                      : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  Deals
+                  <span className="ml-1 font-semibold opacity-70">({catalogDeals.length})</span>
+                </button>
               </div>
-            </div>
+            ) : null}
+
+            {catalogTab === "products" || !showDealsTab ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search products"
+                  ariaLabel="Search products"
+                  radius="rounded-full"
+                  showSubmitButton={false}
+                  showClearButton
+                  className="min-w-0 flex-1"
+                />
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <CustomSelect value={priceSort} onChange={(val) => setPriceSort(val as "default" | "low" | "high")} options={[{ value: "default", label: "All Items" }, { value: "low", label: "Price: Low to High" }, { value: "high", label: "Price: High to Low" }]} size="sm" pill fullWidth={false} ariaLabel="Sort products" />
+                  {priceSort !== "default" && (<button type="button" onClick={() => setPriceSort("default")} className="rounded-full px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" aria-label="Reset sort">✕</button>)}
+                </div>
+              </div>
+            ) : null}
           </section>
         )}
 
-        {showProductCatalog && (
+        {showProductCatalog && (catalogTab === "products" || !showDealsTab) && (
           <section id="products" aria-label="Products">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-sm font-bold text-zinc-900 dark:text-zinc-100"><GridIcon /> Products</h2>
@@ -1557,11 +1677,57 @@ function ShopDetailInner({
           </section>
         )}
 
+        {showProductCatalog && showDealsTab && catalogTab === "deals" && (
+          <section id="shop-catalog-deals" aria-label="Store deals catalog" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">Deals</h2>
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[0.65rem] font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                {catalogDeals.length} deal{catalogDeals.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            {catalogDeals.length === 0 ? (
+              <EmptyState title="No deals right now" description="Check Featured above, or browse Products." />
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                {catalogDeals.map((deal) => (
+                  <DealCard
+                    key={deal.id}
+                    deal={deal}
+                    offerTags={shopDealOfferTags}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Deals-only shops (no product catalog) still need a deals grid */}
+        {!showProductCatalog && !isOwner && catalogDeals.length > 0 && (
+          <section aria-label="Store deals catalog" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">Deals</h2>
+              <span className="text-xs text-zinc-500">{catalogDeals.length}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+              {catalogDeals.map((deal) => (
+                <DealCard key={deal.id} deal={deal} offerTags={shopDealOfferTags} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Reviews & Ratings — owner can reply; cannot self-review */}
-        <section aria-label="Customer Reviews" className="mt-4">
+        <section id="reviews" aria-label="Customer Reviews" className="mt-4 scroll-mt-20">
           <h2 className="mb-3 text-sm font-bold text-zinc-900 dark:text-zinc-100">Customer Reviews</h2>
-          <StoreReviews shopId={shop.id} ownerId={shop.owner_id} />
+          <StoreReviews
+            shopId={shop.id}
+            ownerId={shop.owner_id}
+            onReviewSubmitted={() => {
+              void queryClient.invalidateQueries({ queryKey: ["shop-detail", id] });
+            }}
+          />
         </section>
+        </div>
       </>)}
 
       {/* ── Contact Modal ─────────────────────────────────────────────── */}
@@ -1653,7 +1819,11 @@ function ShopDetailInner({
       {/* ── WhatsApp float — gated by merchant Appearance toggle ──────── */}
       {shop?.whatsapp_number &&
         displayPrefs.showWhatsappFloatingButton && (
-          <WhatsAppFloatButton phone={shop.whatsapp_number} shopName={shop.name} />
+          <WhatsAppFloatButton
+            phone={shop.whatsapp_number}
+            shopName={shop.name}
+            side="left"
+          />
         )}
 
       {/* ── Free AI shop assistant (products, prices, hours) ─────────── */}

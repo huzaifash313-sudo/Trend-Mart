@@ -248,7 +248,13 @@ export default function VariantEditor({
         <div className="min-w-0">
           <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
             Product options
-            <span className="ml-1 font-normal text-zinc-400">(optional)</span>
+            {usuallyNeeds ? (
+              <span className="ml-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                (recommended)
+              </span>
+            ) : (
+              <span className="ml-1 font-normal text-zinc-400">(optional)</span>
+            )}
           </p>
           <p className="mt-0.5 text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
             {shopCategory ? (
@@ -260,7 +266,7 @@ export default function VariantEditor({
                 {" — "}
               </>
             ) : null}
-            {hint}
+            {hint} Tap a pack, then chip options on/off — customers pick before order.
           </p>
         </div>
         {hasVariants ? (

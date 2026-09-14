@@ -16,6 +16,7 @@ import { useCart } from "@/store/cartStore";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { ErrorState } from "@/components/ErrorState";
+import { useLocale } from "@/context/LocaleContext";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline Icons                                                              */
@@ -261,6 +262,7 @@ function WishlistCard({
 
 export default function WishlistPage() {
   const { confirm } = useConfirm();
+  const { t } = useLocale();
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -344,7 +346,7 @@ export default function WishlistPage() {
             <Link href="/" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Go back">
               <ChevronLeftIcon />
             </Link>
-            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Wishlist</h1>
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{t("wishlist.my")}</h1>
           </div>
         </header>
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 pb-safe-nav">
@@ -368,13 +370,13 @@ export default function WishlistPage() {
             <Link href="/" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Go back">
               <ChevronLeftIcon />
             </Link>
-            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Wishlist</h1>
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{t("wishlist.my")}</h1>
           </div>
         </header>
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 pb-safe-nav">
           <ErrorState
-            title="Could not load your wishlist"
-            message="We couldn't fetch your saved items. This might be a temporary issue."
+            title={t("wishlist.loadError")}
+            message={t("wishlist.loadErrorHint")}
             onRetry={() => {
               setLoadError(false);
               setLoading(true);
@@ -394,7 +396,7 @@ export default function WishlistPage() {
             <Link href="/" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label="Go back">
               <ChevronLeftIcon />
             </Link>
-            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Wishlist</h1>
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{t("wishlist.my")}</h1>
           </div>
           {visible.length > 0 && (
             <button
@@ -420,7 +422,7 @@ export default function WishlistPage() {
               }`}
             >
               <ShopIcon />
-              Shops
+              {t("wishlist.shops")}
               <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${tab === "shops" ? "bg-white/20" : "bg-zinc-200 dark:bg-zinc-700"}`}>
                 {shops.length}
               </span>
@@ -435,7 +437,7 @@ export default function WishlistPage() {
               }`}
             >
               <PackageIcon />
-              Products
+              {t("wishlist.products")}
               <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${tab === "products" ? "bg-white/20" : "bg-zinc-200 dark:bg-zinc-700"}`}>
                 {products.length}
               </span>
@@ -451,17 +453,17 @@ export default function WishlistPage() {
               <EmptyHeartIcon />
             </div>
             <h2 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Your wishlist is empty
+              {t("wishlist.emptyTitle")}
             </h2>
             <p className="mb-6 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-              Tap the heart on any shop or product. You can save whole stores and individual products — then view them separately here.
+              {t("wishlist.emptyHint")}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Link href="/" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
-                Browse shops
+                {t("wishlist.browseShops")}
               </Link>
               <Link href="/products" className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-                Search products
+                {t("wishlist.searchProducts")}
               </Link>
             </div>
           </div>
@@ -470,12 +472,12 @@ export default function WishlistPage() {
         {!totalEmpty && visible.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <h2 className="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">
-              No {tab === "shops" ? "shops" : "products"} saved
+              {tab === "shops" ? t("wishlist.noShops") : t("wishlist.noProducts")}
             </h2>
             <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
               {tab === "shops"
-                ? "Heart a store on the homepage to save it here."
-                : "Open a shop and tap the heart on any product you like."}
+                ? t("wishlist.hintShops")
+                : t("wishlist.hintProducts")}
             </p>
             <button
               type="button"

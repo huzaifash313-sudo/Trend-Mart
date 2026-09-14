@@ -1,7 +1,7 @@
 /* -------------------------------------------------------------------------- */
-/*  TrendsMart — Groq / free LLM bridge (server-only)                          */
+/*  TrendsMart — Groq / DeepSeek / Gemini LLM bridge (server-only)             */
 /*                                                                             */
-/*  Security: GROQ_API_KEY must NEVER be NEXT_PUBLIC_*.                        */
+/*  Security: *_API_KEY must NEVER be NEXT_PUBLIC_*.                           */
 /*  Safety: LLM may only NLU-parse or rewrite using FACTS we pass.             */
 /*          It must not invent products, prices, fees, or policies.            */
 /* -------------------------------------------------------------------------- */
@@ -28,20 +28,33 @@ export interface LlmUnderstanding {
 }
 
 type Provider = {
-  name: "groq" | "gemini";
+  name: "deepseek" | "groq" | "gemini";
   base: string;
   key: string;
   /** Model for NLU intent parsing (fast, small is fine) */
   nluModel: string;
   /** Model for grounded reply compose (quality matters more here) */
   replyModel: string;
+  /** DeepSeek thinking burns tokens — keep off for TrendBot. */
+  disableThinking?: boolean;
 };
 
 function getProvider(): Provider | null {
+  // Prefer DeepSeek when set (paid, stable). Groq/Gemini remain free fallbacks.
+  const deepseek = process.env.DEEPSEEK_API_KEY?.trim();
+  if (deepseek) {
+    const model = process.env.DEEPSEEK_MODEL?.trim() || "deepseek-flash";
+    return {
+      name: "deepseek",
+      key: deepseek,
+      base: "https://api.deepseek.com/chat/completions",
+      nluModel: model,
+      replyModel: model,
+      disableThinking: true,
+    };
+  }
   const groq = process.env.GROQ_API_KEY?.trim();
   if (groq) {
-    // NLU: 8b-instant = 10× faster, same free quota, good enough for intent classification
-    // Reply: 70b-versatile = best quality for grounded natural language answers
     const replyModel = process.env.GROQ_MODEL?.trim() || "llama-3.3-70b-versatile";
     const nluModel = process.env.GROQ_NLU_MODEL?.trim() || "llama-3.1-8b-instant";
     return {
@@ -180,7 +193,7 @@ function parseNluJson(text: string): LlmUnderstanding | null {
   }
 }
 
-async function groqChat(
+async function openAiCompatibleChat(
   provider: Provider,
   messages: { role: "system" | "user" | "assistant"; content: string }[],
   opts?: { maxTokens?: number; temperature?: number; json?: boolean; modelOverride?: string },
@@ -199,6 +212,8 @@ async function groqChat(
         temperature: opts?.temperature ?? 0.2,
         max_tokens: opts?.maxTokens ?? 400,
         ...(opts?.json ? { response_format: { type: "json_object" } } : {}),
+        // DeepSeek defaults to thinking mode (burns tokens) — force off.
+        ...(provider.disableThinking ? { thinking: { type: "disabled" } } : {}),
         messages,
       }),
       signal: controller.signal,
@@ -249,8 +264,8 @@ async function geminiChat(
   }
 }
 
-/** Understand user message via Groq/Gemini.
- *  Uses the fast NLU model (8b-instant) to minimize token cost. */
+/** Understand user message via DeepSeek / Groq / Gemini.
+ *  Uses the fast NLU model when available to minimize token cost. */
 export async function understandWithFreeLlm(
   message: string,
   role: "customer" | "merchant" | "shop",
@@ -258,8 +273,8 @@ export async function understandWithFreeLlm(
   const provider = getProvider();
   if (!provider) return null;
   try {
-    if (provider.name === "groq") {
-      const content = await groqChat(
+    if (provider.name === "groq" || provider.name === "deepseek") {
+      const content = await openAiCompatibleChat(
         provider,
         [
           { role: "system", content: NLU_SYSTEM },
@@ -268,15 +283,15 @@ export async function understandWithFreeLlm(
             content: `Role=${role}\nMessage: ${message.slice(0, 500)}`,
           },
         ],
-        // Use fast 8b model for NLU — cheaper, faster, good enough for intent classification
-        { maxTokens: 240, temperature: 0.02, json: true, modelOverride: provider.nluModel },
+        // Compact NLU — keep output tiny
+        { maxTokens: 180, temperature: 0.02, json: true, modelOverride: provider.nluModel },
       );
       return content ? parseNluJson(content) : null;
     }
     const text = await geminiChat(
       provider,
       `${NLU_SYSTEM}\n\nRole=${role}\nMessage: ${message.slice(0, 500)}`,
-      { maxTokens: 240, temperature: 0.02 },
+      { maxTokens: 180, temperature: 0.02 },
     );
     return text ? parseNluJson(text) : null;
   } catch {
@@ -310,9 +325,9 @@ export async function composeGroundedReplyWithLlm(
   const provider = getProvider();
   if (!provider) return null;
 
-  const facts = sanitizeChatString(input.facts, 2800) || "(no confirmed facts)";
-  const draft = input.draftReply ? sanitizeChatString(input.draftReply, 1600) : "";
-  const user = sanitizeChatString(input.userMessage, 500);
+  const facts = sanitizeChatString(input.facts, 2200) || "(no confirmed facts)";
+  const draft = input.draftReply ? sanitizeChatString(input.draftReply, 1200) : "";
+  const user = sanitizeChatString(input.userMessage, 400);
 
   const systemBlock =
     GROUNDED_SYSTEM +
@@ -328,29 +343,28 @@ export async function composeGroundedReplyWithLlm(
   const finalUserMsg = `${factBlock}USER QUESTION:\n${user}\n\nWrite the final helpful reply now.`;
 
   try {
-    if (provider.name === "groq") {
+    if (provider.name === "groq" || provider.name === "deepseek") {
       // Build multi-turn messages: system + history + current user query
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemBlock },
       ];
 
-      // Inject last 6 turns of history for multi-turn context (token-efficient)
-      const recentHistory = (input.history ?? []).slice(-6);
+      // Inject last 4 turns of history for multi-turn context (token-efficient)
+      const recentHistory = (input.history ?? []).slice(-4);
       for (const h of recentHistory) {
-        messages.push({ role: h.role === "user" ? "user" : "assistant", content: h.text.slice(0, 300) });
+        messages.push({ role: h.role === "user" ? "user" : "assistant", content: h.text.slice(0, 220) });
       }
 
       messages.push({ role: "user", content: finalUserMsg });
 
-      return await groqChat(
+      return await openAiCompatibleChat(
         provider,
         messages,
-        // 70b reply model; 500 tokens = ~350 words — enough for rich but concise answers
-        { maxTokens: 500, temperature: 0.22 },
+        { maxTokens: 420, temperature: 0.22 },
       );
     }
     return await geminiChat(provider, `${systemBlock}\n\n${finalUserMsg}`, {
-      maxTokens: 500,
+      maxTokens: 420,
       temperature: 0.22,
     });
   } catch {

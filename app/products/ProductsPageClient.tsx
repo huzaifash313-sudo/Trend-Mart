@@ -48,7 +48,9 @@ import { logProductClick } from "@/services/analyticsService";
 import { fetchShops } from "@/services/shopService";
 import { GEO_SHOP_CANDIDATE_LIMIT } from "@/lib/mobilePerf";
 import { locationHintLabel, sortWithNearbyBoost } from "@/lib/nearbyBoost";
+import { personalizeForYouFeed } from "@/lib/personalizeFeed";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
+import { useLocale } from "@/context/LocaleContext";
 
 const QuickViewModal = dynamic(() => import("@/components/QuickViewModal"), {
   ssr: false,
@@ -67,15 +69,25 @@ function PackageIcon() {
   );
 }
 
-const SORT_OPTIONS: { value: MarketplaceSort; label: string }[] = [
-  { value: "for_you", label: "For You" },
-  { value: "nearest", label: "Nearest" },
-  { value: "popular", label: "Top rated" },
-  { value: "newest", label: "Newest" },
-  { value: "discount", label: "Best deals" },
-  { value: "price_asc", label: "Price ↑" },
-  { value: "price_desc", label: "Price ↓" },
+const SORT_VALUES: MarketplaceSort[] = [
+  "for_you",
+  "nearest",
+  "popular",
+  "newest",
+  "discount",
+  "price_asc",
+  "price_desc",
 ];
+
+const SORT_LABEL_KEYS: Record<MarketplaceSort, string> = {
+  for_you: "products.sortForYou",
+  nearest: "products.sortNearest",
+  popular: "products.sortTopRated",
+  newest: "products.sortNewest",
+  discount: "products.sortBestDeals",
+  price_asc: "products.sortPriceAscShort",
+  price_desc: "products.sortPriceDescShort",
+};
 
 /* Stable empty fallbacks so derived memos don't change identity every render. */
 const EMPTY_PRODUCTS: MarketplaceProduct[] = [];
@@ -102,6 +114,7 @@ function ProductsPageInner({
   initialProducts?: MarketplaceProduct[];
 }) {
   const router = useRouter();
+  const { t } = useLocale();
   const { addToast } = useToast();
   const { addItem } = useCart();
   const { coordinates: globalCoords, location: globalLocation } = useLocation();
@@ -120,7 +133,7 @@ function ProductsPageInner({
   );
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string | null>(subParam);
   const [sort, setSort] = useState<MarketplaceSort>(
-    SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
+    SORT_VALUES.includes(sortParam) ? sortParam : "for_you",
   );
   const [geoDetecting, setGeoDetecting] = useState(false);
   const [geoFilter, setGeoFilter] = useState<GeoFilterState>({
@@ -244,7 +257,7 @@ function ProductsPageInner({
       query: qParam,
       category: categoryParam === "All" ? undefined : categoryParam,
       subCategoryId: subParam,
-      sort: SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you",
+      sort: SORT_VALUES.includes(sortParam) ? sortParam : "for_you",
       limit: 48,
       shopIds: geoShopIds,
     },
@@ -389,7 +402,7 @@ function ProductsPageInner({
     setQuery(qParam);
     setActiveCategory(SHOP_CATEGORIES.includes(categoryParam) ? categoryParam : "All");
     setActiveSubCategoryId(subParam);
-    setSort(SORT_OPTIONS.some((s) => s.value === sortParam) ? sortParam : "for_you");
+    setSort(SORT_VALUES.includes(sortParam) ? sortParam : "for_you");
   }, [qParam, categoryParam, subParam, sortParam]);
 
   // Live search: as the user types, debounce-update the URL so results refresh
@@ -501,6 +514,11 @@ function ProductsPageInner({
       list = sortWithNearbyBoost(list as MarketplaceProduct[], (p) =>
         productDistanceKm(p),
       ) as typeof list;
+    }
+
+    // Personal For You: affinity + soft-demote ignored recently-viewed + hourly freshness.
+    if (sort === "for_you" && !deferredQuery.trim()) {
+      list = personalizeForYouFeed(list as MarketplaceProduct[]) as typeof list;
     }
 
     // "Nearest" sort: re-sort by straight-line distance to the customer's pin.
@@ -620,7 +638,7 @@ function ProductsPageInner({
           ? (product as MarketplaceProduct)
           : productsRef.current.find((p) => p.id === product.id);
       if (!full || !full.is_available) {
-        addToast("This product is unavailable.", "error");
+        addToast(t("products.unavailable"), "error");
         return;
       }
       // Variant products → full page option picker (lighter than keeping a modal catalogue).
@@ -646,7 +664,7 @@ function ProductsPageInner({
         productsRef.current.find((p) => p.id === product.id) ??
         (product as MarketplaceProduct);
       if (!full || !full.is_available) {
-        addToast("This product is unavailable.", "error");
+        addToast(t("products.unavailable"), "error");
         return;
       }
       const shopPick: Pick<Shop, "id" | "name" | "whatsapp_number"> = {
@@ -655,7 +673,7 @@ function ProductsPageInner({
         whatsapp_number: full.shop_whatsapp || "",
       };
       if (!shopPick.whatsapp_number) {
-        addToast("Store WhatsApp missing — opening store.", "info");
+        addToast(t("products.whatsappMissing"), "info");
         router.push(`/shop/${full.shop_id}`);
         return;
       }
@@ -754,7 +772,7 @@ function ProductsPageInner({
           else n.add(product.id);
           return n;
         });
-        addToast("Could not update wishlist", "error");
+        addToast(t("products.wishlistFail"), "error");
       }
     },
     [addToast],
@@ -800,14 +818,14 @@ function ProductsPageInner({
         value={query}
         onChange={setQuery}
         onSubmit={handleSearchSubmit}
-        placeholder="Search products, shops, categories"
-        ariaLabel="Search products"
+        placeholder={t("products.searchPlaceholder")}
+        ariaLabel={t("products.searchAria")}
         showClearButton
         className="mb-0"
       />
 
       {/* Categories */}
-      <section aria-label="Category filters" className="tm-cat-bar -mx-3 sm:-mx-4">
+      <section aria-label={t("products.categoryFilters")} className="tm-cat-bar -mx-3 sm:-mx-4">
         <FadeScrollX className="tm-cat-scroll px-2 sm:px-3">
           {SHOP_CATEGORIES.map((category) => {
             const isActive = activeCategory === category;
@@ -832,7 +850,7 @@ function ProductsPageInner({
           mainCategory={activeCategory}
           selectedId={activeSubCategoryId}
           onSelect={handleSubCategoryChange}
-          label="Filter by sub-category"
+          label={t("products.subFilter")}
         />
       )}
 
@@ -840,18 +858,18 @@ function ProductsPageInner({
       <div className="sticky top-[var(--tm-navbar-sticky-offset,4.35rem)] z-30 -mx-3 mb-1.5 border-b border-zinc-100/80 bg-white/95 px-3 py-1.5 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-950/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none dark:sm:bg-transparent">
         <div className="flex items-center gap-2">
           <div className="tm-fade-scroll-x flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5 pr-2 scrollbar-none">
-            {SORT_OPTIONS.map((opt) => (
+            {SORT_VALUES.map((value) => (
               <button
-                key={opt.value}
+                key={value}
                 type="button"
-                onClick={() => handleSortChange(opt.value)}
+                onClick={() => handleSortChange(value)}
                 className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                  sort === opt.value
+                  sort === value
                     ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
                     : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                 }`}
               >
-                {opt.label}
+                {t(SORT_LABEL_KEYS[value])}
               </button>
             ))}
           </div>
@@ -883,10 +901,12 @@ function ProductsPageInner({
 
       <p className="mb-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
         {loading
-          ? "Loading products…"
+          ? t("products.loading")
           : isFetchingNextPage
-            ? "Loading more…"
-            : `Showing ${displayProducts.length} product${displayProducts.length !== 1 ? "s" : ""}`}
+            ? t("products.loadingMore")
+            : displayProducts.length === 1
+              ? t("products.showingOne")
+              : t("products.showing", { count: displayProducts.length })}
       </p>
 
       {error && (
@@ -897,7 +917,7 @@ function ProductsPageInner({
             className="ml-2 font-semibold underline"
             onClick={() => productsQuery.refetch()}
           >
-            Retry
+            {t("common.retry")}
           </button>
         </div>
       )}
@@ -922,16 +942,16 @@ function ProductsPageInner({
               <PackageIcon />
             </div>
             <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
-              {qParam || activeCategory !== "All" ? "No matching products" : "No products yet"}
+              {qParam || activeCategory !== "All" ? t("products.noMatching") : t("products.noYet")}
             </h3>
             <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
               {qParam || activeCategory !== "All"
-                ? "Try another search, category, or widen your area filter."
-                : "When merchants list items, they’ll show up here across every store."}
+                ? t("products.emptyHintFilter")
+                : t("products.emptyHintFresh")}
             </p>
             {searchSuggestions.length > 0 ? (
               <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                <span className="w-full text-[0.7rem] font-medium text-zinc-400">Did you mean?</span>
+                <span className="w-full text-[0.7rem] font-medium text-zinc-400">{t("search.didYouMean")}?</span>
                 {searchSuggestions.map((s) => (
                   <button
                     key={s}

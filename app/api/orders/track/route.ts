@@ -58,10 +58,18 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Strict order ownership: without a signed-in session there is no verifiable
-  // relationship to the order, so guests receive zero rows.
+  // Strict order ownership: guests cannot look up orders by phone/id alone.
+  // Return an explicit needsAuth flag so the UI can show Sign in — not a fake empty list.
   if (!user) {
-    return NextResponse.json({ success: true, orders: [] });
+    return NextResponse.json(
+      {
+        success: false,
+        needsAuth: true,
+        orders: [],
+        error: "Sign in to track your orders. Tracking is available on the same account used at checkout.",
+      },
+      { status: 401 },
+    );
   }
 
   let rows: TrackedOrderRow[] = [];

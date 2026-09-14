@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/sanitization";
+import { getShopHoursSummary } from "@/lib/shopHours";
 import { sendPushToUser } from "@/lib/webPush";
 import { computeVariantPrice } from "@/lib/variantPricing";
 import { isComboUnavailable } from "@/lib/variantMatrix";
@@ -121,7 +122,9 @@ export async function POST(request: Request) {
 
   const { data: shopRaw, error: shopErr } = await admin
     .from("shops")
-    .select("id, owner_id, name, is_live, verification_status, accepts_dine_in")
+    .select(
+      "id, owner_id, name, is_live, verification_status, accepts_dine_in, business_hours, operating_status, shop_schedule",
+    )
     .eq("id", table.shop_id)
     .maybeSingle();
   const shop = shopRaw as {
@@ -131,6 +134,9 @@ export async function POST(request: Request) {
     is_live: boolean;
     verification_status: string | null;
     accepts_dine_in?: boolean | null;
+    business_hours?: string | null;
+    operating_status?: string | null;
+    shop_schedule?: unknown;
   } | null;
   if (shopErr || !shop) {
     return NextResponse.json({ success: false, error: "Shop not found." }, { status: 404 });
@@ -144,6 +150,24 @@ export async function POST(request: Request) {
   if (shop.accepts_dine_in === false) {
     return NextResponse.json(
       { success: false, error: "Dine-in ordering is paused right now. Please ask staff for help." },
+      { status: 409 },
+    );
+  }
+
+  const hours = getShopHoursSummary({
+    business_hours: shop.business_hours,
+    operating_status: shop.operating_status,
+    shop_schedule: shop.shop_schedule,
+    channel: "dine_in",
+  });
+  if (hours.state === "closed") {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          hours.reason ||
+          `Sitting / dine-in is closed right now (${hours.hoursText}).`,
+      },
       { status: 409 },
     );
   }

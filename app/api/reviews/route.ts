@@ -1,6 +1,7 @@
 /* -------------------------------------------------------------------------- */
-/*  POST /api/reviews  — submit a verified customer review (product or shop)  */
-/*  PATCH /api/reviews — shop owner reply                                     */
+/*  POST   /api/reviews — submit verified customer review (product or shop)   */
+/*  PATCH  /api/reviews — shop owner reply                                    */
+/*  DELETE /api/reviews — author deletes own review                           */
 /* -------------------------------------------------------------------------- */
 
 import { createHash } from "crypto";
@@ -469,4 +470,55 @@ export async function PATCH(request: NextRequest) {
   }
 
   return NextResponse.json({ success: true, data: updated });
+}
+
+export async function DELETE(request: NextRequest) {
+  const limited = checkRateLimit(request, { ...RATE_LIMITS.REVIEWS, name: "reviews-delete" });
+  if (!limited.allowed) {
+    const res = buildRateLimitResponse(limited);
+    return NextResponse.json(res.body, { status: res.status, headers: res.headers });
+  }
+
+  let body: { reviewId?: string };
+  try {
+    body = (await request.json()) as { reviewId?: string };
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid request body." }, { status: 400 });
+  }
+
+  const reviewId = typeof body.reviewId === "string" ? body.reviewId.trim() : "";
+  if (!UUID_RE.test(reviewId)) {
+    return NextResponse.json({ success: false, error: "Invalid review." }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ success: false, error: "Sign in required." }, { status: 401 });
+  }
+
+  const { data: review } = await supabase
+    .from("reviews")
+    .select("id, user_id")
+    .eq("id", reviewId)
+    .maybeSingle();
+
+  if (!review) {
+    return NextResponse.json({ success: false, error: "Review not found." }, { status: 404 });
+  }
+  if (review.user_id !== user.id) {
+    return NextResponse.json(
+      { success: false, error: "You can only delete your own review." },
+      { status: 403 },
+    );
+  }
+
+  const { error } = await supabase.from("reviews").delete().eq("id", reviewId).eq("user_id", user.id);
+  if (error) {
+    return NextResponse.json({ success: false, error: "Could not delete review." }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

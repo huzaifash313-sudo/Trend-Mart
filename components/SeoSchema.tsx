@@ -58,6 +58,16 @@ export function LocalBusinessSchema({
   if (shopCategory) {
     // Map trendsmart categories to Schema.org types
     const categoryMap: Record<string, string> = {
+      "Fast Food & Restaurants": "FoodEstablishment",
+      "Cafe & Beverages": "CafeOrCoffeeShop",
+      "Bakery & Sweets": "Bakery",
+      "Grocery & Kiryana": "GroceryStore",
+      "Fruits & Vegetables": "GroceryStore",
+      "Meat & Seafood": "Butcher",
+      "Fashion & Apparel": "ClothingStore",
+      "Electronics & Gadgets": "ElectronicsStore",
+      "Health & Beauty": "HealthAndBeautyBusiness",
+      "Pharmacy & Medical": "Pharmacy",
       Food: "FoodEstablishment",
       Grocery: "GroceryStore",
       Boutique: "ClothingStore",

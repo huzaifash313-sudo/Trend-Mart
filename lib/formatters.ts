@@ -343,11 +343,34 @@ export function truncate(text: string, maxLength = 60): string {
  */
 export function categoryDisplay(category: string): { emoji: string; label: string } {
   const map: Record<string, string> = {
+    "Grocery & Kiryana": "🛒",
+    "Fruits & Vegetables": "🥬",
+    "Meat & Seafood": "🥩",
+    "Bakery & Sweets": "🧁",
+    "Fast Food & Restaurants": "🍔",
+    "Cafe & Beverages": "☕",
+    "Pharmacy & Medical": "💊",
+    "Fashion & Apparel": "👗",
+    "Electronics & Gadgets": "📱",
+    "Home & Living": "🏠",
+    "Health & Beauty": "💄",
+    "Books & Stationery": "📚",
+    "Sports & Fitness": "🏋️",
+    "Toys & Baby Care": "🧸",
+    "Automotive Accessories": "🚗",
+    "Handmade & Crafts": "🎨",
+    "Home Maintenance & Repair": "🔧",
+    "Security & Surveillance": "📹",
+    "Tech & IT Services": "💻",
+    "Personal & Professional Services": "💼",
+    "Others / Universal": "📦",
     Food: "🍔",
     Grocery: "🛒",
     Boutique: "👗",
     Electronics: "📱",
     Cosmetics: "💄",
+    Cafe: "☕",
+    Meat: "🥩",
   };
   return { emoji: map[category] ?? "🏪", label: category };
 }

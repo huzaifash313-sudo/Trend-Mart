@@ -1671,8 +1671,35 @@ async function runAssistantCore(
 ): Promise<AssistantResponse> {
   const localNlu = runLocalNlu(historyResolved);
 
+  // Token saver: skip LLM NLU when local rules / static knowledge already know the answer.
+  const localProductish =
+    localNlu.intent === "product_search" ||
+    localNlu.intent === "shop_search" ||
+    localNlu.intent === "category_browse" ||
+    localNlu.intent === "deals" ||
+    looksLikeProductSearch(historyResolved);
+  const staticLocalIntents = new Set([
+    "greeting",
+    "brand_owner",
+    "policy",
+    "how_it_works",
+    "cart_help",
+    "delivery_help",
+    "order_help",
+    "account_help",
+    "support",
+    "merchant_help",
+    "out_of_scope",
+  ]);
+  const skipLlmNlu =
+    !localProductish &&
+    ((staticLocalIntents.has(localNlu.intent) && localNlu.confidence >= 0.78) ||
+      (matchAppKnowledge(historyResolved, role)?.confidence ?? 0) >=
+        MIN_KNOWLEDGE_CONFIDENCE ||
+      (matchBrandKnowledge(historyResolved, role)?.confidence ?? 0) >= 0.7);
+
   let llmNlu: Awaited<ReturnType<typeof understandWithFreeLlm>> = null;
-  if (hasFreeLlmKey()) {
+  if (hasFreeLlmKey() && !skipLlmNlu) {
     try {
       llmNlu = await Promise.race([
         understandWithFreeLlm(historyResolved, role),

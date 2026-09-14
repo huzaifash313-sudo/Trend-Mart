@@ -266,39 +266,28 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
               className="mx-auto w-full max-w-[300px] bg-white px-2.5 py-3 font-mono text-[11px] leading-snug text-zinc-900 shadow-sm"
               style={{ width: "80mm" }}
             >
-              {/* ── Brand header ─────────────────────────────────────── */}
+              {/* ── Shop branding first (retail slip style) ─────────── */}
               <div className="text-center">
-                <p className="text-[15px] font-bold tracking-tight text-emerald-700">
-                  🛒 TRENDSMART
-                </p>
-                <p className="mt-0.5 text-[8px] uppercase tracking-[0.3em] text-zinc-400">
-                  Order Receipt · Tax Invoice
-                </p>
-              </div>
-
-              <p className="mt-2 text-center">{DASH}</p>
-
-              {/* ── Shop branding ────────────────────────────────────── */}
-              <div className="mt-2 text-center">
                 {shopLogo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={shopLogo}
                     alt={shopBrand}
-                    className="mx-auto mb-1 h-12 w-12 rounded-full object-cover"
+                    className="mx-auto mb-1 h-12 w-12 rounded-md object-cover"
                   />
-                ) : (
-                  <p className="text-base font-bold">{shopBrand}</p>
-                )}
-                {shopLogo ? (
-                  <p className="text-xs font-bold">{shopBrand}</p>
                 ) : null}
+                <p className="text-[15px] font-black uppercase tracking-wide text-zinc-900">
+                  {shopBrand}
+                </p>
                 {shop.location ? (
                   <p className="mt-0.5 text-[10px] text-zinc-600">{shop.location}</p>
                 ) : null}
                 {shop.whatsapp_number ? (
-                  <p className="mt-0.5 text-[10px] text-zinc-600">📞 {shop.whatsapp_number}</p>
+                  <p className="mt-0.5 text-[10px] text-zinc-600">Tel: {shop.whatsapp_number}</p>
                 ) : null}
+                <p className="mt-1 text-[8px] uppercase tracking-[0.25em] text-zinc-400">
+                  Order receipt
+                </p>
               </div>
 
               <p className="mt-2 text-center">{DASH}</p>
@@ -397,11 +386,17 @@ export default function OrderBillModal({ order, shop, onClose }: OrderBillModalP
                 {order.notes ? (
                   <p className="whitespace-pre-wrap break-words text-zinc-700">Note: {order.notes}</p>
                 ) : null}
-                <p className="pt-1 text-[10px] font-semibold text-zinc-700">
+                <p className="pt-1 text-[10px] font-semibold text-zinc-800">
                   Thank you for ordering from {shopBrand}!
                 </p>
+                <p className="pt-2 text-[8px] uppercase tracking-[0.25em] text-zinc-400">
+                  Powered by
+                </p>
+                <p className="text-[11px] font-black tracking-wide text-emerald-700">
+                  TrendsMart
+                </p>
                 <p>
-                  {shop.slug ? `trendsmart.shop/${shop.slug}` : "Powered by TrendsMart"}
+                  {shop.slug ? `trendsmart.shop/${shop.slug}` : "Local shops on TrendsMart"}
                 </p>
                 {printed ? (
                   <p className="text-[8px] text-zinc-400">— Printed via TrendsMart —</p>

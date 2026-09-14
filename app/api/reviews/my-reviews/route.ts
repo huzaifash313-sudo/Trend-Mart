@@ -164,7 +164,10 @@ export async function GET() {
   }
 
   // Enrich product names/images from products table when order JSON is thin
-  const productMeta = new Map<string, { name: string; imageUrl: string | null }>();
+  const productMeta = new Map<
+    string,
+    { name: string; imageUrl: string | null; shortCode: string | null }
+  >();
   const productIds = reviewableProducts.map((p) => p.productId);
   const reviewedProductIdsList = reviews
     .map((r) => r.product_id)
@@ -173,17 +176,19 @@ export async function GET() {
   if (metaIds.length > 0) {
     const { data: products } = await supabase
       .from("products")
-      .select("id, name, title, image_url")
+      .select("id, name, title, image_url, short_code")
       .in("id", metaIds);
     for (const p of (products ?? []) as {
       id: string;
       name: string | null;
       title: string | null;
       image_url: string | null;
+      short_code: string | null;
     }[]) {
       productMeta.set(String(p.id), {
         name: String(p.name || p.title || "Product"),
         imageUrl: p.image_url,
+        shortCode: p.short_code,
       });
     }
   }
@@ -192,6 +197,9 @@ export async function GET() {
     ...r,
     shop_name: shopNames.get(r.shop_id) || "Store",
     product_name: r.product_id ? productMeta.get(r.product_id)?.name ?? null : null,
+    product_short_code: r.product_id
+      ? productMeta.get(r.product_id)?.shortCode ?? null
+      : null,
   }));
 
   const reviewableProductsOut = reviewableProducts.map((p) => {

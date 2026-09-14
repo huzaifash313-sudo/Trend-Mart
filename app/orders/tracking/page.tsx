@@ -14,6 +14,7 @@
 
 import { useState, useCallback, useEffect, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   trackOrdersByPhone,
   trackOrderById,
@@ -26,6 +27,7 @@ import { formatRupees } from "@/lib/formatters";
 import { formatDate, formatRelativeTime } from "@/lib/formatters";
 import { toWhatsAppDigits } from "@/lib/sanitization";
 import CustomerOrderActions from "@/components/CustomerOrderActions";
+import { useLocale } from "@/context/LocaleContext";
 import { createClient } from "@/lib/supabase/client";
 import type { Order } from "@/types";
 
@@ -541,6 +543,7 @@ function OrderCard({
 
 function OrderTrackingInner() {
   const router = useRouter();
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const initialOrderId = searchParams.get("orderId") ?? "";
   const initialPhone = searchParams.get("phone") ?? "";
@@ -570,13 +573,29 @@ function OrderTrackingInner() {
   const [liveUpdatedIds, setLiveUpdatedIds] = useState<Set<string>>(new Set());
   const [liveConnected, setLiveConnected] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     void supabase.auth.getUser().then(({ data }) => {
       setUserId(data.user?.id ?? null);
+      setAuthReady(true);
     });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+      setAuthReady(true);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
+
+  const loginHref = (() => {
+    const params = new URLSearchParams();
+    if (initialOrderId) params.set("orderId", initialOrderId);
+    if (initialPhone) params.set("phone", initialPhone);
+    const q = params.toString();
+    const next = q ? `/orders/tracking?${q}` : "/orders/tracking";
+    return `/login?next=${encodeURIComponent(next)}`;
+  })();
 
   const handleOrderPatch = useCallback((orderId: string, patch: Partial<Order>) => {
     setOrders((prev) =>
@@ -647,8 +666,9 @@ function OrderTrackingInner() {
 
   // ── Search Handlers ──────────────────────────────────────────────────────
 
-  // Auto-search once on mount when deep-linked via ?orderId= or ?phone=
+  // Auto-search once on mount when deep-linked — only after we know the user is signed in
   useEffect(() => {
+    if (!authReady || !userId) return;
     if (initialOrderId) {
       setSearching(true);
       trackOrderById(initialOrderId).then((result) => {
@@ -674,11 +694,15 @@ function OrderTrackingInner() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authReady, userId]);
 
   const handleSearch = useCallback(
     async (e?: FormEvent) => {
       if (e) e.preventDefault();
+      if (!userId) {
+        setError(t("track.signInRequired"));
+        return;
+      }
       setError(null);
       setSearching(true);
 
@@ -732,7 +756,7 @@ function OrderTrackingInner() {
 
       setSearching(false);
     },
-    [searchMode, phone, orderId],
+    [searchMode, phone, orderId, userId, t],
   );
 
   const handleRecentClick = useCallback(
@@ -791,19 +815,43 @@ function OrderTrackingInner() {
           </button>
           <div>
             <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              Track Orders
+              {t("track.title")}
             </h1>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Check your order status in real-time
+              {t("track.subtitle")}
             </p>
           </div>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6 pb-safe-nav">
+        {authReady && !userId ? (
+          <section className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/50 dark:bg-amber-950/30">
+            <h2 className="text-sm font-bold text-amber-950 dark:text-amber-100">
+              {t("track.signInTitle")}
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+              {t("track.signInBody")}
+            </p>
+            <Link
+              href={loginHref}
+              className="mt-4 inline-flex rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500"
+            >
+              {t("track.signInCta")}
+            </Link>
+            <p className="mt-3 text-[11px] text-amber-800/70 dark:text-amber-300/70">
+              {t("track.signInHint")}
+            </p>
+          </section>
+        ) : null}
+
         {/* Search Form */}
         <section className="mb-6">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div
+            className={`rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 ${
+              authReady && !userId ? "pointer-events-none opacity-50" : ""
+            }`}
+          >
             {/* Mode Tabs */}
             <div className="mb-4 flex rounded-full bg-zinc-100 p-1 dark:bg-zinc-800">
               <button
@@ -818,7 +866,7 @@ function OrderTrackingInner() {
                     : "text-zinc-500 dark:text-zinc-400"
                 }`}
               >
-                📱 Phone Number
+                📱 {t("track.tabPhone")}
               </button>
               <button
                 type="button"
@@ -832,7 +880,7 @@ function OrderTrackingInner() {
                     : "text-zinc-500 dark:text-zinc-400"
                 }`}
               >
-                🆔 Order Ref ID
+                🆔 {t("track.tabOrderId")}
               </button>
             </div>
 
@@ -853,7 +901,7 @@ function OrderTrackingInner() {
                       }}
                       placeholder="0300-1234567"
                       className="tm-input w-full py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400/60 dark:text-zinc-100"
-                      aria-label="Enter your phone number"
+                      aria-label={t("track.ariaPhone")}
                     />
                   ) : (
                     <input
@@ -863,9 +911,9 @@ function OrderTrackingInner() {
                         setOrderId(e.target.value);
                         setError(null);
                       }}
-                      placeholder="Order ID"
+                      placeholder={t("track.placeholderOrderId")}
                       className="tm-input w-full py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400/60 dark:text-zinc-100"
-                      aria-label="Enter order reference ID"
+                      aria-label={t("track.ariaOrderId")}
                     />
                   )}
                   {((searchMode === "phone" && phone) ||
@@ -878,7 +926,7 @@ function OrderTrackingInner() {
                         setError(null);
                       }}
                       className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                      aria-label="Clear input"
+                      aria-label={t("track.clear")}
                     >
                       ✕
                     </button>
@@ -891,10 +939,10 @@ function OrderTrackingInner() {
                 >
                   {searching ? (
                     <>
-                      <SpinnerIcon /> Searching
+                      <SpinnerIcon /> {t("track.searching")}
                     </>
                   ) : (
-                    "Track"
+                    t("track.trackBtn")
                   )}
                 </button>
               </div>
@@ -913,7 +961,7 @@ function OrderTrackingInner() {
         {recentSearches.length > 0 && !hasSearched && (
           <section className="mb-6">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Recent Searches
+              {t("track.recentSearches")}
             </p>
             <div className="flex flex-wrap gap-2">
               {recentSearches.map((search) => (
@@ -938,11 +986,13 @@ function OrderTrackingInner() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                      {orders.length} Order{orders.length !== 1 ? "s" : ""} Found
+                      {orders.length === 1
+                        ? t("track.foundOne")
+                        : t("track.foundMany", { n: orders.length })}
                     </h2>
                     {liveConnected && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[0.625rem] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                        Waiting for the shop to update
+                        {t("track.waitingShop")}
                       </span>
                     )}
                   </div>
@@ -955,7 +1005,7 @@ function OrderTrackingInner() {
                     }}
                     className="text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                   >
-                    Clear Results
+                    {t("track.clearResults")}
                   </button>
                 </div>
 
@@ -976,12 +1026,14 @@ function OrderTrackingInner() {
                   <EmptyBoxIcon />
                 </div>
                 <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                  No Orders Found
+                  {t("track.emptyTitle")}
                 </h3>
                 <p className="mt-1 max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
-                  {searchMode === "phone"
-                    ? "We couldn't find any orders linked to this phone number. Make sure you've placed an order with this number."
-                    : "No order matched this reference ID. Please double-check and try again."}
+                  {!userId
+                    ? t("track.emptySignIn")
+                    : searchMode === "phone"
+                      ? t("track.emptyPhone")
+                      : t("track.emptyOrderId")}
                 </p>
                 <button
                   type="button"
@@ -992,7 +1044,7 @@ function OrderTrackingInner() {
                   }}
                   className="mt-6 rounded-full bg-zinc-200 px-6 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                 >
-                  Try Again
+                  {t("track.tryAgain")}
                 </button>
               </div>
             )}
@@ -1006,16 +1058,15 @@ function OrderTrackingInner() {
               <PackageIcon />
             </div>
             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              Track Your Order
+              {t("track.emptyPromptTitle")}
             </h2>
             <p className="mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-              Enter your phone number or order reference ID. Status stays Pending
-              until the shop updates it in their dashboard — this page is not a
-              live GPS tracker.
+              {t("track.emptyPromptBody")}
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3 text-xs text-zinc-400 dark:text-zinc-500">
               <span className="flex items-center gap-1">
-                📋 Pending → ⚙️ Processing → 🚚 Dispatched → ✅ Delivered
+                📋 {t("orders.status.Pending")} → ⚙️ {t("orders.status.Processing")} → 🚚{" "}
+                {t("orders.status.Dispatched")} → ✅ {t("orders.status.Delivered")}
               </span>
             </div>
           </section>

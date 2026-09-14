@@ -7,11 +7,29 @@ import { withTimeout } from "@/lib/withTimeout";
 
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
+/** Cloudflare always-pass test secret — pairs with 1x00000000000000000000AA */
+const CF_DEV_SECRET = "1x0000000000000000000000000000000AA";
+
 export { getTurnstileSiteKey, isTurnstileUiEnabled } from "@/lib/turnstilePublic";
+
+function useDevTurnstileKeys(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  return (
+    process.env.TURNSTILE_FORCE_PROD !== "true" &&
+    process.env.NEXT_PUBLIC_TURNSTILE_FORCE_PROD !== "true"
+  );
+}
+
+function getTurnstileSecret(): string | null {
+  const configured = process.env.TURNSTILE_SECRET_KEY?.trim();
+  if (!configured) return null;
+  if (useDevTurnstileKeys()) return CF_DEV_SECRET;
+  return configured;
+}
 
 /** Server: enforce captcha when secret+site key are set; in production fail closed if half-configured. */
 export function isTurnstileEnforced(): boolean {
-  const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
+  const secret = getTurnstileSecret();
   const siteKey = getTurnstileSiteKey();
   return Boolean(secret && siteKey);
 }
@@ -20,7 +38,7 @@ export function isTurnstileEnforced(): boolean {
 export function isTurnstileMisconfiguredInProduction(): boolean {
   if (process.env.NODE_ENV !== "production") return false;
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
-  const siteKey = getTurnstileSiteKey();
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim();
   // Soft-launch: only fail closed if one side is set without the other.
   return Boolean((secret && !siteKey) || (!secret && siteKey));
 }
@@ -57,7 +75,7 @@ export async function verifyTurnstileToken(
     };
   }
 
-  const secret = process.env.TURNSTILE_SECRET_KEY!.trim();
+  const secret = getTurnstileSecret()!;
   const body = new URLSearchParams({
     secret,
     response: trimmed,

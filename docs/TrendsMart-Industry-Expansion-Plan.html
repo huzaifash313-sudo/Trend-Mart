@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrendsMart — Industry Expansion Plan</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      line-height: 1.45;
+      color: #14201c;
+      background: #f6faf8;
+      margin: 0;
+      padding: 16px;
+      font-size: 14px;
+    }
+    .sheet {
+      max-width: 720px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      padding: 22px 20px 28px;
+      box-shadow: 0 8px 28px rgba(15, 60, 45, 0.08);
+    }
+    h1 {
+      font-size: 1.45rem;
+      margin: 0 0 6px;
+      color: #0f3d32;
+      line-height: 1.25;
+    }
+    .tag {
+      display: inline-block;
+      background: #d1fae5;
+      color: #065f46;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+    .lead {
+      color: #3f5a52;
+      margin: 0 0 16px;
+      font-size: 0.95rem;
+    }
+    h2 {
+      font-size: 1.05rem;
+      margin: 22px 0 8px;
+      color: #0b5c4a;
+      border-bottom: 2px solid #a7f3d0;
+      padding-bottom: 4px;
+    }
+    h3 {
+      font-size: 0.95rem;
+      margin: 14px 0 6px;
+      color: #134e4a;
+    }
+    p, li { margin: 0 0 8px; }
+    ul { padding-left: 1.15rem; margin: 0 0 10px; }
+    .box {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin: 10px 0 14px;
+    }
+    .box strong { color: #065f46; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 8px 0 14px;
+    }
+    th, td {
+      border: 1px solid #d1e7df;
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #d1fae5; color: #064e3b; }
+    .muted { color: #5b7169; font-size: 0.82rem; }
+    .footer {
+      margin-top: 22px;
+      padding-top: 12px;
+      border-top: 1px solid #d1e7df;
+      color: #5b7169;
+      font-size: 0.78rem;
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .sheet { box-shadow: none; border-radius: 0; padding: 0; max-width: none; }
+      .noprint { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="noprint muted" style="margin-bottom:12px">
+      Phone tip: Chrome/Edge → Share / Print → Save as PDF, phir WhatsApp pe bhejo.
+      Ya neeche wala ready PDF use karo.
+    </div>
+
+    <div class="tag">TrendsMart Roadmap</div>
+    <h1>Industry-Level Local Commerce OS</h1>
+    <p class="lead">
+      Sirf delivery app nahi — qareebi business ka full operating system:
+      order, visit, sit, book, experience. Har category apni business logic ke mutabiq.
+    </p>
+    <p class="muted">Tagline: Har qareebi business — order, visit, sit, book.</p>
+
+    <h2>1. Vision</h2>
+    <div class="box">
+      <strong>Aaj:</strong> Hyper-local multi-vendor + WhatsApp orders (delivery-heavy).<br />
+      <strong>Kal:</strong> Local Commerce OS — delivery, pickup, sitting, store info, booking, experience — ek hi app.
+    </div>
+    <ul>
+      <li>Customer order kare (delivery / pickup)</li>
+      <li>Baith ke khaye (sitting / table QR)</li>
+      <li>Sirf info / discovery (hours, menu, portfolio, map)</li>
+      <li>Experience (cafe, salon booking, repair visit, event / watching)</li>
+      <li>Merchant apni category ke hisaab se modules use kare</li>
+    </ul>
+    <p><strong>Principle:</strong> Platform = shared rails. Category = plug-in business pack. Har shop modes on/off kare.</p>
+
+    <h2>2. Shop Capability Modes</h2>
+    <table>
+      <thead>
+        <tr><th>Mode</th><th>Customer</th><th>Merchant tools</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Delivery</td><td>Ghar pe receive</td><td>Radius, fees, slabs, rider note</td></tr>
+        <tr><td>Pickup</td><td>Counter collect</td><td>Ready-in-X mins, pickup slot</td></tr>
+        <tr><td>Sitting</td><td>Table order</td><td>QR tables, kitchen board</td></tr>
+        <tr><td>Info / Discovery</td><td>Hours, menu, map — no order</td><td>Rich profile, stories, gallery</td></tr>
+        <tr><td>Book / Visit</td><td>Appointment / call-out</td><td>Slots, packages, deposit via WA</td></tr>
+        <tr><td>Experience</td><td>Sit &amp; stay / watch / event</td><td>Capacity, cover, showtimes</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. Phase 0 — Foundation (pehle yeh)</h2>
+    <ul>
+      <li>Category themes align (purane Food/Boutique names → naye categories)</li>
+      <li>Modes = source of truth (delivery / pickup / sitting / book…)</li>
+      <li>Service shops auto shop_type=service</li>
+      <li>Sitting: Fast Food ke ilawa Bakery/cafe expand</li>
+      <li>Ek schedule engine (store + delivery + pickup + sitting)</li>
+      <li>Register intent: Products / Food / Services / Venue</li>
+    </ul>
+
+    <h2>4. Universal Rails (har category)</h2>
+    <ol>
+      <li>Multi-mode header chips: Delivery · Pickup · Sitting · Book · Open · Distance</li>
+      <li>Trust: verified, license/NTN optional, hygiene / warranty badges</li>
+      <li>Digital store passport: shop QR, table QR, deal QR, share card</li>
+      <li>Live hours brain: channel hours, emergency close, busy/quiet</li>
+      <li>Order lifecycle: Pending → Confirmed → Preparing → Ready/Out → Done</li>
+      <li>SME / city analytics (baad mein govt-friendly)</li>
+      <li>Urdu-first + large fonts + low-bandwidth images</li>
+      <li>TrendBot: category-aware, real catalog — prices invent nahi</li>
+      <li>Safety: report shop, Rx path, underage blocks</li>
+      <li>PWA offline: menu/hours weak signal pe</li>
+    </ol>
+
+    <h2>5. Category Business Packs</h2>
+
+    <h3>A. Daily essentials</h3>
+    <p class="muted">Grocery · Fruits · Bakery · Pharmacy</p>
+    <ul>
+      <li>Must: kg/dozen units, substitute item, pharmacy Rx upload, freshness, morning-bake slots</li>
+      <li>Modes: Delivery + Pickup; Bakery → light sitting</li>
+      <li>Wow: weekly rashta list, cold-chain badge, pharmacy expiry alerts</li>
+    </ul>
+
+    <h3>B. Food &amp; hospitality</h3>
+    <p class="muted">Fast Food &amp; Restaurants (+ later Cafe)</p>
+    <ul>
+      <li>Must: full sitting, kitchen KDS, table QR, spice, combos</li>
+      <li>Modes: Delivery + Pickup + Sitting</li>
+      <li>Wow: table wait time, group bill note, hygiene score, festival thali</li>
+    </ul>
+
+    <h3>C. Fashion &amp; lifestyle</h3>
+    <p class="muted">Fashion · Beauty · Handmade · Toys · Sports</p>
+    <ul>
+      <li>Must: size/color (simple), exchange policy, lookbook, salon/boutique appointment</li>
+      <li>Modes: Pickup + Info + Book; Delivery for ready wear</li>
+      <li>Wow: same-day mall pickup, tailor measurement card</li>
+    </ul>
+
+    <h3>D. Hard goods</h3>
+    <p class="muted">Electronics · Home · Books · Automotive · Others</p>
+    <ul>
+      <li>Must: warranty, IMEI optional, install add-on, short specs</li>
+      <li>Modes: Delivery + Pickup + Book (install)</li>
+      <li>Wow: genuine-parts badge, nearby repair shop link</li>
+    </ul>
+
+    <h3>E. Home &amp; field services</h3>
+    <p class="muted">Maintenance · Security/CCTV · Tech &amp; IT · Personal services</p>
+    <ul>
+      <li>Must: job tickets, before/after photos, call-out fee, service radius, emergency slot</li>
+      <li>Modes: Book / Visit primary (plumbing “delivery” nahi)</li>
+      <li>Wow: technician ETA, CCTV survey checklist, salon queue, tutoring recurring</li>
+    </ul>
+
+    <h3>F. New verticals (baad mein)</h3>
+    <ul>
+      <li>Cafe &amp; Desserts · Events &amp; Banquet · Coaching · Gym</li>
+      <li>Entertainment / Viewing (“watching”: match screening, seat QR)</li>
+      <li>Agri / Dairy micro</li>
+    </ul>
+    <p class="muted">“Watching” = Experience mode (sports cafe / hall) — CCTV category alag hai.</p>
+
+    <h2>6. Award / Govt-level differentiators</h2>
+    <ol>
+      <li>SME Digitalization Index (city-wise digital shops)</li>
+      <li>Structured WhatsApp commerce (status + receipts, card force nahi)</li>
+      <li>Hyperlocal truth: GPS + radius + channel hours</li>
+      <li>Multi-modal one shop (lunch sitting, night delivery)</li>
+      <li>Category OS packs (plumber ≠ pharmacy form)</li>
+      <li>Citizen safety + verified shops</li>
+      <li>Youth employment layer (optional later)</li>
+      <li>Open-hours map for city / tourism</li>
+      <li>Urdu AI shop assistant (grounded data)</li>
+      <li>PWA — Play Store ke bina merchant install</li>
+    </ol>
+
+    <h2>7. Roadmap Phases</h2>
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>Time</th><th>Focus</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0 Foundation</td><td>Pehle</td><td>Themes, modes, schedules, service type</td></tr>
+        <tr><td>1 Soft-launch</td><td>4–6 weeks</td><td>Mode chips, order status, sitting expand, trust badges</td></tr>
+        <tr><td>2 Packs v1</td><td>6–14 weeks</td><td>Grocery units, Rx, variants, job tickets, booking</td></tr>
+        <tr><td>3 Experience</td><td>3–5 months</td><td>Venue/watching, kitchen scale, busy signals</td></tr>
+        <tr><td>4 Institutional</td><td>6–12 months</td><td>Payments optional, city analytics, new packs, licenses</td></tr>
+      </tbody>
+    </table>
+
+    <h2>8. Monetization</h2>
+    <ul>
+      <li>Merchant subscription</li>
+      <li>Sponsored ads / spotlight</li>
+      <li>Pack upgrades (Kitchen Pro, Booking Pro)</li>
+      <li>Verified badge (optional, transparent)</li>
+      <li>Product payment escrow abhi force mat karo — pehle compliance</li>
+    </ul>
+
+    <h2>9. Success metrics</h2>
+    <ul>
+      <li>% shops with 2+ modes</li>
+      <li>Pickup + sitting share vs delivery-only</li>
+      <li>Time-to-first-product (new merchant)</li>
+      <li>Order completion (WA confirm → done)</li>
+      <li>Active SMEs / city; youth merchants</li>
+      <li>Complaint rate / trust score</li>
+    </ul>
+
+    <h2>10. Abhi non-goals</h2>
+    <ul>
+      <li>Full payment escrow marketplace</li>
+      <li>Nation-wide logistics fleet</li>
+      <li>Social / reels clone</li>
+      <li>Open-domain entertainment AI</li>
+    </ul>
+    <div class="box">
+      <strong>Rule:</strong> Pehle Local Commerce OS jeeto — phir naye verticals add karo.
+    </div>
+
+    <div class="footer">
+      TrendsMart — Industry Expansion Plan · Soft-launch → Industry OS<br />
+      Internal roadmap document · Share on WhatsApp / mobile OK
+    </div>
+  </div>
+</body>
+</html>

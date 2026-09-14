@@ -6,6 +6,7 @@ import Image from "next/image";
 import { getRecentlyViewed, type RecentlyViewedItem } from "@/lib/behavior";
 import { getSafeImageUrl } from "@/services/storageService";
 import { useMyShop } from "@/lib/queries";
+import { useLocale } from "@/context/LocaleContext";
 
 function ClockIcon() {
   return (
@@ -61,6 +62,7 @@ function timeAgo(ts: number): string {
 }
 
 export default function RecentlyViewedPage() {
+  const { t } = useLocale();
   const [items, setItems] = useState<RecentlyViewedItem[]>([]);
   const [ready, setReady] = useState(false);
   const [scopeVersion, setScopeVersion] = useState(0);
@@ -93,11 +95,13 @@ export default function RecentlyViewedPage() {
             <span className="text-teal-600 dark:text-teal-400">
               <ClockIcon />
             </span>
-            <h1 className="tm-section-title">Recently viewed</h1>
+            <h1 className="tm-section-title">{t("recently.title")}</h1>
           </div>
           {ready && items.length > 0 ? (
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              {items.length} item{items.length !== 1 ? "s" : ""} · pick up where you left off
+              {items.length === 1
+                ? t("recently.countOne")
+                : t("recently.count", { count: items.length })}
             </p>
           ) : null}
         </div>
@@ -124,16 +128,16 @@ export default function RecentlyViewedPage() {
             <ClockIcon />
           </div>
           <h2 className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
-            No recently viewed items
+            {t("recently.empty")}
           </h2>
           <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Browse products and they will show up here so you can jump back quickly.
+            {t("recently.emptyHint")}
           </p>
           <Link
             href="/products"
             className="tm-btn-primary mt-5 inline-flex rounded-full px-4 py-2 text-xs font-semibold"
           >
-            Browse products
+            {t("recently.browse")}
           </Link>
         </div>
       ) : (

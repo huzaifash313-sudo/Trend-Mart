@@ -190,12 +190,39 @@ function cleanupRateLimits(): void {
 
 // ─── Fetch Reviews ───────────────────────────────────────────────────────────
 
+function mapReviewRow(row: Record<string, unknown>): Review {
+  const productJoin = row.products as
+    | { name?: string; short_code?: string | null }
+    | null
+    | undefined;
+  return {
+    id: String(row.id),
+    shop_id: String(row.shop_id),
+    product_id: (row.product_id as string | null) ?? null,
+    product_name:
+      (typeof productJoin?.name === "string" && productJoin.name) ||
+      (typeof row.product_name === "string" ? row.product_name : null),
+    product_short_code:
+      (typeof productJoin?.short_code === "string" && productJoin.short_code) ||
+      (typeof row.product_short_code === "string" ? row.product_short_code : null),
+    customer_name: sanitizeCustomerName(String(row.customer_name ?? "")),
+    comment: sanitizeReviewComment(String(row.comment ?? "")),
+    merchant_reply: row.merchant_reply
+      ? sanitizeReviewComment(String(row.merchant_reply))
+      : "",
+    merchant_reply_at: (row.merchant_reply_at as string | null) ?? null,
+    rating: sanitizeRating(row.rating) ?? (Number(row.rating) || 0),
+    created_at: (row.created_at as string | undefined) ?? undefined,
+    user_id: (row.user_id as string | null) ?? null,
+    verified_purchase: row.verified_purchase === true,
+  };
+}
+
+const REVIEW_SELECT =
+  "id, shop_id, product_id, customer_name, rating, comment, created_at, user_id, merchant_reply, merchant_reply_at, verified_purchase, products(name, short_code)";
+
 /**
- * Fetch all reviews for a given shop, newest first.
- *
- * PROMPT 3: Returns sanitized review data. Comment and name are sanitized
- * server-side (via the database) but we apply a second sanitization pass
- * client-side as defense-in-depth.
+ * Fetch all reviews for a given shop, newest first (product + shop-only).
  */
 export async function fetchReviewsByShopId(
   shopId: string,
@@ -210,26 +237,87 @@ export async function fetchReviewsByShopId(
   try {
     const { data, error } = await supabase
       .from("reviews")
-      .select("id, shop_id, customer_name, rating, comment, created_at, user_id, merchant_reply, merchant_reply_at, verified_purchase")
+      .select(REVIEW_SELECT)
       .eq("shop_id", sanitizedShopId)
       .order("created_at", { ascending: false })
       .limit(200);
 
     if (error) throw error;
 
-    const reviews = (data as Review[]) ?? [];
-    const sanitizedReviews = reviews.map((review) => ({
-      ...review,
-      customer_name: sanitizeCustomerName(review.customer_name),
-      comment: sanitizeReviewComment(review.comment),
-      merchant_reply: review.merchant_reply ? sanitizeReviewComment(review.merchant_reply) : "",
-      rating: sanitizeRating(review.rating) ?? review.rating,
-    }));
-
-    return { success: true, data: sanitizedReviews };
+    const reviews = ((data as Record<string, unknown>[]) ?? []).map(mapReviewRow);
+    return { success: true, data: reviews };
   } catch (err) {
-    logError(err, { module: "reviewService.fetchReviewsByShopId", meta: { shopId: sanitizedShopId } });
-    return { success: false, error: toError(err) };
+    // Fallback without join if FK name differs on older DBs
+    try {
+      const { data, error } = await supabase
+        .from("reviews")
+        .select(
+          "id, shop_id, product_id, customer_name, rating, comment, created_at, user_id, merchant_reply, merchant_reply_at, verified_purchase",
+        )
+        .eq("shop_id", sanitizedShopId)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return {
+        success: true,
+        data: ((data as Record<string, unknown>[]) ?? []).map(mapReviewRow),
+      };
+    } catch (err2) {
+      logError(err2, {
+        module: "reviewService.fetchReviewsByShopId",
+        meta: { shopId: sanitizedShopId },
+      });
+      return { success: false, error: toError(err2) };
+    }
+  }
+}
+
+/**
+ * Fetch reviews for one product (public, newest first).
+ */
+export async function fetchReviewsByProductId(
+  productId: string,
+): Promise<ServiceResult<Review[]>> {
+  const id =
+    productId && /^[0-9a-f-]{36}$/i.test(productId.trim()) ? productId.trim() : "";
+  if (!id) return { success: false, error: "Invalid product ID." };
+
+  const supabase = createClient();
+  try {
+    const { data, error } = await supabase
+      .from("reviews")
+      .select(REVIEW_SELECT)
+      .eq("product_id", id)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+    return {
+      success: true,
+      data: ((data as Record<string, unknown>[]) ?? []).map(mapReviewRow),
+    };
+  } catch (err) {
+    try {
+      const { data, error } = await supabase
+        .from("reviews")
+        .select(
+          "id, shop_id, product_id, customer_name, rating, comment, created_at, user_id, merchant_reply, merchant_reply_at, verified_purchase",
+        )
+        .eq("product_id", id)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return {
+        success: true,
+        data: ((data as Record<string, unknown>[]) ?? []).map(mapReviewRow),
+      };
+    } catch (err2) {
+      logError(err2, {
+        module: "reviewService.fetchReviewsByProductId",
+        meta: { productId: id },
+      });
+      return { success: false, error: toError(err2) };
+    }
   }
 }
 
@@ -428,11 +516,12 @@ export async function fetchReviewSessionContext(
       .select("id")
       .eq("shop_id", sanitizedShopId)
       .eq("user_id", user.id)
+      .is("product_id", null)
       .maybeSingle();
 
     // STRICT ACCOUNT SCOPE: only the exact account that received a delivered
-    // order from this shop (customer_user_id match) may leave a review. No
-    // phone fallback — another account on the same device is never eligible.
+    // order from this shop (customer_user_id match) may leave a shop-level review.
+    // Product reviews do NOT block the overall shop review (separate unique keys).
     const { data: deliveredOrder } = await supabase
       .from("orders")
       .select("id")
@@ -553,9 +642,7 @@ export function computeRatingStats(reviews: Review[]) {
 // ─── Delete Review ───────────────────────────────────────────────────────────
 
 /**
- * Delete a review by ID. Only the review author or shop owner can delete.
- *
- * PROMPT 3: Validates review ID format.
+ * Delete own review (author only). Triggers recalculate shop/product aggregates.
  */
 export async function deleteReview(reviewId: string): Promise<ServiceResult<null>> {
   if (!reviewId || typeof reviewId !== "string") {
@@ -567,14 +654,16 @@ export async function deleteReview(reviewId: string): Promise<ServiceResult<null
     return { success: false, error: "Invalid review ID format." };
   }
 
-  const supabase = createClient();
   try {
-    const { error } = await supabase
-      .from("reviews")
-      .delete()
-      .eq("id", sanitizedReviewId);
-
-    if (error) throw error;
+    const res = await fetch("/api/reviews", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reviewId: sanitizedReviewId }),
+    });
+    const payload = (await res.json()) as { success?: boolean; error?: string };
+    if (!res.ok || !payload.success) {
+      return { success: false, error: payload.error || "Could not delete review." };
+    }
     return { success: true, data: null };
   } catch (err) {
     logError(err, { module: "reviewService.deleteReview", meta: { reviewId: sanitizedReviewId } });

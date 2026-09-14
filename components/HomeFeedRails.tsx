@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
+import { useLocale } from "@/context/LocaleContext";
 import { isDealActiveOnDate, toPkDateKey, type ShopDeal } from "@/lib/dealSchedule";
 import { dealCommerceId } from "@/lib/dealCommerce";
 import { getDealImages } from "@/lib/productImages";
@@ -29,6 +30,7 @@ import { formatPrice, getProductDiscount } from "@/lib/formatters";
 import { shouldSkipHeavyMedia } from "@/lib/mobilePerf";
 import { useMarketplaceProducts } from "@/lib/queries";
 import { trackProductView, trackCategoryInterest } from "@/lib/behavior";
+import { personalizeForYouFeed } from "@/lib/personalizeFeed";
 import { logProductClick } from "@/services/analyticsService";
 import { dealToProduct } from "@/lib/dealCommerce";
 import { getProductSeoPath } from "@/lib/seo/productSlug";
@@ -146,6 +148,7 @@ function MiniTile({
             loading="lazy"
             quality={PRODUCT_CARD_IMAGE_QUALITY}
             unoptimized
+            className="object-cover object-center"
             onError={() => setImgError(true)}
           />
         ) : (
@@ -293,7 +296,9 @@ interface DealsRailProps {
   slot?: number;
 }
 
-function DealsRailInner({ deals, title = "Top Deals", moreHref = "/deals", slot = 0 }: DealsRailProps) {
+function DealsRailInner({ deals, title, moreHref = "/deals", slot = 0 }: DealsRailProps) {
+  const { t } = useLocale();
+  const railTitle = title ?? t("home.topDeals");
   const visible = useMemo(() => {
     const today = toPkDateKey();
     const live = deals.filter(
@@ -340,8 +345,8 @@ function DealsRailInner({ deals, title = "Top Deals", moreHref = "/deals", slot 
   if (visible.length === 0) return null;
 
   return (
-    <section aria-label={title} className="tm-rail">
-      <RailHeading icon={<span aria-hidden>🏷️</span>} title={title} moreLabel="More deals" moreHref={moreHref} />
+    <section aria-label={railTitle} className="tm-rail">
+      <RailHeading icon={<span aria-hidden>🏷️</span>} title={railTitle} moreLabel={t("home.moreDeals")} moreHref={moreHref} />
       <div className="tm-mini-grid" ref={railRef}>
         {visible.map((deal) => {
           const product = dealToProduct(deal);
@@ -391,11 +396,13 @@ interface ProductsRailProps {
 
 function ProductsRailInner({
   myShopId,
-  title = "For You",
+  title,
   moreHref = "/products",
   slot = 0,
   excludeProductIds,
 }: ProductsRailProps) {
+  const { t } = useLocale();
+  const railTitle = title ?? t("home.forYou");
   // "for_you" uses the personalization engine (behavior signals + shop diversity)
   // so the shelf adapts to each user's browsing/wishlist category affinity.
   const productsQuery = useMarketplaceProducts({
@@ -410,12 +417,14 @@ function ProductsRailInner({
     );
     if (all.length === 0) return all;
 
+    // Local affinity + demote ignored recently-viewed before daily window.
+    let ordered = personalizeForYouFeed(all);
+
     // Deals already shown on this page go to the back of the queue.
-    let ordered = all;
     if (excludeProductIds && excludeProductIds.size > 0) {
-      const kept = all.filter((p) => !excludeProductIds.has(p.id));
-      const dup = all.filter((p) => excludeProductIds.has(p.id));
-      ordered = kept.length > 0 ? [...kept, ...dup] : all;
+      const kept = ordered.filter((p) => !excludeProductIds.has(p.id));
+      const dup = ordered.filter((p) => excludeProductIds.has(p.id));
+      ordered = kept.length > 0 ? [...kept, ...dup] : ordered;
     }
 
     // Daily rotation: shift the window by the day-of-year (PKT) × 3 so the
@@ -429,8 +438,8 @@ function ProductsRailInner({
   if (productsQuery.isLoading || products.length === 0) return null;
 
   return (
-    <section aria-label={title} className="tm-rail">
-      <RailHeading icon={<span aria-hidden>✨</span>} title={title} moreLabel="More products" moreHref={moreHref} />
+    <section aria-label={railTitle} className="tm-rail">
+      <RailHeading icon={<span aria-hidden>✨</span>} title={railTitle} moreLabel={t("home.moreProducts")} moreHref={moreHref} />
       <div className="tm-mini-grid" ref={railRef}>
         {products.map((product) => {
           const discount = getProductDiscount(product);

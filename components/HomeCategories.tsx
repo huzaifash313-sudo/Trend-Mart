@@ -21,7 +21,7 @@ import { CATEGORY_GRADIENTS, CATEGORY_ICONS } from "@/types";
 const ALL_GRADIENT = "from-teal-400 via-emerald-500 to-green-600";
 const DEFAULT_GRADIENT = "from-gray-400 to-zinc-500";
 
-const MAX_TILES = 10;
+const MAX_TILES = 12;
 
 /**
  * Short display names for category tiles — long names get truncated at small
@@ -29,6 +29,8 @@ const MAX_TILES = 10;
  */
 const SHORT_CATEGORY_NAMES: Record<string, string> = {
   "Fast Food & Restaurants": "Fast Food",
+  "Cafe & Beverages": "Cafe",
+  "Meat & Seafood": "Meat",
   "Electronics & Gadgets": "Electronics",
   "Health & Beauty": "Beauty",
   "Home & Living": "Home",
@@ -41,6 +43,11 @@ const SHORT_CATEGORY_NAMES: Record<string, string> = {
   "Automotive Accessories": "Auto",
   "Toys & Baby Care": "Kids",
   "Handmade & Crafts": "Crafts",
+  "Home Maintenance & Repair": "Repair",
+  "Security & Surveillance": "CCTV",
+  "Tech & IT Services": "IT",
+  "Personal & Professional Services": "Services",
+  "Books & Stationery": "Books",
   "Others / Universal": "Others",
 };
 

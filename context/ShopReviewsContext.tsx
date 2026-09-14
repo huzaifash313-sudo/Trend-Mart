@@ -12,6 +12,7 @@ import ShopReviewsModal from "@/components/ShopReviewsModal";
 export interface ShopReviewsTarget {
   id: string;
   name: string;
+  ownerId?: string | null;
 }
 
 interface ShopReviewsContextValue {
@@ -32,7 +33,11 @@ export function ShopReviewsProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<ShopReviewsTarget | null>(null);
 
   const openShopReviews = useCallback((shop: ShopReviewsTarget) => {
-    setTarget({ id: shop.id, name: shop.name });
+    setTarget({
+      id: shop.id,
+      name: shop.name,
+      ownerId: shop.ownerId ?? null,
+    });
   }, []);
 
   const close = useCallback(() => setTarget(null), []);
@@ -40,7 +45,12 @@ export function ShopReviewsProvider({ children }: { children: ReactNode }) {
   return (
     <ShopReviewsContext.Provider value={{ openShopReviews }}>
       {children}
-      {target ? <ShopReviewsModal shop={target} onClose={close} /> : null}
+      {target ? (
+        <ShopReviewsModal
+          shop={{ id: target.id, name: target.name, ownerId: target.ownerId }}
+          onClose={close}
+        />
+      ) : null}
     </ShopReviewsContext.Provider>
   );
 }

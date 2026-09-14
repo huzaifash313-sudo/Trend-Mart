@@ -1,4 +1,4 @@
-﻿-- TrendsMart SQL part file — run in order in Supabase SQL Editor
+-- TrendsMart SQL part file — run in order in Supabase SQL Editor
 -- If 'Failed to fetch (api.supabase.com)' appears: wait 10s, re-run THIS part only, or try another browser / disable VPN.
 
 -- #############################################################################
@@ -51,8 +51,10 @@ BEGIN
     SELECT unnest(ARRAY[
       'Grocery & Kiryana',
       'Fruits & Vegetables',
+      'Meat & Seafood',
       'Bakery & Sweets',
       'Fast Food & Restaurants',
+      'Cafe & Beverages',
       'Pharmacy & Medical',
       'Fashion & Apparel',
       'Electronics & Gadgets',
@@ -89,35 +91,58 @@ END $$;
 -- Local retail (Pakistan)
 INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES
   ('Grocery & Kiryana', 'Dry Goods & Spices', 'dry-goods-spices', 'Atta, daal, rice, masala, and pantry staples', '🫙', 1),
-  ('Grocery & Kiryana', 'Dairy & Eggs', 'dairy-eggs', 'Milk, yogurt, cheese, and eggs', '🥛', 2),
-  ('Grocery & Kiryana', 'Snacks & Beverages', 'snacks-beverages', 'Chips, biscuits, juices, and soft drinks', '🧃', 3),
-  ('Grocery & Kiryana', 'Household Essentials', 'household-essentials', 'Cleaning, toiletries, and daily-use items', '🧴', 4),
-  ('Grocery & Kiryana', 'Frozen & Packaged', 'frozen-packaged', 'Frozen foods and packaged convenience items', '🧊', 5)
+  ('Grocery & Kiryana', 'Oil, Ghee & Butter', 'oil-ghee-butter', 'Cooking oil, desi ghee, and spreads', '🫒', 2),
+  ('Grocery & Kiryana', 'Dairy & Eggs', 'dairy-eggs', 'Milk, yogurt, cheese, and eggs', '🥛', 3),
+  ('Grocery & Kiryana', 'Tea, Coffee & Breakfast', 'tea-coffee-breakfast', 'Chai, coffee, cereals, and breakfast items', '☕', 4),
+  ('Grocery & Kiryana', 'Snacks & Beverages', 'snacks-beverages', 'Chips, biscuits, juices, and soft drinks', '🧃', 5),
+  ('Grocery & Kiryana', 'Household Essentials', 'household-essentials', 'Cleaning, toiletries, and daily-use items', '🧴', 6),
+  ('Grocery & Kiryana', 'Frozen & Packaged', 'frozen-packaged', 'Frozen foods and packaged convenience items', '🧊', 7),
+  ('Grocery & Kiryana', 'Baby & Pet Food', 'baby-pet-food', 'Formula, baby food, and pet groceries', '🍼', 8)
 ON CONFLICT (category, slug) DO NOTHING;
 
 INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES
   ('Fruits & Vegetables', 'Seasonal Fruits', 'seasonal-fruits', 'Fresh seasonal fruit by the kilo', '🍎', 1),
   ('Fruits & Vegetables', 'Fresh Vegetables', 'fresh-vegetables', 'Daily sabzi and leafy greens', '🥦', 2),
   ('Fruits & Vegetables', 'Herbs & Roots', 'herbs-roots', 'Adrak, lehsan, pudina, and kitchen herbs', '🌿', 3),
-  ('Fruits & Vegetables', 'Exotic & Imported', 'exotic-imported', 'Imported and specialty produce', '🥑', 4)
+  ('Fruits & Vegetables', 'Exotic & Imported', 'exotic-imported', 'Imported and specialty produce', '🥑', 4),
+  ('Fruits & Vegetables', 'Cut & Ready Packs', 'cut-ready-packs', 'Peeled, cut, and ready-to-cook packs', '🥗', 5)
+ON CONFLICT (category, slug) DO NOTHING;
+
+INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES
+  ('Meat & Seafood', 'Chicken', 'chicken', 'Fresh and cut chicken', '🍗', 1),
+  ('Meat & Seafood', 'Mutton & Beef', 'mutton-beef', 'Mutton, beef, and goat cuts', '🥩', 2),
+  ('Meat & Seafood', 'Fish & Seafood', 'fish-seafood', 'Fish, prawns, and seafood', '🐟', 3),
+  ('Meat & Seafood', 'Frozen Meat', 'frozen-meat', 'Frozen meat packs and kebabs', '🧊', 4),
+  ('Meat & Seafood', 'Marinated & Ready', 'marinated-ready', 'Marinated tikka, boti, and BBQ packs', '🔥', 5)
 ON CONFLICT (category, slug) DO NOTHING;
 
 INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES
   ('Bakery & Sweets', 'Bread & Buns', 'bread-buns', 'Fresh bread, rusk, and bakery buns', '🍞', 1),
   ('Bakery & Sweets', 'Cakes & Pastries', 'cakes-pastries', 'Birthday cakes, cupcakes, and pastries', '🎂', 2),
   ('Bakery & Sweets', 'Mithai & Traditional', 'mithai-traditional', 'Gulab jamun, barfi, jalebi, and mithai boxes', '🍬', 3),
-  ('Bakery & Sweets', 'Cookies & Desserts', 'cookies-desserts', 'Cookies, brownies, and sweet treats', '🍪', 4)
+  ('Bakery & Sweets', 'Cookies & Desserts', 'cookies-desserts', 'Cookies, brownies, and sweet treats', '🍪', 4),
+  ('Bakery & Sweets', 'Savory Bakery', 'savory-bakery', 'Patties, samosas, and savory bakery', '🥐', 5)
 ON CONFLICT (category, slug) DO NOTHING;
 
 INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES
   ('Fast Food & Restaurants', 'Burgers', 'burgers', 'Burgers, smash burgers, and combo meals', '🍔', 1),
   ('Fast Food & Restaurants', 'Shawarma & Rolls', 'shawarma-rolls', 'Shawarma, wraps, rolls, and sandwiches', '🌯', 2),
-  ('Fast Food & Restaurants', 'Deals & Combos', 'deals-combos', 'Family deals, meal boxes, and special offers', '🔥', 3),
+  ('Fast Food & Restaurants', 'Pizza & Pasta', 'pizza-pasta', 'Pizza, pasta, and Italian-style meals', '🍕', 3),
   ('Fast Food & Restaurants', 'Desi & BBQ', 'desi-bbq', 'Biryani, karahi, BBQ, and Pakistani classics', '🍖', 4),
-  ('Fast Food & Restaurants', 'Pizza & Pasta', 'pizza-pasta', 'Pizza, pasta, and Italian-style meals', '🍕', 5),
+  ('Fast Food & Restaurants', 'Chinese & Asian', 'chinese-asian', 'Chinese, Thai, and Asian favourites', '🥡', 5),
   ('Fast Food & Restaurants', 'Fries & Sides', 'fries-sides', 'Fries, nuggets, and side snacks', '🍟', 6),
-  ('Fast Food & Restaurants', 'Cafe & Beverages', 'cafe-beverages', 'Coffee, chai, shakes, and soft drinks', '☕', 7),
-  ('Fast Food & Restaurants', 'Chinese & Asian', 'chinese-asian', 'Chinese, Thai, and Asian favourites', '🥡', 8)
+  ('Fast Food & Restaurants', 'Breakfast & Paratha', 'breakfast-paratha', 'Paratha, omelette, and breakfast plates', '🍳', 7),
+  ('Fast Food & Restaurants', 'Deals & Combos', 'deals-combos', 'Family deals, meal boxes, and special offers', '🔥', 8),
+  ('Fast Food & Restaurants', 'Desserts & Ice Cream', 'desserts-ice-cream', 'Ice cream, kulfi, and sweet endings', '🍨', 9)
+ON CONFLICT (category, slug) DO NOTHING;
+
+INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES
+  ('Cafe & Beverages', 'Coffee & Espresso', 'coffee-espresso', 'Coffee, latte, cappuccino, and espresso', '☕', 1),
+  ('Cafe & Beverages', 'Chai & Desi Drinks', 'chai-desi-drinks', 'Chai, doodh patti, and desi beverages', '🫖', 2),
+  ('Cafe & Beverages', 'Fresh Juices & Shakes', 'juices-shakes', 'Fresh juices, smoothies, and milkshakes', '🥤', 3),
+  ('Cafe & Beverages', 'Mocktails & Cold Drinks', 'mocktails-cold', 'Mocktails, iced drinks, and sodas', '🍹', 4),
+  ('Cafe & Beverages', 'Snacks & Light Bites', 'cafe-snacks', 'Sandwiches, wraps, and cafe snacks', '🥪', 5),
+  ('Cafe & Beverages', 'Desserts & Bakery Cafe', 'cafe-desserts', 'Cakes, brownies, and cafe desserts', '🍰', 6)
 ON CONFLICT (category, slug) DO NOTHING;
 
 INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES

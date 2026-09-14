@@ -129,7 +129,7 @@ export default function ShopMediaHeader({
   const placement = logoPlacement ?? (isHero ? "overlay" : "hidden");
 
   const frameClass = isHero
-    ? "relative h-36 w-full sm:h-44 md:h-48 lg:h-52"
+    ? "relative h-48 w-full sm:h-56 md:h-64 lg:h-72"
     : // Compact marketplace banner (px so font-scale doesn't inflate cards)
       "shop-card-banner relative h-[78px] w-full sm:h-[90px]";
 

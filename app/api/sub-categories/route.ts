@@ -15,6 +15,10 @@ import type { SubCategory } from "@/types";
 import { SHOP_CATEGORIES } from "@/types";
 import { sanitizeLight } from "@/lib/sanitization";
 import {
+  normalizeShopCategory,
+  SUBCATEGORY_CATALOG,
+} from "@/lib/categoryCatalog";
+import {
   apiCache,
   buildCacheKey,
   generateETag,
@@ -73,10 +77,17 @@ export async function GET(request: Request) {
     }
 
     // Sanitize and validate the category against allowed values
-    const category = sanitizeLight(rawCategory);
-    if (!(ALLOWED_CATEGORIES as readonly string[]).includes(category)) {
+    const rawClean = sanitizeLight(rawCategory);
+    const normalized = normalizeShopCategory(rawClean);
+    const category =
+      normalized && normalized !== "All"
+        ? normalized
+        : (ALLOWED_CATEGORIES as readonly string[]).includes(rawClean)
+          ? rawClean
+          : "";
+    if (!category) {
       return NextResponse.json(
-        buildSafeErrorResponse(400, `Invalid category: "${category}". Please provide a valid main category.`),
+        buildSafeErrorResponse(400, `Invalid category: "${rawClean}". Please provide a valid main category.`),
         {
           status: 400,
           headers: getCacheHeaders("private"),
@@ -156,7 +167,21 @@ export async function GET(request: Request) {
       );
     }
 
-    const subs = (data as SubCategory[]) ?? [];
+    let subs = (data as SubCategory[]) ?? [];
+    if (subs.length === 0) {
+      const catalog = SUBCATEGORY_CATALOG[category] ?? [];
+      subs = catalog.map((s, i) => ({
+        id: `catalog-${category}-${s.slug}`,
+        category,
+        name: s.name,
+        slug: s.slug,
+        description: s.description,
+        icon: s.icon,
+        is_active: true,
+        sort_order: s.sort_order ?? i + 1,
+        is_others: s.is_others ?? false,
+      }));
+    }
     const hasOthers = subs.some((s) => s.is_others);
 
     // Programmatic 'Others' fallback — guaranteed for every category

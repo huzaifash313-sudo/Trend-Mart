@@ -234,6 +234,7 @@ export default function DashboardNavbar() {
             </>
           )}
           <Link href="/dashboard/products" className={navLinkClass("/dashboard/products")}>Products</Link>
+          <Link href="/dashboard/pos" className={navLinkClass("/dashboard/pos")}>POS</Link>
           <Link
             href="/dashboard/assistant"
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${

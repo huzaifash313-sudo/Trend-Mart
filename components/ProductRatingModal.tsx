@@ -82,6 +82,7 @@ export default function ProductRatingModal({
 }: ProductRatingModalProps) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [agreePolicy, setAgreePolicy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -91,6 +92,10 @@ export default function ProductRatingModal({
       e.preventDefault();
       if (rating < 1) {
         setError("Please select a star rating.");
+        return;
+      }
+      if (!agreePolicy) {
+        setError("Please confirm the review policy.");
         return;
       }
       setSubmitting(true);
@@ -104,7 +109,7 @@ export default function ProductRatingModal({
       setSubmitted(true);
       window.setTimeout(onRated, 900);
     },
-    [rating, comment, shopId, productId, onRated],
+    [rating, comment, shopId, productId, onRated, agreePolicy],
   );
 
   return (
@@ -225,9 +230,29 @@ export default function ProductRatingModal({
               </p>
             ) : null}
 
+            <label className="flex items-start gap-2 text-[11px] leading-snug text-zinc-600 dark:text-zinc-400">
+              <input
+                type="checkbox"
+                checked={agreePolicy}
+                onChange={(e) => setAgreePolicy(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                I confirm this is an honest review of a product I received.{" "}
+                <a
+                  href="/legal/reviews"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-emerald-600 underline"
+                >
+                  Review policy
+                </a>
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !agreePolicy}
               className="inline-flex w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-zinc-900"
             >
               {submitting ? "Submitting…" : "Submit rating"}

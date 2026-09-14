@@ -25,6 +25,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import BuyerProtectionStrip from "@/components/BuyerProtectionStrip";
 import { createOrder, updateOrderWhatsApp } from "@/services/orderService";
 import { logLead } from "@/services/leadsService";
 import { validateCoupon, fetchCouponsByShopId } from "@/services/couponService";
@@ -59,6 +60,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { getPublicAppUrl } from "@/lib/appUrl";
 import { useToast } from "@/components/Toast";
+import { useLocale } from "@/context/LocaleContext";
 
 const LocationMiniMap = dynamic(() => import("@/components/LocationMiniMap"), {
   ssr: false,
@@ -480,6 +482,7 @@ export default function WhatsAppCheckoutModal({
   accentColor: _accentColor = "emerald",
 }: WhatsAppCheckoutModalProps) {
   const router = useRouter();
+  const { t } = useLocale();
   const supabase = useMemo(() => createClient(), []);
   const { location, isDetecting, detectLocationDetailed, seedLocation, setManualPin } = useLocation();
   const { addToast } = useToast();
@@ -523,7 +526,7 @@ export default function WhatsAppCheckoutModal({
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [locationFillError, setLocationFillError] = useState<string | null>(null);
   const [locationFillBusy, setLocationFillBusy] = useState(false);
-  const [checkoutMapOpen, setCheckoutMapOpen] = useState(false);
+  const [checkoutMapOpen, setCheckoutMapOpen] = useState(true);
   const [mapPinBusy, setMapPinBusy] = useState(false);
   // Portal only after mount so fixed overlay escapes transform ancestors (deals carousel).
   const [portalReady, setPortalReady] = useState(false);
@@ -722,8 +725,10 @@ export default function WhatsAppCheckoutModal({
       getShopHoursSummary({
         business_hours: shop.business_hours,
         operating_status: shop.operating_status,
+        shop_schedule: shop.shop_schedule,
+        channel: isPickup ? "pickup" : "delivery",
       }),
-    [shop.business_hours, shop.operating_status],
+    [shop.business_hours, shop.operating_status, shop.shop_schedule, isPickup],
   );
   const shopClosed = shopHours.state === "closed";
 
@@ -901,7 +906,7 @@ export default function WhatsAppCheckoutModal({
     (async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, price, original_price, compare_at_price, variants, is_available")
+        .select("id, price, original_price, compare_at_price, variants, is_available, accepts_delivery, accepts_pickup")
         .in("id", productIds);
       if (cancelled || error || !data) return;
       const map: Record<string, CartVariantData> = {};
@@ -909,6 +914,12 @@ export default function WhatsAppCheckoutModal({
       for (const row of data as Record<string, unknown>[]) {
         const id = String(row.id);
         if (row.is_available === false) soldOut.add(id);
+        // Per-item fulfillment: delivery-only / pickup-only mismatches
+        if (isPickup) {
+          if (row.accepts_pickup === false) soldOut.add(id);
+        } else if (row.accepts_delivery === false) {
+          soldOut.add(id);
+        }
         const variants = Array.isArray(row.variants)
           ? (row.variants as VariantGroup[])
           : [];
@@ -931,7 +942,7 @@ export default function WhatsAppCheckoutModal({
     return () => {
       cancelled = true;
     };
-  }, [items, supabase]);
+  }, [items, supabase, isPickup]);
 
   // Refresh GPS only when we have no saved delivery pin AND permission is
   // already granted. Never surprise-prompt on modal open — GPS / Pin on map
@@ -1274,8 +1285,9 @@ export default function WhatsAppCheckoutModal({
   // ── Step Handlers ───────────────────────────────────────────────────────
   const handleGoToShipping = useCallback(() => {
     if (hasUnavailableItems) return;
+    if (!isPickup) setCheckoutMapOpen(true);
     setStep("shipping");
-  }, [hasUnavailableItems]);
+  }, [hasUnavailableItems, isPickup]);
 
   const handleGoBackToReview = useCallback(() => {
     setStep("review");
@@ -1365,6 +1377,13 @@ export default function WhatsAppCheckoutModal({
       if (belowMinimumOrder) {
         throw new Error(
           `Minimum order for this shop is ${formatRupees(minOrderAmount)}. Add more items to continue.`,
+        );
+      }
+      if (hasUnavailableItems) {
+        throw new Error(
+          unavailableNames.length
+            ? `Remove unavailable items first: ${unavailableNames.slice(0, 3).join(", ")}`
+            : "Some items are unavailable for this order type. Remove them to continue.",
         );
       }
       if (shopClosed) {
@@ -1633,6 +1652,8 @@ export default function WhatsAppCheckoutModal({
     pooledTotals,
     belowMinimumOrder,
     minOrderAmount,
+    hasUnavailableItems,
+    unavailableNames,
     shopClosed,
     shopHours.hoursText,
     outsideServiceRadius,
@@ -1975,7 +1996,7 @@ export default function WhatsAppCheckoutModal({
                   onClick={toggleCouponField}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 transition-colors hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
                 >
-                  <TagIcon /> Have a coupon code?
+                  <TagIcon /> {t("checkout.haveCoupon")}
                 </button>
               ) : (
                 <div className="space-y-2">
@@ -1984,18 +2005,18 @@ export default function WhatsAppCheckoutModal({
                       type="text"
                       value={couponCode}
                       onChange={(e) => handleCouponChange(e.target.value.toUpperCase())}
-                      placeholder="Enter code"
+                      placeholder={t("checkout.enterCode")}
                       maxLength={20}
                       className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-900 placeholder:font-normal placeholder:tracking-normal focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                     />
                     {couponValidating && <SpinnerIcon />}
                     {couponCode && !couponValidating && couponResult && (
                       <span className="text-xs font-medium">
-                        {couponResult.valid ? <CheckIcon /> : <span className="text-red-500">Invalid</span>}
+                        {couponResult.valid ? <CheckIcon /> : <span className="text-red-500">{t("checkout.invalidCoupon")}</span>}
                       </span>
                     )}
                     {couponCode && (
-                      <button type="button" onClick={handleClearCoupon} className="text-xs text-zinc-400 hover:text-red-500">Clear</button>
+                      <button type="button" onClick={handleClearCoupon} className="text-xs text-zinc-400 hover:text-red-500">{t("common.clear")}</button>
                     )}
                   </div>
                   {availableCoupons.length > 0 && (
@@ -2025,12 +2046,12 @@ export default function WhatsAppCheckoutModal({
                 </div>
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-sm border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
-                    <span className="text-emerald-700 dark:text-emerald-300">Coupon Discount</span>
+                    <span className="text-emerald-700 dark:text-emerald-300">{t("checkout.couponDiscount")}</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">-{formatRupees(discountAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
-                  <span className="text-emerald-700 dark:text-emerald-300">Delivery Fee</span>
+                  <span className="text-emerald-700 dark:text-emerald-300">{t("checkout.deliveryFee")}</span>
                   <span
                     className={`font-semibold ${
                       deliveryBreakdown.freeReason === "threshold" ||
@@ -2123,7 +2144,11 @@ export default function WhatsAppCheckoutModal({
                 <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs dark:bg-red-900/20">
                   <InfoIcon />
                   <span className="text-red-700 dark:text-red-400">
-                    Shop is closed now ({shopHours.hoursText}). You can browse, but checkout is paused.
+                    {isPickup ? "Pickup" : "Delivery"} is not available right now
+                    {shopHours.reason
+                      ? ` — ${shopHours.reason}`
+                      : ` (${shopHours.hoursText})`}
+                    . You can browse, but checkout is paused for this option.
                   </span>
                 </div>
               )}
@@ -2205,14 +2230,14 @@ export default function WhatsAppCheckoutModal({
                 <div className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-xs text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
                   <InfoIcon />
                   <span>
-                    Filled from your saved account details — you can edit anything before continuing.
+                    {t("checkout.autofillHint")}
                   </span>
                 </div>
               )}
 
               {/* Name */}
               <div>
-                <label htmlFor="wc-customer-name" className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Full Name *</label>
+                <label htmlFor="wc-customer-name" className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">{t("checkout.nameRequired")}</label>
                 <input
                   id="wc-customer-name"
                   type="text"
@@ -2235,7 +2260,7 @@ export default function WhatsAppCheckoutModal({
 
               {/* Phone */}
               <div>
-                <label htmlFor="wc-customer-phone" className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Phone Number *</label>
+                <label htmlFor="wc-customer-phone" className="mb-1 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">{t("checkout.phoneRequired")}</label>
                 <input
                   id="wc-customer-phone"
                   type="tel"
@@ -2259,7 +2284,7 @@ export default function WhatsAppCheckoutModal({
                 />
                 {errors.customerPhone && <p className="mt-1 text-xs text-red-500">{errors.customerPhone}</p>}
                 <p className="mt-1 text-[0.65rem] text-zinc-400">
-                  Format: {PK_PHONE_PLACEHOLDER} — spaces, dashes, or +92 all work.
+                  {t("checkout.phoneHint", { format: PK_PHONE_PLACEHOLDER })}
                 </p>
               </div>
 
@@ -2268,7 +2293,7 @@ export default function WhatsAppCheckoutModal({
                 {savedAddresses.length > 0 && !isPickup && (
                   <div className="mb-3">
                     <p className="mb-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                      Saved addresses
+                      {t("checkout.savedAddresses")}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {savedAddresses.map((addr) => {
@@ -2385,7 +2410,7 @@ export default function WhatsAppCheckoutModal({
                         setAutofilledFromAccount(false);
                         setShipping(s => ({ ...s, shippingAddress: e.target.value }));
                       }}
-                      placeholder="Anything the shop should know about collection (optional)"
+                      placeholder={t("checkout.notesPlaceholder")}
                       className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                         errors.shippingAddress
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
@@ -2409,7 +2434,7 @@ export default function WhatsAppCheckoutModal({
                         setLocationFillError(null);
                         setShipping(s => ({ ...s, shippingAddress: e.target.value }));
                       }}
-                      placeholder="Full address"
+                      placeholder={t("checkout.addressPlaceholder")}
                       className={`w-full rounded-xl border bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 ${
                         errors.shippingAddress
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
@@ -2501,7 +2526,7 @@ export default function WhatsAppCheckoutModal({
                   </div>
                 )}
                 <div className="flex justify-between text-sm border-t border-emerald-200/50 pt-1 dark:border-emerald-700/50">
-                  <span className="text-emerald-700 dark:text-emerald-300">Delivery Fee</span>
+                  <span className="text-emerald-700 dark:text-emerald-300">{t("checkout.deliveryFee")}</span>
                   <span className="font-semibold">
                     {deliveryBreakdown.freeReason === "threshold" ||
                     deliveryBreakdown.freeReason === "area" ||
@@ -2583,10 +2608,13 @@ export default function WhatsAppCheckoutModal({
               >
                 ← Edit
               </button>
+              <div className="mb-3 w-full">
+                <BuyerProtectionStrip compact />
+              </div>
               <button
                 type="button"
                 onClick={handlePlaceOrder}
-                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment}
+                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment || hasUnavailableItems}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting ? (

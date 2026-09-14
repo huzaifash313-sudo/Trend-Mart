@@ -195,17 +195,22 @@ export const ROLE_ROUTE_MAP = {
   customer: [
     "/orders",
     "/wishlist",
+    "/account",
     "/auth/settings",
   ],
   merchant: [
     "/dashboard",
     "/dashboard/products",
-    "/shop/manage",
+    "/dashboard/pos",
+    "/dashboard/orders",
+    "/dashboard/settings",
   ],
   admin: [
     "/admin",
-    "/admin/users",
-    "/admin/shops",
+    "/admin/dashboard",
+    "/admin/appearance",
+    "/admin/support",
+    "/admin/audit-logs",
   ],
 } as const;
 

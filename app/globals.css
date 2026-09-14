@@ -505,6 +505,22 @@ html {
   background-color: var(--tm-splash-bg);
 }
 
+/* Urdu UI: keep LTR layout; slightly taller lines for Nastaliq readability */
+html.tm-locale-ur body {
+  line-height: 1.55;
+}
+html.tm-locale-ur .tm-ur-text,
+html.tm-locale-ur button,
+html.tm-locale-ur a,
+html.tm-locale-ur label,
+html.tm-locale-ur h1,
+html.tm-locale-ur h2,
+html.tm-locale-ur h3,
+html.tm-locale-ur p,
+html.tm-locale-ur span {
+  letter-spacing: 0;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
@@ -3513,12 +3529,26 @@ html.dark .tm-story-skel-label {
 .tm-brand-video-poster {
   object-fit: cover;
   object-position: center;
-  z-index: 1;
-  transition: opacity 280ms ease;
+  z-index: 2;
+  transition: opacity 420ms ease;
 }
 .tm-brand-video-poster.is-hidden {
   opacity: 0;
   pointer-events: none;
+}
+.tm-brand-video-el {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+.tm-brand-video-el.is-ready {
+  opacity: 1;
 }
 .tm-brand-video.is-loading {
   /* Keep the slot so shops don’t jump, but stay dark — no teal empty flash. */
@@ -3623,11 +3653,11 @@ html.dark .tm-story-skel-label {
   height: 100%;
   max-width: 100%;
   max-height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center center;
   opacity: 0;
-  transition: opacity 0.35s ease;
-  z-index: 2;
+  transition: opacity 0.42s ease;
+  z-index: 1;
 }
 .tm-brand-video-el.is-ready {
   opacity: 1;
@@ -7661,9 +7691,9 @@ html.dark .tm-rail-more {
 .tm-mini-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  /* Force every row to the SAME height so cards one above another line up
-     perfectly even when one product's meta runs longer than a neighbour's. */
-  grid-auto-rows: minmax(0, 1fr);
+  /* Intrinsic row height — minmax(0,1fr) collapsed media boxes to height 0
+     and broke next/image fill. */
+  grid-auto-rows: auto;
   gap: 0.55rem;
   align-items: stretch;
 }
@@ -7772,8 +7802,8 @@ html.dark .tm-rail-more {
   display: block;
   width: 100%;
   aspect-ratio: 1 / 1;
-  /* Media box must never collapse inside the flex column (short images or a
-     missing image would otherwise shrink the card). */
+  /* Never collapse to 0 — next/image fill warns when parent height is 0. */
+  min-height: 4.5rem;
   flex: 0 0 auto;
   overflow: hidden;
   background: #fff;

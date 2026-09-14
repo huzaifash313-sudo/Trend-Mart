@@ -1,4 +1,4 @@
-/* TrendsMart SW v55 — offline-first app shell.
+/* TrendsMart SW v56 — offline-first app shell.
    Goals:
    - Repeat PWA opens feel native: successful visits to PUBLIC pages are
      cached, and cached copies are served INSTANTLY on the next navigation
@@ -13,11 +13,13 @@
    - When a page had to be served from cache because the network failed, the
      SW tells visible clients {type:"tm-conn", state:"offline"} so the app can
      show a subtle "You're offline" pill instead of looking broken.
-   Push / notifications logic unchanged from v52. */
+   Push / notifications logic unchanged from v52.
+   v56: bump shell cache after shopHours module graph change so stale Turbopack
+   chunks cannot serve "module factory is not available". */
 
-const PAGE_CACHE = "tm-pages-v55"; /* rendered HTML of visited public pages */
-const SHELL_CACHE = "tm-shell-v55"; /* /_next/static, fonts, icons, /offline */
-const IMAGE_CACHE = "tm-images-v55"; /* Cloudinary / Next image proxy */
+const PAGE_CACHE = "tm-pages-v56"; /* rendered HTML of visited public pages */
+const SHELL_CACHE = "tm-shell-v56"; /* /_next/static, fonts, icons, /offline */
+const IMAGE_CACHE = "tm-images-v56"; /* Cloudinary / Next image proxy */
 const KEEP = new Set([PAGE_CACHE, SHELL_CACHE, IMAGE_CACHE]);
 
 /** Keep these bounded — evict oldest entries past the cap on every write. */

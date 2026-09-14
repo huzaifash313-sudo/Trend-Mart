@@ -21,7 +21,7 @@ import { paginateReviews, REVIEW_PAGE_SIZE } from "@/lib/reviewRules";
 /* -------------------------------------------------------------------------- */
 
 interface ShopReviewsModalProps {
-  shop: { id: string; name: string };
+  shop: { id: string; name: string; ownerId?: string | null };
   onClose: () => void;
 }
 
@@ -229,7 +229,10 @@ export default function ShopReviewsModal({ shop, onClose }: ShopReviewsModalProp
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchReviewsByShopId(shop.id), fetchReviewSessionContext(shop.id)]).then(
+    Promise.all([
+      fetchReviewsByShopId(shop.id),
+      fetchReviewSessionContext(shop.id, shop.ownerId),
+    ]).then(
       ([reviewResult, ctx]) => {
         if (cancelled) return;
         if (reviewResult.success) setReviews(reviewResult.data);

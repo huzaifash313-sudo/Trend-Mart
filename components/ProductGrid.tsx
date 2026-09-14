@@ -283,19 +283,22 @@ export const ProductCard = memo(function ProductCard({
           </div>
         )}
 
-        {categoryLabel ? (
+        {hasDiscount && discountPercent > 0 ? (
+          <span className="tm-badge-discount absolute left-1.5 top-1.5 z-10">
+            {discountPercent}% OFF
+          </span>
+        ) : categoryLabel ? (
           <span className="absolute left-1.5 top-1.5 z-10 max-w-[70%] truncate rounded-md bg-zinc-950/85 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/95 shadow-sm">
             {categoryLabel}
           </span>
         ) : null}
 
-        {hasDiscount && discountPercent > 0 ? (
+        {locationHint ? (
           <span
-            className={`tm-badge-discount absolute z-10 ${
-              categoryLabel ? "right-1.5 top-1.5" : "left-1.5 top-1.5"
-            }`}
+            className="absolute right-1.5 top-1.5 z-10 rounded-full bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white shadow-sm"
+            title={locationHint}
           >
-            {discountPercent}% OFF
+            {locationHint}
           </span>
         ) : null}
 
@@ -373,14 +376,6 @@ export const ProductCard = memo(function ProductCard({
               <span className="truncate text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-400 sm:text-[11px]">
                 {product.shop_name}
               </span>
-              {locationHint ? (
-                <span
-                  className="shrink-0 text-[9px] font-medium leading-none text-zinc-400 dark:text-zinc-500"
-                  title={locationHint}
-                >
-                  · {locationHint}
-                </span>
-              ) : null}
             </button>
             <CompactRating
               average={
@@ -407,8 +402,7 @@ export const ProductCard = memo(function ProductCard({
         ) : null}
 
         <div className={`tm-product-footer flex flex-col ${compact ? "gap-1" : "gap-1.5"}`}>
-          {/* Price row — price + % OFF badge + original all on ONE line so card
-              heights stay identical whether a product has a discount or not. */}
+          {/* Price row — image already shows % OFF; keep price + strikethrough only */}
           <div className="min-w-0 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
             <p
               className={`whitespace-nowrap font-bold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50 ${
@@ -418,14 +412,6 @@ export const ProductCard = memo(function ProductCard({
               {priceLabel}
             </p>
 
-            {/* % OFF badge — inline right after the price */}
-            {hasDiscount && discountPercent > 0 ? (
-              <span className="shrink-0 rounded bg-rose-50 px-1 py-px text-[9px] font-bold leading-none text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-                {discountPercent}% OFF
-              </span>
-            ) : null}
-
-            {/* Strikethrough original — inline after the badge */}
             {hasDiscount && originalPrice != null ? (
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] leading-none text-zinc-400 line-through tabular-nums sm:text-[11px]">
                 {formatRupees(originalPrice)}
