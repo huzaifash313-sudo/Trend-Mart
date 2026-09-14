@@ -11,7 +11,7 @@ import {
 } from "@/lib/content/legalDocs";
 
 function renderBullet(locale: "en" | "ur", bullet: LegalBullet) {
-  if ("strong" in bullet && bullet.strong) {
+  if ("strong" in bullet) {
     return (
       <>
         <strong>{pickLocale(locale, bullet.strong)}</strong>{" "}

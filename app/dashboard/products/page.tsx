@@ -61,6 +61,8 @@ import {
   type SubCategoryWithMeta,
 } from "@/services/subCategoryService";
 import { isValidUUID } from "@/lib/sanitization";
+import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
+import { sanitizeVariantGroups } from "@/lib/variantTemplates";
 import {
   importGroceryStarterPack,
   groceryStarterPackCount,

@@ -226,7 +226,7 @@ function OrderCard({
           >
             {t("orders.invoice")}
           </button>
-          {(order.status === "Delivered" || order.status === "Completed") && (
+          {(order.status === "Delivered") && (
             <Link
               href={`/orders/${encodeURIComponent(order.id)}?rate=1`}
               className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
@@ -391,7 +391,7 @@ function OrdersInner() {
       return o.status === "Pending" || o.status === "Processing" || o.status === "Dispatched";
     }
     if (statusTab === "done") {
-      return o.status === "Delivered" || o.status === "Completed";
+      return o.status === "Delivered";
     }
     return o.status === "Cancelled";
   });

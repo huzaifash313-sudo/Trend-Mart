@@ -417,13 +417,21 @@ export async function POST(request: Request) {
 
   let inserted: Record<string, unknown> | null = null;
   {
-    const { data, error } = await admin.from("orders").insert(row).select("*").single();
+    const { data, error } = await admin
+      .from("orders")
+      .insert(row as never)
+      .select("*")
+      .single();
     if (error) {
       // Columns may be missing on older DBs
       delete row.source;
       delete row.payment_method;
       delete row.payment_split;
-      const { data: d2, error: e2 } = await admin.from("orders").insert(row).select("*").single();
+      const { data: d2, error: e2 } = await admin
+        .from("orders")
+        .insert(row as never)
+        .select("*")
+        .single();
       if (e2) {
         return NextResponse.json(
           { success: false, error: e2.message || "Could not save sale." },
@@ -447,7 +455,7 @@ export async function POST(request: Request) {
       reason: d.reason === "recipe" ? "sale" : "sale",
       note: d.reason === "recipe" ? "POS recipe ingredient" : "POS sale",
       order_id: orderId,
-    });
+    } as never);
 
     const prod = byId.get(d.productId);
     if (prod && prod.stock_qty != null && Number.isFinite(Number(prod.stock_qty))) {
@@ -464,7 +472,7 @@ export async function POST(request: Request) {
       }
       await admin
         .from("products")
-        .update(patch)
+        .update(patch as never)
         .eq("id", d.productId)
         .eq("shop_id", shopId);
       prod.stock_qty = next;
@@ -498,7 +506,7 @@ export async function POST(request: Request) {
         };
         if (customerName && customerName !== "Walk-in") patch.name = customerName;
         if (creditAmt > 0) patch.credit_balance = prevBal + creditAmt;
-        await admin.from("pos_customers").update(patch).eq("id", customerId);
+        await admin.from("pos_customers").update(patch as never).eq("id", customerId);
       } else {
         const { data: created } = await admin
           .from("pos_customers")
@@ -509,7 +517,7 @@ export async function POST(request: Request) {
             visit_count: 1,
             last_order_at: new Date().toISOString(),
             credit_balance: creditAmt > 0 ? creditAmt : 0,
-          })
+          } as never)
           .select("id")
           .single();
         customerId = created ? String((created as { id: string }).id) : null;
@@ -525,7 +533,7 @@ export async function POST(request: Request) {
           reason: "sale",
           note: "POS udhaar sale",
           order_id: orderId,
-        });
+        } as never);
       }
     } catch {
       /* optional tables until migration */

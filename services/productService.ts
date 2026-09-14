@@ -1224,7 +1224,7 @@ export async function fetchAlsoBoughtProducts(opts: {
       else if (opts.categoryId) legacyQ = legacyQ.eq("category_id", opts.categoryId);
       else if (opts.shopCategory) legacyQ = legacyQ.eq("shops.category", opts.shopCategory);
       const legacy = await legacyQ;
-      data = legacy.data;
+      data = legacy.data as typeof data;
       error = legacy.error;
     }
     if (error) throw error;

@@ -491,7 +491,17 @@ function MyReviewsModal({
                         return;
                       }
                       addToast("Review deleted", "success");
-                      void load();
+                      const nextReviews = data.reviews.filter((r) => r.id !== review.id);
+                      const total = nextReviews.length;
+                      const average =
+                        total === 0
+                          ? 0
+                          : nextReviews.reduce((sum, r) => sum + r.rating, 0) / total;
+                      onChange({
+                        ...data,
+                        reviews: nextReviews,
+                        stats: { ...data.stats, total, average },
+                      });
                     }}
                     className="mt-2 text-[11px] font-semibold text-red-600 hover:underline dark:text-red-400"
                   >

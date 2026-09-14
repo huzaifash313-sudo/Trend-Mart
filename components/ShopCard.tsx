@@ -32,6 +32,8 @@ export interface ShopCardData {
   free_delivery_radius_km?: number | null;
   avg_rating?: number | null;
   review_count?: number | null;
+  /** Shop owner user id — used when opening the reviews sheet */
+  owner_id?: string | null;
   /** Pre-built slides; if omitted, built from deals / free delivery / coupons */
   offerSlides?: ShopOfferSlide[];
   deals?: import("@/lib/dealSchedule").ShopDeal[];
