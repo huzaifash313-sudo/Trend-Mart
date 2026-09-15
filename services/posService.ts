@@ -122,6 +122,7 @@ function normalizeSettings(raw: unknown, shopCategory?: string | null): PosSetti
     print_width_mm: o.print_width_mm === 58 || o.print_width_mm === 80
       ? o.print_width_mm
       : base.print_width_mm,
+    tax_rate: typeof o.tax_rate === "number" && o.tax_rate >= 0 ? o.tax_rate : base.tax_rate,
   };
   // First-time saves (no pack chosen yet): apply category-aware defaults
   if (o.pack == null) {
@@ -224,6 +225,7 @@ export function buildReceiptText(params: {
   lines: PosCartLine[];
   subtotal: number;
   discount: number;
+  tax?: number;
   total: number;
   paymentMethod: PosPaymentMethod;
   customerName?: string;
@@ -245,6 +247,7 @@ export function buildReceiptText(params: {
     `Subtotal: ${formatRupees(params.subtotal)}`,
   ];
   if (params.discount > 0) lines.push(`Discount: −${formatRupees(params.discount)}`);
+  if (params.tax && params.tax > 0) lines.push(`Tax: ${formatRupees(params.tax)}`);
   lines.push(`Total: ${formatRupees(params.total)}`);
   lines.push(`Pay: ${params.paymentMethod}`);
   if (params.cashReceived != null && params.cashReceived > 0) {
@@ -353,6 +356,7 @@ export async function createPosSale(params: {
   paymentMethod: PosPaymentMethod;
   paymentSplit?: PosPaymentSplit;
   discountAmount?: number;
+  taxAmount?: number;
   notes?: string;
   autoComplete?: boolean;
   orderType?: "pickup" | "delivery";
@@ -385,6 +389,7 @@ export async function createPosSale(params: {
         paymentMethod: params.paymentMethod,
         paymentSplit: params.paymentSplit,
         discountAmount: params.discountAmount,
+        taxAmount: params.taxAmount,
         notes: params.notes,
         autoComplete: params.autoComplete,
         orderType: params.orderType,

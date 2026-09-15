@@ -35,6 +35,7 @@ interface PosSaleBody {
   paymentMethod?: string | null;
   paymentSplit?: Record<string, number> | null;
   discountAmount?: number | null;
+  taxAmount?: number | null;
   notes?: string | null;
   autoComplete?: boolean | null;
   orderType?: string | null;
@@ -347,9 +348,10 @@ export async function POST(request: Request) {
 
   const subtotal = items.reduce((s, i) => s + i.price * Math.max(0.01, i.quantity ?? 1), 0);
   const discount = Math.min(subtotal, money(body.discountAmount));
+  const tax = Math.min(subtotal, money(body.taxAmount));
   const deliveryFee =
     body.orderType === "delivery" ? money(body.deliveryFee) : 0;
-  const total = Math.max(0, subtotal - discount + deliveryFee);
+  const total = Math.max(0, subtotal - discount + tax + deliveryFee);
 
   const payRaw = sanitizeText(body.paymentMethod, 20).toLowerCase() || "cash";
   const paymentMethod = PAY_METHODS.has(payRaw) ? payRaw : "cash";
@@ -406,6 +408,7 @@ export async function POST(request: Request) {
     total_amount: total,
     subtotal_amount: subtotal,
     discount_amount: discount > 0 ? discount : 0,
+    tax_amount: tax > 0 ? tax : 0,
     delivery_fee: deliveryFee,
     status: autoComplete ? "Delivered" : "Pending",
     order_type: orderType,

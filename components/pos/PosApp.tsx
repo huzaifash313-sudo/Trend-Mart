@@ -55,6 +55,7 @@ import PosExcelCounter, {
   type PosExcelCounterHandle,
 } from "@/components/pos/PosExcelCounter";
 import PosBulkAddDialog from "@/components/pos/PosBulkAddDialog";
+import PosSaveCustomItemsModal from "@/components/pos/PosSaveCustomItemsModal";
 import PosStockPanel from "@/components/pos/PosStockPanel";
 import PosExpensesPanel from "@/components/pos/PosExpensesPanel";
 import PosCreditPanel from "@/components/pos/PosCreditPanel";
@@ -175,6 +176,10 @@ export default function PosApp() {
   const [custName, setCustName] = useState("");
   const [custPhone, setCustPhone] = useState("");
   const [discount, setDiscount] = useState("");
+  const [discountMode, setDiscountMode] = useState<"flat" | "percent">("flat");
+  const [pendingCustomSave, setPendingCustomSave] = useState<
+    { name: string; price: number }[] | null
+  >(null);
   const [billNotes, setBillNotes] = useState("");
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
   const [token, setToken] = useState("");
@@ -479,15 +484,22 @@ export default function PosApp() {
 
   const cartTotal = useMemo(() => {
     const sub = cart.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    const d = Math.max(0, Number(discount) || 0);
+    const rawDiscount =
+      discountMode === "percent"
+        ? (sub * Math.max(0, Number(discount) || 0)) / 100
+        : Math.max(0, Number(discount) || 0);
+    const clampedDiscount = Math.min(rawDiscount, sub);
+    const taxable = sub - clampedDiscount;
+    const tax = Math.round(((taxable * (settings.tax_rate || 0)) / 100) * 100) / 100;
     const fee = orderType === "delivery" ? Math.max(0, Number(deliveryFee) || 0) : 0;
     return {
       sub,
-      discount: Math.min(d, sub),
+      discount: clampedDiscount,
+      tax,
       fee,
-      total: Math.max(0, sub - Math.min(d, sub) + fee),
+      total: Math.max(0, taxable + tax + fee),
     };
-  }, [cart, discount, deliveryFee, orderType]);
+  }, [cart, discount, discountMode, deliveryFee, orderType, settings.tax_rate]);
 
   const customerQuickPick = useMemo(() => {
     const q = (custPhone || custName).trim().toLowerCase();
@@ -609,19 +621,27 @@ export default function PosApp() {
       addToast("Custom item needs a price", "info");
       return;
     }
-    const key = `custom::${Date.now()}::${Math.random().toString(36).slice(2, 7)}`;
-    setCart((prev) => [
-      ...prev,
-      {
-        key,
-        productId: key,
-        name,
-        basePrice: price,
-        unitPrice: price,
-        qty,
-        custom: true,
-      },
-    ]);
+    const key = `custom::${name.toLowerCase()}::${price}`;
+    setCart((prev) => {
+      const existing = prev.find((l) => l.key === key);
+      if (existing) {
+        return prev.map((l) =>
+          l.key === key ? { ...l, qty: Math.round((l.qty + qty) * 100) / 100 } : l,
+        );
+      }
+      return [
+        ...prev,
+        {
+          key,
+          productId: key,
+          name,
+          basePrice: price,
+          unitPrice: price,
+          qty,
+          custom: true,
+        },
+      ];
+    });
     setMiscName("");
     setMiscPrice("");
     setMiscQty("1");
@@ -749,6 +769,7 @@ export default function PosApp() {
   function clearBill() {
     setCart([]);
     setDiscount("");
+    setDiscountMode("flat");
     setBillNotes("");
     setCustName("");
     setCustPhone("");
@@ -881,6 +902,7 @@ export default function PosApp() {
       paymentMethod,
       paymentSplit,
       discountAmount: cartTotal.discount,
+      taxAmount: cartTotal.tax,
       notes: billNotes,
       autoComplete: settings.auto_complete_counter && orderType === "pickup",
       orderType,
@@ -901,6 +923,7 @@ export default function PosApp() {
           lines: cart,
           subtotal: cartTotal.sub,
           discount: cartTotal.discount,
+          tax: cartTotal.tax,
           total: cartTotal.total,
           paymentMethod,
           customerName: custName || "Walk-in",
@@ -923,6 +946,7 @@ export default function PosApp() {
       lines: cart,
       subtotal: cartTotal.sub,
       discount: cartTotal.discount,
+      tax: cartTotal.tax,
       total: cartTotal.total,
       paymentMethod,
       customerName: custName || "Walk-in",
@@ -943,6 +967,12 @@ export default function PosApp() {
         : `Bill saved · ${formatRupees(cartTotal.total)}`,
       "success",
     );
+    const customItems = Array.from(
+      new Map(
+        cart.filter((l) => l.custom).map((l) => [l.name, { name: l.name, price: l.unitPrice }]),
+      ).values(),
+    );
+    if (customItems.length > 0) setPendingCustomSave(customItems);
     clearBill();
     await refresh(shop.id);
     void loadCustomers(shop.id);
@@ -1605,6 +1635,26 @@ export default function PosApp() {
                 />
               </div>
 
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
+                  Tax % (applied on bill total, 0 = no tax)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={settings.tax_rate || ""}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      tax_rate: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                    }))
+                  }
+                  placeholder="0"
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                />
+              </div>
+
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
                 <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
                   Online catalog already bills in POS
@@ -1951,6 +2001,7 @@ export default function PosApp() {
                     ref={excelRef}
                     products={products}
                     cart={cart}
+                    shopCategory={shop.category}
                     decimalQty={settings.decimal_qty}
                     barcodeEnabled={settings.barcode_enabled}
                     lowStockThreshold={settings.low_stock_threshold}
@@ -2408,15 +2459,27 @@ export default function PosApp() {
                 ) : null}
 
                 <div className="grid grid-cols-2 gap-1">
-                  <input
-                    ref={discountRef}
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    type="number"
-                    min={0}
-                    placeholder="Discount Rs"
-                    className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
-                  />
+                  <div className="flex gap-1">
+                    <input
+                      ref={discountRef}
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      type="number"
+                      min={0}
+                      placeholder={discountMode === "percent" ? "Discount %" : "Discount Rs"}
+                      className="w-full min-w-0 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDiscountMode((m) => (m === "flat" ? "percent" : "flat"))
+                      }
+                      title="Switch between flat Rs and % discount"
+                      className="shrink-0 rounded-md border border-zinc-200 px-1.5 text-[10px] font-bold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      {discountMode === "percent" ? "%" : "Rs"}
+                    </button>
+                  </div>
                   <input
                     value={billNotes}
                     onChange={(e) => setBillNotes(e.target.value)}
@@ -2436,7 +2499,7 @@ export default function PosApp() {
 
                 <div className="shrink-0 space-y-1.5 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
                 <div className="space-y-0.5 text-sm">
-                  {cartTotal.discount > 0 || cartTotal.fee > 0 ? (
+                  {cartTotal.discount > 0 || cartTotal.tax > 0 || cartTotal.fee > 0 ? (
                     <>
                       <div className="flex justify-between text-[10px] text-zinc-500">
                         <span>Subtotal</span>
@@ -2446,6 +2509,12 @@ export default function PosApp() {
                         <div className="flex justify-between text-[10px] text-zinc-500">
                           <span>Discount</span>
                           <span>−{formatRupees(cartTotal.discount)}</span>
+                        </div>
+                      ) : null}
+                      {cartTotal.tax > 0 ? (
+                        <div className="flex justify-between text-[10px] text-zinc-500">
+                          <span>Tax ({settings.tax_rate}%)</span>
+                          <span>{formatRupees(cartTotal.tax)}</span>
                         </div>
                       ) : null}
                       {cartTotal.fee > 0 ? (
@@ -2920,6 +2989,16 @@ export default function PosApp() {
           favourites={favourites}
           onTryAdd={tryAddProduct}
           onClose={() => setShowBulkAdd(false)}
+        />
+      ) : null}
+
+      {pendingCustomSave && shop ? (
+        <PosSaveCustomItemsModal
+          shopId={shop.id}
+          shopCategory={shop.category}
+          items={pendingCustomSave}
+          onClose={() => setPendingCustomSave(null)}
+          onToast={addToast}
         />
       ) : null}
 

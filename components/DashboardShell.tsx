@@ -15,6 +15,7 @@ import { isDineInCategory } from "@/types";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import DashboardNavSmooth from "@/components/DashboardNavSmooth";
 import DashboardSidebarNav from "@/components/DashboardSidebarNav";
+import BrandLogo from "@/components/BrandLogo";
 
 /** Merchant chrome — skipped on immersive POS so the register can fill the screen. */
 export default function DashboardShell({ children }: { children: ReactNode }) {
@@ -139,9 +140,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
             className="flex items-center gap-2.5 px-1"
             onClick={() => setDrawerOpen(false)}
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-sm font-black text-white shadow-sm shadow-emerald-600/30">
-              TM
-            </span>
+            <BrandLogo size={36} className="shadow-sm shadow-emerald-600/20" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">
                 TrendsMart

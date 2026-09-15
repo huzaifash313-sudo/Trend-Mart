@@ -755,6 +755,8 @@ export interface Order {
   delivery_fee?: number | null;
   /** Coupon discount applied (Rs), when a coupon was used. */
   discount_amount?: number | null;
+  /** Tax charged (Rs), when the POS's tax rate was > 0. */
+  tax_amount?: number | null;
   /** Coupon code used, when any. */
   coupon_code?: string | null;
   /** When the customer confirmed the WhatsApp hand-off (null = not sent yet). */

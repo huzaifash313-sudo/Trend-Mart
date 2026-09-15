@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import BrandLogo from "@/components/BrandLogo";
 
 const ADMIN_NAV = [
   { href: "/admin/dashboard", label: "Dashboard", icon: "📊", desc: "Metrics · merchants · orders" },
@@ -25,8 +26,9 @@ export default function AdminLayoutShell({ children }: { children: ReactNode }) 
     <div className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
       <div className="lg:hidden sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
         <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <span className="mr-2 shrink-0 text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            🛒 Admin
+          <span className="mr-2 flex shrink-0 items-center gap-2 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+            <BrandLogo size={28} />
+            Admin
           </span>
           {ADMIN_NAV.map((item) => (
             <Link
@@ -53,9 +55,7 @@ export default function AdminLayoutShell({ children }: { children: ReactNode }) 
       <div className="mx-auto flex max-w-7xl">
         <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-zinc-200 bg-white px-4 py-6 lg:flex dark:border-zinc-800 dark:bg-zinc-900">
           <Link href="/admin/dashboard" className="flex items-center gap-2 px-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-lg text-white">
-              🛒
-            </span>
+            <BrandLogo size={36} className="shadow-sm shadow-emerald-600/20" />
             <span>
               <span className="block text-sm font-bold text-zinc-900 dark:text-zinc-100">
                 TrendsMart
