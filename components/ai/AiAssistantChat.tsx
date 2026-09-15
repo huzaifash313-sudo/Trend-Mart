@@ -31,6 +31,8 @@ interface AiAssistantChatProps {
   backLabel?: string;
   initialPrompts?: string[];
   initialQuery?: string | null;
+  /** Keep merchant dashboard sidebar + header visible */
+  embedded?: boolean;
 }
 
 function SendIcon() {
@@ -68,6 +70,7 @@ export default function AiAssistantChat({
   backLabel = "Back",
   initialPrompts,
   initialQuery,
+  embedded = false,
 }: AiAssistantChatProps) {
   const prompts = initialPrompts ?? defaultPrompts(role);
   const {
@@ -104,14 +107,15 @@ export default function AiAssistantChat({
   const headerTitle = role === "merchant" ? title : TREND_BOT_NAME;
 
   return (
-    <FullScreenChatShell>
+    <FullScreenChatShell embedded={embedded}>
       <ChatShellHeader
         title={headerTitle}
         subtitle={role === "merchant" ? subtitle : TREND_BOT_TAGLINE}
-        backHref={backHref}
+        backHref={embedded ? undefined : backHref}
         backLabel={backLabel}
         avatar={<TrendBotAvatar size="sm" animated={!loading} />}
         badge="Free AI"
+        gradient={!embedded}
       />
 
       {showOnboarding ? (

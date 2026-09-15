@@ -92,54 +92,21 @@ function MerchantShopTitle({ name }: { name: string }) {
 function DashboardOverviewSkeleton() {
   return (
     <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-          <div className="space-y-2">
-            <div className="h-3 w-28 animate-pulse rounded bg-emerald-200/70 dark:bg-emerald-900/40" />
-            <div className="h-8 w-48 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-          </div>
-          <div className="h-8 w-24 animate-pulse rounded-full bg-emerald-200/80 dark:bg-emerald-900/40" />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
-        <div className="h-16 animate-pulse rounded-2xl bg-emerald-100/80 dark:bg-emerald-950/30" />
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <main className="mx-auto max-w-5xl space-y-3 px-3 py-3 pb-safe-nav sm:px-4 sm:py-4">
+        <div className="h-10 w-48 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-12 animate-pulse rounded-xl bg-emerald-100/80 dark:bg-emerald-950/30" />
+        <div className="grid grid-cols-2 gap-2">
           {Array.from({ length: 2 }).map((_, i) => (
             <div
               key={i}
-              className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              <div className="h-9 w-9 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" />
-              <div className="h-10 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-              <div className="flex gap-1.5">
-                {Array.from({ length: 4 }).map((__, j) => (
-                  <div
-                    key={j}
-                    className="h-12 w-12 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800"
-                  />
-                ))}
-              </div>
-            </div>
+              className="h-28 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800"
+            />
           ))}
         </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="h-14 animate-pulse rounded-xl bg-emerald-100/60 dark:bg-emerald-950/20" />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-20 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-800"
-            />
-          ))}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-16 animate-pulse rounded-2xl bg-zinc-200 dark:bg-zinc-800"
-            />
+            <div key={i} className="h-16 animate-pulse rounded-xl bg-zinc-200 dark:bg-zinc-800" />
           ))}
         </div>
       </main>
@@ -468,34 +435,21 @@ export default function DashboardOverviewPage() {
   }
 
   return (
-    <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      {/* Header */}
-      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+    <div className="tm-dashboard-page">
+      <header className="border-b border-zinc-200/80 bg-white/80 dark:border-zinc-800 dark:bg-zinc-950/50">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-3 sm:px-4">
           <div className="min-w-0">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
-              Merchant dashboard
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
+              Overview
             </p>
-            <h1 className="tm-shop-title tm-shop-title-merchant truncate text-2xl leading-tight sm:text-3xl">
+            <h1 className="tm-shop-title tm-shop-title-merchant truncate text-xl leading-tight sm:text-2xl">
               <MerchantShopTitle name={activeShop?.name ?? "Overview"} />
             </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {activeShop && (
-              <Link
-                href={storefrontUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-              >
-                View store
-              </Link>
-            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
+      <main className="mx-auto max-w-5xl space-y-4 px-3 py-4 pb-safe-nav sm:space-y-5 sm:px-4 sm:py-5">
         {activeShop && (
           <>
             {/* Store status strip */}

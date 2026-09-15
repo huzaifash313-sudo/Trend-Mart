@@ -22,7 +22,9 @@ export type PosCategoryPack =
   | "services"
   | "beauty"
   | "electronics"
-  | "bakery";
+  | "bakery"
+  /** Sanitary, ceramics, pipes, hardware counter billing */
+  | "hardware";
 
 export type PosPaymentMethod =
   | "cash"
@@ -116,52 +118,52 @@ export const POS_MODULE_META: Record<
 > = {
   queue: {
     label: "Orders",
-    blurb: "WhatsApp + online + counter tickets",
+    blurb: "Online & WhatsApp orders waiting",
     icon: "📋",
   },
   counter: {
-    label: "Counter",
-    blurb: "Billing, barcode, split pay, print",
+    label: "Bill / Counter",
+    blurb: "Search item → take payment → print bill",
     icon: "🧾",
   },
   kitchen: {
     label: "Kitchen",
-    blurb: "Dine-in KOT board wired into POS",
+    blurb: "Cook tickets for dine-in / food orders",
     icon: "👨‍🍳",
   },
   stock: {
-    label: "Inventory",
-    blurb: "Catalog setup · stock · barcodes",
+    label: "Stock",
+    blurb: "Product details + count stock in shop",
     icon: "📦",
   },
   cash: {
-    label: "Cash",
-    blurb: "Open drawer · day close · variance",
+    label: "Cash drawer",
+    blurb: "Open morning float → close night count",
     icon: "💵",
   },
   reports: {
     label: "Reports",
-    blurb: "Today + date range sales mix",
+    blurb: "Sales, print & download history",
     icon: "📊",
   },
   customers: {
     label: "Customers",
-    blurb: "Walk-in phone book / quick pick",
+    blurb: "Save phone book for quick billing",
     icon: "👥",
   },
   expenses: {
     label: "Expenses",
-    blurb: "Shop costs · rent · utilities",
+    blurb: "Rent, bills, shop costs",
     icon: "📉",
   },
   credit: {
-    label: "Credit",
-    blurb: "Udhaar give · collect · balances",
+    label: "Udhaar",
+    blurb: "Give credit · collect · balances",
     icon: "💳",
   },
   recipes: {
     label: "Recipes",
-    blurb: "Raw → finished BOM / stock deduct",
+    blurb: "Ingredients → finished item stock",
     icon: "🧪",
   },
 };
@@ -253,195 +255,4 @@ export interface PosOfflineSale {
   id: string;
   payload: Record<string, unknown>;
   createdAt: string;
-}
-
-/** Apply pack defaults onto settings (merchant can still override). */
-export function applyPackDefaults(
-  pack: PosCategoryPack,
-  current: PosSettings,
-): PosSettings {
-  const next = { ...current, pack };
-  const ensure = (mods: PosModuleId[]) => {
-    const set = new Set([...current.modules, ...mods]);
-    return [...set] as PosModuleId[];
-  };
-  const core = [
-    "queue",
-    "counter",
-    "stock",
-    "cash",
-    "reports",
-    "customers",
-    "expenses",
-    "credit",
-  ] as PosModuleId[];
-  const foodish = [...core, "kitchen", "recipes"] as PosModuleId[];
-
-  // Soft stock + optional barcode/expiry/batch everywhere (merchant can turn on).
-  switch (pack) {
-    case "grocery":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: true,
-        token_mode: false,
-        prefer_customer_phone: false,
-        kitchen_enabled: false,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 10,
-        modules: ensure(core),
-      };
-    case "pharmacy":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: false,
-        token_mode: false,
-        prefer_customer_phone: false,
-        kitchen_enabled: false,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 8,
-        modules: ensure(core),
-      };
-    case "food":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: false,
-        token_mode: true,
-        prefer_customer_phone: false,
-        kitchen_enabled: true,
-        counter_layout: "menu",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 5,
-        modules: ensure(foodish),
-      };
-    case "cafe":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: false,
-        token_mode: true,
-        prefer_customer_phone: false,
-        kitchen_enabled: true,
-        counter_layout: "menu",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 5,
-        modules: ensure(foodish),
-      };
-    case "bakery":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: true,
-        token_mode: true,
-        prefer_customer_phone: false,
-        kitchen_enabled: true,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 8,
-        modules: ensure(foodish),
-      };
-    case "fashion":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: false,
-        token_mode: false,
-        prefer_customer_phone: false,
-        kitchen_enabled: false,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 3,
-        modules: ensure(core),
-      };
-    case "beauty":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: false,
-        token_mode: false,
-        prefer_customer_phone: false,
-        kitchen_enabled: false,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 4,
-        modules: ensure(core),
-      };
-    case "electronics":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: false,
-        token_mode: false,
-        prefer_customer_phone: false,
-        kitchen_enabled: false,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 2,
-        modules: ensure(core),
-      };
-    case "services":
-      return {
-        ...next,
-        barcode_enabled: false,
-        decimal_qty: false,
-        token_mode: false,
-        prefer_customer_phone: false,
-        kitchen_enabled: false,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: false,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 0,
-        modules: ensure([
-          "queue",
-          "counter",
-          "cash",
-          "reports",
-          "customers",
-          "expenses",
-          "credit",
-        ]).filter((m) => m !== "stock" && m !== "recipes"),
-      };
-    default:
-      return {
-        ...next,
-        barcode_enabled: false,
-        counter_layout: "excel",
-        block_oversell: false,
-        warn_low_on_add: true,
-        track_batch: false,
-        track_expiry: false,
-        low_stock_threshold: 5,
-        modules: ensure(core),
-      };
-  }
 }

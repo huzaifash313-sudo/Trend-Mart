@@ -8,14 +8,24 @@ interface FullScreenChatShellProps {
   children: ReactNode;
   /** Optional extra classes on the shell container */
   className?: string;
+  /**
+   * When true, render in-page (keeps merchant dashboard sidebar + header visible)
+   * instead of a portal that covers the whole viewport.
+   */
+  embedded?: boolean;
 }
 
 /**
  * WhatsApp-style fixed chat viewport.
  * Opaque backdrop covers homepage (Sponsored, etc.). Shell sits above bottom nav on mobile;
  * on md+ it fills to the viewport bottom (no bottom-nav gap).
+ * Pass `embedded` for merchant dashboard so TrendsMart chrome stays visible.
  */
-export function FullScreenChatShell({ children, className = "" }: FullScreenChatShellProps) {
+export function FullScreenChatShell({
+  children,
+  className = "",
+  embedded = false,
+}: FullScreenChatShellProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -23,6 +33,7 @@ export function FullScreenChatShell({ children, className = "" }: FullScreenChat
   }, []);
 
   useEffect(() => {
+    if (embedded) return;
     document.documentElement.classList.add("tm-chat-fullscreen");
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -30,7 +41,17 @@ export function FullScreenChatShell({ children, className = "" }: FullScreenChat
       document.documentElement.classList.remove("tm-chat-fullscreen");
       document.body.style.overflow = prevOverflow;
     };
-  }, []);
+  }, [embedded]);
+
+  if (embedded) {
+    return (
+      <div
+        className={`tm-chat-shell flex h-[calc(100dvh-3rem)] min-h-[28rem] flex-col overflow-hidden border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${className}`}
+      >
+        {children}
+      </div>
+    );
+  }
 
   const shell = (
     <>
@@ -117,7 +138,13 @@ export function ChatShellHeader({
       </div>
 
       {badge ? (
-        <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[0.55rem] font-bold uppercase tracking-wide">
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[0.55rem] font-bold uppercase tracking-wide ${
+            gradient
+              ? "bg-white/20 text-white"
+              : "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800"
+          }`}
+        >
           {badge}
         </span>
       ) : null}

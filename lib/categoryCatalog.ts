@@ -35,6 +35,14 @@ export const CATEGORY_ALIASES: Record<string, ShopCategory> = {
   Others: "Others / Universal",
   Other: "Others / Universal",
   Universal: "Others / Universal",
+  Sanitary: "Sanitary and Fittings",
+  Fittings: "Sanitary and Fittings",
+  Ceramics: "Sanitary and Fittings",
+  Ceramic: "Sanitary and Fittings",
+  Plumbing: "Sanitary and Fittings",
+  Hardware: "Sanitary and Fittings",
+  Tiles: "Sanitary and Fittings",
+  Bathroom: "Sanitary and Fittings",
 };
 
 /** Normalize any category string to a known ShopCategory (or null if unknown). */
@@ -223,13 +231,17 @@ export const SUBCATEGORY_CATALOG: Record<string, CatalogSubCategory[]> = {
     others("Handmade & Crafts"),
   ],
   "Sanitary and Fittings": [
-    { name: "Taps & Mixers", slug: "taps-mixers", description: "Basin, kitchen, and shower mixers", icon: "🚰", sort_order: 1 },
-    { name: "Pipes & Connectors", slug: "pipes-connectors", description: "PVC, PPR, elbows, and joints", icon: "🔧", sort_order: 2 },
-    { name: "Bathroom Accessories", slug: "bathroom-accessories", description: "Soap dishes, towel rails, and mirrors", icon: "🪞", sort_order: 3 },
-    { name: "Toilet & Cistern", slug: "toilet-cistern", description: "Commodes, seats, and flush tanks", icon: "🚽", sort_order: 4 },
+    { name: "Taps & Mixers", slug: "taps-mixers", description: "Basin, kitchen, and shower mixers (tootiya)", icon: "🚰", sort_order: 1 },
+    { name: "Ceramics & Chinaware", slug: "ceramics-chinaware", description: "Ceramic wash sets, closets, and china sanitaryware", icon: "🏺", sort_order: 2 },
+    { name: "Toilet & Cistern", slug: "toilet-cistern", description: "Commodes, seats, and flush tanks", icon: "🚽", sort_order: 3 },
+    { name: "Sinks & Basins", slug: "sinks-basins", description: "Wash basins, kitchen sinks, and pedestals", icon: "🧼", sort_order: 4 },
     { name: "Showers & Bath", slug: "showers-bath", description: "Shower heads, hand showers, and baths", icon: "🚿", sort_order: 5 },
-    { name: "Valves & Hardware", slug: "valves-hardware", description: "Ball valves, gate valves, and fittings", icon: "⚙️", sort_order: 6 },
-    { name: "Sinks & Basins", slug: "sinks-basins", description: "Wash basins, kitchen sinks, and pedestals", icon: "🧼", sort_order: 7 },
+    { name: "Bathroom Accessories", slug: "bathroom-accessories", description: "Soap dishes, towel rails, mirrors, and holders", icon: "🪞", sort_order: 6 },
+    { name: "Pipes & Connectors", slug: "pipes-connectors", description: "PVC, PPR, elbows, tees, and joints", icon: "🔧", sort_order: 7 },
+    { name: "Valves & Hardware", slug: "valves-hardware", description: "Ball valves, gate valves, and CP fittings", icon: "⚙️", sort_order: 8 },
+    { name: "Tiles & Flooring", slug: "tiles-flooring", description: "Floor tiles, wall tiles, and ceramic tiles", icon: "🧱", sort_order: 9 },
+    { name: "Water Heaters & Geysers", slug: "water-heaters-geysers", description: "Electric / gas geysers and heaters", icon: "♨️", sort_order: 10 },
+    { name: "Sealants & Adhesives", slug: "sealants-adhesives", description: "Silicon, thread tape, glue, and sealants", icon: "🧴", sort_order: 11 },
     others("Sanitary and Fittings"),
   ],
   "Home Maintenance & Repair": [

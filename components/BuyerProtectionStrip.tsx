@@ -19,7 +19,7 @@ export default function BuyerProtectionStrip({
   if (compact) {
     return (
       <div
-        className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-3 py-2 text-[10px] text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200 ${className}`}
+        className={`flex flex-wrap items-center gap-x-2 gap-y-0 rounded-md border border-emerald-200/80 bg-emerald-50/60 px-2 py-1 text-[10px] font-medium text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200 ${className}`}
       >
         <span className="font-bold">{t("trust.title")}</span>
         <Link href="/legal/refund-policy" className="underline underline-offset-2">

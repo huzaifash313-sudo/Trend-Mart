@@ -82,7 +82,7 @@ export default function PosRecipesPanel({
   }
 
   return (
-    <section className="mx-auto max-w-lg space-y-4">
+    <section className="mx-auto max-w-lg space-y-2">
       <div>
         <h2 className="text-sm font-bold">Recipes / BOM</h2>
         <p className="text-[11px] text-zinc-500">
@@ -98,7 +98,7 @@ export default function PosRecipesPanel({
         <select
           value={finishedId}
           onChange={(e) => setFinishedId(e.target.value)}
-          className="mb-3 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+          className="mb-2 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
         >
           <option value="">Select…</option>
           {products.map((p) => (
@@ -137,7 +137,7 @@ export default function PosRecipesPanel({
           <button
             type="button"
             onClick={addIngredient}
-            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
           >
             Add
           </button>
@@ -174,22 +174,22 @@ export default function PosRecipesPanel({
           type="button"
           disabled={busy}
           onClick={() => void save()}
-          className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+          className="mt-2 w-full rounded-xl bg-emerald-600 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
           Save recipe
         </button>
       </div>
 
-      <ul className="space-y-2">
+      <ul className="space-y-1.5">
         {recipes.length === 0 ? (
-          <li className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-500 dark:border-zinc-700">
+          <li className="rounded-xl border border-dashed border-zinc-300 p-3 text-center text-xs text-zinc-500 dark:border-zinc-700">
             No recipes yet — food / cafe / bakery packs ke liye useful
           </li>
         ) : (
           recipes.map((r) => (
             <li
               key={r.id}
-              className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900"
+              className="rounded-xl border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
             >
               <div className="flex items-start justify-between gap-2">
                 <button type="button" className="min-w-0 text-left" onClick={() => loadRecipe(r)}>

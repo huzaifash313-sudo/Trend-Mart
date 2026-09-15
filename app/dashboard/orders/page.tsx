@@ -31,7 +31,8 @@ import {
 
 type StatusFilter = "all" | OrderStatus;
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
+const FETCH_CHUNK = 80;
 
 function formatMoney(n: number) {
   return `Rs. ${Number(n || 0).toLocaleString()}`;
@@ -63,7 +64,9 @@ export default function MerchantOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [hasMoreRemote, setHasMoreRemote] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [billOrder, setBillOrder] = useState<Order | null>(null);
 
   useEffect(() => {
@@ -91,10 +94,15 @@ export default function MerchantOrdersPage() {
         if (cancelled) return;
         setShop(shopResult.data);
 
-        const ordersResult = await fetchOrdersByShopId(shopResult.data.id);
+        const ordersResult = await fetchOrdersByShopId(shopResult.data.id, {
+          limit: FETCH_CHUNK,
+          offset: 0,
+        });
         if (!cancelled) {
-          if (ordersResult.success) setOrders(ordersResult.data);
-          else addToast(ordersResult.error || "Could not load orders.", "error");
+          if (ordersResult.success) {
+            setOrders(ordersResult.data);
+            setHasMoreRemote(ordersResult.data.length >= FETCH_CHUNK);
+          } else addToast(ordersResult.error || "Could not load orders.", "error");
         }
 
         unsub = subscribeToOrders(
@@ -145,16 +153,39 @@ export default function MerchantOrdersPage() {
     });
   }, [orders, filter, query]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
   const paged = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, safePage]);
+    return filtered.slice(0, visibleCount);
+  }, [filtered, visibleCount]);
 
   useEffect(() => {
-    setPage(1);
+    setVisibleCount(PAGE_SIZE);
   }, [filter, query]);
+
+  const loadOlderOrders = useCallback(async () => {
+    if (!shop || loadingMore || !hasMoreRemote) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetchOrdersByShopId(shop.id, {
+        limit: FETCH_CHUNK,
+        offset: orders.length,
+      });
+      if (!res.success) {
+        addToast(res.error || "Could not load more orders.", "error");
+        return;
+      }
+      setOrders((prev) => {
+        const seen = new Set(prev.map((o) => o.id));
+        const next = [...prev];
+        for (const o of res.data) {
+          if (!seen.has(o.id)) next.push(o);
+        }
+        return next;
+      });
+      setHasMoreRemote(res.data.length >= FETCH_CHUNK);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [shop, loadingMore, hasMoreRemote, orders.length, addToast]);
 
   const awaitingCount = useMemo(
     () => orders.filter((o) => isAwaitingWhatsApp(o)).length,
@@ -287,7 +318,7 @@ export default function MerchantOrdersPage() {
             {shop?.name ?? "Your store"} — Orders
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Update status, reply on WhatsApp, and keep fulfillment moving. Latest 200 orders shown.
+            Update status, reply on WhatsApp, and keep fulfillment moving.
           </p>
         </div>
         <Link
@@ -531,28 +562,32 @@ export default function MerchantOrdersPage() {
           })}
         </div>
 
-        {filtered.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between gap-3 pt-1">
+        {(visibleCount < filtered.length || hasMoreRemote) && (
+          <div className="flex flex-col items-center gap-2 pt-2 sm:flex-row sm:justify-between">
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Page {safePage} of {totalPages} · {filtered.length} orders
+              Showing {paged.length} of {filtered.length}
+              {hasMoreRemote ? "+" : ""} orders
             </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
-              >
-                ← Prev
-              </button>
-              <button
-                type="button"
-                disabled={safePage >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
-              >
-                Next →
-              </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {visibleCount < filtered.length ? (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  Show more
+                </button>
+              ) : null}
+              {hasMoreRemote ? (
+                <button
+                  type="button"
+                  disabled={loadingMore}
+                  onClick={() => void loadOlderOrders()}
+                  className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition enabled:hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:enabled:hover:bg-zinc-800"
+                >
+                  {loadingMore ? "Loading…" : "Load older orders"}
+                </button>
+              ) : null}
             </div>
           </div>
         )}

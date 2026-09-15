@@ -279,13 +279,13 @@ function MyStoryRingButton({
               aria-label="Add another story"
               title="Add another story"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <span className="tm-story-add-glyph tm-story-add-glyph--sm" aria-hidden="true">
+                +
+              </span>
             </button>
           </>
         ) : (
-          /* Empty → one clean "add first story" ring — single tap, no clutter */
+          /* Empty → clean add ring (CSS + only — SVG height:auto was drawing a green line) */
           <button
             type="button"
             onClick={onAdd}
@@ -294,21 +294,7 @@ function MyStoryRingButton({
             title="Add your store story"
           >
             <span className="tm-story-ring tm-story-ring--add" aria-hidden="true">
-              <span className="tm-story-ring-avatar">
-                <svg
-                  className="tm-story-add-icon"
-                  viewBox="0 0 24 24"
-                  width="19"
-                  height="19"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </span>
+              <span className="tm-story-ring-avatar tm-story-add-glyph">+</span>
             </span>
           </button>
         )}

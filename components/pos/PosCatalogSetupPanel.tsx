@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   setProductPosFavourite,
   stocktakeSetQty,
@@ -78,7 +79,8 @@ export default function PosCatalogSetupPanel({
   const { addToast } = useToast();
   const [q, setQ] = useState("");
   const [subFilter, setSubFilter] = useState<string>("all");
-  const [onlyMissing, setOnlyMissing] = useState(true);
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  const [lowStockFirst, setLowStockFirst] = useState(true);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [subNames, setSubNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -150,8 +152,24 @@ export default function PosCatalogSetupPanel({
           (p.short_code || "").toLowerCase().includes(needle),
       );
     }
+    if (lowStockFirst) {
+      rows = [...rows].sort((a, b) => {
+        const aq = a.stock_qty;
+        const bq = b.stock_qty;
+        if (aq == null && bq == null) return a.name.localeCompare(b.name);
+        if (aq == null) return 1;
+        if (bq == null) return -1;
+        const ath = a.reorder_level ?? 5;
+        const bth = b.reorder_level ?? 5;
+        const aneed = aq <= ath ? 0 : 1;
+        const bneed = bq <= bth ? 0 : 1;
+        if (aneed !== bneed) return aneed - bneed;
+        if (aq !== bq) return aq - bq;
+        return a.name.localeCompare(b.name);
+      });
+    }
     return rows;
-  }, [products, q, subFilter, onlyMissing]);
+  }, [products, q, subFilter, onlyMissing, lowStockFirst]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE));
   const pageSafe = Math.min(page, pageCount - 1);
@@ -266,19 +284,23 @@ export default function PosCatalogSetupPanel({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-        <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
-          Online catalog = POS products
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-emerald-800/90 dark:text-emerald-200/90">
-          All {products.length} products listed on your store are already available
-          for billing. Fill barcode, cost, or stock when you need them — leave blank
-          and complete later.
-        </p>
-        <p className="mt-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-          {missingCount} with optional POS fields still empty
-        </p>
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Link
+          href="/dashboard/products/new"
+          className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white hover:bg-emerald-700"
+        >
+          Bulk add products
+        </Link>
+        <Link
+          href="/dashboard/products"
+          className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 font-bold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+        >
+          Products page · CSV
+        </Link>
+        <span className="text-[10px] text-zinc-500">
+          {products.length} items · {missingCount} still missing optional fields
+        </span>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -288,8 +310,8 @@ export default function PosCatalogSetupPanel({
             setQ(e.target.value);
             setPage(0);
           }}
-          placeholder="Search name, barcode, SKU"
-          className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          placeholder="Search product name, barcode, SKU"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
         <select
           value={subFilter}
@@ -297,16 +319,16 @@ export default function PosCatalogSetupPanel({
             setSubFilter(e.target.value);
             setPage(0);
           }}
-          className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <option value="all">All sub-categories ({products.length})</option>
+          <option value="all">All groups ({products.length})</option>
           {subOptions.map((o) => (
             <option key={o.id} value={o.id}>
               {o.label} ({o.count})
             </option>
           ))}
         </select>
-        <label className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-xs font-semibold dark:border-zinc-700 dark:bg-zinc-900">
+        <label className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold dark:border-zinc-700 dark:bg-zinc-900">
           <input
             type="checkbox"
             checked={onlyMissing}
@@ -316,21 +338,34 @@ export default function PosCatalogSetupPanel({
             }}
             className="rounded border-zinc-300 text-emerald-600"
           />
-          Missing fields only
+          Only incomplete rows
+        </label>
+        <label className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-1.5 text-xs font-semibold text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+          <input
+            type="checkbox"
+            checked={lowStockFirst}
+            onChange={(e) => {
+              setLowStockFirst(e.target.checked);
+              setPage(0);
+            }}
+            className="rounded border-amber-300 text-emerald-600"
+          />
+          Low / reorder first
         </label>
         <button
           type="button"
           disabled={busy || dirtyIds.length === 0}
           onClick={() => void saveAllDirty()}
-          className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+          className="rounded-xl bg-emerald-600 px-4 py-1.5 text-sm font-bold text-white disabled:opacity-40"
         >
-          {busy ? "Saving…" : `Save changed (${dirtyIds.length})`}
+          {busy ? "Saving…" : `Save changes (${dirtyIds.length})`}
         </button>
       </div>
 
       <p className="text-[11px] text-zinc-500">
         Showing {pageRows.length} of {filtered.length}
         {filtered.length !== products.length ? ` (filtered)` : ""}
+        {" · "}Barcode / Cost / Stock / Reorder — optional, fill when ready
       </p>
 
       {/* Mobile cards */}
@@ -407,15 +442,15 @@ export default function PosCatalogSetupPanel({
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-              <th className="whitespace-nowrap px-3 py-2.5">Product</th>
-              <th className="whitespace-nowrap px-3 py-2.5">Sub-category</th>
-              <th className="whitespace-nowrap px-3 py-2.5">Price</th>
-              <th className="whitespace-nowrap px-3 py-2.5">Barcode</th>
-              <th className="whitespace-nowrap px-3 py-2.5">Cost</th>
-              <th className="whitespace-nowrap px-3 py-2.5">Stock</th>
-              <th className="whitespace-nowrap px-3 py-2.5">Reorder</th>
-              <th className="whitespace-nowrap px-3 py-2.5">Fav</th>
-              <th className="whitespace-nowrap px-3 py-2.5" />
+              <th className="whitespace-nowrap px-3 py-1.5">Product</th>
+              <th className="whitespace-nowrap px-3 py-1.5">Sub-category</th>
+              <th className="whitespace-nowrap px-3 py-1.5">Price</th>
+              <th className="whitespace-nowrap px-3 py-1.5">Barcode</th>
+              <th className="whitespace-nowrap px-3 py-1.5">Cost</th>
+              <th className="whitespace-nowrap px-3 py-1.5">Stock</th>
+              <th className="whitespace-nowrap px-3 py-1.5">Reorder</th>
+              <th className="whitespace-nowrap px-3 py-1.5">Fav</th>
+              <th className="whitespace-nowrap px-3 py-1.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
@@ -426,13 +461,13 @@ export default function PosCatalogSetupPanel({
                 : "Uncategorized";
               return (
                 <tr key={p.id} className="align-middle">
-                  <td className="max-w-[14rem] truncate px-3 py-2 font-semibold text-zinc-900 dark:text-zinc-50">
+                  <td className="max-w-[14rem] truncate px-3 py-1.5 font-semibold text-zinc-900 dark:text-zinc-50">
                     {p.name}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
+                  <td className="whitespace-nowrap px-3 py-1.5 text-xs text-zinc-500">
                     {subLabel}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
+                  <td className="whitespace-nowrap px-3 py-1.5 tabular-nums">
                     {formatRupees(p.price)}
                   </td>
                   <td className="px-2 py-1.5">
@@ -470,7 +505,7 @@ export default function PosCatalogSetupPanel({
                       placeholder="—"
                     />
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-1.5 text-center">
                     <input
                       type="checkbox"
                       checked={d.favourite}

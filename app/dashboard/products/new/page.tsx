@@ -95,16 +95,16 @@ export default function NewProductPage() {
               <ArrowLeftIcon />
               Products
             </Link>
-            <h1 className="truncate text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-              Batch Add Products
+            <h1 className="truncate text-base font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
+              Bulk add catalog
             </h1>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-4 px-3 py-5 pb-safe-nav sm:px-4">
+      <main className="mx-auto max-w-5xl space-y-3 px-3 py-3 pb-safe-nav sm:px-4">
         {!activeShop && (
-          <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             Create a shop on your dashboard first, then come back to add products.
             <Link href="/dashboard" className="ml-2 font-semibold underline">
               Go to Dashboard
@@ -114,13 +114,14 @@ export default function NewProductPage() {
 
         {activeShop && (
           <>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Adding to <span className="font-semibold text-zinc-900 dark:text-zinc-100">{activeShop.name}</span>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              Add many products in one go for{" "}
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">{activeShop.name}</span>
               {" · "}
-              Sub-categories for{" "}
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                 {activeShop.category}
               </span>
+              . Fill name + price per row, then save all.
             </p>
             <BulkProductCreator
               shopId={activeShop.id}

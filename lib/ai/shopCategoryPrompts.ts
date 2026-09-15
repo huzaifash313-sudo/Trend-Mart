@@ -61,6 +61,12 @@ const CATEGORY_PROMPTS: Record<string, string[]> = {
     "Rates kya hain?",
     "Portfolio dikhao",
   ],
+  sanitary: [
+    "Tootiya / mixer available?",
+    "Ceramic closet price?",
+    "PVC pipe kitna?",
+    "Delivery / transport?",
+  ],
 };
 
 function normalizeCategory(category: string | null | undefined): string {
@@ -79,7 +85,16 @@ function matchCategoryKey(category: string): string | null {
     return category.includes("boutique") ? "boutique" : "fashion";
   if (category.includes("pharmacy") || category.includes("medical")) return "pharmacy";
   if (category.includes("bakery") || category.includes("sweets")) return "bakery";
-  if (category.includes("service")) return "services";
+  if (
+    category.includes("sanitary") ||
+    category.includes("fitting") ||
+    category.includes("ceramic") ||
+    category.includes("hardware") ||
+    category.includes("tiles")
+  )
+    return "sanitary";
+  if (category.includes("service") || category.includes("repair") || category.includes("maintenance"))
+    return "services";
   return null;
 }
 
@@ -123,6 +138,10 @@ export function getShopWelcomeExtras(category: string | null | undefined): strin
       return "Fashion items, sizes, prices — main help karunga.";
     case "pharmacy":
       return "Medicines aur availability check kar sakta hoon.";
+    case "sanitary":
+      return "Taps, ceramics, pipes, fittings — prices aur stock bata sakta hoon.";
+    case "services":
+      return "Services, rates, booking — pooch lo.";
     default:
       return "Products, prices, order help — sab yahan.";
   }

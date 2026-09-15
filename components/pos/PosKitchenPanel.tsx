@@ -96,7 +96,7 @@ export default function PosKitchenPanel({
   }
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-2">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
@@ -115,7 +115,7 @@ export default function PosKitchenPanel({
       </div>
 
       {active.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
+        <p className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-sm text-zinc-500 dark:border-zinc-700">
           No kitchen tickets. Table QR orders appear here live.
         </p>
       ) : (
@@ -126,7 +126,7 @@ export default function PosKitchenPanel({
             return (
               <li
                 key={o.id}
-                className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                className="rounded-xl border border-zinc-200 bg-white p-2.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -137,7 +137,7 @@ export default function PosKitchenPanel({
                     {dine}
                   </span>
                 </div>
-                <p className="mt-2 line-clamp-3 text-[11px] text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1.5 line-clamp-3 text-[11px] text-zinc-600 dark:text-zinc-400">
                   {(o.items_json || [])
                     .map((i) => `${i.quantity ?? 1}× ${i.name}`)
                     .join(", ")}
@@ -145,7 +145,7 @@ export default function PosKitchenPanel({
                 <p className="mt-1 text-sm font-bold text-emerald-700">
                   {formatRupees(o.total_amount)}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {nexts
                     .filter((n) => n !== "Cancelled")
                     .map((n) => (

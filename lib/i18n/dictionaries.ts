@@ -340,8 +340,8 @@ const en: Dict = {
   "trust.terms": "Terms",
   "flash.endsIn": "Ends in",
   "flash.hurry": "Limited time",
-  "recs.alsoBought": "Customers also bought",
-  "recs.similar": "Similar nearby",
+  "recs.alsoBought": "Products you may like",
+  "recs.similar": "Nearby",
   "recs.fromShop": "More from this shop",
   "recs.popularNearby": "Popular nearby picks",
 
@@ -825,8 +825,8 @@ const ur: Dict = {
   "trust.terms": "شرائط",
   "flash.endsIn": "ختم ہونے میں",
   "flash.hurry": "محدود وقت",
-  "recs.alsoBought": "گاہک یہ بھی خریدتے ہیں",
-  "recs.similar": "قریبی ملتی جلتی",
+  "recs.alsoBought": "آپ کو پسند آ سکتے ہیں",
+  "recs.similar": "قریبی",
   "recs.fromShop": "اسی دکان سے مزید",
   "recs.popularNearby": "قریبی مقبول انتخاب",
 

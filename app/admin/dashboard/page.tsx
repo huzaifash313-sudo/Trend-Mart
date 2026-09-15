@@ -69,6 +69,14 @@ import {
   setAdminUserBan,
 } from "@/services/adminService";
 import type { AdminUserRecord } from "@/types";
+import {
+  fetchPendingCategoryRequests,
+  fetchAllPlatformCategoriesForAdmin,
+  reviewCategoryRequest,
+  setPlatformCategoryDisabled,
+  type CategoryRequest,
+  type PlatformCategory,
+} from "@/services/categoryRequestService";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -192,6 +200,9 @@ export default function AdminDashboardPage() {
   const [newSubCatName, setNewSubCatName] = useState("");
   const [subCatSaving, setSubCatSaving] = useState(false);
   const [subCatError, setSubCatError] = useState<string | null>(null);
+  const [categoryRequests, setCategoryRequests] = useState<CategoryRequest[]>([]);
+  const [platformCustoms, setPlatformCustoms] = useState<PlatformCategory[]>([]);
+  const [catReqBusyId, setCatReqBusyId] = useState<string | null>(null);
 
   // ─── Promotional Ads Management ────────────────────────────────────────
   const [ads, setAds] = useState<PromotionalAd[]>([]);
@@ -499,11 +510,53 @@ export default function AdminDashboardPage() {
     if (result.success) setSubCategories(result.data);
   }, []);
 
+  const loadCategoryRequests = useCallback(async () => {
+    const [pending, customs] = await Promise.all([
+      fetchPendingCategoryRequests(),
+      fetchAllPlatformCategoriesForAdmin(),
+    ]);
+    if (pending.success) setCategoryRequests(pending.data);
+    if (customs.success) setPlatformCustoms(customs.data);
+  }, []);
+
   useEffect(() => {
     if (state.activeTab === "categories") {
-      loadSubCategories();
+      void loadSubCategories();
+      void loadCategoryRequests();
     }
-  }, [state.activeTab, loadSubCategories]);
+  }, [state.activeTab, loadSubCategories, loadCategoryRequests]);
+
+  async function handleReviewCategoryRequest(
+    id: string,
+    decision: "approved" | "rejected",
+  ) {
+    setCatReqBusyId(id);
+    const res = await reviewCategoryRequest(
+      id,
+      decision,
+      decision === "rejected" ? "Rejected by admin" : undefined,
+    );
+    setCatReqBusyId(null);
+    if (!res.success) {
+      flashAction(res.error, "error");
+      return;
+    }
+    flashAction(decision === "approved" ? "Category approved" : "Request rejected");
+    void loadCategoryRequests();
+    void loadSubCategories();
+  }
+
+  async function handleDisableCustomCategory(cat: PlatformCategory, disabled: boolean) {
+    setCatReqBusyId(cat.id);
+    const res = await setPlatformCategoryDisabled(cat.id, disabled);
+    setCatReqBusyId(null);
+    if (!res.success) {
+      flashAction(res.error, "error");
+      return;
+    }
+    flashAction(disabled ? "Custom category disabled" : "Custom category re-enabled");
+    void loadCategoryRequests();
+  }
 
   // ─── Ads: Load & Mutate ─────────────────────────────────────────────────
   const loadAds = useCallback(async () => {
@@ -2167,6 +2220,131 @@ export default function AdminDashboardPage() {
 
         {/* ── Categories Tab ─────────────────────────────────────────── */}
         {activeTab === "categories" && (
+          <div className="space-y-6">
+            {/* Merchant custom category queue */}
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    Custom category requests
+                    {categoryRequests.length > 0 ? (
+                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                        {categoryRequests.length}
+                      </span>
+                    ) : null}
+                  </h3>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Merchants soft-use these while pending. Approve for platform-wide,
+                    reject / disable anytime.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadCategoryRequests()}
+                  className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {categoryRequests.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-400 dark:border-zinc-700">
+                  No pending requests.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {categoryRequests.map((req) => (
+                    <li
+                      key={req.id}
+                      className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/40"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                            {req.request_type === "category"
+                              ? `${req.category_icon ?? "📦"} ${req.category_name}`
+                              : `${req.subcategory_icon ?? "📦"} ${req.parent_category} → ${req.subcategory_name}`}
+                          </p>
+                          <p className="mt-0.5 text-xs text-zinc-500">
+                            {req.shop_name ?? "Shop"} · {req.request_type} ·{" "}
+                            {new Date(req.created_at).toLocaleString()}
+                          </p>
+                          {req.request_type === "category" &&
+                          req.proposed_subcategories.length > 0 ? (
+                            <p className="mt-1 text-[11px] text-zinc-500">
+                              Subs:{" "}
+                              {req.proposed_subcategories.map((s) => s.name).join(", ")}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={catReqBusyId === req.id}
+                            onClick={() =>
+                              void handleReviewCategoryRequest(req.id, "approved")
+                            }
+                            className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={catReqBusyId === req.id}
+                            onClick={() =>
+                              void handleReviewCategoryRequest(req.id, "rejected")
+                            }
+                            className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {platformCustoms.filter((c) => c.status === "approved" || c.status === "disabled").length >
+              0 ? (
+                <div className="mt-5 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Custom categories (admin control)
+                  </p>
+                  <ul className="space-y-2">
+                    {platformCustoms
+                      .filter((c) => c.status === "approved" || c.status === "disabled")
+                      .map((c) => (
+                        <li
+                          key={c.id}
+                          className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm dark:bg-zinc-900"
+                        >
+                          <span>
+                            {c.icon} {c.name}{" "}
+                            <span className="text-[10px] font-bold uppercase text-zinc-400">
+                              {c.status}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            disabled={catReqBusyId === c.id}
+                            onClick={() =>
+                              void handleDisableCustomCategory(
+                                c,
+                                c.status !== "disabled",
+                              )
+                            }
+                            className="text-xs font-semibold text-zinc-600 underline dark:text-zinc-300"
+                          >
+                            {c.status === "disabled" ? "Re-enable" : "Disable"}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5">
             <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
               Platform Category Taxonomy
@@ -2205,6 +2383,11 @@ export default function AdminDashboardPage() {
                         : cat === "Toys & Baby Care" ? "🧸"
                         : cat === "Automotive Accessories" ? "🚗"
                         : cat === "Handmade & Crafts" ? "🎨"
+                        : cat === "Sanitary and Fittings" ? "🚿"
+                        : cat === "Home Maintenance & Repair" ? "🔧"
+                        : cat === "Security & Surveillance" ? "📹"
+                        : cat === "Tech & IT Services" ? "💻"
+                        : cat === "Personal & Professional Services" ? "💼"
                         : "📦"}
                     </div>
                     <div className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
@@ -2278,11 +2461,11 @@ export default function AdminDashboardPage() {
 
             <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-200 dark:border-blue-800">
               <p className="text-sm text-blue-700 dark:text-blue-400">
-                ℹ Top-level categories are fixed platform-wide. Click a
-                category above to manage its sub-categories — these power the
-                dropdown merchants see when adding products.
+                Built-in categories stay platform-wide. Merchants can propose custom
+                ones above — approve to list publicly, or disable later.
               </p>
             </div>
+          </div>
           </div>
         )}
 

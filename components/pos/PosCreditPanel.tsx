@@ -79,20 +79,20 @@ export default function PosCreditPanel({
   }
 
   return (
-    <section className="mx-auto max-w-lg space-y-4">
+    <section className="mx-auto max-w-lg space-y-2">
       <div>
         <h2 className="text-sm font-bold">Credit / Udhaar</h2>
         <p className="text-[11px] text-zinc-500">
           Counter pe pay method &quot;Credit&quot; choose karo — yahan recover karo. Phone zaroori
           sirf udhaar ke liye.
         </p>
-        <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
+        <p className="mt-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
           Outstanding: {formatRupees(totalOwed)}
         </p>
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
           Collect payment
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -127,17 +127,17 @@ export default function PosCreditPanel({
           type="button"
           disabled={busy}
           onClick={() => void collect()}
-          className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+          className="mt-2 w-full rounded-xl bg-emerald-600 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
           Record collection
         </button>
       </div>
 
       <div>
-        <p className="mb-2 text-[11px] font-bold uppercase text-zinc-500">Who owes</p>
-        <ul className="space-y-2">
+        <p className="mb-1.5 text-[11px] font-bold uppercase text-zinc-500">Who owes</p>
+        <ul className="space-y-1.5">
           {owing.length === 0 ? (
-            <li className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-500 dark:border-zinc-700">
+            <li className="rounded-xl border border-dashed border-zinc-300 p-3 text-center text-xs text-zinc-500 dark:border-zinc-700">
               No open udhaar
             </li>
           ) : (
@@ -168,7 +168,7 @@ export default function PosCreditPanel({
       </div>
 
       <div>
-        <p className="mb-2 text-[11px] font-bold uppercase text-zinc-500">Recent ledger</p>
+        <p className="mb-1.5 text-[11px] font-bold uppercase text-zinc-500">Recent ledger</p>
         <ul className="max-h-56 space-y-1.5 overflow-y-auto">
           {ledger.map((r) => (
             <li

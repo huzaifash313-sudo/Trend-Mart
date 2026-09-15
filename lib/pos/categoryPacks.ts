@@ -9,7 +9,7 @@ export function suggestPosPack(shopCategory?: string | null): PosCategoryPack {
   if (c.includes("fashion") || c.includes("apparel") || c.includes("boutique")) {
     return "fashion";
   }
-  if (c.includes("beauty") || c.includes("cosmetic") || c.includes("salon")) {
+  if (c.includes("beauty") || c.includes("cosmetic") || c.includes("salon") || c.includes("health & beauty")) {
     return "beauty";
   }
   if (c.includes("electronic") || c.includes("mobile") || c.includes("gadget")) {
@@ -28,15 +28,74 @@ export function suggestPosPack(shopCategory?: string | null): PosCategoryPack {
     return "pharmacy";
   }
   if (
+    c.includes("sanitary") ||
+    c.includes("fitting") ||
+    c.includes("ceramic") ||
+    c.includes("plumbing") ||
+    c.includes("hardware") ||
+    c.includes("tiles") ||
+    c.includes("automotive") ||
+    c.includes("auto ")
+  ) {
+    return "hardware";
+  }
+  if (
     c.includes("service") ||
     c.includes("repair") ||
     c.includes("tech & it") ||
-    c.includes("security")
+    c.includes("security") ||
+    c.includes("maintenance")
   ) {
     return "services";
   }
+  // Previously orphaned → deliberate general retail (excel + stock)
+  if (
+    c.includes("home & living") ||
+    c.includes("home and living") ||
+    c.includes("furniture") ||
+    c.includes("books") ||
+    c.includes("stationery") ||
+    c.includes("sports") ||
+    c.includes("fitness") ||
+    c.includes("toys") ||
+    c.includes("baby") ||
+    c.includes("handmade") ||
+    c.includes("craft") ||
+    c.includes("others") ||
+    c.includes("universal")
+  ) {
+    return "general";
+  }
   return "general";
 }
+
+/** Human-readable: which shop categories this pack is meant for. */
+export const POS_PACK_CATEGORY_COVERAGE: Record<PosCategoryPack, string[]> = {
+  grocery: ["Grocery & Kiryana", "Fruits & Vegetables", "Meat & Seafood"],
+  fashion: ["Fashion & Apparel"],
+  beauty: ["Health & Beauty"],
+  electronics: ["Electronics & Gadgets"],
+  bakery: ["Bakery & Sweets"],
+  cafe: ["Cafe & Beverages"],
+  food: ["Fast Food & Restaurants"],
+  pharmacy: ["Pharmacy & Medical"],
+  hardware: ["Sanitary and Fittings", "Automotive Accessories"],
+  services: [
+    "Home Maintenance & Repair",
+    "Security & Surveillance",
+    "Tech & IT Services",
+    "Personal & Professional Services",
+  ],
+  general: [
+    "Home & Living",
+    "Books & Stationery",
+    "Sports & Fitness",
+    "Toys & Baby Care",
+    "Handmade & Crafts",
+    "Others / Universal",
+    "Custom categories (no keyword match)",
+  ],
+};
 
 export const POS_PACK_OPTIONS: PosCategoryPack[] = [
   "general",
@@ -44,6 +103,7 @@ export const POS_PACK_OPTIONS: PosCategoryPack[] = [
   "fashion",
   "beauty",
   "electronics",
+  "hardware",
   "food",
   "cafe",
   "bakery",
@@ -61,6 +121,8 @@ export function posPackLabel(pack: PosCategoryPack): string {
       return "Beauty / Cosmetics";
     case "electronics":
       return "Electronics / Mobiles";
+    case "hardware":
+      return "Sanitary / Ceramics / Auto / Hardware";
     case "food":
       return "Restaurant / Fast food";
     case "cafe":
@@ -68,11 +130,11 @@ export function posPackLabel(pack: PosCategoryPack): string {
     case "bakery":
       return "Bakery / Sweets";
     case "pharmacy":
-      return "Pharmacy";
+      return "Pharmacy (batch + expiry)";
     case "services":
       return "Services / Repair";
     default:
-      return "General retail";
+      return "General retail (home, books, toys…)";
   }
 }
 
@@ -89,7 +151,13 @@ export function posPackHints(pack: PosCategoryPack): string[] {
     case "beauty":
       return ["Excel search billing", "Soft stock · batch/expiry optional", "Cost price for profit"];
     case "electronics":
-      return ["Excel + optional barcode", "IMEI notes · soft stock", "Credit / udhaar ready"];
+      return ["Excel + barcode on", "IMEI notes · block oversell", "Credit / udhaar ready"];
+    case "hardware":
+      return [
+        "Excel counter: search + Enter",
+        "Decimal qty (pipes / tiles by m)",
+        "Soft stock · credit / udhaar ready",
+      ];
     case "food":
       return [
         "Menu tiles + recipes (raw → dish)",
@@ -103,12 +171,16 @@ export function posPackHints(pack: PosCategoryPack): string[] {
     case "pharmacy":
       return [
         "Excel medical-store billing",
-        "Barcode / expiry optional",
-        "Soft stock · phone optional",
+        "Batch + expiry ON · barcode ON",
+        "Block oversell · phone preferred",
       ];
     case "services":
       return ["Excel quick bill", "Inventory usually off", "Credit + expenses"];
     default:
-      return ["Excel search+Enter", "Soft stock warns", "Turn on barcode/expiry in Setup if needed"];
+      return [
+        "Excel search+Enter for home / books / toys / crafts",
+        "Soft stock warns",
+        "Turn on barcode/expiry in Setup if needed",
+      ];
   }
 }

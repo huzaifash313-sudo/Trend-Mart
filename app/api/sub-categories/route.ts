@@ -84,7 +84,9 @@ export async function GET(request: Request) {
         ? normalized
         : (ALLOWED_CATEGORIES as readonly string[]).includes(rawClean)
           ? rawClean
-          : "";
+          : rawClean.length >= 2 && rawClean.length <= 80 && rawClean !== "All"
+            ? rawClean // custom / platform categories
+            : "";
     if (!category) {
       return NextResponse.json(
         buildSafeErrorResponse(400, `Invalid category: "${rawClean}". Please provide a valid main category.`),

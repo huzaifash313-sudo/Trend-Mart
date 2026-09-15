@@ -1,22 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { signOut } from "@/services/authService";
 import type { AlertCounts } from "@/services/alertService";
-import {
-  fetchAlertCounts,
-  formatAlertSummary,
-  subscribeToAlerts,
-} from "@/services/alertService";
-import { logError } from "@/services/errorService";
-import { isDineInCategory } from "@/types";
-
-/* -------------------------------------------------------------------------- */
-/*  Icons                                                                      */
-/* -------------------------------------------------------------------------- */
+import { formatAlertSummary } from "@/services/alertService";
 
 function BellIcon() {
   return (
@@ -55,16 +42,12 @@ function MessageIcon() {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Alert Popover                                                              */
-/* -------------------------------------------------------------------------- */
-
 function AlertPopover({ counts, onClose }: { counts: AlertCounts; onClose: () => void }) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
       <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-        <h3 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Alerts Overview</h3>
+        <h3 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Alerts</h3>
         <div className="space-y-1.5">
           <Link href="/dashboard/products" onClick={onClose} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/20">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"><PackageIcon /></span>
@@ -82,183 +65,115 @@ function AlertPopover({ counts, onClose }: { counts: AlertCounts; onClose: () =>
             {counts.urgentInquiries > 0 ? <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">{counts.urgentInquiries}</span> : <span className="text-xs text-zinc-400">—</span>}
           </Link>
         </div>
-        {counts.total === 0 && <p className="mt-3 text-center text-xs text-zinc-400">All caught up! No alerts.</p>}
+        {counts.total === 0 && <p className="mt-3 text-center text-xs text-zinc-400">All caught up — no alerts.</p>}
       </div>
     </>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  DashboardNavbar                                                            */
-/* -------------------------------------------------------------------------- */
+export type DashboardNavbarProps = {
+  loading: boolean;
+  shopId: string | null;
+  storeHref: string | null;
+  dineIn: boolean;
+  alertCounts: AlertCounts;
+  onOpenMenu: () => void;
+  onSignOut: () => void;
+};
 
-export default function DashboardNavbar() {
-  const supabase = createClient();
-  const pathname = usePathname();
-
-  const [shopId, setShopId] = useState<string | null>(null);
-  const [shopSlug, setShopSlug] = useState<string | null>(null);
-  const [shopCategory, setShopCategory] = useState<string | null>(null);
-  const [alertCounts, setAlertCounts] = useState<AlertCounts>({ lowStock: 0, pendingOrders: 0, urgentInquiries: 0, total: 0 });
+/** Slim top bar — nav lives in the sidebar / mobile drawer. */
+export default function DashboardNavbar({
+  loading,
+  shopId,
+  storeHref,
+  dineIn,
+  alertCounts,
+  onOpenMenu,
+  onSignOut,
+}: DashboardNavbarProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function resolveShop() {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user?.id || cancelled) return;
-        setShopId(null);
-        const { data: shop } = await supabase.from("shops").select("id, slug, category").eq("owner_id", user.id).maybeSingle();
-        if (!cancelled && shop?.id) {
-          setShopId(shop.id);
-          setShopSlug(typeof shop.slug === "string" ? shop.slug : null);
-          setShopCategory(typeof shop.category === "string" ? shop.category : null);
-        }
-      } catch (err) { logError(err, { module: "DashboardNavbar.resolveShop" }); }
-      finally { if (!cancelled) setLoading(false); }
-    }
-    resolveShop();
-    return () => { cancelled = true; };
-  }, [supabase]);
-
-  /** Returns true when the nav link path matches current pathname */
-  const isActive = useCallback((href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
-  }, [pathname]);
-
-  /** Class for a desktop nav link — highlights the currently active page */
-  const navLinkClass = useCallback((href: string) => {
-    const active = isActive(href);
-    return `shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-      active
-        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-        : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-    }`;
-  }, [isActive]);
-
-  useEffect(() => {
-    if (!shopId) return;
-    let cancelled = false;
-    fetchAlertCounts(shopId).then((result) => { if (!cancelled && result.success) setAlertCounts(result.data); });
-    const unsubscribe = subscribeToAlerts(shopId, (counts) => { if (!cancelled) setAlertCounts(counts); });
-    return () => { cancelled = true; unsubscribe(); };
-  }, [shopId]);
-
-  const handleSignOut = useCallback(async () => {
-    await signOut({ redirectTo: "/" });
-  }, []);
-
-  const togglePopover = useCallback(() => setPopoverOpen((prev) => !prev), []);
+  const togglePopover = useCallback(() => setPopoverOpen((p) => !p), []);
   const closePopover = useCallback(() => setPopoverOpen(false), []);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-[color:var(--tm-surface)]">
-      <div className="mx-auto flex h-12 max-w-6xl items-center gap-3 px-4">
-        {/* Logo */}
-        <Link href="/" className="shrink-0 text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-          TrendsMart
-        </Link>
+    <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95">
+      <div className="flex h-12 items-center gap-2 px-3 sm:gap-3 sm:px-4">
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 text-zinc-700 hover:bg-zinc-50 lg:hidden dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          aria-label="Open dashboard menu"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" aria-hidden>
+            <line x1="4" y1="7" x2="20" y2="7" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="17" x2="20" y2="17" />
+          </svg>
+        </button>
 
-        {/* Dashboard label */}
-        <span className="hidden sm:inline text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          · Dashboard
-        </span>
+        <div className="min-w-0 flex-1 lg:hidden">
+          <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">Dashboard</p>
+          <p className="truncate text-[10px] font-medium text-zinc-500">Menu · manage your store</p>
+        </div>
 
-        <div className="flex-1" />
+        <p className="hidden min-w-0 flex-1 truncate text-sm font-semibold text-zinc-600 dark:text-zinc-300 lg:block">
+          Merchant dashboard
+        </p>
 
-        {/* Visit live storefront */}
-        {!loading && shopId && (
+        {!loading && storeHref ? (
           <Link
-            href={shopSlug ? `/shop/${shopSlug}` : `/shop/${shopId}`}
+            href={storeHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 sm:px-3 sm:text-sm"
-            aria-label="View my store on TrendsMart"
+            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+            aria-label="View my store"
           >
-            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            <span className="hidden sm:inline">View My Store</span>
+            <span className="hidden sm:inline">View store</span>
             <span className="sm:hidden">Store</span>
           </Link>
-        )}
+        ) : null}
 
-        {/* Dine-In ordering (restaurants/cafes only) */}
-        {!loading && shopId && isDineInCategory(shopCategory) && (
+        {!loading && shopId && dineIn ? (
           <Link
             href="/dashboard/tables"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-50 sm:px-3 sm:text-sm dark:hover:bg-emerald-900/20"
-            aria-label="QR table ordering dashboard"
+            className="hidden items-center gap-1 rounded-lg border border-emerald-600 px-2 py-1.5 text-[11px] font-semibold text-emerald-600 hover:bg-emerald-50 sm:inline-flex sm:text-xs dark:hover:bg-emerald-900/20"
           >
-            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-            </svg>
-            <span className="hidden sm:inline">Dine-In</span>
-            <span className="sm:hidden">Dine</span>
+            Dine-In
           </Link>
-        )}
+        ) : null}
 
-        {/* Alert Bell */}
-        {!loading && shopId && (
+        {!loading && shopId ? (
           <div className="relative">
-            <button type="button" onClick={togglePopover} className="relative rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 transition-colors dark:text-zinc-400 dark:hover:bg-zinc-800" aria-label={`Alerts — ${formatAlertSummary(alertCounts)}`} aria-expanded={popoverOpen} aria-haspopup="true">
+            <button
+              type="button"
+              onClick={togglePopover}
+              className="relative rounded-lg p-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              aria-label={`Alerts — ${formatAlertSummary(alertCounts)}`}
+              aria-expanded={popoverOpen}
+            >
               <BellIcon />
-              {alertCounts.total > 0 && (
+              {alertCounts.total > 0 ? (
                 <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-950">
                   {alertCounts.total > 99 ? "99+" : alertCounts.total}
                 </span>
-              )}
+              ) : null}
             </button>
-            {popoverOpen && <AlertPopover counts={alertCounts} onClose={closePopover} />}
+            {popoverOpen ? <AlertPopover counts={alertCounts} onClose={closePopover} /> : null}
           </div>
-        )}
+        ) : null}
 
-        {loading && <div className="h-8 w-8 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />}
+        {loading ? (
+          <div className="h-8 w-8 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
+        ) : null}
 
-        {/* Desktop nav links — scrollable when too many fit */}
-        <nav
-          className="hidden max-w-[min(52vw,40rem)] items-center gap-0.5 overflow-x-auto scrollbar-none md:flex"
-          aria-label="Dashboard navigation"
-          style={{ scrollbarWidth: "none" }}
-        >
-          <Link href="/dashboard" className={navLinkClass("/dashboard")}>Overview</Link>
-          <Link href="/dashboard/orders" className={navLinkClass("/dashboard/orders")}>Orders</Link>
-          {isDineInCategory(shopCategory) && (
-            <>
-              <Link href="/dashboard/kitchen" className={navLinkClass("/dashboard/kitchen")}>Kitchen</Link>
-              <Link href="/dashboard/tables" className={navLinkClass("/dashboard/tables")}>Tables</Link>
-            </>
-          )}
-          <Link href="/dashboard/products" className={navLinkClass("/dashboard/products")}>Products</Link>
-          <Link href="/dashboard/pos" className={navLinkClass("/dashboard/pos")}>POS</Link>
-          <Link
-            href="/dashboard/assistant"
-            className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
-              isActive("/dashboard/assistant")
-                ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/25 dark:text-indigo-400"
-                : "text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/20"
-            }`}
-          >
-            TrendBot
-          </Link>
-          <Link href="/dashboard/inquiries" className={navLinkClass("/dashboard/inquiries")}>Messages</Link>
-          <Link href="/dashboard/settings" className={navLinkClass("/dashboard/settings")}>Settings</Link>
-          <Link href="/dashboard/leads" className={navLinkClass("/dashboard/leads")}>Leads</Link>
-          <Link href="/dashboard/finances" className={navLinkClass("/dashboard/finances")}>Finances</Link>
-          <Link href="/dashboard/ads" className={navLinkClass("/dashboard/ads")}>Ads</Link>
-        </nav>
-
-        {/* Divider + Sign Out — visually separated from nav links */}
-        <div className="hidden h-5 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700 md:block" aria-hidden="true" />
         <button
           type="button"
-          onClick={handleSignOut}
-          className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-          aria-label="Sign out of dashboard"
+          onClick={onSignOut}
+          className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 sm:px-3 sm:text-sm dark:text-red-400 dark:hover:bg-red-900/20"
         >
           Sign out
         </button>

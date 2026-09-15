@@ -18,6 +18,7 @@ import {
   type PosRecipeIngredient,
   type PosSettings,
 } from "@/lib/pos/types";
+import { applyPackDefaults } from "@/lib/pos/applyPack";
 import { suggestPosPack } from "@/lib/pos/categoryPacks";
 import { formatRupees } from "@/lib/formatters";
 import { hasPriceTiers, unitPriceForQuantity } from "@/lib/priceTiers";
@@ -56,8 +57,9 @@ function writeLocal(shopId: string, settings: PosSettings) {
 
 function normalizeSettings(raw: unknown, shopCategory?: string | null): PosSettings {
   const base = { ...DEFAULT_POS_SETTINGS };
+  const suggested = suggestPosPack(shopCategory);
   if (!raw || typeof raw !== "object") {
-    return { ...base, pack: suggestPosPack(shopCategory) };
+    return applyPackDefaults(suggested, { ...base, pack: suggested });
   }
   const o = raw as Partial<PosSettings>;
   let modules =
@@ -74,10 +76,11 @@ function normalizeSettings(raw: unknown, shopCategory?: string | null): PosSetti
   ) {
     modules.push("recipes");
   }
-  return {
+  const pack = o.pack ?? suggested;
+  const merged: PosSettings = {
     enabled: Boolean(o.enabled),
     modules,
-    pack: o.pack ?? suggestPosPack(shopCategory),
+    pack,
     receipt_footer: typeof o.receipt_footer === "string" ? o.receipt_footer : base.receipt_footer,
     low_stock_threshold:
       typeof o.low_stock_threshold === "number" ? o.low_stock_threshold : base.low_stock_threshold,
@@ -120,6 +123,11 @@ function normalizeSettings(raw: unknown, shopCategory?: string | null): PosSetti
       ? o.print_width_mm
       : base.print_width_mm,
   };
+  // First-time saves (no pack chosen yet): apply category-aware defaults
+  if (o.pack == null) {
+    return applyPackDefaults(pack, merged);
+  }
+  return merged;
 }
 
 function heldKey(shopId: string) {

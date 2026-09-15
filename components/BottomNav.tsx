@@ -319,8 +319,7 @@ export default function BottomNav() {
     pathname === "/offline" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/t/") ||
-    pathname === "/dashboard/pos" ||
-    pathname.startsWith("/dashboard/pos/")
+    pathname.startsWith("/dashboard")
   ) {
     return null;
   }

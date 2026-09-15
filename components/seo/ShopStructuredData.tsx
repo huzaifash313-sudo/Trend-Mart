@@ -19,6 +19,8 @@ const CATEGORY_TO_SCHEMA_TYPE: Record<string, string> = {
   "Health & Beauty": "HealthAndBeautyBusiness",
   "Pharmacy & Medical": "Pharmacy",
   "Home & Living": "HomeGoodsStore",
+  "Sanitary and Fittings": "HomeGoodsStore",
+  "Automotive Accessories": "AutoPartsStore",
   Food: "Restaurant",
   Grocery: "GroceryStore",
   Boutique: "ClothingStore",

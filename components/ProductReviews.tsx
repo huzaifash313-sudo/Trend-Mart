@@ -1,11 +1,20 @@
 "use client";
 
 /**
- * Product-scoped reviews on PDP — list, filter, sort, rate CTA, policies.
+ * Product / deal reviews — compact rating + shop row above CTA;
+ * “See reviews” opens a compact scrollable modal (not inline expand).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   computeRatingStats,
   deleteReview,
@@ -17,6 +26,7 @@ import {
 import type { Review } from "@/types";
 import { formatRelativeTime } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
+import CompactRating from "@/components/CompactRating";
 import {
   REVIEW_PAGE_SIZE,
   REVIEW_POLICY_POINTS,
@@ -34,7 +44,7 @@ function StarPath() {
 }
 
 function Stars({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) {
-  const starClass = size === "sm" ? "h-4 w-4" : "h-5 w-5";
+  const starClass = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   return (
     <div className="inline-flex items-center gap-0.5" aria-label={`${Number(rating).toFixed(1)} out of 5`}>
       {[1, 2, 3, 4, 5].map((star) => {
@@ -63,14 +73,21 @@ export interface ProductReviewsProps {
   productId: string;
   shopId: string;
   productName: string;
-  /** Denormalized avg from product row (shown while list loads) */
   avgRating?: number | null;
   reviewCount?: number | null;
   onRequestRate: () => void;
-  /** Bump after a successful rate to reload list */
   refreshKey?: number;
-  /** Parent can refresh rating CTA / product aggregates */
   onReviewsChanged?: () => void;
+  /** Controlled modal open (e.g. parent “open reviews”) */
+  expanded?: boolean;
+  onExpandedChange?: (open: boolean) => void;
+  heading?: string;
+  /** Shown above the See reviews CTA (rating + shop row) */
+  shopName?: string | null;
+  shopLocation?: string | null;
+  shopHref?: string | null;
+  /** Optional write-review status line under the strip */
+  rateHint?: ReactNode;
 }
 
 export default function ProductReviews({
@@ -82,6 +99,13 @@ export default function ProductReviews({
   onRequestRate,
   refreshKey = 0,
   onReviewsChanged,
+  expanded: expandedProp,
+  onExpandedChange,
+  heading = "Product reviews",
+  shopName,
+  shopLocation,
+  shopHref,
+  rateHint,
 }: ProductReviewsProps) {
   const { addToast } = useToast();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -92,6 +116,34 @@ export default function ProductReviews({
   const [sort, setSort] = useState<ReviewSortMode>("newest");
   const [page, setPage] = useState(1);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  const open = expandedProp ?? internalOpen;
+  const setOpen = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      const value = typeof next === "function" ? next(expandedProp ?? internalOpen) : next;
+      onExpandedChange?.(value);
+      if (expandedProp === undefined) setInternalOpen(value);
+    },
+    [expandedProp, internalOpen, onExpandedChange],
+  );
+
+  useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, setOpen]);
 
   const load = useCallback(async () => {
     const [listRes, context, auth] = await Promise.all([
@@ -127,6 +179,8 @@ export default function ProductReviews({
   const displayAvg =
     stats.total > 0 ? stats.average : Number(avgRating) > 0 ? Number(avgRating) : 0;
   const displayCount = stats.total > 0 ? stats.total : Number(reviewCount) || 0;
+  const storeHref = shopHref?.trim() || `/shop/${shopId}`;
+  const storeLabel = [shopName?.trim(), shopLocation?.trim()].filter(Boolean).join(" · ");
 
   async function handleDelete(id: string) {
     if (!window.confirm("Delete your review? This cannot be undone.")) return;
@@ -140,7 +194,6 @@ export default function ProductReviews({
       prev ? { ...prev, alreadyReviewed: false, canSubmit: !prev.isOwner && prev.signedIn } : prev,
     );
     addToast("Review deleted", "success");
-    // Re-check eligibility after delete
     void fetchProductReviewContext(productId).then((next) => {
       setCtx(next);
       onReviewsChanged?.();
@@ -157,234 +210,331 @@ export default function ProductReviews({
     addToast("Reply posted", "success");
   }
 
-  return (
-    <section
-      id="product-reviews"
-      className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-3.5"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
-            Product reviews
-          </h2>
-          <p className="mt-0.5 text-[10px] text-zinc-500">
-            Ratings for <span className="font-medium text-zinc-700 dark:text-zinc-300">{productName}</span>
-            {" · "}
-            <Link
-              href={`/shop/${shopId}#reviews`}
-              className="text-emerald-600 hover:underline dark:text-emerald-400"
-            >
-              Store reviews
-            </Link>
-          </p>
-        </div>
-        {ctx?.signedIn && !ctx.isOwner && ctx.canSubmit ? (
-          <button
-            type="button"
-            onClick={onRequestRate}
-            className="rounded-full bg-amber-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-600"
+  const openModal = () => setOpen(true);
+  const closeModal = () => setOpen(false);
+
+  const modal =
+    mounted && open
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[160] flex items-end justify-center bg-black/50 backdrop-blur-[2px] sm:items-center sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-reviews-title"
+            onClick={closeModal}
           >
-            Write a review
-          </button>
-        ) : null}
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-3">
-        <div className="text-center">
-          <p className="text-2xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">
-            {displayCount > 0 ? displayAvg.toFixed(1) : "—"}
-          </p>
-          <Stars rating={displayAvg} />
-          <p className="mt-1 text-[11px] text-zinc-500">
-            {displayCount.toLocaleString()} review{displayCount !== 1 ? "s" : ""}
-          </p>
-        </div>
-        {stats.total > 0 ? (
-          <div className="min-w-0 flex-1 space-y-1">
-            {[5, 4, 3, 2, 1].map((star) => {
-              const count = stats.distribution[star - 1];
-              const pct = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0;
-              return (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setStarFilter((f) => (f === star ? null : star))}
-                  className={`flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-[11px] ${
-                    starFilter === star
-                      ? "bg-amber-50 dark:bg-amber-950/40"
-                      : "hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
-                  }`}
-                >
-                  <span className="w-4 font-semibold tabular-nums text-zinc-600">{star}</span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                    <div
-                      className="h-full rounded-full bg-amber-400"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span className="w-6 text-right tabular-nums text-zinc-400">{count}</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as ReviewSortMode)}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] font-semibold dark:border-zinc-700 dark:bg-zinc-800"
-        >
-          <option value="newest">Newest</option>
-          <option value="highest">Highest rated</option>
-          <option value="lowest">Lowest rated</option>
-        </select>
-        {starFilter ? (
-          <button
-            type="button"
-            onClick={() => setStarFilter(null)}
-            className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
-          >
-            {starFilter}★ only · clear
-          </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setShowPolicy((v) => !v)}
-          className="ml-auto text-[10px] font-semibold text-zinc-500 underline-offset-2 hover:underline"
-        >
-          Review policy
-        </button>
-      </div>
-
-      {showPolicy ? (
-        <ul className="mt-2 space-y-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
-          {REVIEW_POLICY_POINTS.map((p) => (
-            <li key={p}>· {p}</li>
-          ))}
-          <li>
-            · Full rules:{" "}
-            <Link href="/legal/reviews" className="font-semibold text-emerald-600 hover:underline">
-              Review & rating policy
-            </Link>
-          </li>
-        </ul>
-      ) : null}
-
-      {!ctx?.signedIn ? (
-        <p className="mt-3 text-[11px] text-zinc-500">
-          <Link href="/login" className="font-semibold text-emerald-600 hover:underline">
-            Sign in
-          </Link>{" "}
-          with the account that received this product to leave a verified review.
-        </p>
-      ) : ctx.isOwner ? (
-        <p className="mt-3 text-[11px] text-zinc-500">
-          Store owners can reply to reviews but cannot rate their own products.
-        </p>
-      ) : ctx.alreadyReviewed ? (
-        <p className="mt-3 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-          You already reviewed this product. You can delete it below to post again.
-        </p>
-      ) : !ctx.canSubmit ? (
-        <p className="mt-3 text-[11px] text-zinc-500">
-          Rate after your order for this product is marked Delivered.
-        </p>
-      ) : null}
-
-      <div className="mt-2.5 space-y-2">
-        {loading ? (
-          Array.from({ length: 2 }).map((_, i) => (
             <div
-              key={i}
-              className="h-20 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800"
-            />
-          ))
-        ) : paged.items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-400">
-            No product reviews yet
-            {ctx?.canSubmit ? " — be the first." : "."}
-          </p>
-        ) : (
-          paged.items.map((review) => (
-            <article
-              key={review.id}
-              className="rounded-xl border border-zinc-100 bg-zinc-50/80 p-3.5 dark:border-zinc-800 dark:bg-zinc-950/50"
+              className="flex max-h-[min(88dvh,36rem)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900 sm:rounded-2xl"
+              onClick={(e: ReactMouseEvent) => e.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {review.customer_name}
-                    </p>
-                    {review.verified_purchase ? (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                        Verified order
-                      </span>
-                    ) : null}
-                  </div>
-                  <Stars rating={review.rating} />
-                </div>
-                <span className="shrink-0 text-[11px] text-zinc-400">
-                  {review.created_at ? formatRelativeTime(review.created_at) : ""}
-                </span>
-              </div>
-              {review.comment ? (
-                <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-                  {review.comment}
-                </p>
-              ) : null}
-              {review.merchant_reply ? (
-                <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-                  <p className="text-[0.65rem] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                    Store reply
-                  </p>
-                  <p className="mt-0.5 text-sm text-zinc-700 dark:text-zinc-300">
-                    {review.merchant_reply}
+              <header className="flex shrink-0 items-start gap-2 border-b border-zinc-100 px-3 py-2.5 dark:border-zinc-800">
+                <div className="min-w-0 flex-1">
+                  <h2
+                    id="product-reviews-title"
+                    className="text-[13px] font-extrabold text-zinc-900 dark:text-zinc-50"
+                  >
+                    {heading}
+                  </h2>
+                  <p className="mt-0.5 truncate text-[10px] text-zinc-500">
+                    {productName}
+                    {storeLabel ? ` · ${storeLabel}` : ""}
                   </p>
                 </div>
-              ) : ctx?.isOwner ? (
-                <OwnerReplyInline onSubmit={(t) => void handleReply(review.id, t)} />
-              ) : null}
-              {viewerId && review.user_id === viewerId ? (
+                {ctx?.signedIn && !ctx.isOwner && ctx.canSubmit ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeModal();
+                      onRequestRate();
+                    }}
+                    className="shrink-0 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm hover:bg-amber-600"
+                  >
+                    Write
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => void handleDelete(review.id)}
-                  className="mt-2 text-[11px] font-semibold text-red-600 hover:underline dark:text-red-400"
+                  onClick={closeModal}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  aria-label="Close reviews"
                 >
-                  Delete my review
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
-              ) : null}
-            </article>
-          ))
-        )}
-      </div>
+              </header>
 
-      {paged.totalPages > 1 ? (
-        <div className="mt-3 flex items-center justify-center gap-3">
-          <button
-            type="button"
-            disabled={!paged.hasPrev}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold disabled:opacity-40 dark:border-zinc-700"
-          >
-            Previous
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2.5">
+                {stats.total > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="text-center">
+                      <p className="text-xl font-black tabular-nums leading-none text-zinc-900 dark:text-zinc-50">
+                        {displayAvg.toFixed(1)}
+                      </p>
+                      <Stars rating={displayAvg} />
+                      <p className="mt-0.5 text-[10px] text-zinc-500">
+                        {displayCount.toLocaleString()} review
+                        {displayCount !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      {[5, 4, 3, 2, 1].map((star) => {
+                        const count = stats.distribution[star - 1];
+                        const pct =
+                          stats.total > 0 ? Math.round((count / stats.total) * 100) : 0;
+                        return (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setStarFilter((f) => (f === star ? null : star))}
+                            className={`flex w-full items-center gap-1.5 rounded px-0.5 py-px text-left text-[10px] ${
+                              starFilter === star
+                                ? "bg-amber-50 dark:bg-amber-950/40"
+                                : "hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+                            }`}
+                          >
+                            <span className="w-3 font-semibold tabular-nums text-zinc-600">
+                              {star}
+                            </span>
+                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                              <div
+                                className="h-full rounded-full bg-amber-400"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-5 text-right tabular-nums text-zinc-400">
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as ReviewSortMode)}
+                    className="rounded-lg border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[10px] font-semibold dark:border-zinc-700 dark:bg-zinc-800"
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="highest">Highest rated</option>
+                    <option value="lowest">Lowest rated</option>
+                  </select>
+                  {starFilter ? (
+                    <button
+                      type="button"
+                      onClick={() => setStarFilter(null)}
+                      className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+                    >
+                      {starFilter}★ only · clear
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setShowPolicy((v) => !v)}
+                    className="ml-auto text-[10px] font-semibold text-zinc-500 underline-offset-2 hover:underline"
+                  >
+                    Review policy
+                  </button>
+                </div>
+
+                {showPolicy ? (
+                  <ul className="mt-1.5 space-y-0.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-[10px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
+                    {REVIEW_POLICY_POINTS.map((p) => (
+                      <li key={p}>· {p}</li>
+                    ))}
+                    <li>
+                      · Full rules:{" "}
+                      <Link
+                        href="/legal/reviews"
+                        className="font-semibold text-emerald-600 hover:underline"
+                      >
+                        Review & rating policy
+                      </Link>
+                    </li>
+                  </ul>
+                ) : null}
+
+                {!ctx?.signedIn ? (
+                  <p className="mt-1.5 text-[10px] text-zinc-500">
+                    <Link href="/login" className="font-semibold text-emerald-600 hover:underline">
+                      Sign in
+                    </Link>{" "}
+                    with the account that received this product to leave a verified review.
+                  </p>
+                ) : ctx.isOwner ? (
+                  <p className="mt-1.5 text-[10px] text-zinc-500">
+                    Store owners can reply to reviews but cannot rate their own products.
+                  </p>
+                ) : ctx.alreadyReviewed ? (
+                  <p className="mt-1.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                    You already reviewed this. Delete below to post again.
+                  </p>
+                ) : !ctx.canSubmit ? (
+                  <p className="mt-1.5 text-[10px] text-zinc-500">
+                    Rate after your order is marked Delivered.
+                  </p>
+                ) : null}
+
+                <div className="mt-2 space-y-1.5">
+                  {loading ? (
+                    Array.from({ length: 2 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-14 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800"
+                      />
+                    ))
+                  ) : paged.items.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-zinc-400">
+                      No reviews yet
+                      {ctx?.canSubmit ? " — be the first." : "."}
+                    </p>
+                  ) : (
+                    paged.items.map((review) => (
+                      <article
+                        key={review.id}
+                        className="rounded-lg border border-zinc-100 bg-zinc-50/80 p-2 dark:border-zinc-800 dark:bg-zinc-950/50"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                {review.customer_name}
+                              </p>
+                              {review.verified_purchase ? (
+                                <span className="rounded-full bg-emerald-50 px-1.5 py-px text-[0.55rem] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                  Verified
+                                </span>
+                              ) : null}
+                            </div>
+                            <Stars rating={review.rating} />
+                          </div>
+                          <span className="shrink-0 text-[10px] text-zinc-400">
+                            {review.created_at ? formatRelativeTime(review.created_at) : ""}
+                          </span>
+                        </div>
+                        {review.comment ? (
+                          <p className="mt-1 text-xs leading-snug text-zinc-600 dark:text-zinc-400">
+                            {review.comment}
+                          </p>
+                        ) : null}
+                        {review.merchant_reply ? (
+                          <div className="mt-1 rounded-md border border-emerald-100 bg-emerald-50/80 px-2 py-1 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+                            <p className="text-[0.6rem] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                              Store reply
+                            </p>
+                            <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                              {review.merchant_reply}
+                            </p>
+                          </div>
+                        ) : ctx?.isOwner ? (
+                          <OwnerReplyInline onSubmit={(t) => void handleReply(review.id, t)} />
+                        ) : null}
+                        {viewerId && review.user_id === viewerId ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(review.id)}
+                            className="mt-1 text-[10px] font-semibold text-red-600 hover:underline dark:text-red-400"
+                          >
+                            Delete my review
+                          </button>
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+
+                {paged.totalPages > 1 ? (
+                  <div className="mt-2 flex items-center justify-center gap-2 pb-1">
+                    <button
+                      type="button"
+                      disabled={!paged.hasPrev}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="rounded-full border border-zinc-200 px-2.5 py-0.5 text-[10px] font-semibold disabled:opacity-40 dark:border-zinc-700"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-[10px] text-zinc-500">
+                      {paged.page} / {paged.totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={!paged.hasNext}
+                      onClick={() => setPage((p) => p + 1)}
+                      className="rounded-full border border-zinc-200 px-2.5 py-0.5 text-[10px] font-semibold disabled:opacity-40 dark:border-zinc-700"
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              <footer className="shrink-0 border-t border-zinc-100 px-3 py-2 dark:border-zinc-800">
+                <Link
+                  href={`/shop/${shopId}#reviews`}
+                  className="text-[10px] font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+                >
+                  Store reviews →
+                </Link>
+              </footer>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <>
+      <section id="product-reviews" className="space-y-1" aria-label={heading}>
+        {/* Rating + shop — sits above See reviews */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-0.5">
+          <button type="button" onClick={openModal} className="text-left">
+            {displayCount > 0 ? (
+              <CompactRating average={displayAvg} count={displayCount} size="sm" />
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-50 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-500 ring-1 ring-inset ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700">
+                No ratings yet
+              </span>
+            )}
           </button>
-          <span className="text-xs text-zinc-500">
-            {paged.page} / {paged.totalPages}
-          </span>
+          {storeLabel ? (
+            <Link
+              href={storeHref}
+              className="min-w-0 max-w-full truncate text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+            >
+              {storeLabel}
+            </Link>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-50">{heading}</p>
+            <p className="text-[10px] text-zinc-500">
+              {displayCount > 0
+                ? `${displayCount} review${displayCount !== 1 ? "s" : ""} · tap to read`
+                : "Be the first to review"}
+            </p>
+          </div>
           <button
             type="button"
-            disabled={!paged.hasNext}
-            onClick={() => setPage((p) => p + 1)}
-            className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold disabled:opacity-40 dark:border-zinc-700"
+            onClick={openModal}
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200"
           >
-            Next
+            See reviews
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         </div>
-      ) : null}
-    </section>
+
+        {rateHint ? <div className="px-0.5">{rateHint}</div> : null}
+      </section>
+      {modal}
+    </>
   );
 }
 
@@ -396,21 +546,21 @@ function OwnerReplyInline({ onSubmit }: { onSubmit: (text: string) => void }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-2 text-xs font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+        className="mt-1 text-[10px] font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
       >
         Reply
       </button>
     );
   }
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-1 space-y-1">
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={2}
         maxLength={500}
         placeholder="Reply as store"
-        className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
       />
       <div className="flex gap-2">
         <button
@@ -421,14 +571,14 @@ function OwnerReplyInline({ onSubmit }: { onSubmit: (text: string) => void }) {
             setText("");
             setOpen(false);
           }}
-          className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white disabled:opacity-40"
+          className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white disabled:opacity-40"
         >
           Post
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-xs text-zinc-500"
+          className="text-[10px] text-zinc-500"
         >
           Cancel
         </button>

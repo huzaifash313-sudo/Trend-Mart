@@ -139,7 +139,8 @@ const CATEGORY_META: Record<Exclude<ShopCategory, "All">, CategoryMeta> = {
     key: "Sanitary and Fittings",
     label: "Sanitary and Fittings",
     icon: "🚿",
-    description: "Taps, pipes, bathroom fittings, toilets, and sanitary hardware",
+    description:
+      "Taps (tootiya), ceramics, pipes, bathroom fittings, tiles, and sanitary hardware",
   },
   "Home Maintenance & Repair": {
     key: "Home Maintenance & Repair",
@@ -209,7 +210,10 @@ export function getCategoryMeta(key: string | ShopCategory): CategoryMeta {
 export function isValidCategory(value: string | null | undefined): boolean {
   if (!value || typeof value !== "string") return false;
   if ((ALL_CATEGORIES as readonly string[]).includes(value)) return true;
-  return normalizeShopCategory(value) !== null;
+  if (normalizeShopCategory(value) !== null) return true;
+  // Merchant / platform custom categories (pending or approved)
+  const t = value.trim();
+  return t.length >= 2 && t.length <= 80 && t !== "All" && !/[<>{}]/.test(t);
 }
 
 // ─── Dynamic Counts from Supabase ────────────────────────────────────────────
@@ -265,6 +269,29 @@ export async function fetchCategoryCounts(): Promise<
         ...cat,
         count: countMap.get(key) ?? 0,
       });
+    }
+
+    // Approved custom platform categories
+    try {
+      const { data: customs } = await supabase
+        .from("platform_categories")
+        .select("name, icon, description")
+        .eq("status", "approved")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      for (const row of customs ?? []) {
+        const r = row as { name: string; icon: string; description: string };
+        if (!r.name || categories.some((c) => c.key === r.name)) continue;
+        categories.push({
+          key: r.name as ShopCategory,
+          label: r.name,
+          icon: r.icon || "📦",
+          description: r.description || "Custom merchant category",
+          count: countMap.get(r.name) ?? 0,
+        });
+      }
+    } catch {
+      /* optional until migration applied */
     }
 
     return { success: true, data: { categories, total } };

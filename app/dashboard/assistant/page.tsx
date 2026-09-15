@@ -65,6 +65,7 @@ export default function MerchantAssistantPage() {
       subtitle="Live analytics, growth strategy, revenue & stock — from your real store data."
       backHref="/dashboard"
       backLabel="← Dashboard"
+      embedded
     />
   );
 }

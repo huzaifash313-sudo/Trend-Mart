@@ -65,6 +65,7 @@ BEGIN
       'Toys & Baby Care',
       'Automotive Accessories',
       'Handmade & Crafts',
+      'Sanitary and Fittings',
       'Home Maintenance & Repair',
       'Security & Surveillance',
       'Tech & IT Services',
@@ -216,6 +217,20 @@ INSERT INTO public.sub_categories (category, name, slug, description, icon, sort
   ('Automotive Accessories', 'Interior Accessories', 'interior-accessories', 'Seat covers, mats, steering covers, and organizers', '💺', 3),
   ('Automotive Accessories', 'Exterior & Parts', 'exterior-parts', 'Mirrors, lights, bumpers, and body kits', '🔧', 4),
   ('Automotive Accessories', 'Motorcycle Accessories', 'motorcycle-accessories', 'Helmets, gloves, bike covers, and parts', '🏍️', 5)
+ON CONFLICT (category, slug) DO NOTHING;
+
+INSERT INTO public.sub_categories (category, name, slug, description, icon, sort_order) VALUES
+  ('Sanitary and Fittings', 'Taps & Mixers', 'taps-mixers', 'Basin, kitchen, and shower mixers (tootiya)', '🚰', 1),
+  ('Sanitary and Fittings', 'Ceramics & Chinaware', 'ceramics-chinaware', 'Ceramic wash sets, closets, and china sanitaryware', '🏺', 2),
+  ('Sanitary and Fittings', 'Toilet & Cistern', 'toilet-cistern', 'Commodes, seats, and flush tanks', '🚽', 3),
+  ('Sanitary and Fittings', 'Sinks & Basins', 'sinks-basins', 'Wash basins, kitchen sinks, and pedestals', '🧼', 4),
+  ('Sanitary and Fittings', 'Showers & Bath', 'showers-bath', 'Shower heads, hand showers, and baths', '🚿', 5),
+  ('Sanitary and Fittings', 'Bathroom Accessories', 'bathroom-accessories', 'Soap dishes, towel rails, mirrors, and holders', '🪞', 6),
+  ('Sanitary and Fittings', 'Pipes & Connectors', 'pipes-connectors', 'PVC, PPR, elbows, tees, and joints', '🔧', 7),
+  ('Sanitary and Fittings', 'Valves & Hardware', 'valves-hardware', 'Ball valves, gate valves, and CP fittings', '⚙️', 8),
+  ('Sanitary and Fittings', 'Tiles & Flooring', 'tiles-flooring', 'Floor tiles, wall tiles, and ceramic tiles', '🧱', 9),
+  ('Sanitary and Fittings', 'Water Heaters & Geysers', 'water-heaters-geysers', 'Electric / gas geysers and heaters', '♨️', 10),
+  ('Sanitary and Fittings', 'Sealants & Adhesives', 'sealants-adhesives', 'Silicon, thread tape, glue, and sealants', '🧴', 11)
 ON CONFLICT (category, slug) DO NOTHING;
 
 -- ── 4. Products Table Enhancements ───────────────────────────────────────────

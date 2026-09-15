@@ -573,8 +573,11 @@ export async function createSingleItemOrder(
  */
 export async function fetchOrdersByShopId(
   shopId: string,
+  opts?: { limit?: number; offset?: number },
 ): Promise<ServiceResult<Order[]>> {
   const supabase = createClient();
+  const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 500);
+  const offset = Math.max(opts?.offset ?? 0, 0);
 
   try {
     const { data, error } = await supabase
@@ -582,7 +585,7 @@ export async function fetchOrdersByShopId(
       .select("*")
       .eq("shop_id", shopId)
       .order("created_at", { ascending: false })
-      .limit(200);
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
     const orders = ((data as Record<string, unknown>[]) ?? []).map(parseOrder);
@@ -590,7 +593,7 @@ export async function fetchOrdersByShopId(
   } catch (err) {
     logError(err, {
       module: "orderService.fetchOrdersByShopId",
-      meta: { shopId },
+      meta: { shopId, limit, offset },
     });
     return { success: false, error: toError(err) };
   }

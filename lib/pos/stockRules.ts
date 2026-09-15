@@ -66,16 +66,28 @@ export const POS_STOCK_PROFILES: Record<PosCategoryPack, PosPackStockProfile> = 
     blurb: "Kiryana: decimal qty · soft stock warns · batch/expiry optional",
   },
   pharmacy: {
-    block_oversell: false,
+    block_oversell: true,
     warn_low_on_add: true,
-    track_batch: false,
-    track_expiry: false,
+    track_batch: true,
+    track_expiry: true,
     expiry_warn_days: 90,
     low_stock_threshold: 8,
     unit_label: "pcs",
     restock_presets: [5, 10, 20, 40],
     note_hint: "Batch / Rx / return note",
-    blurb: "Pharmacy: Excel billing · barcode/expiry optional · soft stock",
+    blurb: "Pharmacy: Excel billing · batch + expiry on · soft→hard stock",
+  },
+  electronics: {
+    block_oversell: true,
+    warn_low_on_add: true,
+    track_batch: false,
+    track_expiry: false,
+    expiry_warn_days: 30,
+    low_stock_threshold: 2,
+    unit_label: "pcs",
+    restock_presets: [1, 2, 5, 10],
+    note_hint: "IMEI / serial / warranty note",
+    blurb: "Mobiles: serial notes · barcode on · soft stock warn",
   },
   fashion: {
     block_oversell: false,
@@ -101,17 +113,17 @@ export const POS_STOCK_PROFILES: Record<PosCategoryPack, PosPackStockProfile> = 
     note_hint: "Shade / batch / expiry note",
     blurb: "Cosmetics: soft stock · batch/expiry optional",
   },
-  electronics: {
+  hardware: {
     block_oversell: false,
     warn_low_on_add: true,
     track_batch: false,
     track_expiry: false,
     expiry_warn_days: 30,
-    low_stock_threshold: 2,
-    unit_label: "pcs",
-    restock_presets: [1, 2, 5, 10],
-    note_hint: "IMEI / serial / warranty note",
-    blurb: "Mobiles: serial notes · soft stock · barcode optional",
+    low_stock_threshold: 5,
+    unit_label: "pcs/m",
+    restock_presets: [5, 10, 25, 50],
+    note_hint: "Brand / size / finish / supplier note",
+    blurb: "Sanitary & fittings: Excel bill · decimal qty · soft stock · udhaar",
   },
   food: {
     block_oversell: false,
@@ -331,3 +343,48 @@ export function gateStockAdd(params: {
   }
   return { ok: true };
 }
+
+/** True when tracked stock is at/below reorder level (or shop threshold). */
+export function needsReorder(
+  p: Product,
+  lowThreshold: number,
+): boolean {
+  if (p.stock_qty == null) return false;
+  const thresh = p.reorder_level ?? lowThreshold;
+  return p.stock_qty <= thresh;
+}
+
+/**
+ * Suggested qty to bring stock comfortably above reorder level.
+ * Prefer pack restock presets when they cover the gap.
+ */
+export function suggestedRestockQty(
+  p: Product,
+  lowThreshold: number,
+  presets: number[] = [5, 10, 20],
+): number {
+  if (p.stock_qty == null) return presets[0] ?? 10;
+  const thresh = p.reorder_level ?? lowThreshold;
+  const target = Math.max(thresh * 2, thresh + (presets[1] ?? presets[0] ?? 10));
+  const gap = Math.max(1, Math.ceil(target - (Number(p.stock_qty) || 0)));
+  const sorted = [...presets].filter((n) => n > 0).sort((a, b) => a - b);
+  for (const n of sorted) {
+    if (n >= gap) return n;
+  }
+  return gap;
+}
+
+export function listReorderQueue(
+  products: Product[],
+  lowThreshold: number,
+): Product[] {
+  return products
+    .filter((p) => needsReorder(p, lowThreshold))
+    .sort((a, b) => {
+      const aq = a.stock_qty ?? 0;
+      const bq = b.stock_qty ?? 0;
+      if (aq !== bq) return aq - bq;
+      return a.name.localeCompare(b.name);
+    });
+}
+

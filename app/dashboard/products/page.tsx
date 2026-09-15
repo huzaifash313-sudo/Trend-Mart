@@ -40,7 +40,6 @@ import {
   bulkUpdateFulfillment,
 } from "@/services/productService";
 import { fetchMyShop } from "@/services/shopService";
-import { getShopPath } from "@/lib/shopSlug";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
 import { downloadProductsCSV } from "@/services/exportService";
 import { getProductDiscount } from "@/lib/formatters";
@@ -754,57 +753,76 @@ export default function ProductsDashboardPage() {
 
   return (
     <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      {/* Header */}
-      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href="/dashboard" className="shrink-0 text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
-              ← Dashboard
+      {/* Header — slim; store link lives in DashboardNavbar */}
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link href="/dashboard" className="shrink-0 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+              ← Back
             </Link>
-            <h1 className="tm-font-display truncate text-lg font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-xl">
+            <h1 className="tm-font-display truncate text-base font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
               Products
             </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <Link
               href="/dashboard/products/new"
-              className="inline-flex items-center rounded-full border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+              className="inline-flex items-center rounded-lg border border-emerald-600 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
             >
-              Batch Add
+              Bulk add
             </Link>
-            {activeShopId && (
-              <Link
-                href={activeShop ? getShopPath(activeShop) : "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-              >
-                View My Store
-              </Link>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditingProductId(null);
+                setForm(INITIAL_PRODUCT_FORM);
+                setShowAdvanced(false);
+                setShowProductForm(true);
+              }}
+              className="inline-flex items-center rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+            >
+              + Add
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 pb-safe-nav">
+      <main className="mx-auto max-w-5xl space-y-3 px-3 py-3 pb-safe-nav sm:px-4 sm:py-4">
+        <div className="rounded-lg border border-sky-200/80 bg-sky-50/90 px-2.5 py-2 dark:border-sky-900/50 dark:bg-sky-950/30">
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-sky-800 dark:text-sky-200">
+            Easy guide
+          </p>
+          <ol className="mt-1 space-y-0.5 text-[11px] leading-snug text-sky-950/90 dark:text-sky-100/90">
+            <li>
+              <strong>1.</strong> + Add = ek product. <strong>Bulk add</strong> = bohot products ek saath.
+            </li>
+            <li>
+              <strong>2.</strong> Grocery pack / CSV = ready list import (neeche buttons).
+            </li>
+            <li>
+              <strong>3.</strong> Edit / Delete list mein. Available = customers ko dikhega.
+            </li>
+          </ol>
+        </div>
+
         {/* Quick Stats Bar */}
         {activeShopId && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="tm-panel p-3 text-center">
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{products.length}</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Total Products</p>
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+            <div className="tm-panel px-2 py-1.5 text-center">
+              <p className="text-base font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-lg">{products.length}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Total</p>
             </div>
-            <div className="tm-panel p-3 text-center">
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{products.filter(p => p.is_available).length}</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Available</p>
+            <div className="tm-panel px-2 py-1.5 text-center">
+              <p className="text-base font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-lg">{products.filter(p => p.is_available).length}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">In stock</p>
             </div>
-            <div className="tm-panel p-3 text-center">
-              <p className="text-xl font-bold text-red-500">{products.filter(p => !p.is_available).length}</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Sold Out</p>
+            <div className="tm-panel px-2 py-1.5 text-center">
+              <p className="text-base font-extrabold tabular-nums text-red-500 sm:text-lg">{products.filter(p => !p.is_available).length}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Sold out</p>
             </div>
-            <div className="tm-panel p-3 text-center">
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{analytics?.total_product_clicks ?? "—"}</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Total Clicks</p>
+            <div className="tm-panel px-2 py-1.5 text-center">
+              <p className="text-base font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-lg">{analytics?.total_product_clicks ?? "—"}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Clicks</p>
             </div>
           </div>
         )}
@@ -816,7 +834,7 @@ export default function ProductsDashboardPage() {
               <button
                 type="button"
                 onClick={() => setShowProductForm(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/80 px-4 py-3.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/80 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
               >
                 + Add product
               </button>

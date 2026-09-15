@@ -36,6 +36,8 @@ import { computeDeliveryFeeBreakdown } from "@/lib/deliveryFee";
 import {
   parseShopSchedule,
 } from "@/lib/shopHours";
+import { fetchSellableCategoryOptions } from "@/services/categoryRequestService";
+import CustomCategoryRequestPanel from "@/components/dashboard/CustomCategoryRequestPanel";
 
 /* -------------------------------------------------------------------------- */
 /*  Icons                                                                     */
@@ -383,7 +385,21 @@ export default function DashboardSettingsPage() {
   const [pushBusy, setPushBusy] = useState(false);
   // Whether the "Custom…" km input is expanded in the free-delivery picker.
   const [customRadiusOpen, setCustomRadiusOpen] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([
+    ...PRODUCT_CATEGORIES,
+  ]);
   const { addToast } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSellableCategoryOptions(shop?.id).then((res) => {
+      if (cancelled || !res.success) return;
+      setCategoryOptions(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [shop?.id]);
 
   // Live delivery-charge preview — uses the same helper as checkout so merchants
   // see exactly what customers pay (below the free-delivery threshold).
@@ -819,13 +835,26 @@ export default function DashboardSettingsPage() {
             <CustomSelect
               value={form.category}
               onChange={(value) => setForm((current) => ({ ...current, category: value }))}
-              options={PRODUCT_CATEGORIES.map((c) => ({ value: c, label: c }))}
+              options={categoryOptions.map((c) => ({ value: c, label: c }))}
               ariaLabel="Store category"
             />
             <p className="mt-1.5 text-[0.7rem] leading-relaxed text-zinc-400 dark:text-zinc-500">
               Customers find your store under this category.
             </p>
           </div>
+
+          {shop?.id ? (
+            <CustomCategoryRequestPanel
+              shopId={shop.id}
+              currentCategory={form.category}
+              onCategoryCreated={(categoryName) => {
+                setCategoryOptions((prev) =>
+                  prev.includes(categoryName) ? prev : [...prev, categoryName],
+                );
+                setForm((current) => ({ ...current, category: categoryName }));
+              }}
+            />
+          ) : null}
         </SectionShell>
 
         <SectionShell

@@ -23,8 +23,11 @@ import {
   daysUntilExpiry,
   isExpired,
   isExpiringSoon,
+  listReorderQueue,
+  needsReorder,
   packStockProfile,
   productStockBucket,
+  suggestedRestockQty,
   summarizeStockHealth,
   type StockHealthFilter,
 } from "@/lib/pos/stockRules";
@@ -69,10 +72,17 @@ export default function PosStockPanel({
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [moves, setMoves] = useState<PosStockMoveRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   const health = useMemo(
     () => summarizeStockHealth(products, settings.low_stock_threshold, warnDays),
     [products, settings.low_stock_threshold, warnDays],
+  );
+
+  const reorderQueue = useMemo(
+    () => listReorderQueue(products, settings.low_stock_threshold),
+    [products, settings.low_stock_threshold],
   );
 
   const list = useMemo(() => {
@@ -92,7 +102,7 @@ export default function PosStockPanel({
         (p) => productStockBucket(p, settings.low_stock_threshold, warnDays) === filter,
       );
     }
-    return rows.slice(0, 150);
+    return rows.slice(0, 200);
   }, [products, q, filter, settings.low_stock_threshold, warnDays]);
 
   useEffect(() => {
@@ -118,19 +128,54 @@ export default function PosStockPanel({
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkRestockSuggested(targets: Product[]) {
+    if (!targets.length || bulkBusy) return;
+    setBulkBusy(true);
+    let ok = 0;
+    let fail = 0;
+    try {
+      for (const p of targets) {
+        if (p.stock_qty == null) continue;
+        const n = suggestedRestockQty(
+          p,
+          settings.low_stock_threshold,
+          profile.restock_presets,
+        );
+        const res = await restockProduct(shopId, p.id, n, "Bulk restock");
+        if (res.success) ok += 1;
+        else fail += 1;
+      }
+      if (ok) addToast(`Restocked ${ok} item${ok === 1 ? "" : "s"}`, "success");
+      if (fail) addToast(`${fail} could not update`, "error");
+      setSelected(new Set());
+      await onRefresh();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const chips: { id: StockHealthFilter; label: string; count: number; tone: string }[] = [
     { id: "all", label: "All", count: health.total, tone: "bg-zinc-100 dark:bg-zinc-800" },
-    { id: "low", label: "Low", count: health.low, tone: "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" },
-    { id: "out", label: "Out", count: health.out, tone: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" },
+    { id: "low", label: "Low / reorder", count: health.low, tone: "bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" },
+    { id: "out", label: "Zero left", count: health.out, tone: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" },
     {
       id: "expiring",
-      label: "Expiring",
+      label: "Expiring soon",
       count: health.expiring,
       tone: "bg-orange-100 text-orange-900 dark:bg-orange-950/40 dark:text-orange-200",
     },
     {
       id: "untracked",
-      label: "Untracked",
+      label: "Not counted yet",
       count: health.untracked,
       tone: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800",
     },
@@ -138,16 +183,16 @@ export default function PosStockPanel({
   ];
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-2.5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            {mode === "catalog" ? "Catalog setup" : "Inventory desk"}
+          <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
+            {mode === "catalog" ? "Product details" : "Stock maintenance"}
           </h2>
           <p className="text-[11px] text-zinc-500">
             {mode === "catalog"
-              ? "Online products are already in POS — fill optional fields when ready."
-              : `${profile.blurb} · low ≤ ${settings.low_stock_threshold}`}
+              ? "Barcode, cost, reorder level & stock — fill what you need"
+              : "Count, restock, damage & reorder — keep shelves healthy"}
           </p>
         </div>
         <div className="inline-flex rounded-xl border border-zinc-200 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
@@ -160,7 +205,7 @@ export default function PosStockPanel({
                 : "text-zinc-600 dark:text-zinc-300"
             }`}
           >
-            Catalog setup
+            Product details
           </button>
           <button
             type="button"
@@ -171,7 +216,7 @@ export default function PosStockPanel({
                 : "text-zinc-600 dark:text-zinc-300"
             }`}
           >
-            Stock desk
+            Count & restock
           </button>
         </div>
       </div>
@@ -185,30 +230,88 @@ export default function PosStockPanel({
         />
       ) : (
         <>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950">
-          <p className="text-[10px] font-bold uppercase text-zinc-400">Tracked</p>
-          <p className="text-lg font-black tabular-nums">{health.tracked}</p>
+      {reorderQueue.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50 to-white p-3 dark:border-amber-900/50 dark:from-amber-950/40 dark:to-zinc-900">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-amber-900 dark:text-amber-100">
+                Reorder list · {reorderQueue.length} item
+                {reorderQueue.length === 1 ? "" : "s"}
+              </p>
+              <p className="mt-0.5 text-[11px] text-amber-800/80 dark:text-amber-200/80">
+                Low or out — suggested qty brings stock above your reorder level
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setFilter("low")}
+                className="rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
+              >
+                View low
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void bulkRestockSuggested(reorderQueue.slice(0, 40))}
+                className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {bulkBusy ? "Restocking…" : "Restock all suggested"}
+              </button>
+            </div>
+          </div>
+          <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto">
+            {reorderQueue.slice(0, 12).map((p) => {
+              const sug = suggestedRestockQty(
+                p,
+                settings.low_stock_threshold,
+                profile.restock_presets,
+              );
+              return (
+                <li
+                  key={`rq-${p.id}`}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-white/80 px-2 py-1.5 text-[11px] dark:bg-zinc-950/50"
+                >
+                  <span className="min-w-0 truncate font-semibold text-zinc-800 dark:text-zinc-100">
+                    {p.name}
+                    <span className="ml-1 font-medium text-zinc-400">
+                      · {p.stock_qty ?? "—"} left
+                      {p.reorder_level != null ? ` · reorder ${p.reorder_level}` : ""}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busyId === p.id || bulkBusy || p.stock_qty == null}
+                    onClick={() =>
+                      void withBusy(p.id, async () => {
+                        const res = await restockProduct(
+                          shopId,
+                          p.id,
+                          sug,
+                          "Suggested restock",
+                        );
+                        if (!res.success) addToast(res.error, "error");
+                        else {
+                          addToast(`+${sug} ${p.name}`, "success");
+                          await onRefresh();
+                        }
+                      })
+                    }
+                    className="shrink-0 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-800"
+                  >
+                    +{sug}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {reorderQueue.length > 12 ? (
+            <p className="mt-1 text-[10px] text-amber-700/80 dark:text-amber-300/80">
+              +{reorderQueue.length - 12} more — use Low filter below
+            </p>
+          ) : null}
         </div>
-        <div className="rounded-xl border border-amber-200/60 bg-amber-50/80 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/20">
-          <p className="text-[10px] font-bold uppercase text-amber-700/70">Low</p>
-          <p className="text-lg font-black tabular-nums text-amber-800 dark:text-amber-200">
-            {health.low}
-          </p>
-        </div>
-        <div className="rounded-xl border border-red-200/60 bg-red-50/80 px-3 py-2 dark:border-red-900 dark:bg-red-950/20">
-          <p className="text-[10px] font-bold uppercase text-red-700/70">Out</p>
-          <p className="text-lg font-black tabular-nums text-red-800 dark:text-red-200">
-            {health.out}
-          </p>
-        </div>
-        <div className="rounded-xl border border-orange-200/60 bg-orange-50/80 px-3 py-2 dark:border-orange-900 dark:bg-orange-950/20">
-          <p className="text-[10px] font-bold uppercase text-orange-700/70">Expiring</p>
-          <p className="text-lg font-black tabular-nums text-orange-800 dark:text-orange-200">
-            {health.expiring}
-          </p>
-        </div>
-      </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-1.5">
         {chips.map((c) => (
@@ -225,10 +328,36 @@ export default function PosStockPanel({
         ))}
       </div>
 
+      {selected.size > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+          <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-100">
+            {selected.size} selected
+          </span>
+          <button
+            type="button"
+            disabled={bulkBusy}
+            onClick={() => {
+              const targets = products.filter((p) => selected.has(p.id));
+              void bulkRestockSuggested(targets);
+            }}
+            className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+          >
+            Restock selected (suggested)
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="text-[10px] font-semibold text-zinc-500 hover:underline"
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
+
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search name / barcode / batch…"
+        placeholder="Search product name / barcode…"
         className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
       />
 
@@ -243,11 +372,20 @@ export default function PosStockPanel({
             const expired = isExpired(p.expiry_date);
             const soon = isExpiringSoon(p.expiry_date, warnDays);
             const busy = busyId === p.id;
+            const reorder = needsReorder(p, settings.low_stock_threshold);
+            const sug =
+              p.stock_qty != null
+                ? suggestedRestockQty(
+                    p,
+                    settings.low_stock_threshold,
+                    profile.restock_presets,
+                  )
+                : 0;
 
             return (
               <li
                 key={p.id}
-                className={`space-y-2 px-3 py-3 ${
+                className={`space-y-1.5 px-3 py-2 ${
                   bucket === "out"
                     ? "bg-red-50/50 dark:bg-red-950/15"
                     : bucket === "low"
@@ -258,7 +396,17 @@ export default function PosStockPanel({
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <div className="flex min-w-0 items-start gap-2">
+                    {p.stock_qty != null ? (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(p.id)}
+                        onChange={() => toggleSelect(p.id)}
+                        className="mt-1 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                        aria-label={`Select ${p.name}`}
+                      />
+                    ) : null}
+                    <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
                       {p.name}
                       {bucket === "low" ? (
@@ -284,8 +432,33 @@ export default function PosStockPanel({
                       {p.reorder_level != null ? ` · reorder @ ${p.reorder_level}` : ""}
                       {p.batch_no ? ` · batch ${p.batch_no}` : ""}
                     </p>
+                    </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {reorder && sug > 0 ? (
+                      <button
+                        type="button"
+                        disabled={busy || bulkBusy}
+                        onClick={() =>
+                          void withBusy(p.id, async () => {
+                            const res = await restockProduct(
+                              shopId,
+                              p.id,
+                              sug,
+                              "Suggested restock",
+                            );
+                            if (!res.success) addToast(res.error, "error");
+                            else {
+                              addToast(`+${sug}`, "success");
+                              await onRefresh();
+                            }
+                          })
+                        }
+                        className="rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white"
+                      >
+                        Restock +{sug}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       disabled={busy}
@@ -328,7 +501,7 @@ export default function PosStockPanel({
                           : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800"
                       }`}
                     >
-                      {on ? "In" : "Out"}
+                      {on ? "Selling" : "Paused"}
                     </button>
                     <button
                       type="button"
@@ -337,7 +510,7 @@ export default function PosStockPanel({
                       }
                       className="rounded-full border border-zinc-200 px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700"
                     >
-                      Hist
+                      History
                     </button>
                   </div>
                 </div>
@@ -360,12 +533,12 @@ export default function PosStockPanel({
                       }
                       className="rounded-lg border border-dashed border-emerald-400 px-2.5 py-1.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-200"
                     >
-                      Start tracking
+                      Start counting this item
                     </button>
                   ) : (
                     <>
-                      <label className="text-[10px] text-zinc-500">
-                        Stocktake
+                      <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
+                        Exact count now
                         <input
                           type="number"
                           min={0}
@@ -390,17 +563,17 @@ export default function PosStockPanel({
                             );
                             if (!res.success) addToast(res.error, "error");
                             else {
-                              addToast("Stocktake saved", "success");
+                              addToast("Count saved", "success");
                               await onRefresh();
                             }
                           })
                         }
-                        className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[10px] font-bold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-700"
                       >
-                        Set
+                        Save count
                       </button>
-                      <label className="text-[10px] text-zinc-500">
-                        + Restock
+                      <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
+                        New stock arrived (+)
                         <input
                           type="number"
                           min={1}
@@ -429,7 +602,7 @@ export default function PosStockPanel({
                             );
                             if (!res.success) addToast(res.error, "error");
                             else {
-                              addToast(`Restocked +${n}`, "success");
+                              addToast(`Added +${n}`, "success");
                               setRestockDraft((d) => ({ ...d, [p.id]: "" }));
                               await onRefresh();
                             }
@@ -437,7 +610,7 @@ export default function PosStockPanel({
                         }
                         className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
                       >
-                        Restock
+                        Add
                       </button>
                       <button
                         type="button"
@@ -504,8 +677,7 @@ export default function PosStockPanel({
                   className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
                 />
 
-                {(showBatch || showExpiry) && (
-                  <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     {showBatch ? (
                       <label className="text-[10px] text-zinc-500">
                         Batch / lot
@@ -559,8 +731,8 @@ export default function PosStockPanel({
                         />
                       </label>
                     ) : null}
-                    <label className="text-[10px] text-zinc-500">
-                      Reorder at
+                    <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
+                      Reorder when ≤
                       <input
                         type="number"
                         min={0}
@@ -581,13 +753,14 @@ export default function PosStockPanel({
                                   x.id === p.id ? { ...x, reorder_level: next } : x,
                                 ),
                               );
+                              addToast("Reorder level saved", "success");
                             }
                           });
                         }}
-                        className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
+                        className="mt-0.5 w-full rounded-lg border border-emerald-200/80 bg-white px-2 py-1.5 text-[11px] dark:border-emerald-900/40 dark:bg-zinc-800"
                       />
                     </label>
-                    <label className="text-[10px] text-zinc-500">
+                    <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
                       Cost (optional)
                       <input
                         type="number"
@@ -616,7 +789,6 @@ export default function PosStockPanel({
                       />
                     </label>
                   </div>
-                )}
 
                 <form
                   className="flex gap-2"
@@ -649,7 +821,7 @@ export default function PosStockPanel({
                   <button
                     type="submit"
                     disabled={busy}
-                    className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[10px] font-bold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-700"
                   >
                     Save
                   </button>

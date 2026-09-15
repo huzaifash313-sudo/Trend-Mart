@@ -58,7 +58,7 @@ export default function PosExpensesPanel({ shopId }: { shopId: string }) {
   const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
 
   return (
-    <section className="mx-auto max-w-lg space-y-4">
+    <section className="mx-auto max-w-lg space-y-2">
       <div>
         <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Expenses</h2>
         <p className="text-[11px] text-zinc-500">
@@ -104,7 +104,7 @@ export default function PosExpensesPanel({ shopId }: { shopId: string }) {
           type="button"
           disabled={busy}
           onClick={() => void onAdd()}
-          className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+          className="mt-2 w-full rounded-xl bg-emerald-600 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
         >
           Add expense
         </button>
@@ -114,16 +114,16 @@ export default function PosExpensesPanel({ shopId }: { shopId: string }) {
         Listed total: {formatRupees(total)}
       </p>
 
-      <ul className="space-y-2">
+      <ul className="space-y-1.5">
         {rows.length === 0 ? (
-          <li className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-500 dark:border-zinc-700">
+          <li className="rounded-xl border border-dashed border-zinc-300 p-3 text-center text-xs text-zinc-500 dark:border-zinc-700">
             No expenses yet
           </li>
         ) : (
           rows.map((r) => (
             <li
               key={r.id}
-              className="flex items-start justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900"
+              className="flex items-start justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{r.title}</p>

@@ -28,8 +28,8 @@ import {
   removeOfflineSale,
   saveOfflineQueue,
 } from "@/lib/pos/offlineQueue";
+import { applyPackDefaults } from "@/lib/pos/applyPack";
 import {
-  applyPackDefaults,
   DEFAULT_POS_SETTINGS,
   POS_MODULE_META,
   type PosCartLine,
@@ -43,6 +43,7 @@ import {
 } from "@/lib/pos/types";
 import {
   POS_PACK_OPTIONS,
+  POS_PACK_CATEGORY_COVERAGE,
   posPackHints,
   posPackLabel,
   suggestPosPack,
@@ -422,6 +423,44 @@ export default function PosApp() {
     [products],
   );
 
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!shop?.id || typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(`tm_pos_recent_${shop.id}`);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as string[];
+      if (Array.isArray(parsed)) setRecentIds(parsed.slice(0, 16));
+    } catch {
+      /* ignore */
+    }
+  }, [shop?.id]);
+
+  const recentProducts = useMemo(() => {
+    const map = new Map(products.map((p) => [p.id, p]));
+    const out: Product[] = [];
+    for (const id of recentIds) {
+      const p = map.get(id);
+      if (p && p.is_available !== false) out.push(p);
+      if (out.length >= 10) break;
+    }
+    return out;
+  }, [products, recentIds]);
+
+  function pushRecent(productId: string) {
+    if (!shop?.id) return;
+    setRecentIds((prev) => {
+      const next = [productId, ...prev.filter((id) => id !== productId)].slice(0, 16);
+      try {
+        localStorage.setItem(`tm_pos_recent_${shop.id}`, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
   const filteredProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = products.filter((p) => p.is_available !== false);
@@ -529,11 +568,18 @@ export default function PosApp() {
   }
 
   function removeCartLine(key: string) {
-    setCart((prev) => {
-      const hit = prev.find((x) => x.key === key);
-      if (hit) setUndoLine(hit);
-      return prev.filter((x) => x.key !== key);
-    });
+    const hit = cart.find((x) => x.key === key);
+    if (!hit) return;
+    setUndoLine(hit);
+    setCart((prev) => prev.filter((x) => x.key !== key));
+    addToast(`Removed ${hit.name} · Undo (Alt+Z)`, "info");
+    window.setTimeout(() => excelRef.current?.focusSearch(), 40);
+  }
+
+  function removeLastCartLine() {
+    if (cart.length === 0) return;
+    const last = cart[cart.length - 1];
+    if (last) removeCartLine(last.key);
   }
 
   function undoRemove() {
@@ -589,6 +635,7 @@ export default function PosApp() {
     const price = unitPrice ?? base;
     const key = lineKey(product.id, variant);
     const step = qtyStep(settings.decimal_qty);
+    pushRecent(product.id);
     setCart((prev) => {
       const existing = prev.find((l) => l.key === key);
       if (existing) {
@@ -616,6 +663,18 @@ export default function PosApp() {
     if (isExpired(product.expiry_date) && settings.track_expiry) {
       addToast(`${product.name} is expired — restock / update expiry first`, "info");
       if (settings.block_oversell !== false) return;
+    }
+    if (settings.pack === "pharmacy" && settings.track_expiry) {
+      if (!product.expiry_date?.trim()) {
+        addToast(`${product.name}: set expiry in Stock before pharmacy sale`, "info");
+        if (settings.block_oversell) return;
+      }
+    }
+    if (settings.pack === "pharmacy" && settings.track_batch) {
+      if (!product.batch_no?.trim()) {
+        addToast(`${product.name}: set batch no. in Stock (pharmacy pack)`, "info");
+        if (settings.block_oversell) return;
+      }
     }
     const step = qtyStep(settings.decimal_qty);
     const gate = gateStockAdd({
@@ -1052,12 +1111,12 @@ export default function PosApp() {
 
   if (needsPin) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-zinc-900 px-4 text-zinc-100">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-zinc-50 px-4 text-zinc-800 dark:bg-zinc-950 dark:text-zinc-100">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
           TrendsMart POS
         </p>
-        <h1 className="mt-2 text-xl font-bold">{shop.name}</h1>
-        <p className="mt-1 text-xs text-zinc-400">Enter staff PIN to unlock cashier</p>
+        <h1 className="mt-2 text-xl font-bold text-zinc-900 dark:text-zinc-50">{shop.name}</h1>
+        <p className="mt-1 text-xs text-zinc-500">Enter staff PIN to unlock cashier</p>
         <form
           className="mt-6 flex w-full max-w-xs flex-col gap-3"
           onSubmit={(e) => {
@@ -1091,7 +1150,7 @@ export default function PosApp() {
   const navBtn = (id: Tab) => {
     const meta =
       id === "setup"
-        ? { label: "Setup", icon: "⚙️", blurb: "Modules & preferences" }
+        ? { label: "Setup", icon: "⚙️", blurb: "Turn modules on/off · shop type" }
         : POS_MODULE_META[id];
     const active = tab === id;
     return (
@@ -1099,16 +1158,26 @@ export default function PosApp() {
         key={id}
         type="button"
         onClick={() => setTab(id)}
-        className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition lg:w-full ${
+        title={meta.blurb}
+        className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold transition lg:w-full ${
           active
-            ? "bg-emerald-600 text-white shadow-sm"
-            : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+            ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/20"
+            : "text-zinc-600 hover:bg-emerald-50 hover:text-emerald-800 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
         }`}
       >
         <span aria-hidden className="text-sm">
           {meta.icon}
         </span>
-        <span className="flex-1">{meta.label}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block leading-tight">{meta.label}</span>
+          <span
+            className={`mt-0.5 hidden text-[9px] font-medium leading-tight lg:block ${
+              active ? "text-emerald-100/90" : "text-zinc-400"
+            }`}
+          >
+            {meta.blurb}
+          </span>
+        </span>
         {id === "queue" && queue.length > 0 ? (
           <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">
             {queue.length}
@@ -1124,82 +1193,82 @@ export default function PosApp() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-zinc-100 dark:bg-zinc-950 lg:flex-row">
-      {/* Desktop left nav */}
-      <aside className="hidden w-52 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900 text-zinc-100 lg:flex">
-        <div className="border-b border-zinc-800 px-3 py-3">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-950 lg:flex-row">
+      {/* Desktop left nav — TrendsMart light chrome; own scroll only */}
+      <aside className="hidden h-full w-56 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-zinc-200 bg-white text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 lg:flex">
+        <div className="sticky top-0 z-10 shrink-0 border-b border-zinc-100 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950">
           <Link
             href="/dashboard"
-            className="mb-2 inline-flex text-[11px] font-semibold text-emerald-400 hover:text-emerald-300"
+            className="mb-2 inline-flex text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400"
           >
             ← Dashboard
           </Link>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400/80">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400/90">
             TrendsMart POS
           </p>
-          <p className="mt-1 truncate text-sm font-bold">{shop.name}</p>
-          <p className="mt-0.5 truncate text-[10px] text-zinc-400">{posPackLabel(settings.pack)}</p>
+          <p className="mt-1 truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">{shop.name}</p>
+          <p className="mt-0.5 truncate text-[10px] text-zinc-500">{posPackLabel(settings.pack)}</p>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-2" aria-label="POS modules">
           {enabledTabs.map(navBtn)}
         </nav>
-        <div className="border-t border-zinc-800 p-3 text-[10px] text-zinc-500">
-          <Link href="/dashboard/orders" className="hover:text-zinc-300">
+        <div className="shrink-0 border-t border-zinc-100 p-3 text-[10px] text-zinc-500 dark:border-zinc-800">
+          <Link href="/dashboard/orders" className="font-semibold text-emerald-700 hover:underline dark:text-emerald-400">
             Full orders →
           </Link>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* ERP header */}
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-900 px-3 py-2 text-zinc-100 sm:px-4">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-zinc-200 bg-white px-3 py-2 text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 sm:px-4">
           <div className="min-w-0">
             <div className="mb-0.5 flex items-center gap-2 lg:hidden">
               <Link
                 href="/dashboard"
-                className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300"
+                className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400"
               >
                 ← Dashboard
               </Link>
-              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">
                 POS
               </span>
             </div>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <h1 className="truncate text-sm font-bold sm:text-base">{shop.name}</h1>
-              <span className="text-[11px] text-zinc-400">{posPackLabel(settings.pack)}</span>
+              <h1 className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50 sm:text-base">{shop.name}</h1>
+              <span className="text-[11px] text-zinc-500">{posPackLabel(settings.pack)}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                 online
-                  ? "bg-emerald-500/20 text-emerald-300"
-                  : "bg-amber-500/20 text-amber-300"
+                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800"
+                  : "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
               }`}
             >
               {online ? "Online" : "Offline"}
             </span>
             {offlinePending > 0 ? (
-              <span className="rounded-full bg-amber-600/30 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
                 {offlinePending} queued
               </span>
             ) : null}
-            <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[10px] font-semibold text-zinc-200">
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
               Cashier unlocked
             </span>
             {settings.staff_pin && settings.staff_pin.trim().length >= 4 ? (
               <button
                 type="button"
                 onClick={() => setUnlocked(false)}
-                className="rounded-md border border-zinc-600 px-2 py-0.5 text-[10px] font-semibold text-zinc-300 hover:bg-zinc-800"
+                className="rounded-md border border-zinc-200 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Lock
               </button>
             ) : null}
             <Link
               href="/dashboard/orders"
-              className="hidden rounded-md border border-zinc-600 px-2 py-0.5 text-[10px] font-semibold text-zinc-300 hover:bg-zinc-800 sm:inline"
+              className="hidden rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50 sm:inline dark:border-zinc-700 dark:bg-zinc-900 dark:text-emerald-400"
             >
               Orders
             </Link>
@@ -1208,13 +1277,13 @@ export default function PosApp() {
 
         {/* Mobile horizontal tabs */}
         <nav
-          className="flex gap-1 overflow-x-auto border-b border-zinc-800 bg-zinc-900 px-2 py-1.5 lg:hidden"
+          className="flex shrink-0 gap-1 overflow-x-auto border-b border-zinc-200 bg-white px-2 py-1.5 dark:border-zinc-800 dark:bg-zinc-950 lg:hidden"
           aria-label="POS sections"
         >
           {enabledTabs.map(navBtn)}
         </nav>
 
-        <main className="flex-1 overflow-y-auto p-3 sm:p-4">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 sm:p-3">
           {/* SETUP */}
           {tab === "setup" && (
             <section className="mx-auto max-w-2xl space-y-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5">
@@ -1274,6 +1343,12 @@ export default function PosApp() {
                     <li key={h}>· {h}</li>
                   ))}
                 </ul>
+                <p className="mt-2 rounded-lg bg-zinc-100 px-2.5 py-1.5 text-[10px] leading-relaxed text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                    Covers:{" "}
+                  </span>
+                  {(POS_PACK_CATEGORY_COVERAGE[settings.pack] ?? []).join(" · ")}
+                </p>
                 <button
                   type="button"
                   className="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400"
@@ -1282,7 +1357,8 @@ export default function PosApp() {
                     setSettings((s) => applyPackDefaults(pack, s));
                   }}
                 >
-                  Suggest from store category ({shop.category})
+                  Auto-match from store category ({shop.category} →{" "}
+                  {posPackLabel(suggestPosPack(shop.category))})
                 </button>
               </div>
 
@@ -1677,12 +1753,11 @@ export default function PosApp() {
 
           {/* COUNTER */}
           {tab === "counter" && settings.enabled && (
-            <section className="grid gap-4 lg:grid-cols-[1.25fr_0.95fr]">
-              <div className="space-y-3">
-                <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-                  {products.length} catalog product{products.length === 1 ? "" : "s"} ready
-                  for billing — same as your online store. Optional POS fields: Inventory →
-                  Catalog setup.
+            <section className="grid gap-3 lg:grid-cols-[1.35fr_minmax(17rem,22rem)] lg:items-start">
+              <div className="space-y-2">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  {products.length} product{products.length === 1 ? "" : "s"} ready
+                  {" · "}same list as your store
                 </p>
                 {held.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
@@ -1748,6 +1823,7 @@ export default function PosApp() {
                       <li>Alt+S — complete sale</li>
                       <li>Alt+C — clear bill</li>
                       <li>Alt+Z — undo remove</li>
+                      <li>⌫ empty search — remove last line</li>
                       <li>Alt+G — discount</li>
                       <li>Alt+M — misc item</li>
                       <li>Alt+P — reprint last</li>
@@ -1878,10 +1954,13 @@ export default function PosApp() {
                     decimalQty={settings.decimal_qty}
                     barcodeEnabled={settings.barcode_enabled}
                     lowStockThreshold={settings.low_stock_threshold}
+                    favourites={favourites}
+                    recentProducts={recentProducts}
                     onTryAdd={tryAddProduct}
                     onSetQty={updateCartLineQty}
                     onSetUnitPrice={updateCartLinePrice}
                     onRemove={removeCartLine}
+                    onRemoveLast={removeLastCartLine}
                     onAdded={(name) => addToast(`+ ${name}`, "success")}
                     onAddCustom={() => setMiscOpen(true)}
                     onScanCode={(code) => handleBarcodeSubmit(code)}
@@ -1968,15 +2047,11 @@ export default function PosApp() {
                 )}
               </div>
 
-              <div className="flex flex-col rounded-2xl border border-zinc-800/10 bg-white p-3 shadow-md dark:border-zinc-700 dark:bg-zinc-900 sm:p-4 lg:sticky lg:top-3">
-                <div className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800">
-                  <div>
+              <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 sm:p-3.5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                  <div className="min-w-0">
                     <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Bill</h2>
                     <p className="truncate text-[10px] text-zinc-500">
-                      {(settings.counter_layout || "excel") === "excel"
-                        ? "Quick search"
-                        : "Menu"}
-                      {" · "}
                       {shop.name}
                     </p>
                   </div>
@@ -1985,7 +2060,7 @@ export default function PosApp() {
                       type="button"
                       disabled={!undoLine}
                       onClick={undoRemove}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-bold disabled:opacity-40 dark:border-zinc-700"
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
                     >
                       Undo
                     </button>
@@ -1993,7 +2068,7 @@ export default function PosApp() {
                       type="button"
                       disabled={cart.length === 0}
                       onClick={holdBill}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-bold disabled:opacity-40 dark:border-zinc-700"
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
                     >
                       Hold
                     </button>
@@ -2001,72 +2076,78 @@ export default function PosApp() {
                       type="button"
                       disabled={cart.length === 0}
                       onClick={clearBill}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-bold disabled:opacity-40 dark:border-zinc-700"
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
                     >
                       Clear
                     </button>
                   </div>
                 </div>
 
+                <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain py-2.5">
                 {cart.length === 0 ? (
-                  <p className="mt-6 text-center text-xs text-zinc-500">
+                  <p className="rounded-xl bg-zinc-50 py-4 text-center text-[11px] text-zinc-500 dark:bg-zinc-800/50">
                     {(settings.counter_layout || "excel") === "excel"
-                      ? "Search + Enter on the grid to add"
+                      ? "Quick add / search se bill shuru karo"
                       : "Tap products to add"}
                   </p>
                 ) : (settings.counter_layout || "excel") === "excel" ? (
-                  <p className="mt-3 text-center text-xs font-medium text-zinc-500">
+                  <p className="text-center text-[10px] font-medium text-zinc-500">
                     {cart.length} lines · see grid
                   </p>
                 ) : (
-                  <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+                  <ul className="max-h-36 space-y-1 overflow-y-auto">
                     {cart.map((l) => (
                       <li
                         key={l.key}
-                        className="flex items-start justify-between gap-2 text-xs"
+                        className="flex items-start justify-between gap-2 text-[11px]"
                       >
                         <div className="min-w-0">
                           <p className="font-semibold text-zinc-800 dark:text-zinc-100">
                             {l.name}
                           </p>
                           {l.variant ? (
-                            <p className="text-[10px] text-zinc-500">{l.variant}</p>
+                            <p className="text-[9px] text-zinc-500">{l.variant}</p>
                           ) : null}
-                          <div className="mt-1 flex items-center gap-2">
+                          <div className="mt-0.5 flex items-center gap-1.5">
                             <button
                               type="button"
-                              className="h-6 w-6 rounded bg-zinc-100 font-bold dark:bg-zinc-800"
-                              onClick={() =>
-                                updateCartLineQty(
-                                  l.key,
-                                  bumpQty(
-                                    l.qty,
-                                    -qtyStep(settings.decimal_qty),
-                                    settings.decimal_qty,
-                                  ),
-                                )
-                              }
+                              className="h-6 w-6 rounded bg-zinc-100 text-[11px] font-bold hover:bg-red-50 hover:text-red-600 dark:bg-zinc-800"
+                              onClick={() => {
+                                const next = bumpQty(
+                                  l.qty,
+                                  -qtyStep(settings.decimal_qty),
+                                  settings.decimal_qty,
+                                );
+                                if (next <= 0) removeCartLine(l.key);
+                                else updateCartLineQty(l.key, next);
+                              }}
                             >
-                              −
+                              {l.qty <= qtyStep(settings.decimal_qty) ? "✕" : "−"}
                             </button>
                             {settings.decimal_qty ? (
                               <input
                                 type="number"
-                                min={0.25}
+                                min={0}
                                 step={0.25}
                                 value={l.qty}
                                 onChange={(e) => {
-                                  const v = Math.max(0.25, Number(e.target.value) || 0.25);
+                                  const v = Number(e.target.value);
+                                  if (!Number.isFinite(v) || v <= 0) {
+                                    removeCartLine(l.key);
+                                    return;
+                                  }
                                   updateCartLineQty(l.key, v);
                                 }}
-                                className="w-14 rounded border border-zinc-200 bg-zinc-50 px-1 py-0.5 text-center tabular-nums dark:border-zinc-700 dark:bg-zinc-800"
+                                className="w-12 rounded border border-zinc-200 bg-zinc-50 px-1 py-0.5 text-center text-[10px] tabular-nums dark:border-zinc-700 dark:bg-zinc-800"
                               />
                             ) : (
-                              <span className="tabular-nums">{l.qty}</span>
+                              <span className="min-w-[1.25rem] text-center tabular-nums">
+                                {l.qty}
+                              </span>
                             )}
                             <button
                               type="button"
-                              className="h-6 w-6 rounded bg-zinc-100 font-bold dark:bg-zinc-800"
+                              className="h-6 w-6 rounded bg-emerald-50 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
                               onClick={() =>
                                 updateCartLineQty(
                                   l.key,
@@ -2080,7 +2161,7 @@ export default function PosApp() {
                             >
                               +
                             </button>
-                            <span className="flex items-center gap-1 text-[10px] text-zinc-400">
+                            <span className="flex items-center gap-1 text-[9px] text-zinc-400">
                               @
                               <input
                                 type="number"
@@ -2090,7 +2171,7 @@ export default function PosApp() {
                                 onChange={(e) =>
                                   updateCartLinePrice(l.key, Number(e.target.value) || 0)
                                 }
-                                className="w-16 rounded border border-zinc-200 bg-zinc-50 px-1 py-0.5 text-center tabular-nums dark:border-zinc-700 dark:bg-zinc-800"
+                                className="w-14 rounded border border-zinc-200 bg-zinc-50 px-1 py-0.5 text-center tabular-nums dark:border-zinc-700 dark:bg-zinc-800"
                                 title="Tap to change sale price"
                               />
                               {l.priceLocked ? (
@@ -2101,24 +2182,33 @@ export default function PosApp() {
                             </span>
                           </div>
                         </div>
-                        <p className="shrink-0 font-bold tabular-nums">
-                          {formatRupees(l.unitPrice * l.qty)}
-                        </p>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <p className="font-bold tabular-nums">
+                            {formatRupees(l.unitPrice * l.qty)}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => removeCartLine(l.key)}
+                            className="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-600 dark:bg-red-950/40 dark:text-red-300"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )}
 
-                <div className="mt-3 flex gap-1.5">
+                <div className="flex gap-1.5">
                   {(["pickup", "delivery"] as const).map((t) => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => setOrderType(t)}
-                      className={`flex-1 rounded-lg py-1.5 text-[11px] font-bold capitalize ${
+                      className={`flex-1 rounded-xl py-2 text-[11px] font-bold capitalize transition ${
                         orderType === t
-                          ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                          ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
+                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
                       }`}
                     >
                       {t}
@@ -2126,23 +2216,23 @@ export default function PosApp() {
                   ))}
                 </div>
 
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   <input
                     value={custName}
                     onChange={(e) => setCustName(e.target.value)}
-                    placeholder="Name (optional)"
-                    className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                    placeholder="Customer name"
+                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-[12px] dark:border-zinc-700 dark:bg-zinc-800"
                   />
                   <input
                     value={custPhone}
                     onChange={(e) => setCustPhone(e.target.value)}
-                    placeholder="Phone (optional)"
-                    className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                    placeholder="Phone"
+                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-[12px] dark:border-zinc-700 dark:bg-zinc-800"
                   />
                 </div>
 
                 {customerQuickPick.length > 0 ? (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-0.5">
                     {customerQuickPick.map((c) => (
                       <button
                         key={c.id}
@@ -2151,9 +2241,9 @@ export default function PosApp() {
                           setCustName(c.name);
                           setCustPhone(c.phone);
                         }}
-                        className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        className="rounded bg-zinc-100 px-1.5 py-0.5 text-[9px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
                       >
-                        {c.name} · {c.phone}
+                        {c.name}
                       </button>
                     ))}
                   </div>
@@ -2163,8 +2253,8 @@ export default function PosApp() {
                   <input
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder="Token / queue #"
-                    className="mt-2 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                    placeholder="Token #"
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
                   />
                 ) : null}
 
@@ -2175,11 +2265,11 @@ export default function PosApp() {
                     type="number"
                     min={0}
                     placeholder="Delivery fee Rs."
-                    className="mt-2 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
                   />
                 ) : null}
 
-                <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                <label className="flex items-center gap-1.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
                   <input
                     type="checkbox"
                     checked={splitPay}
@@ -2197,11 +2287,11 @@ export default function PosApp() {
                       }
                     }}
                   />
-                  Split payment
+                  Split pay
                 </label>
 
                 {splitPay ? (
-                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-1">
                     {(
                       [
                         ["cash", "Cash"],
@@ -2211,7 +2301,7 @@ export default function PosApp() {
                         ["credit", "Udhaar"],
                       ] as const
                     ).map(([key, label]) => (
-                      <label key={key} className="text-[10px] text-zinc-500">
+                      <label key={key} className="text-[9px] text-zinc-500">
                         {label}
                         <input
                           type="number"
@@ -2223,12 +2313,12 @@ export default function PosApp() {
                               [key]: Math.max(0, Number(e.target.value) || 0),
                             }))
                           }
-                          className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                          className="mt-0.5 w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
                         />
                       </label>
                     ))}
-                    <p className="col-span-2 text-[10px] text-zinc-500">
-                      Split total {formatRupees(splitSum(split))} · bill{" "}
+                    <p className="col-span-2 text-[9px] text-zinc-500">
+                      Split {formatRupees(splitSum(split))} · bill{" "}
                       {formatRupees(cartTotal.total)}
                       {Math.abs(splitSum(split) - cartTotal.total) > 2 ? (
                         <span className="font-semibold text-amber-600"> · mismatch</span>
@@ -2236,7 +2326,7 @@ export default function PosApp() {
                     </p>
                   </div>
                 ) : (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {(
                       [
                         "cash",
@@ -2251,7 +2341,7 @@ export default function PosApp() {
                         key={m}
                         type="button"
                         onClick={() => setPay(m)}
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
+                        className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
                           pay === m
                             ? "bg-emerald-600 text-white"
                             : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
@@ -2264,9 +2354,9 @@ export default function PosApp() {
                 )}
 
                 {!splitPay && pay === "cash" ? (
-                  <div className="mt-2 space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">
-                      Cash received · Shift+Enter
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold uppercase tracking-wide text-zinc-500">
+                      Cash · Shift+Enter
                     </label>
                     <input
                       ref={cashRef}
@@ -2277,9 +2367,9 @@ export default function PosApp() {
                       placeholder={
                         cartTotal.total > 0 ? String(cartTotal.total) : "Amount paid"
                       }
-                      className="w-full rounded-lg border-2 border-emerald-500/50 bg-emerald-50/50 px-2 py-2 text-sm font-bold tabular-nums dark:border-emerald-700 dark:bg-emerald-950/20"
+                      className="w-full rounded-md border-2 border-emerald-500/50 bg-emerald-50/50 px-1.5 py-1.5 text-sm font-bold tabular-nums dark:border-emerald-700 dark:bg-emerald-950/20"
                     />
-                    <div className="grid grid-cols-7 gap-1">
+                    <div className="grid grid-cols-7 gap-0.5">
                       {[50, 100, 200, 500, 1000, 2000, 5000].map((val) => (
                         <button
                           key={val}
@@ -2287,9 +2377,9 @@ export default function PosApp() {
                           onClick={() =>
                             setCashReceived(String(cashPaidNum + val))
                           }
-                          className="rounded-md border border-zinc-200 py-1 text-[10px] font-bold hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          className="rounded border border-zinc-200 py-0.5 text-[9px] font-bold hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
                         >
-                          {val}
+                          {val >= 1000 ? `${val / 1000}k` : val}
                         </button>
                       ))}
                     </div>
@@ -2297,80 +2387,80 @@ export default function PosApp() {
                       <button
                         type="button"
                         onClick={() => setCashReceived(String(cartTotal.total))}
-                        className="rounded-md border border-zinc-200 px-2 py-1 text-[10px] font-bold dark:border-zinc-700"
+                        className="rounded border border-zinc-200 px-1.5 py-0.5 text-[9px] font-bold dark:border-zinc-700"
                       >
                         Exact
                       </button>
                       <button
                         type="button"
                         onClick={() => setCashReceived("")}
-                        className="rounded-md border border-zinc-200 px-2 py-1 text-[10px] font-bold dark:border-zinc-700"
+                        className="rounded border border-zinc-200 px-1.5 py-0.5 text-[9px] font-bold dark:border-zinc-700"
                       >
                         Clear
                       </button>
+                      {changeDue > 0 ? (
+                        <span className="ml-auto text-[11px] font-black tabular-nums text-emerald-700 dark:text-emerald-300">
+                          Change {formatRupees(changeDue)}
+                        </span>
+                      ) : null}
                     </div>
-                    {changeDue > 0 ? (
-                      <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2">
-                        <span className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">
-                          Change / wapas
-                        </span>
-                        <span className="text-lg font-black tabular-nums text-emerald-700 dark:text-emerald-300">
-                          {formatRupees(changeDue)}
-                        </span>
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
 
-                <input
-                  ref={discountRef}
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                  type="number"
-                  min={0}
-                  placeholder="Discount Rs. (Alt+G)"
-                  className="mt-2 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800"
-                />
-                <textarea
-                  value={billNotes}
-                  onChange={(e) => setBillNotes(e.target.value)}
-                  rows={2}
-                  placeholder={
-                    settings.pack === "electronics"
-                      ? "IMEI / serial / notes"
-                      : settings.pack === "pharmacy"
-                        ? "Rx reminder / notes"
-                        : "Bill notes"
-                  }
-                  className="mt-2 w-full resize-none rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800"
-                />
+                <div className="grid grid-cols-2 gap-1">
+                  <input
+                    ref={discountRef}
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    type="number"
+                    min={0}
+                    placeholder="Discount Rs"
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                  <input
+                    value={billNotes}
+                    onChange={(e) => setBillNotes(e.target.value)}
+                    placeholder={
+                      settings.pack === "electronics"
+                        ? "IMEI / notes"
+                        : settings.pack === "pharmacy"
+                          ? "Rx / notes"
+                          : settings.pack === "hardware"
+                            ? "Size / finish / notes"
+                            : "Notes"
+                    }
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
+                  />
+                </div>
+                </div>
 
-                <div className="mt-3 space-y-0.5 text-sm">
+                <div className="shrink-0 space-y-1.5 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+                <div className="space-y-0.5 text-sm">
                   {cartTotal.discount > 0 || cartTotal.fee > 0 ? (
                     <>
-                      <div className="flex justify-between text-xs text-zinc-500">
+                      <div className="flex justify-between text-[10px] text-zinc-500">
                         <span>Subtotal</span>
                         <span>{formatRupees(cartTotal.sub)}</span>
                       </div>
                       {cartTotal.discount > 0 ? (
-                        <div className="flex justify-between text-xs text-zinc-500">
+                        <div className="flex justify-between text-[10px] text-zinc-500">
                           <span>Discount</span>
                           <span>−{formatRupees(cartTotal.discount)}</span>
                         </div>
                       ) : null}
                       {cartTotal.fee > 0 ? (
-                        <div className="flex justify-between text-xs text-zinc-500">
+                        <div className="flex justify-between text-[10px] text-zinc-500">
                           <span>Delivery</span>
                           <span>{formatRupees(cartTotal.fee)}</span>
                         </div>
                       ) : null}
                     </>
                   ) : null}
-                  <div className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2.5 text-white dark:bg-emerald-950">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
+                  <div className="flex items-center justify-between rounded-xl bg-emerald-600 px-3 py-2.5 text-white shadow-sm shadow-emerald-600/30">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-100">
                       Total
                     </span>
-                    <span className="text-xl font-black tabular-nums tracking-tight">
+                    <span className="text-lg font-black tabular-nums tracking-tight">
                       {formatRupees(cartTotal.total)}
                     </span>
                   </div>
@@ -2380,7 +2470,7 @@ export default function PosApp() {
                   type="button"
                   disabled={busy || cart.length === 0}
                   onClick={() => void checkout()}
-                  className="mt-3 w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/25 hover:bg-emerald-500 disabled:opacity-50"
+                  className="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-extrabold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 disabled:opacity-50"
                 >
                   {busy
                     ? "Saving…"
@@ -2390,7 +2480,7 @@ export default function PosApp() {
                 </button>
 
                 {lastReceipt ? (
-                  <div className="mt-2 flex gap-1.5">
+                  <div className="flex gap-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -2402,26 +2492,27 @@ export default function PosApp() {
                           void copyReceipt();
                         }
                       }}
-                      className="flex-1 rounded-lg border border-zinc-200 py-2 text-[11px] font-bold dark:border-zinc-700"
+                      className="flex-1 rounded-md border border-zinc-200 py-1 text-[10px] font-bold dark:border-zinc-700"
                     >
                       Print again
                     </button>
                     <button
                       type="button"
                       onClick={() => void copyReceipt()}
-                      className="flex-1 rounded-lg border border-zinc-200 py-2 text-[11px] font-bold dark:border-zinc-700"
+                      className="flex-1 rounded-md border border-zinc-200 py-1 text-[10px] font-bold dark:border-zinc-700"
                     >
                       Copy
                     </button>
                     <button
                       type="button"
                       onClick={shareReceiptWhatsApp}
-                      className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 py-2 text-[11px] font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                      className="flex-1 rounded-md border border-emerald-200 bg-emerald-50 py-1 text-[10px] font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
                     >
                       WhatsApp
                     </button>
                   </div>
                 ) : null}
+                </div>
               </div>
             </section>
           )}
@@ -2471,33 +2562,113 @@ export default function PosApp() {
 
           {/* REPORTS */}
           {tab === "reports" && settings.enabled && (
-            <section className="space-y-4">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                  Sales & profit
+            <section className="space-y-2.5">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
+                  Sales &amp; reports
                 </h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-[11px] text-zinc-500">
+                <p className="text-[10px] text-zinc-500">
+                  Dates choose → Print / Download → neeche history se bill reprint
+                </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <label className="text-[10px] font-semibold text-zinc-500">
                     From
                     <input
                       type="date"
                       value={reportFrom}
                       onChange={(e) => setReportFrom(e.target.value)}
-                      className="ml-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                      className="ml-1 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-900"
                     />
                   </label>
-                  <label className="text-[11px] text-zinc-500">
+                  <label className="text-[10px] font-semibold text-zinc-500">
                     To
                     <input
                       type="date"
                       value={reportTo}
                       onChange={(e) => setReportTo(e.target.value)}
-                      className="ml-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                      className="ml-1 rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-900"
                     />
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lines = [
+                        `TrendsMart POS report`,
+                        `Shop: ${shop.name}`,
+                        `Range: ${reportFrom} → ${reportTo}`,
+                        `Total sales: ${formatRupees(report.totalRevenue)}`,
+                        `Online: ${report.onlineCount} · ${formatRupees(report.onlineRevenue)}`,
+                        `Counter: ${report.posCount} · ${formatRupees(report.posRevenue)}`,
+                        `Cash: ${formatRupees(report.cashSales)}`,
+                        `Udhaar: ${formatRupees(report.creditSales)}`,
+                        `Gross profit (est.): ${formatRupees(report.grossProfitEstimate)}`,
+                        `Expenses: ${formatRupees(report.expenseTotal)}`,
+                        `Net: ${formatRupees(report.netProfitEstimate)}`,
+                        "",
+                        "Top items:",
+                        ...report.topItems.map(
+                          (t) => `${t.name} x${t.qty} · ${formatRupees(t.revenue)}`,
+                        ),
+                      ];
+                      const blob = new Blob([lines.join("\n")], {
+                        type: "text/plain;charset=utf-8",
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `pos-report-${reportFrom}-${reportTo}.txt`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      addToast("Report downloaded", "success");
+                    }}
+                    className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[10px] font-bold dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const w = window.open("", "_blank", "noopener,noreferrer,width=720,height=900");
+                      if (!w) {
+                        addToast("Allow popups to print", "info");
+                        return;
+                      }
+                      const rows = report.topItems
+                        .map(
+                          (t) =>
+                            `<tr><td>${t.name}</td><td>×${t.qty}</td><td>${formatRupees(t.revenue)}</td></tr>`,
+                        )
+                        .join("");
+                      w.document.write(`<!doctype html><html><head><title>POS Report</title>
+                        <style>body{font-family:system-ui,sans-serif;padding:16px;color:#111}
+                        h1{font-size:18px;margin:0 0 8px}table{width:100%;border-collapse:collapse;font-size:12px}
+                        td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left}
+                        .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+                        .card{border:1px solid #e5e5e5;border-radius:8px;padding:8px}
+                        .label{font-size:10px;color:#666;text-transform:uppercase}.val{font-weight:700}</style></head><body>
+                        <h1>${shop.name} · Sales report</h1>
+                        <p>${reportFrom} → ${reportTo}</p>
+                        <div class="grid">
+                          <div class="card"><div class="label">Total</div><div class="val">${formatRupees(report.totalRevenue)}</div></div>
+                          <div class="card"><div class="label">Counter</div><div class="val">${report.posCount} · ${formatRupees(report.posRevenue)}</div></div>
+                          <div class="card"><div class="label">Cash</div><div class="val">${formatRupees(report.cashSales)}</div></div>
+                          <div class="card"><div class="label">Net</div><div class="val">${formatRupees(report.netProfitEstimate)}</div></div>
+                        </div>
+                        <h2 style="font-size:14px">Top items</h2>
+                        <table><thead><tr><th>Item</th><th>Qty</th><th>Revenue</th></tr></thead><tbody>${rows || "<tr><td colspan=3>No sales</td></tr>"}</tbody></table>
+                        <script>window.onload=()=>{window.print();}</script>
+                        </body></html>`);
+                      w.document.close();
+                    }}
+                    className="rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white"
+                  >
+                    Print
+                  </button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-6">
                 {[
                   { label: "Total sales", value: formatRupees(report.totalRevenue) },
                   {
@@ -2508,69 +2679,144 @@ export default function PosApp() {
                     label: "Counter",
                     value: `${report.posCount} · ${formatRupees(report.posRevenue)}`,
                   },
-                  { label: "Cash sales", value: formatRupees(report.cashSales) },
-                  { label: "Udhaar sales", value: formatRupees(report.creditSales) },
-                  { label: "COGS (est.)", value: formatRupees(report.cogsEstimate) },
-                  { label: "Gross profit", value: formatRupees(report.grossProfitEstimate) },
+                  { label: "Cash", value: formatRupees(report.cashSales) },
+                  { label: "Udhaar", value: formatRupees(report.creditSales) },
+                  { label: "COGS", value: formatRupees(report.cogsEstimate) },
+                  { label: "Gross", value: formatRupees(report.grossProfitEstimate) },
                   { label: "Expenses", value: formatRupees(report.expenseTotal) },
-                  { label: "Net (gross−exp)", value: formatRupees(report.netProfitEstimate) },
+                  { label: "Net", value: formatRupees(report.netProfitEstimate) },
                   { label: "Refunds", value: formatRupees(report.refundedTotal) },
-                  { label: "Open tickets", value: String(report.pendingCount) },
+                  { label: "Open", value: String(report.pendingCount) },
                 ].map((c) => (
                   <div
                     key={c.label}
-                    className="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 dark:border-zinc-800 dark:bg-zinc-900"
                   >
-                    <p className="text-[10px] font-semibold uppercase text-zinc-500">
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-zinc-500">
                       {c.label}
                     </p>
-                    <p className="mt-1 text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    <p className="mt-0.5 text-[12px] font-extrabold tabular-nums text-zinc-900 dark:text-zinc-100">
                       {c.value}
                     </p>
                   </div>
                 ))}
               </div>
-              <div>
-                <h3 className="mb-2 text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                  Top items
-                </h3>
-                <ul className="space-y-1.5">
-                  {report.topItems.length === 0 ? (
-                    <li className="text-xs text-zinc-500">No sales in this range</li>
-                  ) : (
-                    report.topItems.map((t) => (
-                      <li
-                        key={t.name}
-                        className="flex justify-between rounded-lg bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-900"
-                      >
-                        <span className="font-medium">
-                          {t.name} ×{t.qty}
-                        </span>
-                        <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                          {formatRupees(t.revenue)}
-                        </span>
+              <div className="grid gap-2 lg:grid-cols-2">
+                <div>
+                  <h3 className="mb-1 text-[11px] font-extrabold text-zinc-700 dark:text-zinc-300">
+                    Top items
+                  </h3>
+                  <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    {report.topItems.length === 0 ? (
+                      <li className="px-2.5 py-3 text-center text-[11px] text-zinc-500">
+                        No sales in this range
                       </li>
-                    ))
-                  )}
-                </ul>
+                    ) : (
+                      report.topItems.map((t) => (
+                        <li
+                          key={t.name}
+                          className="flex justify-between border-b border-zinc-100 px-2.5 py-1.5 text-[11px] last:border-0 dark:border-zinc-800"
+                        >
+                          <span className="min-w-0 truncate font-semibold">
+                            {t.name} ×{t.qty}
+                          </span>
+                          <span className="shrink-0 font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                            {formatRupees(t.revenue)}
+                          </span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="mb-1 text-[11px] font-extrabold text-zinc-700 dark:text-zinc-300">
+                    Sale history
+                  </h3>
+                  <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    {orders
+                      .filter((o) => {
+                        const t = new Date(o.created_at).getTime();
+                        const from = Number.isFinite(reportFromMs)
+                          ? reportFromMs
+                          : startOfTodayMs();
+                        const until = Number.isFinite(reportUntilMs)
+                          ? reportUntilMs
+                          : Number.POSITIVE_INFINITY;
+                        return t >= from && t <= until;
+                      })
+                      .slice(0, 40)
+                      .map((o) => (
+                        <li
+                          key={o.id}
+                          className="flex items-center justify-between gap-2 border-b border-zinc-100 px-2.5 py-1.5 text-[11px] last:border-0 dark:border-zinc-800"
+                        >
+                          <span className="min-w-0 truncate">
+                            <span className="font-semibold">{o.customer_name || "Walk-in"}</span>
+                            <span className="text-zinc-400">
+                              {" "}
+                              ·{" "}
+                              {new Date(o.created_at).toLocaleString("en-PK", {
+                                day: "2-digit",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            <span className="text-zinc-400">
+                              {" "}
+                              · {o.source === "pos" ? "Counter" : o.source || "Order"}
+                            </span>
+                          </span>
+                          <span className="shrink-0 font-bold tabular-nums">
+                            {formatRupees(o.total_amount)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAutoPrintBill(true);
+                              setBillOrder(o);
+                              setLastPrintedOrder(o);
+                            }}
+                            className="shrink-0 rounded border border-zinc-200 px-1.5 py-0.5 text-[9px] font-bold dark:border-zinc-700"
+                          >
+                            Print
+                          </button>
+                        </li>
+                      ))}
+                    {orders.filter((o) => {
+                      const t = new Date(o.created_at).getTime();
+                      const from = Number.isFinite(reportFromMs)
+                        ? reportFromMs
+                        : startOfTodayMs();
+                      const until = Number.isFinite(reportUntilMs)
+                        ? reportUntilMs
+                        : Number.POSITIVE_INFINITY;
+                      return t >= from && t <= until;
+                    }).length === 0 ? (
+                      <li className="px-2.5 py-3 text-center text-[11px] text-zinc-500">
+                        No orders in this range
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
               </div>
             </section>
           )}
 
           {/* CUSTOMERS */}
           {tab === "customers" && settings.enabled && (
-            <section className="mx-auto max-w-lg space-y-4">
+            <section className="mx-auto max-w-2xl space-y-2">
               <div>
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                  Walk-in customers
+                <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
+                  Customers
                 </h2>
-                <p className="text-[11px] text-zinc-500">
-                  Tap a contact to fill the counter bill. Add new numbers below.
+                <p className="text-[10px] text-zinc-500">
+                  Name + phone save karo · Counter bill pe quick fill ke liye tap
                 </p>
               </div>
 
               <form
-                className="space-y-2 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
+                className="grid gap-1.5 rounded-xl border border-zinc-200 bg-white p-2.5 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-[1fr_1fr_1fr_auto]"
                 onSubmit={async (e) => {
                   e.preventDefault();
                   const res = await upsertPosCustomer(shop.id, {
@@ -2592,26 +2838,26 @@ export default function PosApp() {
                 <input
                   value={newCustName}
                   onChange={(e) => setNewCustName(e.target.value)}
-                  placeholder="Name (optional)"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                  placeholder="Name"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
                 />
                 <input
                   value={newCustPhone}
                   onChange={(e) => setNewCustPhone(e.target.value)}
-                  placeholder="Phone (optional)"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                  placeholder="Phone"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
                 />
                 <input
                   value={newCustNotes}
                   onChange={(e) => setNewCustNotes(e.target.value)}
-                  placeholder="Notes (optional)"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                  placeholder="Notes"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
                 />
                 <button
                   type="submit"
-                  className="w-full rounded-lg bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
+                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
                 >
-                  Save customer
+                  Save
                 </button>
               </form>
 
@@ -2709,12 +2955,22 @@ export default function PosApp() {
         <div
           className="fixed inset-0 z-[180] flex items-end justify-center bg-black/50 sm:items-center"
           onClick={() => setVariantProduct(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              confirmVariant();
+            }
+            if (e.key === "Escape") setVariantProduct(null);
+          }}
         >
           <div
             className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 dark:bg-zinc-900 sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-sm font-bold">{variantProduct.name}</h3>
+            <p className="mt-0.5 text-[11px] text-zinc-500">
+              Options select karo — Enter se bill pe add
+            </p>
             <div className="mt-3">
               <VariantSelector
                 variants={(variantProduct.variants as never) ?? []}
@@ -2724,13 +2980,22 @@ export default function PosApp() {
                 compact
               />
             </div>
-            <button
-              type="button"
-              onClick={confirmVariant}
-              className="mt-4 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white"
-            >
-              Add to bill
-            </button>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setVariantProduct(null)}
+                className="rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmVariant}
+                className="rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white"
+              >
+                Add to bill ↵
+              </button>
+            </div>
           </div>
         </div>
       )}

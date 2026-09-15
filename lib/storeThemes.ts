@@ -380,7 +380,7 @@ export const CATEGORY_THEMES: Record<string, StoreTheme> = {
     showVariantsProminent: true,
     useGalleryLayout: false,
     categoryDescription:
-      "Taps, pipes, bathroom fittings, toilets, showers, and sanitary hardware.",
+      "Taps (tootiya), ceramics, pipes, bathroom fittings, tiles, geysers, and sanitary hardware.",
   },
   "Home Maintenance & Repair": {
     label: "Home Maintenance",

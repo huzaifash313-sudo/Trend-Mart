@@ -59,15 +59,15 @@ export default async function DealSeoPage({ params }: PageProps) {
   return (
     <>
       <DealStructuredData deal={deal} />
-      <div className="mx-auto w-full max-w-lg pb-10">
+      <div className="mx-auto w-full max-w-lg pb-6">
         {/* Image-first gallery (same idea as PDP) */}
         <div className="relative overflow-hidden bg-zinc-100 dark:bg-zinc-900">
           {gallery.length > 0 ? (
-            <div className="flex aspect-square snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex aspect-[5/4] snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {gallery.map((url, i) => (
                 <div
                   key={`${deal.id}-img-${i}`}
-                  className="relative h-full w-full min-w-full shrink-0 snap-center"
+                  className="relative h-full w-full min-w-full shrink-0 snap-center bg-zinc-100 dark:bg-zinc-900"
                 >
                   <Image
                     src={getSafeImageUrl(url, "product")}
@@ -78,14 +78,14 @@ export default async function DealSeoPage({ params }: PageProps) {
                     }
                     fill
                     priority={i === 0}
-                    className="object-contain"
+                    className="object-cover"
                     sizes="(max-width: 640px) 100vw, 32rem"
                   />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex aspect-square items-center justify-center bg-zinc-100 dark:bg-zinc-800">
+            <div className="flex aspect-[5/4] items-center justify-center bg-zinc-100 dark:bg-zinc-800">
               <span className="text-5xl text-zinc-300 dark:text-zinc-600">
                 {deal.title.charAt(0).toUpperCase()}
               </span>
@@ -114,27 +114,27 @@ export default async function DealSeoPage({ params }: PageProps) {
         </div>
 
         {/* Compact details under image */}
-        <article className="space-y-2 px-3 pt-3">
-          <h1 className="text-[1.15rem] font-bold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
+        <article className="space-y-0.5 px-3 pt-0.5">
+          <h1 className="text-[1rem] font-extrabold leading-tight tracking-tight text-zinc-900 dark:text-zinc-50">
             {deal.title}
           </h1>
           {deal.description ? (
-            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+            <p className="text-xs leading-snug text-zinc-600 dark:text-zinc-300">
               {deal.description}
             </p>
           ) : null}
           {typeof deal.price === "number" && deal.price > 0 ? (
-            <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+            <p className="text-lg font-extrabold tabular-nums leading-none text-emerald-600 dark:text-emerald-400">
               {formatRupees(deal.price)}
               {typeof deal.original_price === "number" &&
               deal.original_price > deal.price ? (
-                <span className="ml-2 text-sm font-normal text-zinc-400 line-through">
+                <span className="ml-1.5 text-xs font-normal text-zinc-400 line-through">
                   {formatRupees(deal.original_price)}
                 </span>
               ) : null}
             </p>
           ) : null}
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
             From{" "}
             <Link
               href={shopHref}
@@ -146,7 +146,7 @@ export default async function DealSeoPage({ params }: PageProps) {
           </p>
         </article>
 
-        {/* Actions + related — no duplicate big card */}
+        {/* Actions + reviews + related — same system as PDP */}
         <div className="px-3">
           <DealDetailClient dealId={deal.id} hideCard />
         </div>

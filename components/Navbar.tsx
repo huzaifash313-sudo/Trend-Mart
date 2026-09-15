@@ -334,8 +334,7 @@ export default function Navbar() {
     pathname === "/offline" ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/t/") ||
-    pathname === "/dashboard/pos" ||
-    pathname.startsWith("/dashboard/pos/");
+    pathname.startsWith("/dashboard");
 
   // Auth pages keep the top navbar but never mount the sidebar / reopen chip.
   const isAuthPage =
