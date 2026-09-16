@@ -222,6 +222,8 @@ export default function PosApp() {
   const [undoLine, setUndoLine] = useState<PosCartLine | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showRecent, setShowRecent] = useState(true);
+  /** Phone screens: false = product search/grid, true = bill/payment panel (both always show side-by-side at lg+). */
+  const [mobileBillView, setMobileBillView] = useState(false);
   const [miscOpen, setMiscOpen] = useState(false);
   const [miscName, setMiscName] = useState("");
   const [miscPrice, setMiscPrice] = useState("");
@@ -1370,7 +1372,7 @@ export default function PosApp() {
             ) : null}
             <Link
               href="/dashboard/orders"
-              className="hidden rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50 sm:inline dark:border-zinc-700 dark:bg-zinc-900 dark:text-emerald-400"
+              className="hidden items-center rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50 sm:inline-flex dark:border-zinc-700 dark:bg-zinc-900 dark:text-emerald-400"
             >
               Orders
             </Link>
@@ -1888,11 +1890,67 @@ export default function PosApp() {
           {/* COUNTER */}
           {tab === "counter" && settings.enabled && (
             <section className="grid gap-3 lg:grid-cols-[1.35fr_minmax(17rem,22rem)] lg:items-start">
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {products.length} product{products.length === 1 ? "" : "s"} ready
-                  {" · "}same list as your store
-                </p>
+              <div className={`${mobileBillView ? "hidden lg:block" : ""} space-y-1.5`}>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                  <p className="shrink-0 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {products.length} product{products.length === 1 ? "" : "s"} ready
+                    {" · "}same list as your store
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setMiscOpen(true)}
+                      className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      + Custom<span className="hidden sm:inline"> (Alt+M)</span>
+                    </button>
+                    {settings.barcode_enabled ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCamera(true)}
+                        className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200"
+                      >
+                        Scan<span className="hidden sm:inline"> (Alt+B)</span>
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={!undoLine}
+                      onClick={undoRemove}
+                      className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      Undo<span className="hidden sm:inline"> (Alt+Z)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowShortcuts((v) => !v)}
+                      className="hidden items-center rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700 dark:bg-zinc-900 md:inline-flex"
+                    >
+                      Shortcuts
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRecent((v) => !v)}
+                      className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      Recent (Alt+R)
+                    </button>
+                  </div>
+                </div>
+
+                {cart.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setMobileBillView(true)}
+                    className="flex w-full items-center justify-between rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-600/25 lg:hidden"
+                  >
+                    <span>
+                      View Bill · {cart.length} item{cart.length === 1 ? "" : "s"}
+                    </span>
+                    <span>{formatRupees(cartTotal.total)} →</span>
+                  </button>
+                ) : null}
+
                 {held.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {held.map((h) => (
@@ -1907,47 +1965,6 @@ export default function PosApp() {
                     ))}
                   </div>
                 ) : null}
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setMiscOpen(true)}
-                    className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700 dark:bg-zinc-900"
-                  >
-                    + Custom<span className="hidden sm:inline"> (Alt+M)</span>
-                  </button>
-                  {settings.barcode_enabled ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowCamera(true)}
-                      className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200"
-                    >
-                      Scan<span className="hidden sm:inline"> (Alt+B)</span>
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={!undoLine}
-                    onClick={undoRemove}
-                    className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900"
-                  >
-                    Undo<span className="hidden sm:inline"> (Alt+Z)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowShortcuts((v) => !v)}
-                    className="hidden rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700 dark:bg-zinc-900 md:inline-flex"
-                  >
-                    Shortcuts
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowRecent((v) => !v)}
-                    className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700 dark:bg-zinc-900"
-                  >
-                    Recent (Alt+R)
-                  </button>
-                </div>
 
                 {showShortcuts ? (
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] dark:border-zinc-700 dark:bg-zinc-900">
@@ -2182,11 +2199,11 @@ export default function PosApp() {
                 )}
               </div>
 
-              <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 sm:p-3.5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden">
-                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800">
+              <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 sm:p-2.5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100 pb-1 dark:border-zinc-800">
                   <div className="min-w-0">
-                    <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Bill</h2>
-                    <p className="truncate text-[10px] text-zinc-500">
+                    <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-50">Bill</h2>
+                    <p className="truncate text-[9px] text-zinc-500">
                       {shop.name}
                     </p>
                   </div>
@@ -2195,7 +2212,7 @@ export default function PosApp() {
                       type="button"
                       disabled={!undoLine}
                       onClick={undoRemove}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
+                      className="rounded-lg border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
                     >
                       Undo
                     </button>
@@ -2203,7 +2220,7 @@ export default function PosApp() {
                       type="button"
                       disabled={cart.length === 0}
                       onClick={holdBill}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
+                      className="rounded-lg border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
                     >
                       Hold
                     </button>
@@ -2211,14 +2228,14 @@ export default function PosApp() {
                       type="button"
                       disabled={cart.length === 0}
                       onClick={clearBill}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
+                      className="rounded-lg border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
                     >
                       Clear
                     </button>
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain py-2.5">
+                <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain py-1">
                 {cart.length === 0 ? (
                   <p className="rounded-xl bg-zinc-50 py-4 text-center text-[11px] text-zinc-500 dark:bg-zinc-800/50">
                     {(settings.counter_layout || "excel") === "excel"
@@ -2340,7 +2357,7 @@ export default function PosApp() {
                       key={t}
                       type="button"
                       onClick={() => setOrderType(t)}
-                      className={`flex-1 rounded-xl py-2 text-[11px] font-bold capitalize transition ${
+                      className={`flex-1 rounded-xl py-1 text-[11px] font-bold capitalize transition ${
                         orderType === t
                           ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
                           : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300"
@@ -2356,13 +2373,13 @@ export default function PosApp() {
                     value={custName}
                     onChange={(e) => setCustName(e.target.value)}
                     placeholder="Customer name"
-                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-[12px] dark:border-zinc-700 dark:bg-zinc-800"
+                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[12px] dark:border-zinc-700 dark:bg-zinc-800"
                   />
                   <input
                     value={custPhone}
                     onChange={(e) => setCustPhone(e.target.value)}
                     placeholder="Phone"
-                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-[12px] dark:border-zinc-700 dark:bg-zinc-800"
+                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[12px] dark:border-zinc-700 dark:bg-zinc-800"
                   />
                 </div>
 
@@ -2502,7 +2519,7 @@ export default function PosApp() {
                       placeholder={
                         cartTotal.total > 0 ? String(cartTotal.total) : "Amount paid"
                       }
-                      className="w-full rounded-md border-2 border-emerald-500/50 bg-emerald-50/50 px-1.5 py-1.5 text-sm font-bold tabular-nums dark:border-emerald-700 dark:bg-emerald-950/20"
+                      className="w-full rounded-md border-2 border-emerald-500/50 bg-emerald-50/50 px-1.5 py-1 text-sm font-bold tabular-nums dark:border-emerald-700 dark:bg-emerald-950/20"
                     />
                     <div className="grid grid-cols-7 gap-0.5">
                       {[50, 100, 200, 500, 1000, 2000, 5000].map((val) => (
@@ -2581,7 +2598,7 @@ export default function PosApp() {
                 </div>
                 </div>
 
-                <div className="shrink-0 space-y-1.5 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
+                <div className="shrink-0 space-y-1 border-t border-zinc-100 pt-1 dark:border-zinc-800">
                 <div className="space-y-0.5 text-sm">
                   {cartTotal.discount > 0 || cartTotal.tax > 0 || cartTotal.fee > 0 ? (
                     <>
@@ -2609,7 +2626,7 @@ export default function PosApp() {
                       ) : null}
                     </>
                   ) : null}
-                  <div className="flex items-center justify-between rounded-xl bg-emerald-600 px-3 py-2.5 text-white shadow-sm shadow-emerald-600/30">
+                  <div className="flex items-center justify-between rounded-xl bg-emerald-600 px-3 py-1.5 text-white shadow-sm shadow-emerald-600/30">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-100">
                       Total
                     </span>
@@ -2623,7 +2640,7 @@ export default function PosApp() {
                   type="button"
                   disabled={busy || cart.length === 0}
                   onClick={() => void checkout()}
-                  className="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-extrabold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 disabled:opacity-50"
+                  className="w-full rounded-lg bg-emerald-600 py-1.5 text-xs font-extrabold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 disabled:opacity-50"
                 >
                   {busy
                     ? "Saving…"

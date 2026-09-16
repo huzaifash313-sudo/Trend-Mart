@@ -5,7 +5,7 @@
  * health filters, stocktake, restock/damage, batch/expiry, move history.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   damageWriteOff,
   enableProductStockTracking,
@@ -36,6 +36,15 @@ import { formatRupees } from "@/lib/formatters";
 import { useToast } from "@/components/Toast";
 import type { Product } from "@/types";
 import PosCatalogSetupPanel from "@/components/pos/PosCatalogSetupPanel";
+
+/** Spreadsheet cell styles — every cell gets a gridline like Excel. */
+const TH =
+  "whitespace-nowrap border border-zinc-300 px-2 py-1.5 dark:border-zinc-700";
+const TD = "border border-zinc-200 px-1.5 py-1 dark:border-zinc-800";
+const CELL_INPUT =
+  "rounded border border-zinc-200 bg-white px-1.5 py-1 text-[11px] tabular-nums dark:border-zinc-700 dark:bg-zinc-900";
+const BTN_GREEN =
+  "rounded bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50";
 
 export interface PosStockPanelProps {
   shopId: string;
@@ -361,519 +370,566 @@ export default function PosStockPanel({
         className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
       />
 
-      <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-        {list.length === 0 ? (
-          <li className="px-4 py-10 text-center text-sm text-zinc-500">No products in this filter</li>
-        ) : (
-          list.map((p) => {
-            const bucket = productStockBucket(p, settings.low_stock_threshold, warnDays);
-            const on = p.is_available !== false;
-            const days = daysUntilExpiry(p.expiry_date);
-            const expired = isExpired(p.expiry_date);
-            const soon = isExpiringSoon(p.expiry_date, warnDays);
-            const busy = busyId === p.id;
-            const reorder = needsReorder(p, settings.low_stock_threshold);
-            const sug =
-              p.stock_qty != null
-                ? suggestedRestockQty(
-                    p,
-                    settings.low_stock_threshold,
-                    profile.restock_presets,
-                  )
-                : 0;
-
-            return (
-              <li
-                key={p.id}
-                className={`space-y-1.5 px-3 py-2 ${
+      <div className="max-h-[70vh] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
+        <table className="w-full min-w-[1100px] border-collapse text-left text-xs">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-zinc-100 text-[10px] font-bold uppercase tracking-wide text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+              <th className={`${TH} w-8 text-center`}>
+                <span className="sr-only">Select</span>
+              </th>
+              <th className={`${TH} w-9 text-center`}>#</th>
+              <th className={`${TH} min-w-[12rem]`}>Product</th>
+              <th className={`${TH} text-right`}>Price</th>
+              <th className={`${TH} text-right`}>On hand</th>
+              <th className={TH}>Reorder ≤</th>
+              <th className={TH}>Cost</th>
+              {showBatch ? <th className={TH}>Batch</th> : null}
+              {showExpiry ? <th className={TH}>Expiry</th> : null}
+              <th className={TH}>Barcode</th>
+              <th className={TH}>Exact count</th>
+              <th className={TH}>Stock in / damage</th>
+              <th className={`${TH} min-w-[9rem]`}>Note</th>
+              <th className={TH}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={12 + (showBatch ? 1 : 0) + (showExpiry ? 1 : 0)}
+                  className="px-4 py-10 text-center text-sm text-zinc-500"
+                >
+                  No products in this filter
+                </td>
+              </tr>
+            ) : (
+              list.map((p, idx) => {
+                const bucket = productStockBucket(p, settings.low_stock_threshold, warnDays);
+                const on = p.is_available !== false;
+                const days = daysUntilExpiry(p.expiry_date);
+                const expired = isExpired(p.expiry_date);
+                const soon = isExpiringSoon(p.expiry_date, warnDays);
+                const busy = busyId === p.id;
+                const reorder = needsReorder(p, settings.low_stock_threshold);
+                const sug =
+                  p.stock_qty != null
+                    ? suggestedRestockQty(
+                        p,
+                        settings.low_stock_threshold,
+                        profile.restock_presets,
+                      )
+                    : 0;
+                const rowTone =
                   bucket === "out"
-                    ? "bg-red-50/50 dark:bg-red-950/15"
+                    ? "bg-red-50/70 dark:bg-red-950/20"
                     : bucket === "low"
-                      ? "bg-amber-50/60 dark:bg-amber-950/15"
+                      ? "bg-amber-50/70 dark:bg-amber-950/20"
                       : bucket === "expiring"
-                        ? "bg-orange-50/60 dark:bg-orange-950/15"
-                        : ""
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-start gap-2">
-                    {p.stock_qty != null ? (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(p.id)}
-                        onChange={() => toggleSelect(p.id)}
-                        className="mt-1 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                        aria-label={`Select ${p.name}`}
-                      />
-                    ) : null}
-                    <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                      {p.name}
-                      {bucket === "low" ? (
-                        <span className="ml-1.5 text-[10px] font-bold text-amber-700">LOW</span>
-                      ) : null}
-                      {bucket === "out" ? (
-                        <span className="ml-1.5 text-[10px] font-bold text-red-700">OUT</span>
-                      ) : null}
-                      {expired ? (
-                        <span className="ml-1.5 text-[10px] font-bold text-red-700">EXPIRED</span>
-                      ) : soon ? (
-                        <span className="ml-1.5 text-[10px] font-bold text-orange-700">
-                          EXP {days}d
-                        </span>
-                      ) : null}
-                      {p.stock_qty == null ? (
-                        <span className="ml-1.5 text-[10px] font-bold text-zinc-400">UNTRACKED</span>
-                      ) : null}
-                    </p>
-                    <p className="text-[11px] text-zinc-500">
-                      {formatRupees(p.price)}
-                      {p.stock_qty != null ? ` · on hand ${p.stock_qty} ${profile.unit_label}` : ""}
-                      {p.reorder_level != null ? ` · reorder @ ${p.reorder_level}` : ""}
-                      {p.batch_no ? ` · batch ${p.batch_no}` : ""}
-                    </p>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                    {reorder && sug > 0 ? (
-                      <button
-                        type="button"
-                        disabled={busy || bulkBusy}
-                        onClick={() =>
-                          void withBusy(p.id, async () => {
-                            const res = await restockProduct(
-                              shopId,
-                              p.id,
-                              sug,
-                              "Suggested restock",
-                            );
-                            if (!res.success) addToast(res.error, "error");
-                            else {
-                              addToast(`+${sug}`, "success");
-                              await onRefresh();
-                            }
-                          })
-                        }
-                        className="rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white"
-                      >
-                        Restock +{sug}
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      title="Favourite"
-                      onClick={() =>
-                        void withBusy(p.id, async () => {
-                          const next = !p.pos_favourite;
-                          const res = await setProductPosFavourite(shopId, p.id, next);
-                          if (!res.success) addToast(res.error, "error");
-                          else {
-                            onProductsChange((prev) =>
-                              prev.map((x) =>
-                                x.id === p.id ? { ...x, pos_favourite: next } : x,
-                              ),
-                            );
-                          }
-                        })
-                      }
-                      className={`rounded-full px-2 py-1 text-[11px] font-bold ${
-                        p.pos_favourite
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-                      }`}
-                    >
-                      ★
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        void withBusy(p.id, async () => {
-                          const res = await setProductStockAvailable(shopId, p.id, !on);
-                          if (!res.success) addToast(res.error, "error");
-                          else await onRefresh();
-                        })
-                      }
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                        on
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                          : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800"
-                      }`}
-                    >
-                      {on ? "Selling" : "Paused"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setHistoryFor((h) => (h === p.id ? null : p.id))
-                      }
-                      className="rounded-full border border-zinc-200 px-2.5 py-1 text-[11px] font-bold dark:border-zinc-700"
-                    >
-                      History
-                    </button>
-                  </div>
-                </div>
+                        ? "bg-orange-50/70 dark:bg-orange-950/20"
+                        : idx % 2 === 1
+                          ? "bg-zinc-50/80 dark:bg-zinc-900/40"
+                          : "bg-white dark:bg-zinc-950";
 
-                {/* Stocktake + restock + damage */}
-                <div className="flex flex-wrap items-end gap-2">
-                  {p.stock_qty == null ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        void withBusy(p.id, async () => {
-                          const res = await enableProductStockTracking(shopId, p.id, 0);
-                          if (!res.success) addToast(res.error, "error");
-                          else {
-                            addToast("Tracking on — set qty", "success");
-                            await onRefresh();
-                          }
-                        })
-                      }
-                      className="rounded-lg border border-dashed border-emerald-400 px-2.5 py-1.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-200"
-                    >
-                      Start counting this item
-                    </button>
-                  ) : (
-                    <>
-                      <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
-                        Exact count now
+                return (
+                  <Fragment key={p.id}>
+                    <tr className={`align-middle ${rowTone}`}>
+                      <td className={`${TD} text-center`}>
+                        {p.stock_qty != null ? (
+                          <input
+                            type="checkbox"
+                            checked={selected.has(p.id)}
+                            onChange={() => toggleSelect(p.id)}
+                            className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                            aria-label={`Select ${p.name}`}
+                          />
+                        ) : null}
+                      </td>
+                      <td className={`${TD} text-center tabular-nums text-zinc-400`}>
+                        {idx + 1}
+                      </td>
+                      <td className={TD}>
+                        <p className="max-w-[16rem] truncate font-semibold text-zinc-900 dark:text-zinc-50">
+                          {p.name}
+                        </p>
+                        <p className="flex flex-wrap gap-1 text-[9px] font-bold">
+                          {bucket === "low" ? <span className="text-amber-700">LOW</span> : null}
+                          {bucket === "out" ? <span className="text-red-700">OUT</span> : null}
+                          {expired ? (
+                            <span className="text-red-700">EXPIRED</span>
+                          ) : soon ? (
+                            <span className="text-orange-700">EXP {days}d</span>
+                          ) : null}
+                          {p.stock_qty == null ? (
+                            <span className="text-zinc-400">UNTRACKED</span>
+                          ) : null}
+                        </p>
+                      </td>
+                      <td className={`${TD} whitespace-nowrap text-right tabular-nums`}>
+                        {formatRupees(p.price)}
+                      </td>
+                      <td className={`${TD} whitespace-nowrap text-right font-bold tabular-nums`}>
+                        {p.stock_qty != null ? (
+                          <>
+                            {p.stock_qty}
+                            <span className="ml-0.5 text-[9px] font-medium text-zinc-400">
+                              {profile.unit_label}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-zinc-400">—</span>
+                        )}
+                      </td>
+                      <td className={TD}>
                         <input
                           type="number"
                           min={0}
-                          value={qtyDraft[p.id] ?? String(p.stock_qty)}
-                          onChange={(e) =>
-                            setQtyDraft((d) => ({ ...d, [p.id]: e.target.value }))
-                          }
-                          className="mt-0.5 block w-20 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                          defaultValue={p.reorder_level ?? ""}
+                          key={`r-${p.id}-${p.reorder_level ?? ""}`}
+                          placeholder={String(settings.low_stock_threshold)}
+                          onBlur={(e) => {
+                            const raw = e.target.value.trim();
+                            const next = raw === "" ? null : Math.max(0, Number(raw) || 0);
+                            if (next === (p.reorder_level ?? null)) return;
+                            void updateProductInventoryMeta(shopId, p.id, {
+                              reorder_level: next,
+                            }).then((res) => {
+                              if (!res.success) addToast(res.error, "error");
+                              else {
+                                onProductsChange((prev) =>
+                                  prev.map((x) =>
+                                    x.id === p.id ? { ...x, reorder_level: next } : x,
+                                  ),
+                                );
+                                addToast("Reorder level saved", "success");
+                              }
+                            });
+                          }}
+                          className={`${CELL_INPUT} w-16`}
+                          aria-label="Reorder level"
                         />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void withBusy(p.id, async () => {
-                            const raw = qtyDraft[p.id] ?? String(p.stock_qty ?? 0);
-                            const res = await stocktakeSetQty(
-                              shopId,
-                              p.id,
-                              Number(raw) || 0,
-                              noteDraft[p.id],
-                            );
-                            if (!res.success) addToast(res.error, "error");
-                            else {
-                              addToast("Count saved", "success");
-                              await onRefresh();
-                            }
-                          })
-                        }
-                        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-700"
-                      >
-                        Save count
-                      </button>
-                      <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
-                        New stock arrived (+)
+                      </td>
+                      <td className={TD}>
                         <input
                           type="number"
-                          min={1}
-                          value={restockDraft[p.id] ?? ""}
-                          onChange={(e) =>
-                            setRestockDraft((d) => ({ ...d, [p.id]: e.target.value }))
-                          }
-                          placeholder="qty"
-                          className="mt-0.5 block w-16 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-800"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void withBusy(p.id, async () => {
-                            const n = Math.max(
-                              1,
-                              Number(restockDraft[p.id]) || profile.restock_presets[0] || 10,
-                            );
-                            const res = await restockProduct(
-                              shopId,
-                              p.id,
-                              n,
-                              noteDraft[p.id],
-                            );
-                            if (!res.success) addToast(res.error, "error");
-                            else {
-                              addToast(`Added +${n}`, "success");
-                              setRestockDraft((d) => ({ ...d, [p.id]: "" }));
-                              await onRefresh();
-                            }
-                          })
-                        }
-                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void withBusy(p.id, async () => {
-                            const n = Math.max(
-                              1,
-                              Number(restockDraft[p.id]) || 1,
-                            );
-                            if (!window.confirm(`Write off ${n} as damage/wastage?`)) return;
-                            const res = await damageWriteOff(
-                              shopId,
-                              p.id,
-                              n,
-                              noteDraft[p.id] || "Damage/wastage",
-                            );
-                            if (!res.success) addToast(res.error, "error");
-                            else {
-                              addToast(`Damage −${n}`, "info");
-                              await onRefresh();
-                            }
-                          })
-                        }
-                        className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-bold text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"
-                      >
-                        Damage
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {p.stock_qty != null && profile.restock_presets.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {profile.restock_presets.map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void withBusy(p.id, async () => {
-                            const res = await restockProduct(shopId, p.id, n);
-                            if (!res.success) addToast(res.error, "error");
-                            else {
-                              addToast(`+${n}`, "success");
-                              await onRefresh();
-                            }
-                          })
-                        }
-                        className="rounded-md border border-zinc-200 px-2 py-0.5 text-[10px] font-bold dark:border-zinc-700"
-                      >
-                        +{n}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                <input
-                  value={noteDraft[p.id] ?? ""}
-                  onChange={(e) =>
-                    setNoteDraft((d) => ({ ...d, [p.id]: e.target.value }))
-                  }
-                  placeholder={profile.note_hint}
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
-                />
-
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    {showBatch ? (
-                      <label className="text-[10px] text-zinc-500">
-                        Batch / lot
-                        <input
-                          defaultValue={p.batch_no ?? ""}
-                          key={`b-${p.id}-${p.batch_no ?? ""}`}
+                          min={0}
+                          defaultValue={p.cost_price ?? ""}
+                          key={`c-${p.id}-${p.cost_price ?? ""}`}
+                          placeholder="—"
                           onBlur={(e) => {
-                            const v = e.target.value.trim();
-                            if (v === (p.batch_no || "")) return;
-                            void updateProductInventoryMeta(shopId, p.id, {
-                              batch_no: v || null,
-                            }).then((res) => {
+                            const raw = e.target.value.trim();
+                            const next = raw === "" ? null : Math.max(0, Number(raw) || 0);
+                            if (next === (p.cost_price ?? null)) return;
+                            void updateProductCostPrice(shopId, p.id, next).then((res) => {
                               if (!res.success) addToast(res.error, "error");
                               else {
                                 onProductsChange((prev) =>
                                   prev.map((x) =>
-                                    x.id === p.id ? { ...x, batch_no: v || null } : x,
+                                    x.id === p.id ? { ...x, cost_price: next } : x,
                                   ),
                                 );
+                                addToast("Cost saved", "success");
                               }
                             });
                           }}
-                          className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 font-mono text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
+                          className={`${CELL_INPUT} w-20`}
+                          aria-label="Cost"
                         />
-                      </label>
-                    ) : null}
-                    {showExpiry ? (
-                      <label className="text-[10px] text-zinc-500">
-                        Expiry
-                        <input
-                          type="date"
-                          defaultValue={p.expiry_date?.slice(0, 10) ?? ""}
-                          key={`e-${p.id}-${p.expiry_date ?? ""}`}
-                          onBlur={(e) => {
-                            const v = e.target.value;
-                            if (v === (p.expiry_date?.slice(0, 10) || "")) return;
-                            void updateProductInventoryMeta(shopId, p.id, {
-                              expiry_date: v || null,
-                            }).then((res) => {
-                              if (!res.success) addToast(res.error, "error");
-                              else {
-                                onProductsChange((prev) =>
-                                  prev.map((x) =>
-                                    x.id === p.id ? { ...x, expiry_date: v || null } : x,
-                                  ),
-                                );
-                              }
-                            });
-                          }}
-                          className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
-                        />
-                      </label>
-                    ) : null}
-                    <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
-                      Reorder when ≤
-                      <input
-                        type="number"
-                        min={0}
-                        defaultValue={p.reorder_level ?? ""}
-                        key={`r-${p.id}-${p.reorder_level ?? ""}`}
-                        placeholder={String(settings.low_stock_threshold)}
-                        onBlur={(e) => {
-                          const raw = e.target.value.trim();
-                          const next = raw === "" ? null : Math.max(0, Number(raw) || 0);
-                          if (next === (p.reorder_level ?? null)) return;
-                          void updateProductInventoryMeta(shopId, p.id, {
-                            reorder_level: next,
-                          }).then((res) => {
-                            if (!res.success) addToast(res.error, "error");
-                            else {
-                              onProductsChange((prev) =>
-                                prev.map((x) =>
-                                  x.id === p.id ? { ...x, reorder_level: next } : x,
-                                ),
-                              );
-                              addToast("Reorder level saved", "success");
-                            }
-                          });
-                        }}
-                        className="mt-0.5 w-full rounded-lg border border-emerald-200/80 bg-white px-2 py-1.5 text-[11px] dark:border-emerald-900/40 dark:bg-zinc-800"
-                      />
-                    </label>
-                    <label className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
-                      Cost (optional)
-                      <input
-                        type="number"
-                        min={0}
-                        defaultValue={p.cost_price ?? ""}
-                        key={`c-${p.id}-${p.cost_price ?? ""}`}
-                        placeholder="COGS"
-                        onBlur={(e) => {
-                          const raw = e.target.value.trim();
-                          const next =
-                            raw === "" ? null : Math.max(0, Number(raw) || 0);
-                          if (next === (p.cost_price ?? null)) return;
-                          void updateProductCostPrice(shopId, p.id, next).then((res) => {
-                            if (!res.success) addToast(res.error, "error");
-                            else {
-                              onProductsChange((prev) =>
-                                prev.map((x) =>
-                                  x.id === p.id ? { ...x, cost_price: next } : x,
-                                ),
-                              );
-                              addToast("Cost saved", "success");
-                            }
-                          });
-                        }}
-                        className="mt-0.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
-                      />
-                    </label>
-                  </div>
-
-                <form
-                  className="flex gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    const code = String(fd.get("barcode") || "").trim();
-                    void withBusy(p.id, async () => {
-                      const res = await updateProductBarcode(shopId, p.id, code || null);
-                      if (!res.success) {
-                        addToast(res.error, "error");
-                        return;
-                      }
-                      onProductsChange((prev) =>
-                        prev.map((x) =>
-                          x.id === p.id ? { ...x, barcode: code || null } : x,
-                        ),
-                      );
-                      addToast("Barcode saved", "success");
-                    });
-                  }}
-                >
-                  <input
-                    name="barcode"
-                    defaultValue={p.barcode ?? ""}
-                    key={`${p.id}-${p.barcode ?? ""}`}
-                    placeholder="Barcode"
-                    className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 font-mono text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
-                  />
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-700"
-                  >
-                    Save
-                  </button>
-                </form>
-
-                {historyFor === p.id ? (
-                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-900">
-                    <p className="mb-1 text-[10px] font-bold uppercase text-zinc-500">
-                      Recent moves
-                    </p>
-                    {moves.length === 0 ? (
-                      <p className="text-[11px] text-zinc-500">No ledger rows yet</p>
-                    ) : (
-                      <ul className="max-h-40 space-y-1 overflow-y-auto">
-                        {moves.map((m) => (
-                          <li
-                            key={m.id}
-                            className="flex justify-between gap-2 text-[10px] tabular-nums"
-                          >
-                            <span>
-                              <span
-                                className={
-                                  m.delta >= 0 ? "font-bold text-emerald-700" : "font-bold text-red-600"
+                      </td>
+                      {showBatch ? (
+                        <td className={TD}>
+                          <input
+                            defaultValue={p.batch_no ?? ""}
+                            key={`b-${p.id}-${p.batch_no ?? ""}`}
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              if (v === (p.batch_no || "")) return;
+                              void updateProductInventoryMeta(shopId, p.id, {
+                                batch_no: v || null,
+                              }).then((res) => {
+                                if (!res.success) addToast(res.error, "error");
+                                else {
+                                  onProductsChange((prev) =>
+                                    prev.map((x) =>
+                                      x.id === p.id ? { ...x, batch_no: v || null } : x,
+                                    ),
+                                  );
                                 }
+                              });
+                            }}
+                            className={`${CELL_INPUT} w-24 font-mono`}
+                            aria-label="Batch / lot"
+                          />
+                        </td>
+                      ) : null}
+                      {showExpiry ? (
+                        <td className={TD}>
+                          <input
+                            type="date"
+                            defaultValue={p.expiry_date?.slice(0, 10) ?? ""}
+                            key={`e-${p.id}-${p.expiry_date ?? ""}`}
+                            onBlur={(e) => {
+                              const v = e.target.value;
+                              if (v === (p.expiry_date?.slice(0, 10) || "")) return;
+                              void updateProductInventoryMeta(shopId, p.id, {
+                                expiry_date: v || null,
+                              }).then((res) => {
+                                if (!res.success) addToast(res.error, "error");
+                                else {
+                                  onProductsChange((prev) =>
+                                    prev.map((x) =>
+                                      x.id === p.id ? { ...x, expiry_date: v || null } : x,
+                                    ),
+                                  );
+                                }
+                              });
+                            }}
+                            className={`${CELL_INPUT} w-32`}
+                            aria-label="Expiry"
+                          />
+                        </td>
+                      ) : null}
+                      <td className={TD}>
+                        <form
+                          className="flex gap-1"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const fd = new FormData(e.currentTarget);
+                            const code = String(fd.get("barcode") || "").trim();
+                            void withBusy(p.id, async () => {
+                              const res = await updateProductBarcode(shopId, p.id, code || null);
+                              if (!res.success) {
+                                addToast(res.error, "error");
+                                return;
+                              }
+                              onProductsChange((prev) =>
+                                prev.map((x) =>
+                                  x.id === p.id ? { ...x, barcode: code || null } : x,
+                                ),
+                              );
+                              addToast("Barcode saved", "success");
+                            });
+                          }}
+                        >
+                          <input
+                            name="barcode"
+                            defaultValue={p.barcode ?? ""}
+                            key={`${p.id}-${p.barcode ?? ""}`}
+                            placeholder="—"
+                            className={`${CELL_INPUT} w-28 font-mono`}
+                            aria-label="Barcode"
+                          />
+                          <button type="submit" disabled={busy} className={BTN_GREEN}>
+                            Save
+                          </button>
+                        </form>
+                      </td>
+                      <td className={TD}>
+                        {p.stock_qty == null ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void withBusy(p.id, async () => {
+                                const res = await enableProductStockTracking(shopId, p.id, 0);
+                                if (!res.success) addToast(res.error, "error");
+                                else {
+                                  addToast("Tracking on — set qty", "success");
+                                  await onRefresh();
+                                }
+                              })
+                            }
+                            className="whitespace-nowrap rounded border border-dashed border-emerald-400 px-2 py-1 text-[10px] font-bold text-emerald-800 dark:text-emerald-200"
+                          >
+                            Start counting
+                          </button>
+                        ) : (
+                          <div className="flex gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              value={qtyDraft[p.id] ?? String(p.stock_qty)}
+                              onChange={(e) =>
+                                setQtyDraft((d) => ({ ...d, [p.id]: e.target.value }))
+                              }
+                              className={`${CELL_INPUT} w-16`}
+                              aria-label="Exact count now"
+                            />
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void withBusy(p.id, async () => {
+                                  const raw = qtyDraft[p.id] ?? String(p.stock_qty ?? 0);
+                                  const res = await stocktakeSetQty(
+                                    shopId,
+                                    p.id,
+                                    Number(raw) || 0,
+                                    noteDraft[p.id],
+                                  );
+                                  if (!res.success) addToast(res.error, "error");
+                                  else {
+                                    addToast("Count saved", "success");
+                                    await onRefresh();
+                                  }
+                                })
+                              }
+                              className={BTN_GREEN}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className={TD}>
+                        {p.stock_qty == null ? (
+                          <span className="text-zinc-400">—</span>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex gap-1">
+                              <input
+                                type="number"
+                                min={1}
+                                value={restockDraft[p.id] ?? ""}
+                                onChange={(e) =>
+                                  setRestockDraft((d) => ({ ...d, [p.id]: e.target.value }))
+                                }
+                                placeholder="qty"
+                                className={`${CELL_INPUT} w-14`}
+                                aria-label="New stock arrived"
+                              />
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void withBusy(p.id, async () => {
+                                    const n = Math.max(
+                                      1,
+                                      Number(restockDraft[p.id]) ||
+                                        profile.restock_presets[0] ||
+                                        10,
+                                    );
+                                    const res = await restockProduct(
+                                      shopId,
+                                      p.id,
+                                      n,
+                                      noteDraft[p.id],
+                                    );
+                                    if (!res.success) addToast(res.error, "error");
+                                    else {
+                                      addToast(`Added +${n}`, "success");
+                                      setRestockDraft((d) => ({ ...d, [p.id]: "" }));
+                                      await onRefresh();
+                                    }
+                                  })
+                                }
+                                className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
                               >
-                                {m.delta >= 0 ? "+" : ""}
-                                {m.delta}
-                              </span>{" "}
-                              <span className="uppercase text-zinc-500">{m.reason}</span>
-                              {m.note ? (
-                                <span className="text-zinc-400"> · {m.note}</span>
-                              ) : null}
-                            </span>
-                            <span className="shrink-0 text-zinc-400">
-                              {new Date(m.created_at).toLocaleString("en-PK", {
-                                day: "2-digit",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ) : null}
-              </li>
-            );
-          })
-        )}
-      </ul>
+                                + Add
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void withBusy(p.id, async () => {
+                                    const n = Math.max(1, Number(restockDraft[p.id]) || 1);
+                                    if (!window.confirm(`Write off ${n} as damage/wastage?`)) return;
+                                    const res = await damageWriteOff(
+                                      shopId,
+                                      p.id,
+                                      n,
+                                      noteDraft[p.id] || "Damage/wastage",
+                                    );
+                                    if (!res.success) addToast(res.error, "error");
+                                    else {
+                                      addToast(`Damage −${n}`, "info");
+                                      await onRefresh();
+                                    }
+                                  })
+                                }
+                                className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-bold text-red-800 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"
+                              >
+                                Damage
+                              </button>
+                            </div>
+                            {profile.restock_presets.length > 0 ? (
+                              <div className="flex gap-0.5">
+                                {profile.restock_presets.map((n) => (
+                                  <button
+                                    key={n}
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      void withBusy(p.id, async () => {
+                                        const res = await restockProduct(shopId, p.id, n);
+                                        if (!res.success) addToast(res.error, "error");
+                                        else {
+                                          addToast(`+${n}`, "success");
+                                          await onRefresh();
+                                        }
+                                      })
+                                    }
+                                    className="rounded border border-zinc-200 px-1.5 py-0.5 text-[9px] font-bold dark:border-zinc-700"
+                                  >
+                                    +{n}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </td>
+                      <td className={TD}>
+                        <input
+                          value={noteDraft[p.id] ?? ""}
+                          onChange={(e) =>
+                            setNoteDraft((d) => ({ ...d, [p.id]: e.target.value }))
+                          }
+                          placeholder={profile.note_hint}
+                          className={`${CELL_INPUT} w-full min-w-[8rem]`}
+                          aria-label="Note"
+                        />
+                      </td>
+                      <td className={TD}>
+                        <div className="flex items-center gap-1">
+                          {reorder && sug > 0 ? (
+                            <button
+                              type="button"
+                              disabled={busy || bulkBusy}
+                              onClick={() =>
+                                void withBusy(p.id, async () => {
+                                  const res = await restockProduct(
+                                    shopId,
+                                    p.id,
+                                    sug,
+                                    "Suggested restock",
+                                  );
+                                  if (!res.success) addToast(res.error, "error");
+                                  else {
+                                    addToast(`+${sug}`, "success");
+                                    await onRefresh();
+                                  }
+                                })
+                              }
+                              className={`${BTN_GREEN} whitespace-nowrap`}
+                            >
+                              Restock +{sug}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            disabled={busy}
+                            title="Favourite"
+                            onClick={() =>
+                              void withBusy(p.id, async () => {
+                                const next = !p.pos_favourite;
+                                const res = await setProductPosFavourite(shopId, p.id, next);
+                                if (!res.success) addToast(res.error, "error");
+                                else {
+                                  onProductsChange((prev) =>
+                                    prev.map((x) =>
+                                      x.id === p.id ? { ...x, pos_favourite: next } : x,
+                                    ),
+                                  );
+                                }
+                              })
+                            }
+                            className={`rounded px-1.5 py-1 text-[10px] font-bold ${
+                              p.pos_favourite
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
+                            }`}
+                          >
+                            ★
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void withBusy(p.id, async () => {
+                                const res = await setProductStockAvailable(shopId, p.id, !on);
+                                if (!res.success) addToast(res.error, "error");
+                                else await onRefresh();
+                              })
+                            }
+                            className={`rounded px-2 py-1 text-[10px] font-bold ${
+                              on
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                                : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800"
+                            }`}
+                          >
+                            {on ? "Selling" : "Paused"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryFor((h) => (h === p.id ? null : p.id))}
+                            className={`rounded border px-2 py-1 text-[10px] font-bold ${
+                              historyFor === p.id
+                                ? "border-emerald-500 text-emerald-700 dark:text-emerald-300"
+                                : "border-zinc-200 dark:border-zinc-700"
+                            }`}
+                          >
+                            History
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {historyFor === p.id ? (
+                      <tr className="bg-zinc-50 dark:bg-zinc-900">
+                        <td
+                          colSpan={12 + (showBatch ? 1 : 0) + (showExpiry ? 1 : 0)}
+                          className={`${TD} px-3 py-2`}
+                        >
+                          <p className="mb-1 text-[10px] font-bold uppercase text-zinc-500">
+                            Recent moves · {p.name}
+                          </p>
+                          {moves.length === 0 ? (
+                            <p className="text-[11px] text-zinc-500">No ledger rows yet</p>
+                          ) : (
+                            <table className="w-full max-w-2xl border-collapse text-[10px] tabular-nums">
+                              <thead>
+                                <tr className="bg-zinc-100 text-left uppercase text-zinc-500 dark:bg-zinc-800">
+                                  <th className={TH}>Change</th>
+                                  <th className={TH}>Reason</th>
+                                  <th className={TH}>Note</th>
+                                  <th className={TH}>When</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {moves.map((m) => (
+                                  <tr key={m.id} className="bg-white dark:bg-zinc-950">
+                                    <td
+                                      className={`${TD} font-bold ${
+                                        m.delta >= 0 ? "text-emerald-700" : "text-red-600"
+                                      }`}
+                                    >
+                                      {m.delta >= 0 ? "+" : ""}
+                                      {m.delta}
+                                    </td>
+                                    <td className={`${TD} uppercase text-zinc-500`}>{m.reason}</td>
+                                    <td className={`${TD} text-zinc-500`}>{m.note || "—"}</td>
+                                    <td className={`${TD} whitespace-nowrap text-zinc-400`}>
+                                      {new Date(m.created_at).toLocaleString("en-PK", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
         </>
       )}
     </section>

@@ -393,151 +393,91 @@ export default function PosCatalogSetupPanel({
         {" · "}Barcode / Cost / Stock / Reorder — optional, fill when ready
       </p>
 
-      {/* Mobile cards */}
-      <ul className="space-y-2 sm:hidden">
-        {pageRows.map((p) => {
-          const d = drafts[p.id] || emptyDraft(p);
-          const subLabel = p.sub_category_id
-            ? subNames[p.sub_category_id] || "Sub-category"
-            : "Uncategorized";
-          return (
-            <li
-              key={p.id}
-              className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                    {p.name}
-                  </p>
-                  <p className="text-[11px] text-zinc-500">
-                    {subLabel} · {formatRupees(p.price)}
-                  </p>
-                </div>
-                <label className="shrink-0 text-[10px] font-bold text-zinc-500">
-                  <input
-                    type="checkbox"
-                    checked={d.favourite}
-                    onChange={(e) => patchDraft(p.id, { favourite: e.target.checked })}
-                    className="mr-1"
-                  />
-                  Fav
-                </label>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Field
-                  label="Barcode"
-                  value={d.barcode}
-                  onChange={(v) => patchDraft(p.id, { barcode: v })}
-                />
-                <Field
-                  label="Cost"
-                  value={d.cost}
-                  onChange={(v) => patchDraft(p.id, { cost: v })}
-                  inputMode="decimal"
-                />
-                <Field
-                  label="Stock qty"
-                  value={d.stock}
-                  onChange={(v) => patchDraft(p.id, { stock: v })}
-                  inputMode="decimal"
-                />
-                <Field
-                  label="Reorder"
-                  value={d.reorder}
-                  onChange={(v) => patchDraft(p.id, { reorder: v })}
-                  inputMode="numeric"
-                />
-              </div>
-              <button
-                type="button"
-                disabled={busy || !draftChanged(p, d)}
-                onClick={() => void saveOne(p).then((ok) => ok && addToast("Saved", "success"))}
-                className="mt-2 w-full rounded-xl border border-emerald-200 bg-emerald-50 py-2 text-xs font-bold text-emerald-800 disabled:opacity-40 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
-              >
-                Save row
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-
-      {/* Desktop table */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800 sm:block">
-        <table className="w-full min-w-[900px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-zinc-200 bg-zinc-50 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-              <th className="whitespace-nowrap px-3 py-1.5">Product</th>
-              <th className="whitespace-nowrap px-3 py-1.5">Sub-category</th>
-              <th className="whitespace-nowrap px-3 py-1.5">Price</th>
-              <th className="whitespace-nowrap px-3 py-1.5">Barcode</th>
-              <th className="whitespace-nowrap px-3 py-1.5">Cost</th>
-              <th className="whitespace-nowrap px-3 py-1.5">Stock</th>
-              <th className="whitespace-nowrap px-3 py-1.5">Reorder</th>
-              <th className="whitespace-nowrap px-3 py-1.5">Fav</th>
-              <th className="whitespace-nowrap px-3 py-1.5" />
+      {/* Spreadsheet — same sheet on phone (scrolls sideways) and desktop */}
+      <div className="max-h-[70vh] overflow-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
+        <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-zinc-100 text-[11px] font-semibold uppercase tracking-wide text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+              <th className="w-9 whitespace-nowrap border border-zinc-300 px-2 py-1.5 text-center dark:border-zinc-700">#</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Product</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Sub-category</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Price</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Barcode</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Cost</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Stock</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Reorder</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700">Fav</th>
+              <th className="whitespace-nowrap border border-zinc-300 px-3 py-1.5 dark:border-zinc-700" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-900">
-            {pageRows.map((p) => {
+          <tbody>
+            {pageRows.map((p, idx) => {
               const d = drafts[p.id] || emptyDraft(p);
               const subLabel = p.sub_category_id
                 ? subNames[p.sub_category_id] || "—"
                 : "Uncategorized";
               return (
-                <tr key={p.id} className="align-middle">
-                  <td className="max-w-[14rem] truncate px-3 py-1.5 font-semibold text-zinc-900 dark:text-zinc-50">
+                <tr
+                  key={p.id}
+                  className={`align-middle ${
+                    idx % 2 === 1 ? "bg-zinc-50/80 dark:bg-zinc-900/40" : "bg-white dark:bg-zinc-950"
+                  }`}
+                >
+                  <td className={`${TD} text-center text-xs tabular-nums text-zinc-400`}>
+                    {pageSafe * PAGE + idx + 1}
+                  </td>
+                  <td className={`${TD} max-w-[14rem] truncate px-3 py-1.5 font-semibold text-zinc-900 dark:text-zinc-50`}>
                     {p.name}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-xs text-zinc-500">
+                  <td className={`${TD} whitespace-nowrap px-3 py-1.5 text-xs text-zinc-500`}>
                     {subLabel}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-1.5 tabular-nums">
+                  <td className={`${TD} whitespace-nowrap px-3 py-1.5 tabular-nums`}>
                     {formatRupees(p.price)}
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className={`${TD} px-2 py-1.5`}>
                     <input
                       value={d.barcode}
                       onChange={(e) => patchDraft(p.id, { barcode: e.target.value })}
-                      className="w-28 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                      className="w-28 rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
                       placeholder="Optional"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className={`${TD} px-2 py-1.5`}>
                     <input
                       value={d.cost}
                       onChange={(e) => patchDraft(p.id, { cost: e.target.value })}
                       inputMode="decimal"
-                      className="w-20 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                      className="w-20 rounded border border-zinc-200 bg-white px-2 py-1 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
                       placeholder="—"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className={`${TD} px-2 py-1.5`}>
                     <input
                       value={d.stock}
                       onChange={(e) => patchDraft(p.id, { stock: e.target.value })}
                       inputMode="decimal"
-                      className="w-20 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                      className="w-20 rounded border border-zinc-200 bg-white px-2 py-1 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
                       placeholder="—"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className={`${TD} px-2 py-1.5`}>
                     <input
                       value={d.reorder}
                       onChange={(e) => patchDraft(p.id, { reorder: e.target.value })}
                       inputMode="numeric"
-                      className="w-16 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                      className="w-16 rounded border border-zinc-200 bg-white px-2 py-1 text-xs tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
                       placeholder="—"
                     />
                   </td>
-                  <td className="px-3 py-1.5 text-center">
+                  <td className={`${TD} px-3 py-1.5 text-center`}>
                     <input
                       type="checkbox"
                       checked={d.favourite}
                       onChange={(e) => patchDraft(p.id, { favourite: e.target.checked })}
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className={`${TD} px-2 py-1.5`}>
                     <button
                       type="button"
                       disabled={busy || !draftChanged(p, d)}
@@ -591,27 +531,5 @@ export default function PosCatalogSetupPanel({
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  inputMode,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  inputMode?: "decimal" | "numeric";
-}) {
-  return (
-    <label className="block text-[10px] font-semibold text-zinc-500">
-      {label}
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        inputMode={inputMode}
-        placeholder="Optional"
-        className="mt-0.5 h-9 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-      />
-    </label>
-  );
-}
+const TD = "border border-zinc-200 dark:border-zinc-800";
+

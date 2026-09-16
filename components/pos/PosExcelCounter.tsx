@@ -595,29 +595,31 @@ const PosExcelCounter = forwardRef<PosExcelCounterHandle, PosExcelCounterProps>(
                 ))}
               </ul>
 
-              <div className="hidden min-w-0 sm:block">
-                <div className="sticky top-0 z-10 grid grid-cols-[2.25rem_minmax(8rem,1fr)_4.5rem_7.5rem_5rem_4.5rem] gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-                  <span className="whitespace-nowrap">#</span>
-                  <span className="whitespace-nowrap">Product</span>
-                  <span className="whitespace-nowrap text-right">Rate</span>
-                  <span className="whitespace-nowrap text-center">Qty</span>
-                  <span className="whitespace-nowrap text-right">Amount</span>
-                  <span className="whitespace-nowrap text-center"> </span>
+              <div className="hidden min-w-0 overflow-hidden rounded-lg border border-zinc-200 sm:block dark:border-zinc-800">
+                <div className="sticky top-0 z-10 grid grid-cols-[2.25rem_minmax(8rem,1fr)_5.5rem_8.5rem_5.5rem_6rem] divide-x divide-zinc-200 border-b border-zinc-200 bg-zinc-100 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+                  <span className="whitespace-nowrap px-2 py-1.5">#</span>
+                  <span className="whitespace-nowrap px-2 py-1.5">Product</span>
+                  <span className="whitespace-nowrap px-2 py-1.5 text-right">Rate</span>
+                  <span className="whitespace-nowrap px-2 py-1.5 text-center">Qty</span>
+                  <span className="whitespace-nowrap px-2 py-1.5 text-right">Amount</span>
+                  <span className="whitespace-nowrap px-2 py-1.5 text-center"> </span>
                 </div>
-                <ul>
+                <ul className="divide-y divide-zinc-100 dark:divide-zinc-900">
                   {cart.map((l, idx) => (
                     <li
                       key={l.key}
-                      className={`grid grid-cols-[2.25rem_minmax(8rem,1fr)_4.5rem_7.5rem_5rem_4.5rem] items-center gap-2 border-b border-zinc-100 px-3 py-2 text-xs transition-colors dark:border-zinc-900 ${
+                      className={`grid grid-cols-[2.25rem_minmax(8rem,1fr)_5.5rem_8.5rem_5.5rem_6rem] items-center divide-x divide-zinc-100 text-xs transition-colors dark:divide-zinc-900 ${
                         flashKey === l.key
                           ? "bg-emerald-50 dark:bg-emerald-950/30"
-                          : ""
+                          : idx % 2 === 1
+                            ? "bg-zinc-50/70 dark:bg-zinc-900/40"
+                            : "bg-white dark:bg-zinc-950"
                       }`}
                     >
-                      <span className="tabular-nums text-zinc-400">
+                      <span className="px-2 py-1.5 tabular-nums text-zinc-400">
                         {idx + 1}
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 px-2 py-1.5">
                         <p className="truncate font-semibold text-zinc-900 dark:text-zinc-50">
                           {l.name}
                           {l.custom ? (
@@ -632,33 +634,37 @@ const PosExcelCounter = forwardRef<PosExcelCounterHandle, PosExcelCounterProps>(
                           </p>
                         ) : null}
                       </div>
-                      <input
-                        type="number"
-                        min={0}
-                        value={l.unitPrice}
-                        onChange={(e) =>
-                          onSetUnitPrice(
-                            l.key,
-                            Math.max(0, Number(e.target.value) || 0),
-                          )
-                        }
-                        className="w-full rounded border border-zinc-200 bg-zinc-50 px-1 py-1 text-right tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
-                        aria-label="Rate"
-                      />
-                      <div className="flex justify-center">
+                      <div className="px-1.5 py-1">
+                        <input
+                          type="number"
+                          min={0}
+                          value={l.unitPrice}
+                          onChange={(e) =>
+                            onSetUnitPrice(
+                              l.key,
+                              Math.max(0, Number(e.target.value) || 0),
+                            )
+                          }
+                          className="w-full rounded border border-zinc-200 bg-zinc-50 px-1 py-1 text-right tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                          aria-label="Rate"
+                        />
+                      </div>
+                      <div className="flex justify-center px-1.5 py-1">
                         <QtyControls line={l} />
                       </div>
-                      <span className="whitespace-nowrap text-right font-bold tabular-nums text-zinc-900 dark:text-zinc-50">
+                      <span className="whitespace-nowrap px-2 py-1.5 text-right font-bold tabular-nums text-zinc-900 dark:text-zinc-50">
                         {formatRupees(l.unitPrice * l.qty)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => onRemove(l.key)}
-                        className="rounded-lg bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300"
-                        aria-label="Remove item"
-                      >
-                        Remove
-                      </button>
+                      <div className="flex justify-center px-1.5 py-1">
+                        <button
+                          type="button"
+                          onClick={() => onRemove(l.key)}
+                          className="rounded-lg bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300"
+                          aria-label="Remove item"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
