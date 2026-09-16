@@ -844,39 +844,26 @@ export async function voidPosOrder(
   if (order.voided_at || order.status === "Cancelled") {
     return { success: false, error: "Already voided / cancelled." };
   }
-  const supabase = createClient();
   try {
-    const { data, error } = await supabase
-      .from("orders")
-      .update({
-        status: "Cancelled",
-        voided_at: new Date().toISOString(),
-        refunded_amount: Number(order.total_amount) || 0,
-        notes: `${order.notes || ""} [VOID]`.trim(),
-      })
-      .eq("id", order.id)
-      .eq("shop_id", shopId)
-      .select("*")
-      .single();
-    if (error) {
-      // Fallback without void columns
-      const { data: d2, error: e2 } = await supabase
-        .from("orders")
-        .update({
-          status: "Cancelled",
-          notes: `${order.notes || ""} [VOID]`.trim(),
-        })
-        .eq("id", order.id)
-        .eq("shop_id", shopId)
-        .select("*")
-        .single();
-      if (e2) throw e2;
-      await restoreStockFromOrder(shopId, order);
-      return { success: true, data: d2 as Order };
+    // Routed through the server so the void is recorded in the POS audit trail
+    // with the service role — a client-side update could skip that write.
+    const res = await fetch("/api/pos/sales/void", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shopId, orderId: order.id }),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      order?: Order;
+    };
+    if (!res.ok || !json.success || !json.order) {
+      return { success: false, error: json.error || "Could not void the bill." };
     }
     await restoreStockFromOrder(shopId, order);
-    return { success: true, data: data as Order };
+    return { success: true, data: json.order };
   } catch (err) {
+    logError(err, { module: "posService.voidPosOrder", meta: { shopId, orderId: order.id } });
     return { success: false, error: toError(err) };
   }
 }

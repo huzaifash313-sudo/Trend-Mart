@@ -53,6 +53,8 @@ interface BulkRow {
   price_tiers: PriceTier[];
   /** Default true — merchant can mark Out of Stock while bulk-adding. */
   is_available: boolean;
+  /** Default true — false hides the product online (POS counter only). */
+  sell_online: boolean;
 }
 
 function newRow(defaultSubId = ""): BulkRow {
@@ -68,6 +70,7 @@ function newRow(defaultSubId = ""): BulkRow {
     variants: [],
     price_tiers: [],
     is_available: true,
+    sell_online: true,
   };
 }
 
@@ -302,6 +305,7 @@ export default function BulkProductCreator({
         image_url: gallery.image_url,
         images: gallery.images,
         is_available: r.is_available !== false,
+        sell_online: r.sell_online !== false,
         category_id: shopCategory,
         sub_category_id: subId,
         variants: sanitizeVariantGroups(r.variants),
@@ -583,6 +587,20 @@ export default function BulkProductCreator({
                     >
                       {row.is_available ? "In stock" : "Out of stock"}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRow(row.key, { sell_online: !row.sell_online })
+                      }
+                      className={`mt-1 w-full rounded-md px-1.5 py-1 text-[10px] font-semibold transition-colors ${
+                        row.sell_online
+                          ? "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+                          : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                      }`}
+                      title="Show online, or sell only at the POS counter"
+                    >
+                      {row.sell_online ? "Online + POS" : "POS only"}
+                    </button>
                   </td>
                   <td className="px-2 py-2.5">
                     <input
@@ -757,6 +775,25 @@ export default function BulkProductCreator({
                   }`}
                 >
                   {row.is_available ? "In stock" : "Out of stock"}
+                </button>
+              </div>
+
+              <div>
+                <label className={labelClass}>Where it sells</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRow(row.key, { sell_online: !row.sell_online })
+                  }
+                  className={`w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    row.sell_online
+                      ? "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+                      : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                  }`}
+                >
+                  {row.sell_online
+                    ? "Online store + POS counter"
+                    : "POS counter only — hidden online"}
                 </button>
               </div>
 

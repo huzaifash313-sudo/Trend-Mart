@@ -61,6 +61,7 @@ export default function ProductEditorModal({
   const [isAvailable, setIsAvailable] = useState(true);
   const [acceptsDelivery, setAcceptsDelivery] = useState(true);
   const [acceptsPickup, setAcceptsPickup] = useState(true);
+  const [sellOnline, setSellOnline] = useState(true);
   const [subCategoryId, setSubCategoryId] = useState("");
   const [subs, setSubs] = useState<SubCategoryWithMeta[]>([]);
   const [variants, setVariants] = useState<VariantGroup[]>([]);
@@ -82,6 +83,7 @@ export default function ProductEditorModal({
       setIsAvailable(product.is_available !== false);
       setAcceptsDelivery(product.accepts_delivery !== false);
       setAcceptsPickup(product.accepts_pickup !== false);
+      setSellOnline(product.sell_online !== false);
       setSubCategoryId(product.sub_category_id ?? "");
       setVariants((product.variants as VariantGroup[] | null) ?? []);
       setPriceTiers((product.price_tiers as PriceTier[] | null) ?? []);
@@ -95,6 +97,7 @@ export default function ProductEditorModal({
       setIsAvailable(true);
       setAcceptsDelivery(true);
       setAcceptsPickup(true);
+      setSellOnline(true);
       setSubCategoryId("");
       setVariants([]);
       setPriceTiers([]);
@@ -129,7 +132,9 @@ export default function ProductEditorModal({
         addToast("Price must be greater than 0.", "error");
         return;
       }
-      if (!acceptsDelivery && !acceptsPickup) {
+      // Delivery/pickup only govern online orders — a POS-only product never
+      // reaches the storefront, so neither is required for it.
+      if (sellOnline && !acceptsDelivery && !acceptsPickup) {
         addToast("Enable Delivery and/or Pickup — at least one is required.", "error");
         return;
       }
@@ -164,6 +169,7 @@ export default function ProductEditorModal({
         is_available: isAvailable,
         accepts_delivery: acceptsDelivery,
         accepts_pickup: acceptsPickup,
+        sell_online: sellOnline,
         stock_status: isAvailable ? "in_stock" : "out_of_stock",
         category_id: shopCategory || null,
         sub_category_id: subId || null,
@@ -195,6 +201,7 @@ export default function ProductEditorModal({
       isAvailable,
       acceptsDelivery,
       acceptsPickup,
+      sellOnline,
       subCategoryId,
       variants,
       priceTiers,
@@ -391,6 +398,16 @@ export default function ProductEditorModal({
                 label="Accept pickup for this product"
                 visibleLabel={
                   acceptsPickup ? "Pickup on — customers can collect" : "Pickup paused"
+                }
+              />
+              <ToggleSwitch
+                checked={sellOnline}
+                onChange={setSellOnline}
+                label="Show this product on the online store"
+                visibleLabel={
+                  sellOnline
+                    ? "Online + counter — customers can see and order this"
+                    : "POS only — hidden online, sells at the counter"
                 }
               />
             </div>

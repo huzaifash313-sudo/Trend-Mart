@@ -34,15 +34,35 @@ interface ImportRow {
   price: number;
   original_price: number | null;
   is_available: boolean;
+  sell_online: boolean;
+  image_url: string;
   sub_category_id: string | null;
   subCategoryLabel: string;
 }
 
-const TEMPLATE_HEADERS = ["Name", "Sub-category", "Price", "Original Price", "Description", "Available"];
+const TEMPLATE_HEADERS = [
+  "Name",
+  "Sub-category",
+  "Price",
+  "Original Price",
+  "Description",
+  "Available",
+  "Sell Online",
+  "Image URL",
+];
 
 function downloadTemplate() {
   const csv = buildCSVDocument(TEMPLATE_HEADERS, [
-    ["Sample Product", "Others", "500", "", "Optional description", "Yes"],
+    [
+      "Sample Product",
+      "Others",
+      "500",
+      "",
+      "Optional description",
+      "Yes",
+      "Yes",
+      "https://example.com/photo.jpg",
+    ],
   ]);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -135,6 +155,8 @@ export default function ProductCsvImportDialog({
         original: header.indexOf("original price"),
         desc: header.indexOf("description"),
         avail: header.indexOf("available"),
+        sellOnline: header.indexOf("sell online"),
+        image: header.indexOf("image url"),
       };
       if (idx.name === -1 || idx.price === -1) {
         onToast?.("CSV must have at least Name and Price columns.", "error");
@@ -170,6 +192,8 @@ export default function ProductCsvImportDialog({
             price: 0,
             original_price: null,
             is_available: true,
+            sell_online: true,
+            image_url: "",
             sub_category_id: null,
             subCategoryLabel: "—",
           });
@@ -189,6 +213,10 @@ export default function ProductCsvImportDialog({
         const original = originalRaw ? Number(originalRaw) : null;
         const availRaw = (idx.avail !== -1 ? cols[idx.avail] : "")?.trim().toLowerCase() ?? "";
         const isAvailable = availRaw === "" || availRaw === "yes" || availRaw === "true" || availRaw === "1";
+        const sellRaw = (idx.sellOnline !== -1 ? cols[idx.sellOnline] : "")?.trim().toLowerCase() ?? "";
+        const sellOnline = sellRaw === "" || sellRaw === "yes" || sellRaw === "true" || sellRaw === "1";
+        const imageRaw = (idx.image !== -1 ? cols[idx.image] : "")?.trim() ?? "";
+        const imageUrl = /^https?:\/\//i.test(imageRaw) ? imageRaw : "";
 
         const isDuplicate = existingNames.has(name.toLowerCase());
 
@@ -201,6 +229,8 @@ export default function ProductCsvImportDialog({
           price,
           original_price: original != null && Number.isFinite(original) && original > price ? original : null,
           is_available: isAvailable,
+          sell_online: sellOnline,
+          image_url: imageUrl,
           sub_category_id: subId,
           subCategoryLabel: subLabel,
         });
@@ -244,9 +274,10 @@ export default function ProductCsvImportDialog({
       price: r.price,
       original_price: r.original_price,
       deal_expires_at: null,
-      image_url: "",
-      images: [],
+      image_url: r.image_url,
+      images: r.image_url ? [r.image_url] : [],
       is_available: r.is_available,
+      sell_online: r.sell_online,
       category_id: shopCategory,
       sub_category_id: r.sub_category_id,
       variants: [],
@@ -284,8 +315,10 @@ export default function ProductCsvImportDialog({
           {rows.length === 0 ? (
             <div className="space-y-3">
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                CSV columns: <code>Name, Sub-category, Price, Original Price, Description, Available</code>.
-                Name aur Price zaroori hain, baaki optional.
+                CSV columns: <code>Name, Sub-category, Price, Original Price, Description,
+                Available, Sell Online, Image URL</code>. Name aur Price zaroori hain, baaki
+                optional. <strong>Sell Online</strong> ko <code>No</code> karo to product sirf
+                POS counter pe milega, online store pe nahi.
               </p>
               <button
                 type="button"
@@ -329,6 +362,7 @@ export default function ProductCsvImportDialog({
                       <th className="px-2 py-2 font-semibold">Name</th>
                       <th className="px-2 py-2 font-semibold">Sub-category</th>
                       <th className="px-2 py-2 font-semibold">Price</th>
+                      <th className="px-2 py-2 font-semibold">Sells</th>
                       <th className="px-2 py-2 font-semibold">Status</th>
                     </tr>
                   </thead>
@@ -347,6 +381,20 @@ export default function ProductCsvImportDialog({
                         <td className="px-2 py-1.5 text-zinc-500">{r.subCategoryLabel}</td>
                         <td className="px-2 py-1.5 tabular-nums text-zinc-700 dark:text-zinc-300">
                           {r.price > 0 ? r.price : "—"}
+                        </td>
+                        <td className="px-2 py-1.5 text-[10px] font-semibold">
+                          {r.status === "error" ? (
+                            <span className="text-zinc-400">—</span>
+                          ) : r.sell_online ? (
+                            <span className="text-sky-700 dark:text-sky-300">Online + POS</span>
+                          ) : (
+                            <span className="text-amber-700 dark:text-amber-300">POS only</span>
+                          )}
+                          {r.image_url ? (
+                            <span className="ml-1 text-zinc-400" title={r.image_url}>
+                              · 🖼
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-2 py-1.5">
                           <span

@@ -4,9 +4,13 @@
 /* -------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isValidUUID } from "@/lib/sanitization";
+import { STAFF_COOKIE, verifyStaffSession } from "@/lib/pos/staffAuth";
+import { logPosAudit } from "@/lib/pos/posAudit";
+import { computeBillTotals } from "@/lib/pos/billMath";
 import { computeVariantPricing } from "@/lib/variantPricing";
 import { hasPriceTiers, unitPriceForQuantity } from "@/lib/priceTiers";
 import type { OrderItem, PriceTier, VariantGroup } from "@/types";
@@ -100,13 +104,36 @@ export async function POST(request: Request) {
   }
   const { data: shop, error: shopErr } = await admin
     .from("shops")
-    .select("id, owner_id, name")
+    .select("id, owner_id, name, pos_settings")
     .eq("id", shopId)
     .maybeSingle();
 
   if (shopErr || !shop || (shop as { owner_id?: string }).owner_id !== user.id) {
     return NextResponse.json(
       { success: false, error: "You can only bill for your own store." },
+      { status: 403 },
+    );
+  }
+
+  // ── Who is at the counter? ────────────────────────────────────────────────
+  // The owner session above authorizes the shop; the staff cookie identifies the
+  // person. Once a shop has configured staff, an identified shift is required —
+  // otherwise sales would be unattributable, defeating the audit trail. Shops
+  // with no staff configured keep working exactly as before (owner at counter).
+  const staffToken = (await cookies()).get(STAFF_COOKIE)?.value;
+  const staffSession = verifyStaffSession(staffToken);
+  const activeStaff =
+    staffSession && staffSession.shopId === shopId ? staffSession : null;
+
+  const { count: staffCount } = await admin
+    .from("pos_staff")
+    .select("id", { count: "exact", head: true })
+    .eq("shop_id", shopId)
+    .eq("is_active", true);
+
+  if ((staffCount ?? 0) > 0 && !activeStaff) {
+    return NextResponse.json(
+      { success: false, error: "Start your shift — pick your name and enter your PIN." },
       { status: 403 },
     );
   }
@@ -212,6 +239,13 @@ export async function POST(request: Request) {
   }
 
   const items: OrderItem[] = [];
+  /** Lines where the cashier charged something other than the catalog price. */
+  const priceOverrides: Array<{
+    product: string;
+    catalogPrice: number;
+    chargedPrice: number;
+    qty: number;
+  }> = [];
   const stockDeltas: { productId: string; units: number; reason: string }[] = [];
 
   for (const line of rawLines) {
@@ -278,6 +312,12 @@ export async function POST(request: Request) {
     if (locked && clientUnit > 0) {
       // Merchant counter override (known customer / special deal)
       unit = clientUnit;
+      priceOverrides.push({
+        product: String(prod.name || line.name || "Item").slice(0, 120),
+        catalogPrice: base,
+        chargedPrice: clientUnit,
+        qty,
+      });
     } else if (variantLabel) {
       const priced = computeVariantPricing(
         base,
@@ -346,12 +386,28 @@ export async function POST(request: Request) {
     }
   }
 
-  const subtotal = items.reduce((s, i) => s + i.price * Math.max(0.01, i.quantity ?? 1), 0);
-  const discount = Math.min(subtotal, money(body.discountAmount));
-  const tax = Math.min(subtotal, money(body.taxAmount));
-  const deliveryFee =
-    body.orderType === "delivery" ? money(body.deliveryFee) : 0;
-  const total = Math.max(0, subtotal - discount + tax + deliveryFee);
+  const rawSubtotal = items.reduce(
+    (s, i) => s + i.price * Math.max(0.01, i.quantity ?? 1),
+    0,
+  );
+
+  // Tax is computed from the shop's configured rate, never from a client-sent
+  // amount — otherwise a tampered request could under- or over-charge tax.
+  const shopSettings = (shop as { pos_settings?: { tax_rate?: unknown } | null })
+    .pos_settings;
+  const shopTaxRate = money(shopSettings?.tax_rate);
+
+  // Shared arithmetic with the counter UI (lib/pos/billMath) so the total the
+  // cashier sees and the total stored here can never drift apart.
+  const { subtotal, discount, tax, fee: deliveryFee, total } = computeBillTotals({
+    subtotal: rawSubtotal,
+    // The discount IS a legitimate cashier decision, so it comes from the
+    // request — but computeBillTotals clamps it to the subtotal.
+    discountValue: money(body.discountAmount),
+    discountMode: "flat",
+    taxRatePercent: shopTaxRate,
+    deliveryFee: body.orderType === "delivery" ? money(body.deliveryFee) : 0,
+  });
 
   const payRaw = sanitizeText(body.paymentMethod, 20).toLowerCase() || "cash";
   const paymentMethod = PAY_METHODS.has(payRaw) ? payRaw : "cash";
@@ -410,6 +466,8 @@ export async function POST(request: Request) {
     discount_amount: discount > 0 ? discount : 0,
     tax_amount: tax > 0 ? tax : 0,
     delivery_fee: deliveryFee,
+    staff_id: activeStaff?.staffId ?? null,
+    staff_name: activeStaff?.name ?? "Owner",
     status: autoComplete ? "Delivered" : "Pending",
     order_type: orderType,
     notes,
@@ -430,6 +488,11 @@ export async function POST(request: Request) {
       delete row.source;
       delete row.payment_method;
       delete row.payment_split;
+      // Staff attribution lands with 20260917_pos_staff.sql; until that runs the
+      // sale must still go through (unattributed) rather than fail at the counter.
+      delete row.staff_id;
+      delete row.staff_name;
+      delete row.tax_amount;
       const { data: d2, error: e2 } = await admin
         .from("orders")
         .insert(row as never)
@@ -449,16 +512,70 @@ export async function POST(request: Request) {
 
   const orderId = String(inserted.id);
 
+  // ── Audit trail ───────────────────────────────────────────────────────────
+  // Recorded server-side with the service role so a cashier can't suppress it.
+  // Discounts and counter price overrides are allowed for cashiers by design —
+  // accountability comes from these records, not from blocking the action.
+  const auditActor = activeStaff
+    ? { staffId: activeStaff.staffId, name: activeStaff.name }
+    : null;
+
+  void logPosAudit({
+    shopId,
+    staff: auditActor,
+    eventType: "sale.completed",
+    orderId,
+    metadata: { subtotal, discount, tax, deliveryFee, total, paymentMethod, itemCount: items.length },
+  });
+
+  if (discount > 0) {
+    void logPosAudit({
+      shopId,
+      staff: auditActor,
+      eventType: "sale.discount",
+      severity: "warning",
+      orderId,
+      metadata: {
+        discount,
+        subtotal,
+        percentOfSubtotal: subtotal > 0 ? Math.round((discount / subtotal) * 1000) / 10 : 0,
+      },
+    });
+  }
+
+  for (const line of priceOverrides) {
+    void logPosAudit({
+      shopId,
+      staff: auditActor,
+      eventType: "sale.price_override",
+      severity: "warning",
+      orderId,
+      metadata: line,
+    });
+  }
+
   // Stock ledger + qty (best-effort). Soft mode allows negative on-hand.
   for (const d of stockDeltas) {
-    await admin.from("pos_stock_moves").insert({
+    const move: Record<string, unknown> = {
       shop_id: shopId,
       product_id: d.productId,
       delta: -d.units,
       reason: d.reason === "recipe" ? "sale" : "sale",
       note: d.reason === "recipe" ? "POS recipe ingredient" : "POS sale",
       order_id: orderId,
-    } as never);
+      staff_id: activeStaff?.staffId ?? null,
+      staff_name: activeStaff?.name ?? "Owner",
+    };
+    const { error: moveErr } = await admin
+      .from("pos_stock_moves")
+      .insert(move as never);
+    if (moveErr) {
+      // Staff columns arrive with 20260917_pos_staff.sql — never lose the
+      // ledger row just because attribution columns aren't there yet.
+      delete move.staff_id;
+      delete move.staff_name;
+      await admin.from("pos_stock_moves").insert(move as never);
+    }
 
     const prod = byId.get(d.productId);
     if (prod && prod.stock_qty != null && Number.isFinite(Number(prod.stock_qty))) {

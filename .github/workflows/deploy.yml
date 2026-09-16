@@ -77,6 +77,18 @@ jobs:
         run: npx depcheck --ignores="@types/*,eslint*,tailwindcss,postcss,autoprefixer" || true
         continue-on-error: true
 
+      # Fails when the code expects a table/column the database doesn't have yet.
+      # Without this, missing migrations surface as silent runtime breakage (a
+      # missing products.sell_online once made search return zero results while
+      # every page still answered HTTP 200). Skips cleanly without secrets, so
+      # fork PRs are unaffected.
+      - name: Schema drift check (pending migrations)
+        run: node scripts/verify-schema.mjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        timeout-minutes: 3
+
   # ===========================================================================
   # JOB 2: Build & Bundle Analysis
   # ===========================================================================

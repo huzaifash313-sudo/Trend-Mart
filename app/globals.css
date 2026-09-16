@@ -630,10 +630,27 @@ body:has(.fixed.inset-0:not([class*="opacity-"])) .tm-cartbar-root {
 }
 
 /* Right-edge fade affordance for horizontal scrollers: content dims at the
-   edge so users see there is more without a visible scrollbar. */
+   edge so users see there is more without a visible scrollbar. The fade is
+   scroll-aware — once the row is scrolled to the end there is nothing left to
+   reveal, so the last chip is shown at full opacity instead of staying dimmed. */
 .tm-fade-scroll-x {
-  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.25rem), transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.25rem), transparent 100%);
+  --tm-fade-x: 2.25rem;
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - var(--tm-fade-x)), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - var(--tm-fade-x)), transparent 100%);
+  animation: tm-fade-scroll-x-end linear both;
+  animation-timeline: scroll(self inline);
+}
+@keyframes tm-fade-scroll-x-end {
+  /* Start / middle keep the right-edge fade; the final frame clears it. */
+  0%,
+  85% {
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - var(--tm-fade-x)), transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - var(--tm-fade-x)), transparent 100%);
+  }
+  100% {
+    mask-image: linear-gradient(90deg, #000 0, #000 100%);
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 100%);
+  }
 }
 
 /* Semantic badges — discount/danger + deal/silver live behind tokens so every
@@ -5734,7 +5751,54 @@ html.dark .tm-toggle-track.tm-toggle-off {
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  /* Scrollbars are hidden on these rows, so fade the edges instead — without a
+     cue, tabs/chips past the fold read as "cut off" rather than scrollable.
+     The mask follows scroll position, so each edge only fades when there is
+     actually more content that way. */
+  --tm-scroll-fade: 1.75rem;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--tm-scroll-fade),
+    #000 calc(100% - var(--tm-scroll-fade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--tm-scroll-fade),
+    #000 calc(100% - var(--tm-scroll-fade)),
+    transparent 100%
+  );
+  /* At the very start / end there is nothing to reveal on that side, so pull the
+     mask back in — otherwise the first/last chip looks permanently dimmed. */
+  animation: tm-scroll-fade-edges linear both;
+  animation-timeline: scroll(self inline);
 }
+@keyframes tm-scroll-fade-edges {
+  0% {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 calc(100% - var(--tm-scroll-fade)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 calc(100% - var(--tm-scroll-fade)),
+      transparent 100%
+    );
+  }
+  100% {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--tm-scroll-fade)
+    );
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--tm-scroll-fade));
+  }
+}
+/* Browsers without scroll-driven animations keep the static both-edge mask,
+   which still reads as "scrollable" — no JS fallback needed. */
 .tm-cat-tab {
   position: relative;
   display: inline-flex;

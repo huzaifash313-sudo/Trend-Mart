@@ -143,6 +143,9 @@ function buildProductRow(
     if ("accepts_pickup" in sanitized) {
       row.accepts_pickup = sanitized.accepts_pickup !== false;
     }
+    if ("sell_online" in sanitized) {
+      row.sell_online = sanitized.sell_online !== false;
+    }
     if ("deal_expires_at" in sanitized) {
       const raw = sanitized.deal_expires_at;
       if (raw == null || raw === "") {
@@ -366,6 +369,7 @@ function mapMarketplaceRow(row: Record<string, unknown>): MarketplaceProduct | n
     is_available: row.is_available !== false,
     accepts_delivery: row.accepts_delivery !== false,
     accepts_pickup: row.accepts_pickup !== false,
+    sell_online: row.sell_online !== false,
     stock_status: (row.stock_status as string | undefined) ?? undefined,
     variants: (row.variants as Product["variants"]) ?? null,
     price_tiers: (row.price_tiers as Product["price_tiers"]) ?? null,
@@ -619,13 +623,15 @@ async function runMarketplaceRows(
 ): Promise<{ rows: Record<string, unknown>[] | null; error: unknown }> {
   const build = (
     select: string,
-    overrides?: { orderBy?: Array<[string, boolean]> },
+    overrides?: { orderBy?: Array<[string, boolean]>; skipSellOnline?: boolean },
   ) => {
     let b = supabase
       .from("products")
       .select(select)
       .eq("shops.is_live", true)
       .eq("shops.verification_status", "approved");
+    // POS-only products never surface in the marketplace / search feed.
+    if (!overrides?.skipSellOnline) b = b.eq("sell_online", true);
     if (opts.availableOnly) b = b.eq("is_available", true);
     if (opts.shopCategory) {
       b = b.eq("shops.category", opts.shopCategory);
@@ -657,12 +663,13 @@ async function runMarketplaceRows(
 
   const primary = await build(MARKETPLACE_SELECT);
   if (primary.error && isMissingRatingColumnError(primary.error)) {
-    // Popularity columns don't exist yet — retry without them (and without
-    // ordering on missing columns).
+    // Popularity / sell_online columns don't exist yet — retry without them
+    // (and without ordering on missing columns).
     const legacy = await build(MARKETPLACE_SELECT_LEGACY, {
       orderBy: opts.orderBy?.filter(
         ([col]) => col !== "orders_count" && col !== "click_count" && col !== "avg_rating",
       ),
+      skipSellOnline: true,
     });
     return {
       rows: (legacy.data as Record<string, unknown>[] | null) ?? null,

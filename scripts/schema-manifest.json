@@ -1,0 +1,41 @@
+{
+  "_comment": "Columns/tables the application code depends on. Add an entry in the SAME commit that ships code needing it, so CI fails before a deploy can hit 'column does not exist' at runtime. Checked by scripts/verify-schema.mjs.",
+  "tables": {
+    "products": [
+      "id",
+      "shop_id",
+      "name",
+      "price",
+      "is_available",
+      "sub_category_id",
+      "sell_online",
+      "barcode",
+      "cost_price",
+      "stock_qty"
+    ],
+    "orders": [
+      "id",
+      "shop_id",
+      "total_amount",
+      "subtotal_amount",
+      "discount_amount",
+      "delivery_fee",
+      "tax_amount",
+      "staff_id",
+      "staff_name"
+    ],
+    "sub_categories": ["id", "category", "name", "slug", "is_active", "is_others"],
+    "pos_staff": ["id", "shop_id", "name", "pin_hash", "role", "is_active"],
+    "pos_audit_logs": [
+      "id",
+      "shop_id",
+      "staff_id",
+      "staff_name",
+      "event_type",
+      "severity",
+      "order_id",
+      "metadata"
+    ],
+    "pos_stock_moves": ["id", "shop_id", "product_id", "delta", "reason", "staff_id", "staff_name"]
+  }
+}

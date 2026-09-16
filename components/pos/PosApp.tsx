@@ -56,6 +56,18 @@ import PosExcelCounter, {
 } from "@/components/pos/PosExcelCounter";
 import PosBulkAddDialog from "@/components/pos/PosBulkAddDialog";
 import PosSaveCustomItemsModal from "@/components/pos/PosSaveCustomItemsModal";
+import PosShiftLogin from "@/components/pos/PosShiftLogin";
+import PosStaffPanel from "@/components/pos/PosStaffPanel";
+import PosAuditPanel from "@/components/pos/PosAuditPanel";
+import { computeBillTotals } from "@/lib/pos/billMath";
+import {
+  cacheActiveStaff,
+  endStaffShift,
+  listPosStaff,
+  readCachedActiveStaff,
+  type ActiveStaff,
+  type PosStaff,
+} from "@/services/posStaffService";
 import PosStockPanel from "@/components/pos/PosStockPanel";
 import PosExpensesPanel from "@/components/pos/PosExpensesPanel";
 import PosCreditPanel from "@/components/pos/PosCreditPanel";
@@ -164,6 +176,12 @@ export default function PosApp() {
   const [online, setOnline] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState("");
+  /** Configured staff for this shop — empty means "owner runs the counter". */
+  const [staffList, setStaffList] = useState<PosStaff[]>([]);
+  const [activeStaff, setActiveStaff] = useState<ActiveStaff | null>(null);
+  const [staffReady, setStaffReady] = useState(false);
+  /** Cashiers don't see reports, cost price or profit; managers and the owner do. */
+  const canSeeReports = !activeStaff || activeStaff.role === "manager";
 
   const [query, setQuery] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -331,6 +349,18 @@ export default function PosApp() {
         setUnlocked(true);
       }
 
+      // Staff list decides whether a PIN shift is required at this counter.
+      const staffRes = await listPosStaff(s.id);
+      if (!cancelled) {
+        const rows = staffRes.success ? staffRes.data.filter((r) => r.is_active) : [];
+        setStaffList(rows);
+        // Cached identity only avoids a lock-screen flash; the httpOnly cookie
+        // set by the server is what actually authorizes anything.
+        const cached = readCachedActiveStaff(s.id);
+        if (cached && rows.some((r) => r.id === cached.id)) setActiveStaff(cached);
+        setStaffReady(true);
+      }
+
       await refresh(s.id);
       await loadCustomers(s.id);
       void flushOffline(s.id);
@@ -379,8 +409,14 @@ export default function PosApp() {
   const enabledTabs = useMemo(() => {
     if (!settings.enabled) return ["setup"] as Tab[];
     const unique = [...new Set(settings.modules)] as PosModuleId[];
-    return [...unique, "setup"] as Tab[];
-  }, [settings.enabled, settings.modules]);
+    // Cashiers don't get reports (sales history, profit) or POS setup — those
+    // are owner/manager surfaces. The existing effect below moves them off the
+    // tab automatically if they were on one when the shift started.
+    const allowed = canSeeReports
+      ? [...unique, "setup"]
+      : unique.filter((id) => id !== "reports");
+    return allowed as Tab[];
+  }, [settings.enabled, settings.modules, canSeeReports]);
 
   useEffect(() => {
     if (!enabledTabs.includes(tab)) {
@@ -483,22 +519,16 @@ export default function PosApp() {
   const packProfile = useMemo(() => packStockProfile(settings.pack), [settings.pack]);
 
   const cartTotal = useMemo(() => {
-    const sub = cart.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    const rawDiscount =
-      discountMode === "percent"
-        ? (sub * Math.max(0, Number(discount) || 0)) / 100
-        : Math.max(0, Number(discount) || 0);
-    const clampedDiscount = Math.min(rawDiscount, sub);
-    const taxable = sub - clampedDiscount;
-    const tax = Math.round(((taxable * (settings.tax_rate || 0)) / 100) * 100) / 100;
-    const fee = orderType === "delivery" ? Math.max(0, Number(deliveryFee) || 0) : 0;
-    return {
-      sub,
-      discount: clampedDiscount,
-      tax,
-      fee,
-      total: Math.max(0, taxable + tax + fee),
-    };
+    // Same helper the sales API uses (lib/pos/billMath) — the counter total and
+    // the charged total are computed by one function, so they cannot drift.
+    const bill = computeBillTotals({
+      subtotal: cart.reduce((s, l) => s + l.unitPrice * l.qty, 0),
+      discountValue: Number(discount) || 0,
+      discountMode,
+      taxRatePercent: settings.tax_rate || 0,
+      deliveryFee: orderType === "delivery" ? Number(deliveryFee) || 0 : 0,
+    });
+    return { sub: bill.subtotal, discount: bill.discount, tax: bill.tax, fee: bill.fee, total: bill.total };
   }, [cart, discount, discountMode, deliveryFee, orderType, settings.tax_rate]);
 
   const customerQuickPick = useMemo(() => {
@@ -1115,6 +1145,13 @@ export default function PosApp() {
     }
   }
 
+  async function handleEndShift() {
+    await endStaffShift();
+    if (shop) cacheActiveStaff(shop.id, null);
+    setActiveStaff(null);
+    addToast("Shift ended", "info");
+  }
+
   function toggleModule(id: PosModuleId) {
     setSettings((s) => {
       const on = s.modules.includes(id);
@@ -1138,6 +1175,24 @@ export default function PosApp() {
   }
 
   if (!shop) return null;
+
+  // Once a shop has staff configured, a named shift is required — the server
+  // enforces this too, so skipping the screen can't produce a sale.
+  if (staffReady && staffList.length > 0 && !activeStaff) {
+    return (
+      <PosShiftLogin
+        shopId={shop.id}
+        shopName={shop.name}
+        staff={staffList}
+        onStarted={(staff) => {
+          setActiveStaff(staff);
+          cacheActiveStaff(shop.id, staff);
+          setUnlocked(true);
+          addToast(`Shift started — ${staff.name}`, "success");
+        }}
+      />
+    );
+  }
 
   if (needsPin) {
     return (
@@ -1284,10 +1339,27 @@ export default function PosApp() {
                 {offlinePending} queued
               </span>
             ) : null}
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              Cashier unlocked
-            </span>
-            {settings.staff_pin && settings.staff_pin.trim().length >= 4 ? (
+            {activeStaff ? (
+              <span
+                className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                title={`On shift · ${activeStaff.role}`}
+              >
+                {activeStaff.name} · {activeStaff.role}
+              </span>
+            ) : (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                Owner
+              </span>
+            )}
+            {activeStaff ? (
+              <button
+                type="button"
+                onClick={() => void handleEndShift()}
+                className="rounded-md border border-zinc-200 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                End shift
+              </button>
+            ) : settings.staff_pin && settings.staff_pin.trim().length >= 4 ? (
               <button
                 type="button"
                 onClick={() => setUnlocked(false)}
@@ -1556,22 +1628,34 @@ export default function PosApp() {
                 </p>
               </div>
 
+              <PosStaffPanel
+                shopId={shop.id}
+                onToast={addToast}
+                onChanged={(rows) => setStaffList(rows.filter((r) => r.is_active))}
+              />
+
               <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
-                    Staff PIN (4+ digits, optional)
-                  </label>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    value={settings.staff_pin ?? ""}
-                    onChange={(e) =>
-                      setSettings((s) => ({ ...s, staff_pin: e.target.value }))
-                    }
-                    placeholder="Leave blank to disable"
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
-                  />
-                </div>
+                {staffList.length === 0 ? (
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
+                      Legacy shared PIN (optional)
+                    </label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      value={settings.staff_pin ?? ""}
+                      onChange={(e) =>
+                        setSettings((s) => ({ ...s, staff_pin: e.target.value }))
+                      }
+                      placeholder="Leave blank to disable"
+                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                      Ye purana single PIN hai (sirf is device pe check hota tha). Staff add
+                      karte hi ye band ho jata hai aur har banda apne PIN se shift start karta hai.
+                    </p>
+                  </div>
+                ) : null}
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
                     Low-stock threshold
@@ -2630,8 +2714,9 @@ export default function PosApp() {
           )}
 
           {/* REPORTS */}
-          {tab === "reports" && settings.enabled && (
+          {tab === "reports" && settings.enabled && canSeeReports && (
             <section className="space-y-2.5">
+              <PosAuditPanel shopId={shop.id} />
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                 <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
@@ -3009,7 +3094,7 @@ export default function PosApp() {
             order={billOrder}
             shop={shop}
             footerNote={settings.receipt_footer}
-            cashierLabel="Cashier"
+            cashierLabel={activeStaff?.name || "Cashier"}
             autoPrint={autoPrintBill}
             printTarget={settings.print_target || getPrintTarget()}
             printWidthMm={settings.print_width_mm || 80}

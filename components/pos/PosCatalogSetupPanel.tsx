@@ -133,6 +133,22 @@ export default function PosCatalogSetupPanel({
     [products],
   );
 
+  /**
+   * Products created without a photo (bulk-add / CSV import / "save custom item"
+   * all allow skipping it). They sell fine, but look blank on the storefront —
+   * surface the count so photos can be added later.
+   */
+  const missingPhotoCount = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          p.sell_online !== false &&
+          !(p.image_url || "").trim() &&
+          !(Array.isArray(p.images) && p.images.some((u) => (u || "").trim())),
+      ).length,
+    [products],
+  );
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let rows = products;
@@ -301,6 +317,15 @@ export default function PosCatalogSetupPanel({
         <span className="text-[10px] text-zinc-500">
           {products.length} items · {missingCount} still missing optional fields
         </span>
+        {missingPhotoCount > 0 ? (
+          <Link
+            href="/dashboard/products"
+            className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300"
+            title="These products show online without a photo — add one from the Products page"
+          >
+            🖼 {missingPhotoCount} online item{missingPhotoCount === 1 ? "" : "s"} without a photo
+          </Link>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

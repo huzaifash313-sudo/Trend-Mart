@@ -15,6 +15,7 @@ import {
 import { createProduct } from "@/services/productService";
 import { isValidUUID } from "@/lib/sanitization";
 import CustomSelect from "@/components/CustomSelect";
+import MultiImageUpload from "@/components/MultiImageUpload";
 
 export interface PosSaveCustomItemsModalProps {
   shopId: string;
@@ -36,6 +37,8 @@ export default function PosSaveCustomItemsModal({
   const [checked, setChecked] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(items.map((i) => [i.name, true])),
   );
+  const [photos, setPhotos] = useState<Record<string, string[]>>({});
+  const [photoFor, setPhotoFor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -79,14 +82,15 @@ export default function PosSaveCustomItemsModal({
     setSaving(true);
     let created = 0;
     for (const item of toSave) {
+      const gallery = (photos[item.name] ?? []).filter((u) => (u || "").trim());
       const result = await createProduct(shopId, {
         name: item.name,
         description: "",
         price: item.price,
         original_price: null,
         deal_expires_at: null,
-        image_url: "",
-        images: [],
+        image_url: gallery[0] ?? "",
+        images: gallery,
         is_available: true,
         category_id: shopCategory,
         sub_category_id: subCategoryId,
@@ -116,26 +120,61 @@ export default function PosSaveCustomItemsModal({
         </p>
 
         <div className="mt-3 space-y-1.5">
-          {items.map((item) => (
-            <label
-              key={item.name}
-              className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 px-2.5 py-2 text-sm dark:border-zinc-700"
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                <input
-                  type="checkbox"
-                  checked={!!checked[item.name]}
-                  onChange={(e) =>
-                    setChecked((prev) => ({ ...prev, [item.name]: e.target.checked }))
-                  }
-                />
-                <span className="truncate font-medium text-zinc-800 dark:text-zinc-100">
-                  {item.name}
-                </span>
-              </span>
-              <span className="shrink-0 text-zinc-500">{formatRupees(item.price)}</span>
-            </label>
-          ))}
+          {items.map((item) => {
+            const shots = photos[item.name] ?? [];
+            return (
+              <div
+                key={item.name}
+                className="rounded-lg border border-zinc-200 px-2.5 py-2 text-sm dark:border-zinc-700"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <label className="flex min-w-0 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!!checked[item.name]}
+                      onChange={(e) =>
+                        setChecked((prev) => ({ ...prev, [item.name]: e.target.checked }))
+                      }
+                    />
+                    <span className="truncate font-medium text-zinc-800 dark:text-zinc-100">
+                      {item.name}
+                    </span>
+                  </label>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-zinc-500">{formatRupees(item.price)}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPhotoFor((cur) => (cur === item.name ? null : item.name))
+                      }
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        shots.length > 0
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      }`}
+                      title="Add a photo now (optional — you can also add it later)"
+                    >
+                      {shots.length > 0 ? "🖼 1" : "＋ Photo"}
+                    </button>
+                  </span>
+                </div>
+                {photoFor === item.name ? (
+                  <div className="mt-2">
+                    <MultiImageUpload
+                      label="Photo (optional)"
+                      urls={shots}
+                      onChange={(urls) =>
+                        setPhotos((prev) => ({ ...prev, [item.name]: urls }))
+                      }
+                      folder="products"
+                      fileIdPrefix={`${shopId}-custom-${item.name}`}
+                      variant="compact"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
 
         <div className="mt-3">
