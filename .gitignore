@@ -38,6 +38,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# capacitor android — google-services.json is per-Firebase-project, don't commit it
+/android/app/google-services.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

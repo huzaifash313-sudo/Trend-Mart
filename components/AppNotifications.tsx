@@ -18,6 +18,8 @@ import ChatIncomingBanner from "@/components/ChatIncomingBanner";
 import { isViewingConversation } from "@/lib/activeChat";
 import { isChatNotification } from "@/lib/chatNotifications";
 import PermissionNudge from "@/components/PermissionNudge";
+import { wireCapacitorBackButton } from "@/lib/capacitorBackButton";
+import { registerCapacitorPush } from "@/lib/capacitorPush";
 
 function BrowserNotifyBridge() {
   const { notifications, isMuted } = useNotifications();
@@ -227,6 +229,14 @@ function AutoSubscribeWebPush() {
   return null;
 }
 
+function AutoRegisterNativeApp() {
+  useEffect(() => {
+    void wireCapacitorBackButton();
+    void registerCapacitorPush();
+  }, []);
+  return null;
+}
+
 function NotificationChrome() {
   const { isPanelOpen, closePanel } = useNotifications();
   const router = useRouter();
@@ -286,6 +296,7 @@ function NotificationChrome() {
       <BrowserNotifyBridge />
       <AutoRegisterUserNotifications />
       <AutoSubscribeWebPush />
+      <AutoRegisterNativeApp />
       <PermissionNudge />
       <ChatIncomingBanner />
       <NotificationPanel isOpen={isPanelOpen} onClose={closePanel} />

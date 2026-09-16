@@ -98,9 +98,12 @@ export function applyPackDefaults(
         barcode_enabled: false,
         decimal_qty: false,
         token_mode: false,
-        prefer_customer_phone: false,
+        // Exchanges/returns are common in apparel — capture the buyer's phone by default.
+        prefer_customer_phone: true,
         kitchen_enabled: false,
         counter_layout: "excel",
+        // One-off sizes/pieces — don't let the till sell a piece that's already gone.
+        block_oversell: true,
         modules: ensure(core),
       };
     case "beauty":
@@ -113,6 +116,9 @@ export function applyPackDefaults(
         prefer_customer_phone: false,
         kitchen_enabled: false,
         counter_layout: "excel",
+        // Cosmetics genuinely expire — turn on the expiry tracking stockRules.ts
+        // already sizes a 60-day warning window for.
+        track_expiry: true,
         modules: ensure(core),
       };
     case "electronics":
@@ -134,9 +140,12 @@ export function applyPackDefaults(
         barcode_enabled: false,
         decimal_qty: true,
         token_mode: false,
-        prefer_customer_phone: false,
+        // Geysers/fittings often carry warranty — the buyer's phone matters here.
+        prefer_customer_phone: true,
         kitchen_enabled: false,
         counter_layout: "excel",
+        // Higher-value items — don't sell past what's actually on the shelf.
+        block_oversell: true,
         modules: ensure(core),
       };
     case "services":

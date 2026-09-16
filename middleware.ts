@@ -55,6 +55,8 @@ const SENSITIVE_PATH_PATTERNS = [
   "/admin/",
   "/login",
   "/signup",
+  // POS staff PIN endpoints — a 4-digit PIN is brute-forceable without a cap.
+  "/api/pos/staff",
 ] as const;
 
 const SENSITIVE_RATE_LIMIT_MAX = 20;

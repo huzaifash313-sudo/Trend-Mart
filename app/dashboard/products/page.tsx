@@ -90,6 +90,8 @@ interface ProductFormState {
   acceptsDelivery: boolean;
   /** When false, product cannot be ordered for self-pickup. */
   acceptsPickup: boolean;
+  /** When false, product is hidden online and sells at the POS counter only. */
+  sellOnline: boolean;
   /** SKU prefix auto-generated from product name */
   skuPrefix: string;
   /** Multi-attribute variants */
@@ -116,6 +118,7 @@ const INITIAL_PRODUCT_FORM: ProductFormState = {
   isAvailable: true,
   acceptsDelivery: true,
   acceptsPickup: true,
+  sellOnline: true,
   skuPrefix: "",
   variantGroups: [],
   priceTiers: [],
@@ -347,7 +350,9 @@ export default function ProductsDashboardPage() {
     if (!activeShopId) return;
     if (!form.name.trim()) { addToast("Product name is required.", "error"); return; }
     if (form.basePrice <= 0) { addToast("Price must be greater than 0.", "error"); return; }
-    if (!form.acceptsDelivery && !form.acceptsPickup) {
+    // Delivery/pickup only govern online orders — a POS-only product never
+    // reaches the storefront, so neither is required for it.
+    if (form.sellOnline && !form.acceptsDelivery && !form.acceptsPickup) {
       addToast("Enable Delivery and/or Pickup — at least one is required.", "error");
       return;
     }
@@ -390,6 +395,7 @@ export default function ProductsDashboardPage() {
       is_available: form.isAvailable,
       accepts_delivery: form.acceptsDelivery,
       accepts_pickup: form.acceptsPickup,
+      sell_online: form.sellOnline,
       stock_status: form.isAvailable ? "in_stock" : "out_of_stock",
       // Availability toggle only — no numeric stock counts.
       variants: sanitizeVariantGroups(form.variantGroups),
@@ -444,6 +450,7 @@ export default function ProductsDashboardPage() {
       isAvailable: product.is_available,
       acceptsDelivery: product.accepts_delivery !== false,
       acceptsPickup: product.accepts_pickup !== false,
+      sellOnline: product.sell_online !== false,
       skuPrefix: generateSkuPrefix(product.name),
       variantGroups: product.variants ?? [],
       priceTiers: product.price_tiers ?? [],
@@ -1105,6 +1112,18 @@ export default function ProductsDashboardPage() {
                     />
                     Pickup
                   </label>
+                  <label
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300"
+                    title="Uncheck to keep this product off the online store — it stays sellable at the POS counter"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.sellOnline}
+                      onChange={() => setForm((f) => ({ ...f, sellOnline: !f.sellOnline }))}
+                      className="h-3.5 w-3.5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Sell online
+                  </label>
                 </div>
                 <div className="ml-auto flex gap-2">
                   {(editingProductId || showProductForm) && (
@@ -1397,6 +1416,14 @@ export default function ProductsDashboardPage() {
                         >
                           {product.is_available ? "Available" : "Sold Out"}
                         </button>
+                        {product.sell_online === false ? (
+                          <span
+                            className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            title="Hidden from the online store — sells at the POS counter only"
+                          >
+                            POS only
+                          </span>
+                        ) : null}
                         {product.accepts_delivery === false ? (
                           <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
                             Pickup only

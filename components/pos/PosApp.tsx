@@ -55,6 +55,19 @@ import PosExcelCounter, {
   type PosExcelCounterHandle,
 } from "@/components/pos/PosExcelCounter";
 import PosBulkAddDialog from "@/components/pos/PosBulkAddDialog";
+import PosSaveCustomItemsModal from "@/components/pos/PosSaveCustomItemsModal";
+import PosShiftLogin from "@/components/pos/PosShiftLogin";
+import PosStaffPanel from "@/components/pos/PosStaffPanel";
+import PosAuditPanel from "@/components/pos/PosAuditPanel";
+import { computeBillTotals } from "@/lib/pos/billMath";
+import {
+  cacheActiveStaff,
+  endStaffShift,
+  listPosStaff,
+  readCachedActiveStaff,
+  type ActiveStaff,
+  type PosStaff,
+} from "@/services/posStaffService";
 import PosStockPanel from "@/components/pos/PosStockPanel";
 import PosExpensesPanel from "@/components/pos/PosExpensesPanel";
 import PosCreditPanel from "@/components/pos/PosCreditPanel";
@@ -163,6 +176,12 @@ export default function PosApp() {
   const [online, setOnline] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
   const [pinInput, setPinInput] = useState("");
+  /** Configured staff for this shop — empty means "owner runs the counter". */
+  const [staffList, setStaffList] = useState<PosStaff[]>([]);
+  const [activeStaff, setActiveStaff] = useState<ActiveStaff | null>(null);
+  const [staffReady, setStaffReady] = useState(false);
+  /** Cashiers don't see reports, cost price or profit; managers and the owner do. */
+  const canSeeReports = !activeStaff || activeStaff.role === "manager";
 
   const [query, setQuery] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -175,6 +194,10 @@ export default function PosApp() {
   const [custName, setCustName] = useState("");
   const [custPhone, setCustPhone] = useState("");
   const [discount, setDiscount] = useState("");
+  const [discountMode, setDiscountMode] = useState<"flat" | "percent">("flat");
+  const [pendingCustomSave, setPendingCustomSave] = useState<
+    { name: string; price: number }[] | null
+  >(null);
   const [billNotes, setBillNotes] = useState("");
   const [orderType, setOrderType] = useState<"pickup" | "delivery">("pickup");
   const [token, setToken] = useState("");
@@ -326,6 +349,18 @@ export default function PosApp() {
         setUnlocked(true);
       }
 
+      // Staff list decides whether a PIN shift is required at this counter.
+      const staffRes = await listPosStaff(s.id);
+      if (!cancelled) {
+        const rows = staffRes.success ? staffRes.data.filter((r) => r.is_active) : [];
+        setStaffList(rows);
+        // Cached identity only avoids a lock-screen flash; the httpOnly cookie
+        // set by the server is what actually authorizes anything.
+        const cached = readCachedActiveStaff(s.id);
+        if (cached && rows.some((r) => r.id === cached.id)) setActiveStaff(cached);
+        setStaffReady(true);
+      }
+
       await refresh(s.id);
       await loadCustomers(s.id);
       void flushOffline(s.id);
@@ -374,8 +409,14 @@ export default function PosApp() {
   const enabledTabs = useMemo(() => {
     if (!settings.enabled) return ["setup"] as Tab[];
     const unique = [...new Set(settings.modules)] as PosModuleId[];
-    return [...unique, "setup"] as Tab[];
-  }, [settings.enabled, settings.modules]);
+    // Cashiers don't get reports (sales history, profit) or POS setup — those
+    // are owner/manager surfaces. The existing effect below moves them off the
+    // tab automatically if they were on one when the shift started.
+    const allowed = canSeeReports
+      ? [...unique, "setup"]
+      : unique.filter((id) => id !== "reports");
+    return allowed as Tab[];
+  }, [settings.enabled, settings.modules, canSeeReports]);
 
   useEffect(() => {
     if (!enabledTabs.includes(tab)) {
@@ -478,16 +519,17 @@ export default function PosApp() {
   const packProfile = useMemo(() => packStockProfile(settings.pack), [settings.pack]);
 
   const cartTotal = useMemo(() => {
-    const sub = cart.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    const d = Math.max(0, Number(discount) || 0);
-    const fee = orderType === "delivery" ? Math.max(0, Number(deliveryFee) || 0) : 0;
-    return {
-      sub,
-      discount: Math.min(d, sub),
-      fee,
-      total: Math.max(0, sub - Math.min(d, sub) + fee),
-    };
-  }, [cart, discount, deliveryFee, orderType]);
+    // Same helper the sales API uses (lib/pos/billMath) — the counter total and
+    // the charged total are computed by one function, so they cannot drift.
+    const bill = computeBillTotals({
+      subtotal: cart.reduce((s, l) => s + l.unitPrice * l.qty, 0),
+      discountValue: Number(discount) || 0,
+      discountMode,
+      taxRatePercent: settings.tax_rate || 0,
+      deliveryFee: orderType === "delivery" ? Number(deliveryFee) || 0 : 0,
+    });
+    return { sub: bill.subtotal, discount: bill.discount, tax: bill.tax, fee: bill.fee, total: bill.total };
+  }, [cart, discount, discountMode, deliveryFee, orderType, settings.tax_rate]);
 
   const customerQuickPick = useMemo(() => {
     const q = (custPhone || custName).trim().toLowerCase();
@@ -609,19 +651,27 @@ export default function PosApp() {
       addToast("Custom item needs a price", "info");
       return;
     }
-    const key = `custom::${Date.now()}::${Math.random().toString(36).slice(2, 7)}`;
-    setCart((prev) => [
-      ...prev,
-      {
-        key,
-        productId: key,
-        name,
-        basePrice: price,
-        unitPrice: price,
-        qty,
-        custom: true,
-      },
-    ]);
+    const key = `custom::${name.toLowerCase()}::${price}`;
+    setCart((prev) => {
+      const existing = prev.find((l) => l.key === key);
+      if (existing) {
+        return prev.map((l) =>
+          l.key === key ? { ...l, qty: Math.round((l.qty + qty) * 100) / 100 } : l,
+        );
+      }
+      return [
+        ...prev,
+        {
+          key,
+          productId: key,
+          name,
+          basePrice: price,
+          unitPrice: price,
+          qty,
+          custom: true,
+        },
+      ];
+    });
     setMiscName("");
     setMiscPrice("");
     setMiscQty("1");
@@ -749,6 +799,7 @@ export default function PosApp() {
   function clearBill() {
     setCart([]);
     setDiscount("");
+    setDiscountMode("flat");
     setBillNotes("");
     setCustName("");
     setCustPhone("");
@@ -881,6 +932,7 @@ export default function PosApp() {
       paymentMethod,
       paymentSplit,
       discountAmount: cartTotal.discount,
+      taxAmount: cartTotal.tax,
       notes: billNotes,
       autoComplete: settings.auto_complete_counter && orderType === "pickup",
       orderType,
@@ -901,6 +953,7 @@ export default function PosApp() {
           lines: cart,
           subtotal: cartTotal.sub,
           discount: cartTotal.discount,
+          tax: cartTotal.tax,
           total: cartTotal.total,
           paymentMethod,
           customerName: custName || "Walk-in",
@@ -923,6 +976,7 @@ export default function PosApp() {
       lines: cart,
       subtotal: cartTotal.sub,
       discount: cartTotal.discount,
+      tax: cartTotal.tax,
       total: cartTotal.total,
       paymentMethod,
       customerName: custName || "Walk-in",
@@ -943,6 +997,12 @@ export default function PosApp() {
         : `Bill saved · ${formatRupees(cartTotal.total)}`,
       "success",
     );
+    const customItems = Array.from(
+      new Map(
+        cart.filter((l) => l.custom).map((l) => [l.name, { name: l.name, price: l.unitPrice }]),
+      ).values(),
+    );
+    if (customItems.length > 0) setPendingCustomSave(customItems);
     clearBill();
     await refresh(shop.id);
     void loadCustomers(shop.id);
@@ -1085,6 +1145,13 @@ export default function PosApp() {
     }
   }
 
+  async function handleEndShift() {
+    await endStaffShift();
+    if (shop) cacheActiveStaff(shop.id, null);
+    setActiveStaff(null);
+    addToast("Shift ended", "info");
+  }
+
   function toggleModule(id: PosModuleId) {
     setSettings((s) => {
       const on = s.modules.includes(id);
@@ -1108,6 +1175,24 @@ export default function PosApp() {
   }
 
   if (!shop) return null;
+
+  // Once a shop has staff configured, a named shift is required — the server
+  // enforces this too, so skipping the screen can't produce a sale.
+  if (staffReady && staffList.length > 0 && !activeStaff) {
+    return (
+      <PosShiftLogin
+        shopId={shop.id}
+        shopName={shop.name}
+        staff={staffList}
+        onStarted={(staff) => {
+          setActiveStaff(staff);
+          cacheActiveStaff(shop.id, staff);
+          setUnlocked(true);
+          addToast(`Shift started — ${staff.name}`, "success");
+        }}
+      />
+    );
+  }
 
   if (needsPin) {
     return (
@@ -1254,10 +1339,27 @@ export default function PosApp() {
                 {offlinePending} queued
               </span>
             ) : null}
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              Cashier unlocked
-            </span>
-            {settings.staff_pin && settings.staff_pin.trim().length >= 4 ? (
+            {activeStaff ? (
+              <span
+                className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                title={`On shift · ${activeStaff.role}`}
+              >
+                {activeStaff.name} · {activeStaff.role}
+              </span>
+            ) : (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                Owner
+              </span>
+            )}
+            {activeStaff ? (
+              <button
+                type="button"
+                onClick={() => void handleEndShift()}
+                className="rounded-md border border-zinc-200 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                End shift
+              </button>
+            ) : settings.staff_pin && settings.staff_pin.trim().length >= 4 ? (
               <button
                 type="button"
                 onClick={() => setUnlocked(false)}
@@ -1526,22 +1628,34 @@ export default function PosApp() {
                 </p>
               </div>
 
+              <PosStaffPanel
+                shopId={shop.id}
+                onToast={addToast}
+                onChanged={(rows) => setStaffList(rows.filter((r) => r.is_active))}
+              />
+
               <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
-                    Staff PIN (4+ digits, optional)
-                  </label>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    value={settings.staff_pin ?? ""}
-                    onChange={(e) =>
-                      setSettings((s) => ({ ...s, staff_pin: e.target.value }))
-                    }
-                    placeholder="Leave blank to disable"
-                    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
-                  />
-                </div>
+                {staffList.length === 0 ? (
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
+                      Legacy shared PIN (optional)
+                    </label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      value={settings.staff_pin ?? ""}
+                      onChange={(e) =>
+                        setSettings((s) => ({ ...s, staff_pin: e.target.value }))
+                      }
+                      placeholder="Leave blank to disable"
+                      className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+                      Ye purana single PIN hai (sirf is device pe check hota tha). Staff add
+                      karte hi ye band ho jata hai aur har banda apne PIN se shift start karta hai.
+                    </p>
+                  </div>
+                ) : null}
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
                     Low-stock threshold
@@ -1601,6 +1715,26 @@ export default function PosApp() {
                     setSettings((s) => ({ ...s, receipt_footer: e.target.value }))
                   }
                   placeholder="Thanks for shopping with us!"
+                  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-zinc-500">
+                  Tax % (applied on bill total, 0 = no tax)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={settings.tax_rate || ""}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      tax_rate: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                    }))
+                  }
+                  placeholder="0"
                   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
                 />
               </div>
@@ -1951,6 +2085,7 @@ export default function PosApp() {
                     ref={excelRef}
                     products={products}
                     cart={cart}
+                    shopCategory={shop.category}
                     decimalQty={settings.decimal_qty}
                     barcodeEnabled={settings.barcode_enabled}
                     lowStockThreshold={settings.low_stock_threshold}
@@ -2408,15 +2543,27 @@ export default function PosApp() {
                 ) : null}
 
                 <div className="grid grid-cols-2 gap-1">
-                  <input
-                    ref={discountRef}
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    type="number"
-                    min={0}
-                    placeholder="Discount Rs"
-                    className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
-                  />
+                  <div className="flex gap-1">
+                    <input
+                      ref={discountRef}
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      type="number"
+                      min={0}
+                      placeholder={discountMode === "percent" ? "Discount %" : "Discount Rs"}
+                      className="w-full min-w-0 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-1 text-[11px] dark:border-zinc-700 dark:bg-zinc-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDiscountMode((m) => (m === "flat" ? "percent" : "flat"))
+                      }
+                      title="Switch between flat Rs and % discount"
+                      className="shrink-0 rounded-md border border-zinc-200 px-1.5 text-[10px] font-bold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      {discountMode === "percent" ? "%" : "Rs"}
+                    </button>
+                  </div>
                   <input
                     value={billNotes}
                     onChange={(e) => setBillNotes(e.target.value)}
@@ -2436,7 +2583,7 @@ export default function PosApp() {
 
                 <div className="shrink-0 space-y-1.5 border-t border-zinc-100 pt-1.5 dark:border-zinc-800">
                 <div className="space-y-0.5 text-sm">
-                  {cartTotal.discount > 0 || cartTotal.fee > 0 ? (
+                  {cartTotal.discount > 0 || cartTotal.tax > 0 || cartTotal.fee > 0 ? (
                     <>
                       <div className="flex justify-between text-[10px] text-zinc-500">
                         <span>Subtotal</span>
@@ -2446,6 +2593,12 @@ export default function PosApp() {
                         <div className="flex justify-between text-[10px] text-zinc-500">
                           <span>Discount</span>
                           <span>−{formatRupees(cartTotal.discount)}</span>
+                        </div>
+                      ) : null}
+                      {cartTotal.tax > 0 ? (
+                        <div className="flex justify-between text-[10px] text-zinc-500">
+                          <span>Tax ({settings.tax_rate}%)</span>
+                          <span>{formatRupees(cartTotal.tax)}</span>
                         </div>
                       ) : null}
                       {cartTotal.fee > 0 ? (
@@ -2561,8 +2714,9 @@ export default function PosApp() {
           )}
 
           {/* REPORTS */}
-          {tab === "reports" && settings.enabled && (
+          {tab === "reports" && settings.enabled && canSeeReports && (
             <section className="space-y-2.5">
+              <PosAuditPanel shopId={shop.id} />
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                 <h2 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">
@@ -2923,6 +3077,16 @@ export default function PosApp() {
         />
       ) : null}
 
+      {pendingCustomSave && shop ? (
+        <PosSaveCustomItemsModal
+          shopId={shop.id}
+          shopCategory={shop.category}
+          items={pendingCustomSave}
+          onClose={() => setPendingCustomSave(null)}
+          onToast={addToast}
+        />
+      ) : null}
+
       {billOrder && shop ? (
         orderSource(billOrder) === "pos" ||
         (billOrder.notes || "").includes("[POS]") ? (
@@ -2930,7 +3094,7 @@ export default function PosApp() {
             order={billOrder}
             shop={shop}
             footerNote={settings.receipt_footer}
-            cashierLabel="Cashier"
+            cashierLabel={activeStaff?.name || "Cashier"}
             autoPrint={autoPrintBill}
             printTarget={settings.print_target || getPrintTarget()}
             printWidthMm={settings.print_width_mm || 80}

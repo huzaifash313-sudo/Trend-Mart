@@ -469,12 +469,13 @@ export async function fetchShopById(
       .from("products")
       .select(PRODUCT_SELECT)
       .eq("shop_id", shop.id)
+      .eq("sell_online", true)
       .order("created_at", { ascending: false })
       .limit(SHOP_STOREFRONT_PRODUCT_LIMIT);
     products = (first.data as Product[] | null) ?? null;
     productError = first.error;
 
-    // Older schemas may not have is_pinned yet — retry without it.
+    // Older schemas may not have is_pinned / sell_online yet — retry without them.
     if (productError && isMissingColumnError(productError)) {
       const retry = await supabase
         .from("products")
@@ -526,6 +527,7 @@ export async function fetchShopProductsPage(
       .from("products")
       .select(STOREFRONT_PRODUCT_SELECT)
       .eq("shop_id", shopId)
+      .eq("sell_online", true)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 

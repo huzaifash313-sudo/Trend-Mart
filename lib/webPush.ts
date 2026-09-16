@@ -52,10 +52,22 @@ export async function sendPushToUser(
   payload: PushPayload,
   options: SendPushOptions = {},
 ): Promise<{ sent: number; failed: number }> {
-  if (!isWebPushConfigured()) return { sent: 0, failed: 0 };
+  // Native (Android app) devices go through FCM — separate channel, same
+  // trigger call sites. Fire in parallel with the Web Push loop below.
+  const fcmPromise = import("@/lib/fcmPush").then(({ sendFcmToUser }) =>
+    sendFcmToUser(userId, payload),
+  );
+
+  if (!isWebPushConfigured()) {
+    const fcm = await fcmPromise;
+    return fcm;
+  }
 
   const admin = getSupabaseAdminClient();
-  if (!admin) return { sent: 0, failed: 0 };
+  if (!admin) {
+    const fcm = await fcmPromise;
+    return fcm;
+  }
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
   const privateKey = process.env.VAPID_PRIVATE_KEY!;
@@ -114,5 +126,6 @@ export async function sendPushToUser(
     }),
   );
 
-  return { sent, failed };
+  const fcm = await fcmPromise;
+  return { sent: sent + fcm.sent, failed: failed + fcm.failed };
 }

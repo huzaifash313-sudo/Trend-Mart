@@ -22,6 +22,7 @@ import { normalizeProductGallery } from "@/lib/productImages";
 import { normalizeTiers } from "@/lib/priceTiers";
 import { getProductNamePlaceholder } from "@/lib/productPlaceholders";
 import CustomSelect from "@/components/CustomSelect";
+import ProductCsvImportDialog from "@/components/ProductCsvImportDialog";
 import {
   cloneVariantGroups,
   getComboTemplates,
@@ -52,6 +53,8 @@ interface BulkRow {
   price_tiers: PriceTier[];
   /** Default true — merchant can mark Out of Stock while bulk-adding. */
   is_available: boolean;
+  /** Default true — false hides the product online (POS counter only). */
+  sell_online: boolean;
 }
 
 function newRow(defaultSubId = ""): BulkRow {
@@ -67,6 +70,7 @@ function newRow(defaultSubId = ""): BulkRow {
     variants: [],
     price_tiers: [],
     is_available: true,
+    sell_online: true,
   };
 }
 
@@ -95,6 +99,7 @@ export default function BulkProductCreator({
   const [saving, setSaving] = useState(false);
   const [defaultSubId, setDefaultSubId] = useState("");
   const [expandedVariants, setExpandedVariants] = useState<Record<string, boolean>>({});
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,6 +266,8 @@ export default function BulkProductCreator({
         setSaving(true);
 
     const forms: ProductFormData[] = [];
+    const formRows: BulkRow[] = [];
+    const uncategorizedRows: BulkRow[] = [];
     for (const r of validRows) {
       const price = Number(r.price);
       const original = r.original_price.trim() ? Number(r.original_price) : null;
@@ -276,9 +283,16 @@ export default function BulkProductCreator({
         subId = isValidUUID(othersFallback) ? othersFallback : null;
       }
 
+      if (!subId) {
+        // Never silently save as uncategorized — keep the row for the merchant to fix.
+        uncategorizedRows.push(r);
+        continue;
+      }
+
       const gallery = normalizeProductGallery(r.images);
       const cleanTiers = normalizeTiers(r.price_tiers);
 
+      formRows.push(r);
       forms.push({
         name: r.name.trim(),
         description: r.description.trim(),
@@ -291,11 +305,21 @@ export default function BulkProductCreator({
         image_url: gallery.image_url,
         images: gallery.images,
         is_available: r.is_available !== false,
+        sell_online: r.sell_online !== false,
         category_id: shopCategory,
         sub_category_id: subId,
         variants: sanitizeVariantGroups(r.variants),
         price_tiers: cleanTiers.length > 0 ? cleanTiers : null,
       });
+    }
+
+    if (forms.length === 0) {
+      setSaving(false);
+      onToast?.(
+        "Couldn't resolve a sub-category for any row — pick one manually and try again.",
+        "error",
+      );
+      return;
     }
 
     const result = await bulkCreateProducts(shopId, forms);
@@ -307,17 +331,21 @@ export default function BulkProductCreator({
     }
 
     const { created, failed } = result.data;
-    if (failed.length === 0) {
+    const failedRows = failed.map(({ index }) => formRows[index]).filter((r): r is BulkRow => !!r);
+    const remainingRows = [...uncategorizedRows, ...failedRows];
+
+    if (failed.length === 0 && uncategorizedRows.length === 0) {
       onToast?.(`${created.length} product${created.length === 1 ? "" : "s"} added!`, "success");
+      setRows([newRow(defaultSubId)]);
+      setExpandedVariants({});
     } else {
-      onToast?.(
-        `${created.length} added, ${failed.length} failed (check names/prices).`,
-        "info",
-      );
+      const parts = [`${created.length} added`];
+      if (failed.length) parts.push(`${failed.length} failed (check names/prices)`);
+      if (uncategorizedRows.length) parts.push(`${uncategorizedRows.length} need a sub-category`);
+      onToast?.(parts.join(", ") + " — fix the remaining rows below.", "info");
+      setRows(remainingRows.length > 0 ? remainingRows : [newRow(defaultSubId)]);
     }
 
-    setRows([newRow(defaultSubId)]);
-    setExpandedVariants({});
     onCreated?.();
   }, [shopId, shopCategory, rows, defaultSubId, onToast, onCreated]);
 
@@ -378,8 +406,29 @@ export default function BulkProductCreator({
           >
             +5 Rows
           </button>
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="btn-compact rounded-full border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+          >
+            Import CSV
+          </button>
         </div>
       </div>
+
+      {showImport ? (
+        <ProductCsvImportDialog
+          shopId={shopId}
+          shopCategory={shopCategory}
+          subs={subs}
+          onClose={() => setShowImport(false)}
+          onImported={(count) => {
+            setShowImport(false);
+            if (count > 0) onCreated?.();
+          }}
+          onToast={onToast}
+        />
+      ) : null}
 
       {/* Category option packs — simple first, same as Add / Edit product */}
       {shopCategory && (simplePacks.length > 0 || mixPacks.length > 0) ? (
@@ -506,7 +555,6 @@ export default function BulkProductCreator({
                     <input
                       type="number"
                       min={0}
-                      step={1}
                       value={row.price}
                       onChange={(e) => updateRow(row.key, { price: e.target.value })}
                       placeholder="Price"
@@ -517,7 +565,6 @@ export default function BulkProductCreator({
                     <input
                       type="number"
                       min={0}
-                      step={1}
                       value={row.original_price}
                       onChange={(e) =>
                         updateRow(row.key, { original_price: e.target.value })
@@ -539,6 +586,20 @@ export default function BulkProductCreator({
                       title="In stock / Out of stock"
                     >
                       {row.is_available ? "In stock" : "Out of stock"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRow(row.key, { sell_online: !row.sell_online })
+                      }
+                      className={`mt-1 w-full rounded-md px-1.5 py-1 text-[10px] font-semibold transition-colors ${
+                        row.sell_online
+                          ? "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+                          : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                      }`}
+                      title="Show online, or sell only at the POS counter"
+                    >
+                      {row.sell_online ? "Online + POS" : "POS only"}
                     </button>
                   </td>
                   <td className="px-2 py-2.5">
@@ -714,6 +775,25 @@ export default function BulkProductCreator({
                   }`}
                 >
                   {row.is_available ? "In stock" : "Out of stock"}
+                </button>
+              </div>
+
+              <div>
+                <label className={labelClass}>Where it sells</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRow(row.key, { sell_online: !row.sell_online })
+                  }
+                  className={`w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    row.sell_online
+                      ? "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+                      : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                  }`}
+                >
+                  {row.sell_online
+                    ? "Online store + POS counter"
+                    : "POS counter only — hidden online"}
                 </button>
               </div>
 

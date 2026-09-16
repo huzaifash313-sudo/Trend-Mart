@@ -439,6 +439,11 @@ export interface Product {
    * Defaults to true.
    */
   accepts_pickup?: boolean | null;
+  /**
+   * When false, the product is hidden from the public storefront, marketplace
+   * and search — it stays sellable at the POS counter only. Defaults to true.
+   */
+  sell_online?: boolean | null;
   /** Stock status: in_stock, low_stock, out_of_stock, pre_order */
   stock_status?: string;
   /** Merchant pin-to-top flag — pinned items sort first in the storefront. */
@@ -550,6 +555,11 @@ export interface ProductFormData {
   accepts_delivery?: boolean;
   /** When false, product cannot be ordered for self-pickup. Default true. */
   accepts_pickup?: boolean;
+  /**
+   * When false, the product is hidden from the public storefront / search and
+   * is sellable only at the POS counter. Default true.
+   */
+  sell_online?: boolean;
   stock_status?: string;
   /** FK to main category string */
   category_id?: string | null;
@@ -755,6 +765,8 @@ export interface Order {
   delivery_fee?: number | null;
   /** Coupon discount applied (Rs), when a coupon was used. */
   discount_amount?: number | null;
+  /** Tax charged (Rs), when the POS's tax rate was > 0. */
+  tax_amount?: number | null;
   /** Coupon code used, when any. */
   coupon_code?: string | null;
   /** When the customer confirmed the WhatsApp hand-off (null = not sent yet). */

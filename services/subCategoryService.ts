@@ -10,6 +10,7 @@ import { sanitizeLight, truncate, isValidUUID } from "@/lib/sanitization";
 import {
   normalizeShopCategory,
   SUBCATEGORY_CATALOG,
+  type CatalogSubCategory,
 } from "@/lib/categoryCatalog";
 import type { SubCategory } from "@/types";
 
@@ -122,17 +123,63 @@ export async function fetchSubCategories(
   }
 }
 
+/** Find the catalog entry a synthetic fallback id was generated from. */
+function findCatalogEntryForSyntheticId(
+  category: string,
+  subCategoryId: string,
+): CatalogSubCategory | null {
+  const rows = SUBCATEGORY_CATALOG[category];
+  if (!rows?.length) return null;
+  if (subCategoryId.startsWith("fallback-others-")) {
+    return rows.find((s) => s.is_others) ?? null;
+  }
+  const prefix = `catalog-${category}-`;
+  if (!subCategoryId.startsWith(prefix)) return null;
+  const slug = subCategoryId.slice(prefix.length);
+  return rows.find((s) => s.slug === slug) ?? null;
+}
+
 /**
  * Resolve a sub-category id. Returns the original id if it is already a valid UUID.
- * Synthetic seed IDs are no longer supported; non-UUID ids resolve to null.
+ * Synthetic catalog-fallback ids (used when a category's real DB rows haven't been
+ * seeded yet) are matched back to the real DB row by category + slug (or the
+ * category's 'Others' row, matched by the is_others flag so a differing slug in the
+ * DB doesn't cause a miss). Returns null only when no real row can be found at all.
  */
 export async function resolveSubCategoryId(
-  _category: string,
+  category: string,
   subCategoryId: string | null | undefined,
 ): Promise<string | null> {
   if (!subCategoryId) return null;
   if (isValidUUID(subCategoryId)) return subCategoryId;
-  return null;
+
+  const safeCategory = sanitizeCategoryParam(category);
+  if (!safeCategory) return null;
+
+  const entry = findCatalogEntryForSyntheticId(safeCategory, subCategoryId);
+  if (!entry) return null;
+
+  const supabase = createClient();
+  try {
+    let query = supabase
+      .from("sub_categories")
+      .select("id")
+      .eq("category", safeCategory)
+      .eq("is_active", true);
+    query = entry.is_others
+      ? query.eq("is_others", true)
+      : query.eq("slug", entry.slug);
+
+    const { data, error } = await query.limit(1).single();
+    if (error || !data) return null;
+    return (data as { id: string }).id;
+  } catch (err) {
+    logError(err, {
+      module: "subCategoryService.resolveSubCategoryId",
+      meta: { category: safeCategory, subCategoryId },
+    });
+    return null;
+  }
 }
 
 /**

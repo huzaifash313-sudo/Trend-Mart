@@ -131,28 +131,40 @@ async function searchProducts(
   if (!ilike) return { items: [], hasMore: false };
 
   const pool = clamp(Math.max(limit + offset, limit) * 5, 24, 160);
-  let query = supabase
-    .from("products")
-    .select(PRODUCT_SELECT)
-    .eq("is_available", true)
-    .eq("shops.is_live", true)
-    .eq("shops.verification_status", "approved")
-    .or(ilike);
 
-  if (filters?.minPrice != null && filters.minPrice > 0) {
-    query = query.gte("price", filters.minPrice);
-  }
-  if (filters?.maxPrice != null && filters.maxPrice > 0) {
-    query = query.lte("price", filters.maxPrice);
-  }
-  if (filters?.shopCategory) {
-    query = query.eq("shops.category", filters.shopCategory);
-  }
+  // `sell_online` keeps POS-only products out of customer search. Projects that
+  // haven't run the migration yet don't have the column — retry without the
+  // filter there rather than returning an empty product list.
+  const runQuery = async (applySellOnline: boolean) => {
+    let query = supabase
+      .from("products")
+      .select(PRODUCT_SELECT)
+      .eq("is_available", true)
+      .eq("shops.is_live", true)
+      .eq("shops.verification_status", "approved")
+      .or(ilike);
 
-  const { data, error } = await query
-    .order("orders_count", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(pool);
+    if (applySellOnline) query = query.eq("sell_online", true);
+    if (filters?.minPrice != null && filters.minPrice > 0) {
+      query = query.gte("price", filters.minPrice);
+    }
+    if (filters?.maxPrice != null && filters.maxPrice > 0) {
+      query = query.lte("price", filters.maxPrice);
+    }
+    if (filters?.shopCategory) {
+      query = query.eq("shops.category", filters.shopCategory);
+    }
+
+    return query
+      .order("orders_count", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(pool);
+  };
+
+  let { data, error } = await runQuery(true);
+  if (error && /sell_online/i.test(error.message || "")) {
+    ({ data, error } = await runQuery(false));
+  }
 
   if (error) {
     console.error("[api/search] products:", error.message);

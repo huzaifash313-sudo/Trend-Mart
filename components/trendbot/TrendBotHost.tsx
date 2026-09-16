@@ -51,9 +51,21 @@ function markTeaserDismissed() {
   }
 }
 
+/**
+ * Product/deal DETAIL pages (not the listing pages) render a primary
+ * "Order now" action button in normal page flow, low enough on mobile that
+ * the auto-popup teaser bubble can land directly on top of it. The launcher
+ * FAB (small, tap-to-open) still shows there — only the unsolicited text
+ * bubble is suppressed.
+ */
+function pageHasFoldedBuyButton(pathname: string): boolean {
+  return /^\/(products|p|deals)\/[^/]+/i.test(pathname);
+}
+
 export default function TrendBotHost() {
   const pathname = usePathname() ?? "/";
   const hidden = shouldHideGlobalTrendBot(pathname);
+  const suppressTeaser = pageHasFoldedBuyButton(pathname);
   const pageCtx = resolveTrendBotPageContext(pathname);
   const pack = useMemo(() => getTrendBotPagePack(pageCtx), [pageCtx]);
 
@@ -101,9 +113,10 @@ export default function TrendBotHost() {
     [open, teasersMuted, flashPose],
   );
 
-  /* Soft tip once on route — never during dismiss window. */
+  /* Soft tip once on route — never during dismiss window, and never on a
+     detail page where it would land on top of the "Order now" button. */
   useEffect(() => {
-    if (hidden || open || teasersMuted) return;
+    if (hidden || open || teasersMuted || suppressTeaser) return;
     const tip = pack.teasers[0];
     const voice = pack.voiceLines[0];
     const t = setTimeout(() => {
@@ -202,9 +215,11 @@ export default function TrendBotHost() {
         <div
           className="tm-trendbot-bubble fixed right-3 z-[119] max-w-[min(168px,calc(100vw-5rem))]"
           style={{
+            // Kept just above the launcher FAB (see FAB_BOTTOM in
+            // TrendBotLauncher) so the two never separate or re-overlap.
             bottom: cartVisible
-              ? "calc(11.2rem + env(safe-area-inset-bottom, 0px))"
-              : "calc(7.35rem + env(safe-area-inset-bottom, 0px))",
+              ? "calc(12.75rem + env(safe-area-inset-bottom, 0px))"
+              : "calc(8.9rem + env(safe-area-inset-bottom, 0px))",
           }}
         >
           <div className="rounded-lg rounded-br-sm border border-emerald-100/90 bg-white/95 px-2 py-1.5 text-left shadow-md dark:border-emerald-900/40 dark:bg-zinc-900/95">

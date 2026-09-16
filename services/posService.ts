@@ -122,6 +122,7 @@ function normalizeSettings(raw: unknown, shopCategory?: string | null): PosSetti
     print_width_mm: o.print_width_mm === 58 || o.print_width_mm === 80
       ? o.print_width_mm
       : base.print_width_mm,
+    tax_rate: typeof o.tax_rate === "number" && o.tax_rate >= 0 ? o.tax_rate : base.tax_rate,
   };
   // First-time saves (no pack chosen yet): apply category-aware defaults
   if (o.pack == null) {
@@ -224,6 +225,7 @@ export function buildReceiptText(params: {
   lines: PosCartLine[];
   subtotal: number;
   discount: number;
+  tax?: number;
   total: number;
   paymentMethod: PosPaymentMethod;
   customerName?: string;
@@ -245,6 +247,7 @@ export function buildReceiptText(params: {
     `Subtotal: ${formatRupees(params.subtotal)}`,
   ];
   if (params.discount > 0) lines.push(`Discount: −${formatRupees(params.discount)}`);
+  if (params.tax && params.tax > 0) lines.push(`Tax: ${formatRupees(params.tax)}`);
   lines.push(`Total: ${formatRupees(params.total)}`);
   lines.push(`Pay: ${params.paymentMethod}`);
   if (params.cashReceived != null && params.cashReceived > 0) {
@@ -353,6 +356,7 @@ export async function createPosSale(params: {
   paymentMethod: PosPaymentMethod;
   paymentSplit?: PosPaymentSplit;
   discountAmount?: number;
+  taxAmount?: number;
   notes?: string;
   autoComplete?: boolean;
   orderType?: "pickup" | "delivery";
@@ -385,6 +389,7 @@ export async function createPosSale(params: {
         paymentMethod: params.paymentMethod,
         paymentSplit: params.paymentSplit,
         discountAmount: params.discountAmount,
+        taxAmount: params.taxAmount,
         notes: params.notes,
         autoComplete: params.autoComplete,
         orderType: params.orderType,
@@ -839,39 +844,26 @@ export async function voidPosOrder(
   if (order.voided_at || order.status === "Cancelled") {
     return { success: false, error: "Already voided / cancelled." };
   }
-  const supabase = createClient();
   try {
-    const { data, error } = await supabase
-      .from("orders")
-      .update({
-        status: "Cancelled",
-        voided_at: new Date().toISOString(),
-        refunded_amount: Number(order.total_amount) || 0,
-        notes: `${order.notes || ""} [VOID]`.trim(),
-      })
-      .eq("id", order.id)
-      .eq("shop_id", shopId)
-      .select("*")
-      .single();
-    if (error) {
-      // Fallback without void columns
-      const { data: d2, error: e2 } = await supabase
-        .from("orders")
-        .update({
-          status: "Cancelled",
-          notes: `${order.notes || ""} [VOID]`.trim(),
-        })
-        .eq("id", order.id)
-        .eq("shop_id", shopId)
-        .select("*")
-        .single();
-      if (e2) throw e2;
-      await restoreStockFromOrder(shopId, order);
-      return { success: true, data: d2 as Order };
+    // Routed through the server so the void is recorded in the POS audit trail
+    // with the service role — a client-side update could skip that write.
+    const res = await fetch("/api/pos/sales/void", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shopId, orderId: order.id }),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      error?: string;
+      order?: Order;
+    };
+    if (!res.ok || !json.success || !json.order) {
+      return { success: false, error: json.error || "Could not void the bill." };
     }
     await restoreStockFromOrder(shopId, order);
-    return { success: true, data: data as Order };
+    return { success: true, data: json.order };
   } catch (err) {
+    logError(err, { module: "posService.voidPosOrder", meta: { shopId, orderId: order.id } });
     return { success: false, error: toError(err) };
   }
 }

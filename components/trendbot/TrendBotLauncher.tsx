@@ -21,10 +21,13 @@ interface TrendBotLauncherProps {
 }
 
 const FAB_BOTTOM = {
-  default: "calc(5.2rem + env(safe-area-inset-bottom, 0px))",
-  raised: "calc(5.2rem + env(safe-area-inset-bottom, 0px))",
+  // Raised enough to clear the primary action-button row that most pages
+  // (product detail, deal detail) render in normal flow near the bottom of
+  // the viewport on phones — the FAB used to sit right on top of it.
+  default: "calc(6.75rem + env(safe-area-inset-bottom, 0px))",
+  raised: "calc(6.75rem + env(safe-area-inset-bottom, 0px))",
   /** Raised above the CartBar strip that appears when the user has items in cart. */
-  cart: "calc(9rem + env(safe-area-inset-bottom, 0px))",
+  cart: "calc(10.5rem + env(safe-area-inset-bottom, 0px))",
 } as const;
 
 export function TrendBotLauncher({

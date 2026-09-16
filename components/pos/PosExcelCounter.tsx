@@ -15,6 +15,7 @@ import {
 } from "react";
 import { formatRupees } from "@/lib/formatters";
 import { customerVariantGroups } from "@/lib/variantPricing";
+import { fetchSubCategories, type SubCategoryWithMeta } from "@/services/subCategoryService";
 import type { PosCartLine } from "@/lib/pos/types";
 import type { Product } from "@/types";
 
@@ -25,6 +26,7 @@ export interface PosExcelCounterHandle {
 export interface PosExcelCounterProps {
   products: Product[];
   cart: PosCartLine[];
+  shopCategory?: string;
   decimalQty: boolean;
   barcodeEnabled: boolean;
   lowStockThreshold: number;
@@ -63,6 +65,7 @@ const PosExcelCounter = forwardRef<PosExcelCounterHandle, PosExcelCounterProps>(
     {
       products,
       cart,
+      shopCategory,
       decimalQty,
       barcodeEnabled,
       lowStockThreshold,
@@ -84,8 +87,39 @@ const PosExcelCounter = forwardRef<PosExcelCounterHandle, PosExcelCounterProps>(
     const [hi, setHi] = useState(0);
     const [open, setOpen] = useState(false);
     const [flashKey, setFlashKey] = useState<string | null>(null);
+    const [subCats, setSubCats] = useState<SubCategoryWithMeta[]>([]);
+    const [activeSubCat, setActiveSubCat] = useState<string>("");
     const inputRef = useRef<HTMLInputElement>(null);
     const cartLenRef = useRef(cart.length);
+
+    useEffect(() => {
+      let cancelled = false;
+      if (!shopCategory) {
+        setSubCats([]);
+        return;
+      }
+      fetchSubCategories(shopCategory).then((result) => {
+        if (!cancelled && result.success) setSubCats(result.data);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [shopCategory]);
+
+    const subCatsWithStock = useMemo(
+      () =>
+        subCats.filter((s) =>
+          products.some((p) => p.sub_category_id === s.id && p.is_available !== false),
+        ),
+      [subCats, products],
+    );
+
+    const categoryProducts = useMemo(() => {
+      if (!activeSubCat) return [];
+      return products
+        .filter((p) => p.is_available !== false && p.sub_category_id === activeSubCat)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }, [products, activeSubCat]);
 
     useImperativeHandle(ref, () => ({
       focusSearch: () => {
@@ -422,6 +456,56 @@ const PosExcelCounter = forwardRef<PosExcelCounterHandle, PosExcelCounterProps>(
                 );
               })}
             </div>
+          </div>
+        ) : null}
+
+        {!q.trim() && subCatsWithStock.length > 0 ? (
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-zinc-500">
+              Browse by category
+            </p>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+              {subCatsWithStock.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setActiveSubCat((prev) => (prev === s.id ? "" : s.id))}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
+                    activeSubCat === s.id
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-zinc-200 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                  }`}
+                >
+                  {s.icon ? `${s.icon} ` : ""}
+                  {s.name}
+                </button>
+              ))}
+            </div>
+            {activeSubCat && categoryProducts.length > 0 ? (
+              <div className="mt-1.5 grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">
+                {categoryProducts.map((p) => {
+                  const inCart = cartQtyByProduct.get(p.id) || 0;
+                  return (
+                    <button
+                      key={`cp-${p.id}`}
+                      type="button"
+                      onClick={() => pick(p)}
+                      className={`rounded-lg border px-2 py-1.5 text-left text-[11px] font-semibold ${
+                        inCart > 0
+                          ? "border-emerald-400 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                          : "border-zinc-200 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                      }`}
+                    >
+                      <span className="block truncate">{p.name}</span>
+                      <span className="block text-zinc-400">
+                        {formatRupees(p.price)}
+                        {inCart > 0 ? ` · ×${inCart}` : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

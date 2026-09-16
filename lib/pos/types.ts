@@ -85,6 +85,8 @@ export interface PosSettings {
   print_target: "browser" | "bluetooth" | "serial";
   /** Paper width for ESC/POS (58mm ≈ 32 cols, 80mm ≈ 42 cols) */
   print_width_mm: 58 | 80;
+  /** Tax percentage applied to (subtotal − discount) at checkout. 0 = no tax. */
+  tax_rate: number;
 }
 
 export const DEFAULT_POS_SETTINGS: PosSettings = {
@@ -110,6 +112,7 @@ export const DEFAULT_POS_SETTINGS: PosSettings = {
   track_expiry: false,
   print_target: "browser",
   print_width_mm: 80,
+  tax_rate: 0,
 };
 
 export const POS_MODULE_META: Record<
