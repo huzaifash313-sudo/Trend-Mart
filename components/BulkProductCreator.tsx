@@ -484,10 +484,10 @@ export default function BulkProductCreator({
       )}
 
       {/* Desktop / laptop — wide single-line table */}
-      <div className="hidden overflow-x-auto lg:block">
+      <div className="hidden overflow-x-auto rounded-lg border border-teal-200/70 lg:block dark:border-teal-900/40">
         <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-teal-100 text-[0.65rem] uppercase tracking-wider text-zinc-400 dark:border-teal-900/40">
+            <tr className="divide-x divide-teal-100 border-b border-teal-200/70 bg-teal-50/80 text-[0.65rem] uppercase tracking-wider text-teal-800 dark:divide-teal-900/40 dark:border-teal-900/40 dark:bg-teal-950/30 dark:text-teal-300">
               <th className="min-w-[200px] px-2 py-2 font-semibold">Name *</th>
               <th className="min-w-[160px] px-2 py-2 font-semibold">Sub-category *</th>
               <th className="w-[110px] min-w-[110px] px-2 py-2 font-semibold">Price *</th>
@@ -497,7 +497,7 @@ export default function BulkProductCreator({
               <th className="w-10 px-2 py-2" />
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-zinc-100 dark:divide-[color:var(--tm-border)]">
             {rows.map((row, idx) => {
               const priceN = Number(row.price);
               const wasN = Number(row.original_price);
@@ -506,7 +506,11 @@ export default function BulkProductCreator({
               return (
                 <Fragment key={row.key}>
                 <tr
-                  className="border-b border-zinc-100 align-top dark:border-[color:var(--tm-border)]"
+                  className={`divide-x divide-zinc-100 align-top dark:divide-[color:var(--tm-border)] ${
+                    idx % 2 === 1
+                      ? "bg-teal-50/30 dark:bg-teal-950/10"
+                      : "bg-white dark:bg-transparent"
+                  }`}
                 >
                   <td className="px-2 py-2.5">
                     <input
@@ -645,7 +649,7 @@ export default function BulkProductCreator({
                   </td>
                 </tr>
                 {expandedVariants[row.key] && (
-                  <tr className="border-b border-zinc-100 dark:border-[color:var(--tm-border)]">
+                  <tr className={idx % 2 === 1 ? "bg-teal-50/30 dark:bg-teal-950/10" : "bg-white dark:bg-transparent"}>
                     <td colSpan={7} className="space-y-2 px-2 pb-3 pt-1">
                       <VariantEditor
                         variants={row.variants}

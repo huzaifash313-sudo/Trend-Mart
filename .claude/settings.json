@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wait)",
+      "Bash(npx cap *)",
+      "Bash(node -e ' *)",
+      "Bash(npx capacitor-assets *)"
+    ]
+  }
+}
