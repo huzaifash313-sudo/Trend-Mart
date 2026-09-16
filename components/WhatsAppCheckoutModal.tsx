@@ -1226,14 +1226,16 @@ export default function WhatsAppCheckoutModal({
   }, [detectLocationDetailed, formatLocationAddress]);
 
   /** Map center for checkout pin — prefer live/saved coords, else shop city, else Gujranwala. */
+  const locationCoords = location?.coordinates;
+  const shopLocation = shop.location;
   const checkoutMapCenter = useMemo(() => {
-    if (location?.coordinates) {
+    if (locationCoords) {
       return {
-        latitude: location.coordinates.latitude,
-        longitude: location.coordinates.longitude,
+        latitude: locationCoords.latitude,
+        longitude: locationCoords.longitude,
       };
     }
-    const shopCity = (shop.location || "").trim();
+    const shopCity = (shopLocation || "").trim();
     const cityHit = Object.keys(CITY_CENTROIDS).find(
       (c) => shopCity.toLowerCase().includes(c.toLowerCase()),
     );
@@ -1243,7 +1245,7 @@ export default function WhatsAppCheckoutModal({
     }
     const fallback = CITY_CENTROIDS.Gujranwala;
     return { latitude: fallback.lat, longitude: fallback.lng };
-  }, [location?.coordinates, shop.location]);
+  }, [locationCoords, shopLocation]);
 
   const handleCheckoutMapPin = useCallback(
     async (lat: number, lng: number) => {

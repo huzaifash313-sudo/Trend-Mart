@@ -301,7 +301,7 @@ export default function CartBar() {
                         <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
                           {item.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                            <img loading="lazy" decoding="async" src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center text-[0.6rem] font-bold text-zinc-400">
                               {item.name.charAt(0)}

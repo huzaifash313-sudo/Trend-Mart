@@ -1066,9 +1066,11 @@ export default function PosApp() {
     await refresh(shop.id);
   }
 
-  checkoutRef.current = () => {
-    void checkout();
-  };
+  useEffect(() => {
+    checkoutRef.current = () => {
+      void checkout();
+    };
+  });
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -2170,7 +2172,7 @@ export default function PosApp() {
                           >
                             {p.image_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img
+                              <img loading="lazy" decoding="async"
                                 src={p.image_url}
                                 alt=""
                                 className="h-28 w-full object-cover sm:h-32"

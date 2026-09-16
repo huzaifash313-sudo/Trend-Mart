@@ -37,6 +37,8 @@ import { useToast } from "@/components/Toast";
 import type { Product } from "@/types";
 import PosCatalogSetupPanel from "@/components/pos/PosCatalogSetupPanel";
 
+const STOCK_PAGE_SIZE = 50;
+
 /** Spreadsheet cell styles — every cell gets a gridline like Excel. */
 const TH =
   "whitespace-nowrap border border-zinc-300 px-2 py-1.5 dark:border-zinc-700";
@@ -68,13 +70,15 @@ export default function PosStockPanel({
 }: PosStockPanelProps) {
   const { addToast } = useToast();
   const [mode, setMode] = useState<"stock" | "catalog">(initialMode);
-  const profile = packStockProfile(settings.pack);
+  const profile = useMemo(() => packStockProfile(settings.pack), [settings.pack]);
   const warnDays = profile.expiry_warn_days;
   const showBatch = settings.track_batch || profile.track_batch;
   const showExpiry = settings.track_expiry || profile.track_expiry;
 
   const [filter, setFilter] = useState<StockHealthFilter>("all");
   const [q, setQ] = useState("");
+  /** Rows rendered at once — every row holds ~10 inputs, so keep typing snappy. */
+  const [rowLimit, setRowLimit] = useState(STOCK_PAGE_SIZE);
   const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
   const [restockDraft, setRestockDraft] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
@@ -94,7 +98,7 @@ export default function PosStockPanel({
     [products, settings.low_stock_threshold],
   );
 
-  const list = useMemo(() => {
+  const allRows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let rows = products;
     if (needle) {
@@ -111,8 +115,10 @@ export default function PosStockPanel({
         (p) => productStockBucket(p, settings.low_stock_threshold, warnDays) === filter,
       );
     }
-    return rows.slice(0, 200);
+    return rows;
   }, [products, q, filter, settings.low_stock_threshold, warnDays]);
+
+  const list = allRows.slice(0, rowLimit);
 
   useEffect(() => {
     if (!historyFor) {
@@ -254,7 +260,10 @@ export default function PosStockPanel({
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                onClick={() => setFilter("low")}
+                onClick={() => {
+                  setFilter("low");
+                  setRowLimit(STOCK_PAGE_SIZE);
+                }}
                 className="rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
               >
                 View low
@@ -327,7 +336,10 @@ export default function PosStockPanel({
           <button
             key={c.id}
             type="button"
-            onClick={() => setFilter(c.id)}
+            onClick={() => {
+              setFilter(c.id);
+              setRowLimit(STOCK_PAGE_SIZE);
+            }}
             className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${c.tone} ${
               filter === c.id ? "ring-2 ring-emerald-500" : ""
             }`}
@@ -365,7 +377,10 @@ export default function PosStockPanel({
 
       <input
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setRowLimit(STOCK_PAGE_SIZE);
+        }}
         placeholder="Search product name / barcode…"
         className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
       />
@@ -930,6 +945,18 @@ export default function PosStockPanel({
           </tbody>
         </table>
       </div>
+      {allRows.length > list.length ? (
+        <div className="flex items-center justify-center gap-2 text-[11px] text-zinc-500">
+          Showing {list.length} of {allRows.length}
+          <button
+            type="button"
+            onClick={() => setRowLimit((n) => n + STOCK_PAGE_SIZE)}
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          >
+            Show {Math.min(STOCK_PAGE_SIZE, allRows.length - list.length)} more
+          </button>
+        </div>
+      ) : null}
         </>
       )}
     </section>

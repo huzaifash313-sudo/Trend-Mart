@@ -80,7 +80,7 @@ export default function Footer() {
           className="inline-flex items-center gap-2 text-base font-bold text-emerald-600 dark:text-emerald-400"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <img loading="lazy" decoding="async"
             src="/trendsmart-mark.png?v=16"
             alt=""
             width={24}
@@ -129,7 +129,7 @@ export default function Footer() {
               className="inline-flex items-center gap-2 text-lg font-bold text-emerald-600 dark:text-emerald-400"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <img loading="lazy" decoding="async"
                 src="/trendsmart-mark.png?v=16"
                 alt=""
                 width={28}

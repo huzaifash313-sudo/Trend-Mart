@@ -1072,7 +1072,7 @@ export async function fetchCrossShopRelatedProducts(opts: {
     // Only fall back to open catalog when we have a name to match against.
     if (seedName.length >= 3) modes.push("any");
 
-    let mapped: MarketplaceProduct[] = [];
+    const mapped: MarketplaceProduct[] = [];
     let lastError: unknown = null;
 
     for (const mode of modes) {
@@ -1236,7 +1236,7 @@ export async function fetchAlsoBoughtProducts(opts: {
     }
     if (error) throw error;
 
-    let rows = ((data as Record<string, unknown>[]) || [])
+    const rows = ((data as Record<string, unknown>[]) || [])
       .map(mapMarketplaceRow)
       .filter((p): p is MarketplaceProduct => !!p);
 

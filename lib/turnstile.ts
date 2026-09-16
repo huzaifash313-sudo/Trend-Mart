@@ -12,7 +12,7 @@ const CF_DEV_SECRET = "1x0000000000000000000000000000000AA";
 
 export { getTurnstileSiteKey, isTurnstileUiEnabled } from "@/lib/turnstilePublic";
 
-function useDevTurnstileKeys(): boolean {
+function shouldUseDevTurnstileKeys(): boolean {
   if (process.env.NODE_ENV === "production") return false;
   return (
     process.env.TURNSTILE_FORCE_PROD !== "true" &&
@@ -23,7 +23,7 @@ function useDevTurnstileKeys(): boolean {
 function getTurnstileSecret(): string | null {
   const configured = process.env.TURNSTILE_SECRET_KEY?.trim();
   if (!configured) return null;
-  if (useDevTurnstileKeys()) return CF_DEV_SECRET;
+  if (shouldUseDevTurnstileKeys()) return CF_DEV_SECRET;
   return configured;
 }
 

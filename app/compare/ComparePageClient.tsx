@@ -85,7 +85,7 @@ export default function ComparePageClient() {
         const src = getSafeImageUrl(i.imageUrl, "product", "card");
         return src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="" className="mx-auto h-24 w-24 rounded-lg object-cover" />
+          <img loading="lazy" decoding="async" src={src} alt="" className="mx-auto h-24 w-24 rounded-lg object-cover" />
         ) : (
           <span className="text-2xl text-zinc-300">?</span>
         );

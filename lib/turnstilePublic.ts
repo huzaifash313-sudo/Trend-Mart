@@ -11,7 +11,7 @@ function isLocalHostname(): boolean {
   return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
 }
 
-function useDevTurnstileKeys(): boolean {
+function shouldUseDevTurnstileKeys(): boolean {
   if (process.env.NEXT_PUBLIC_TURNSTILE_FORCE_PROD === "true") return false;
   if (process.env.NODE_ENV === "production" && !isLocalHostname()) return false;
   // next dev, or browser on localhost even if a prod build is opened locally
@@ -23,7 +23,7 @@ export function getTurnstileSiteKey(): string | null {
   const configured = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim();
   if (!configured) return null;
   // Real prod keys fail on localhost (Error 110200).
-  if (useDevTurnstileKeys()) return CF_DEV_SITE_KEY;
+  if (shouldUseDevTurnstileKeys()) return CF_DEV_SITE_KEY;
   return configured;
 }
 

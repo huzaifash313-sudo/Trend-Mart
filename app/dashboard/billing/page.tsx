@@ -28,23 +28,30 @@ import { fetchMyShop } from "@/services/shopService";
 
 function MerchantBillingInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { addToast } = useToast();
-  const supabase = useMemo(() => createClient(), []);
+  const paidEnabled = isPaidFeaturesEnabled();
 
   useEffect(() => {
-    if (!isPaidFeaturesEnabled()) {
+    if (!paidEnabled) {
       router.replace("/dashboard");
     }
-  }, [router]);
+  }, [paidEnabled, router]);
 
-  if (!isPaidFeaturesEnabled()) {
+  if (!paidEnabled) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center px-4 text-center text-sm text-zinc-500">
         Billing is paused during soft launch.
       </div>
     );
   }
+  return <MerchantBillingContent />;
+}
+
+/** Hooks live here so they always run in the same order (never after an early return). */
+function MerchantBillingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { addToast } = useToast();
+  const supabase = useMemo(() => createClient(), []);
 
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopName, setShopName] = useState("");
@@ -90,7 +97,7 @@ function MerchantBillingInner() {
     return () => {
       cancelled = true;
     };
-  }, [supabase, router, refresh]);
+  }, [supabase, router, refresh, addToast]);
 
   useEffect(() => {
     if (paidFlag === "1") {
@@ -103,12 +110,9 @@ function MerchantBillingInner() {
     }
   }, [paidFlag, addToast, shopId, refresh, router]);
 
-  const trialDaysLeft = useMemo(() => {
-    if (!sub?.trial_ends_at) return null;
-    const ms = new Date(sub.trial_ends_at).getTime() - Date.now();
-    if (ms <= 0) return 0;
-    return Math.ceil(ms / (24 * 60 * 60 * 1000));
-  }, [sub?.trial_ends_at]);
+  const trialDaysLeft = sub?.trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / 86_400_000))
+    : null;
 
   const buyPack = async (packId: string) => {
     if (!shopId) return;
@@ -124,7 +128,7 @@ function MerchantBillingInner() {
       return;
     }
     if (res.data.checkoutUrl) {
-      window.location.href = res.data.checkoutUrl;
+      window.location.assign(res.data.checkoutUrl);
       return;
     }
     addToast("Order created. Complete payment from your gateway.", "info");

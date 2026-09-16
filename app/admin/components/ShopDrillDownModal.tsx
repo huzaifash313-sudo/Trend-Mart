@@ -185,7 +185,7 @@ export default function ShopDrillDownModal({
                   <li key={p.id} className="flex items-center gap-3 py-2">
                     {p.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={p.image_url}
                         alt={p.name}
                         className="h-10 w-10 shrink-0 rounded-lg bg-zinc-100 object-cover dark:bg-zinc-800"

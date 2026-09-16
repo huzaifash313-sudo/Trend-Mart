@@ -122,7 +122,7 @@ export default function PosBulkAddDialog({
             >
               {p.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.image_url} alt="" className="h-20 w-full object-cover" />
+                <img loading="lazy" decoding="async" src={p.image_url} alt="" className="h-20 w-full object-cover" />
               ) : (
                 <div className="flex h-16 items-center justify-center bg-zinc-200/80 text-2xl dark:bg-zinc-700">
                   🍽️

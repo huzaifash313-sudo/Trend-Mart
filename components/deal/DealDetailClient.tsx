@@ -326,19 +326,20 @@ export default function DealDetailClient({
     addToast,
   ]);
 
+  const dealProductId = deal?.product_id;
   const handleRated = useCallback(() => {
     setRatingOpen(false);
     setReviewsRefreshKey((k) => k + 1);
     if (!reviewProductId) return;
     void fetchProductReviewContext(reviewProductId).then(setRatingCtx);
-    if (deal?.product_id && isUuid(deal.product_id)) {
-      void fetchMarketplaceProductById(deal.product_id).then((pr) => {
+    if (dealProductId && isUuid(dealProductId)) {
+      void fetchMarketplaceProductById(dealProductId).then((pr) => {
         if (!pr.success || !pr.data) return;
         setLinkedAvg(Number(pr.data.avg_rating) > 0 ? Number(pr.data.avg_rating) : null);
         setLinkedCount(Number(pr.data.review_count) || 0);
       });
     }
-  }, [reviewProductId, deal?.product_id]);
+  }, [reviewProductId, dealProductId]);
 
   if (loading) {
     return (

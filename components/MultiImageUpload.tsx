@@ -282,7 +282,7 @@ export default function MultiImageUpload({
               aria-label={`Change photo ${i + 1}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt={`Photo ${i + 1}`} className={imgFit} />
+              <img loading="lazy" decoding="async" src={url} alt={`Photo ${i + 1}`} className={imgFit} />
             </button>
             {i === 0 ? (
               <span className="pointer-events-none absolute bottom-0.5 left-0.5 rounded bg-zinc-950/70 px-1 py-px text-[8px] font-semibold text-white">

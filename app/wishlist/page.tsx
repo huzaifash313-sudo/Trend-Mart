@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import type { FavoriteItem } from "@/services/wishlistService";
@@ -131,6 +132,7 @@ function WishlistCard({
   onRemove: (id: string) => void;
 }) {
   const { addToast } = useToast();
+  const router = useRouter();
   const { addItem, items } = useCart();
   const [waBusy, setWaBusy] = useState(false);
   const [cartBusy, setCartBusy] = useState(false);
@@ -143,7 +145,7 @@ function WishlistCard({
     if (waBusy) return;
     if (!item.shopId) {
       addToast("Open the store to message this shop.", "info");
-      window.location.href = `/search?q=${encodeURIComponent(item.name)}`;
+      router.push(`/search?q=${encodeURIComponent(item.name)}`);
       return;
     }
     setWaBusy(true);
@@ -152,13 +154,13 @@ function WishlistCard({
       const wa = res.success ? res.data.shop?.whatsapp_number : undefined;
       if (!wa) {
         addToast("This shop has no WhatsApp number yet — opening the store.", "info");
-        window.location.href = `/shop/${item.shopId}`;
+        router.push(`/shop/${item.shopId}`);
         return;
       }
       openWhatsAppCheckout(item, wa);
     } catch {
       addToast("Could not load shop contact — opening the store.", "info");
-      window.location.href = `/shop/${item.shopId}`;
+      router.push(`/shop/${item.shopId}`);
     } finally {
       setWaBusy(false);
     }
@@ -175,7 +177,7 @@ function WishlistCard({
           product ? "This item is out of stock — open the store for options." : "Could not load this product.",
           product ? "info" : "error",
         );
-        if (item.shopId) window.location.href = `/shop/${item.shopId}`;
+        if (item.shopId) router.push(`/shop/${item.shopId}`);
         return;
       }
       const otherShop = items.find((i) => i.shopId && i.shopId !== product.shop_id);
@@ -201,7 +203,7 @@ function WishlistCard({
       <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-800 dark:to-emerald-700">
         {item.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+          <img loading="lazy" decoding="async" src={item.imageUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
             {item.type === "shop" ? <ShopIcon /> : <PackageIcon />}

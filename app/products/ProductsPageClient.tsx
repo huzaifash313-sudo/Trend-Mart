@@ -654,7 +654,7 @@ function ProductsPageInner({
       addItem(full, shop, 1);
       addToast(`“${full.name}” added to cart`, "success");
     },
-    [addItem, addToast, router],
+    [addItem, addToast, router, t],
   );
 
   const handleOrder = useCallback(
@@ -725,7 +725,7 @@ function ProductsPageInner({
         /* keep fallback */
       }
     },
-    [addItem, addToast, router],
+    [addItem, addToast, router, t],
   );
 
   const handleFavorite = useCallback(
@@ -775,7 +775,7 @@ function ProductsPageInner({
         addToast(t("products.wishlistFail"), "error");
       }
     },
-    [addToast],
+    [addToast, t],
   );
 
   const handleShopClick = useCallback(

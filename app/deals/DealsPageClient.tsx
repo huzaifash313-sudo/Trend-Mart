@@ -130,20 +130,21 @@ function DealsInner({
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Trigger next page when sentinel enters viewport.
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = dealsQuery;
   useEffect(() => {
     const el = loadMoreRef.current;
-    if (!el || !dealsQuery.hasNextPage) return;
+    if (!el || !hasNextPage) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && dealsQuery.hasNextPage && !dealsQuery.isFetchingNextPage) {
-          void dealsQuery.fetchNextPage();
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
         }
       },
       { rootMargin: "400px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [dealsQuery.hasNextPage, dealsQuery.isFetchingNextPage, dealsQuery.fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const deals = useMemo(() => {
     const all = dealsQuery.data?.pages.flat() ?? EMPTY_DEALS;

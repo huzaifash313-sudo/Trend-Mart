@@ -275,7 +275,7 @@ export default function ChatInbox({
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-sm font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                   {role === "customer" && conv.shop_logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={conv.shop_logo} alt="" className="h-full w-full object-cover" />
+                    <img loading="lazy" decoding="async" src={conv.shop_logo} alt="" className="h-full w-full object-cover" />
                   ) : (
                     label.charAt(0).toUpperCase()
                   )}

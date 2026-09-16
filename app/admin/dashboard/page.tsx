@@ -2611,7 +2611,7 @@ export default function AdminDashboardPage() {
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {pendingAds.map((ad) => (
                     <div key={ad.id} className="px-5 py-4 flex flex-wrap items-center gap-4">
-                      <img src={ad.image_url} alt={ad.title} className="h-14 w-24 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0" />
+                      <img loading="lazy" decoding="async" src={ad.image_url} alt={ad.title} className="h-14 w-24 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0" />
                       <div className="flex-grow min-w-[180px]">
                         <div className="font-medium text-zinc-900 dark:text-zinc-100">{ad.title}</div>
                         <div className="text-xs text-zinc-500 mt-0.5">

@@ -16,17 +16,32 @@ import { usePathname, useSearchParams } from "next/navigation";
 /* -------------------------------------------------------------------------- */
 
 const SCROLL_KEY = "tm_scroll_v1";
+/** Oldest routes are dropped past this, so the stored JSON never grows unbounded. */
+const MAX_ROUTES = 60;
+
+/**
+ * In-memory copy of the saved positions. Scrolling only touches this object;
+ * sessionStorage (synchronous, blocks the main thread) is written after the
+ * user stops scrolling or when the page is hidden — never once per frame.
+ */
+let memoryMap: Record<string, number> | null = null;
 
 function readMap(): Record<string, number> {
+  if (memoryMap) return memoryMap;
   if (typeof window === "undefined") return {};
   try {
-    return JSON.parse(sessionStorage.getItem(SCROLL_KEY) || "{}");
+    memoryMap = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || "{}");
   } catch {
-    return {};
+    memoryMap = {};
   }
+  return memoryMap!;
 }
 
 function saveMap(map: Record<string, number>): void {
+  const keys = Object.keys(map);
+  if (keys.length > MAX_ROUTES) {
+    for (const k of keys.slice(0, keys.length - MAX_ROUTES)) delete map[k];
+  }
   try {
     sessionStorage.setItem(SCROLL_KEY, JSON.stringify(map));
   } catch {
@@ -67,20 +82,37 @@ function ScrollToTopCore({ pathname, search }: { pathname: string; search: strin
   //    so modal-open and modal-closed states both keep their own position.
   useLayoutEffect(() => {
     let raf = 0;
+    let flushTimer = 0;
+    const flush = () => {
+      window.clearTimeout(flushTimer);
+      flushTimer = 0;
+      saveMap(readMap());
+    };
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
         const map = readMap();
-        map[`${window.location.pathname}${window.location.search}`] =
-          window.scrollY || document.documentElement.scrollTop || 0;
-        saveMap(map);
+        const key = `${window.location.pathname}${window.location.search}`;
+        // Re-insert so the key order tracks recency for MAX_ROUTES trimming.
+        delete map[key];
+        map[key] = window.scrollY || document.documentElement.scrollTop || 0;
+        window.clearTimeout(flushTimer);
+        flushTimer = window.setTimeout(flush, 250);
       });
     };
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHide);
     return () => {
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHide);
       if (raf) cancelAnimationFrame(raf);
+      if (flushTimer) flush();
     };
   }, []);
 

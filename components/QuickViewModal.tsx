@@ -664,7 +664,7 @@ export default function QuickViewModal({
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={getSafeImageUrl(url, "product")} alt={imageAltFor(i)} className="h-full w-full object-cover" />
+                <img loading="lazy" decoding="async" src={getSafeImageUrl(url, "product")} alt={imageAltFor(i)} className="h-full w-full object-cover" />
               </button>
             ))}
           </div>

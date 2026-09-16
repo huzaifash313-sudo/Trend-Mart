@@ -636,7 +636,7 @@ export default function MerchantAdsPage() {
               {ads.map((ad) => (
                 <div key={ad.id} className="flex gap-3 tm-panel p-4">
                   <div className="h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                    {ad.image_url && <img src={ad.image_url} alt={ad.title} className="h-full w-full object-cover" />}
+                    {ad.image_url && <img loading="lazy" decoding="async" src={ad.image_url} alt={ad.title} className="h-full w-full object-cover" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

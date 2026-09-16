@@ -62,7 +62,7 @@ function normalizeSettings(raw: unknown, shopCategory?: string | null): PosSetti
     return applyPackDefaults(suggested, { ...base, pack: suggested });
   }
   const o = raw as Partial<PosSettings>;
-  let modules =
+  const modules =
     Array.isArray(o.modules) && o.modules.length > 0
       ? ([...o.modules] as PosSettings["modules"])
       : [...base.modules];
