@@ -224,6 +224,8 @@ export default function PosApp() {
   const [showRecent, setShowRecent] = useState(true);
   /** Phone screens: false = product search/grid, true = bill/payment panel (both always show side-by-side at lg+). */
   const [mobileBillView, setMobileBillView] = useState(false);
+  // Bill emptied (checkout / clear) → go back to the product list on phones.
+  if (mobileBillView && cart.length === 0) setMobileBillView(false);
   const [miscOpen, setMiscOpen] = useState(false);
   const [miscName, setMiscName] = useState("");
   const [miscPrice, setMiscPrice] = useState("");
@@ -2202,6 +2204,15 @@ export default function PosApp() {
               <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 sm:p-2.5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden">
                 <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100 pb-1 dark:border-zinc-800">
                   <div className="min-w-0">
+                    {mobileBillView ? (
+                      <button
+                        type="button"
+                        onClick={() => setMobileBillView(false)}
+                        className="mb-0.5 text-[10px] font-bold text-emerald-700 lg:hidden dark:text-emerald-400"
+                      >
+                        ← Products
+                      </button>
+                    ) : null}
                     <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-50">Bill</h2>
                     <p className="truncate text-[9px] text-zinc-500">
                       {shop.name}
