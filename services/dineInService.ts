@@ -9,6 +9,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
 import { normalizePkPhoneDigits } from "@/lib/sanitization";
+import { pkStartOfDayISO } from "@/lib/dealSchedule";
 import type { DineInTable, DineStatus, Order, OrderItem, Shop } from "@/types";
 import { dineStatusToLegacy, isDineInCategory } from "@/types";
 
@@ -221,14 +222,12 @@ export async function fetchTodayDineStats(
 ): Promise<ServiceResult<{ orders: number; revenue: number }>> {
   const supabase = createClient();
   try {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
     const { data, error } = await supabase
       .from("orders")
       .select("total_amount, dine_status")
       .eq("shop_id", shopId)
       .eq("order_type", "dine_in")
-      .gte("created_at", start.toISOString());
+      .gte("created_at", pkStartOfDayISO());
     if (error) throw error;
     const rows = (data as { total_amount: number; dine_status: string | null }[]) ?? [];
     const active = rows.filter((r) => r.dine_status !== "Cancelled");

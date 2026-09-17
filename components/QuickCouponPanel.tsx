@@ -75,6 +75,7 @@ export default function QuickCouponPanel({ shopId, onChanged }: QuickCouponPanel
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           placeholder="Coupon code"
+          aria-label="Coupon code"
           maxLength={24}
           className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm uppercase dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />
@@ -95,6 +96,7 @@ export default function QuickCouponPanel({ shopId, onChanged }: QuickCouponPanel
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={discountType === "percent" ? "10" : "200"}
+            aria-label="Discount value"
             className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>

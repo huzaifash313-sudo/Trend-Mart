@@ -5,6 +5,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { logError } from "@/services/errorService";
+import { pkStartOfDayISO } from "@/lib/dealSchedule";
 import {
   sanitizeLight,
   sanitizeAndValidatePhone,
@@ -112,7 +113,7 @@ export function logLead(payload: LeadPayload): void {
   supabase
     .from("leads")
     .insert(sanitized)
-    .then(({ error }) => {
+    .then(({ error }: { error?: unknown }) => {
       if (error) {
         logError(error, {
           module: "leadsService.logLead",
@@ -283,8 +284,7 @@ export async function fetchLeadStats(
   }
   const supabase = createClient();
   try {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const todayStartISO = pkStartOfDayISO();
 
     // Run the four independent COUNT queries in parallel instead of four
     // sequential round-trips to the database.
@@ -307,7 +307,7 @@ export async function fetchLeadStats(
         .from("leads")
         .select("*", { count: "exact", head: true })
         .eq("shop_id", shopId)
-        .gte("created_at", todayStart.toISOString()),
+        .gte("created_at", todayStartISO),
     ]);
 
     return {

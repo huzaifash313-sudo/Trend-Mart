@@ -93,14 +93,19 @@ export default function AdLinkTargetPicker({
         .limit(300);
       if (cancelled) return;
       setShops((data as ShopOption[]) ?? []);
-      // Infer shop from current URL if present
-      const m = value.trim().match(/^\/shop\/([^/#?]+)/);
-      if (m?.[1]) setSelectedShopId(m[1]);
     })();
     return () => {
       cancelled = true;
     };
-  }, [allowAnyShop, supabase, value]);
+  }, [allowAnyShop, supabase]);
+
+  // Infer shop from current URL value whenever it changes — does not refetch
+  // the shop list (that only needs to happen once per admin session).
+  useEffect(() => {
+    if (!allowAnyShop) return;
+    const m = value.trim().match(/^\/shop\/([^/#?]+)/);
+    if (m?.[1]) setSelectedShopId(m[1]);
+  }, [allowAnyShop, value]);
 
   const loadCatalog = useCallback(async (id: string) => {
     if (!id) {

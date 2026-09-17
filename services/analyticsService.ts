@@ -12,6 +12,7 @@
 import { createClient } from "@/lib/supabase/client";
 import type { AnalyticsSummary } from "@/types";
 import { logError } from "@/services/errorService";
+import { pkStartOfDayISO } from "@/lib/dealSchedule";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   PRODUCT_CLICK_DEDUPE_MS,
@@ -374,7 +375,7 @@ export function subscribeToRealtimeAnalytics(
         notifyMetricsSubscribers(shopId, "shop_view");
       },
     )
-    .subscribe((status) => {
+    .subscribe((status: string) => {
       if (status === "SUBSCRIBED") {
         console.log(`[Analytics] ✅ Realtime channel active for shop: ${shopId}`);
       }
@@ -401,9 +402,7 @@ export async function fetchAnalyticsSummary(
     // Server-side COUNT (head: true) instead of streaming every log row to the
     // browser and counting client-side — O(1) transfer regardless of how many
     // analytics events a shop has accumulated.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayISO = today.toISOString();
+    const todayISO = pkStartOfDayISO();
 
     const buildCount = (eventType: string, from?: string) => {
       let q = supabase

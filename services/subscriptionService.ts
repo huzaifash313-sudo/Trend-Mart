@@ -614,7 +614,10 @@ export async function generateBillingInvoice(
 
     if (orderError) throw orderError;
 
-    const totalRevenue = (orders ?? []).reduce((sum, o) => sum + (o.total_amount || 0), 0);
+    const totalRevenue = (orders ?? []).reduce(
+      (sum: number, o: { total_amount?: number | null }) => sum + (o.total_amount || 0),
+      0,
+    );
     const commissionAmount = Math.round(totalRevenue * (tierConfig.commission_rate_pct / 100));
     const totalDue = tierConfig.monthly_fee_pkr + commissionAmount;
 

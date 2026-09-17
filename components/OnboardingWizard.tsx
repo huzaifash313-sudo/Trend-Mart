@@ -302,7 +302,8 @@ export default function OnboardingWizard() {
       if (variant === "guest") {
         markSeen(`${STORAGE_PREFIX}:guest`);
       } else {
-        supabase.auth.getSession().then(({ data }) => {
+        supabase.auth.getSession().then((result: { data: { session: { user?: { id?: string } } | null } }) => {
+          const { data } = result;
           const id = data.session?.user?.id;
           if (id) markSeen(`${STORAGE_PREFIX}:${id}`);
         });

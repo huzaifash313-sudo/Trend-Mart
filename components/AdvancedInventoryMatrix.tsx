@@ -222,13 +222,9 @@ export default function AdvancedInventoryMatrix({
   const [realTimeConnected, setRealTimeConnected] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasInitialized = useRef(false);
 
   // ─── Load existing inventory_variants from DB ───────────────────────────
   useEffect(() => {
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
-
     async function loadInventory() {
       setLoading(true);
       try {

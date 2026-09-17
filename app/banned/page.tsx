@@ -16,7 +16,8 @@ export default function BannedPage() {
   useEffect(() => {
     let cancelled = false;
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then((result: { data: { session: { user?: { id: string } } | null } }) => {
+      const { data } = result;
       if (cancelled) return;
       if (!data.session) {
         window.location.replace("/login");

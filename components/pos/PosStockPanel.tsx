@@ -88,11 +88,7 @@ export default function PosStockPanel({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
-  const health = useMemo(
-    () => summarizeStockHealth(products, settings.low_stock_threshold, warnDays),
-    [products, settings.low_stock_threshold, warnDays],
-  );
-
+  const health = summarizeStockHealth(products, settings.low_stock_threshold, warnDays);
   const reorderQueue = useMemo(
     () => listReorderQueue(products, settings.low_stock_threshold),
     [products, settings.low_stock_threshold],

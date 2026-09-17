@@ -52,7 +52,8 @@ export default function ContactModal({
 
   useEffect(() => {
     const supabase = createClient();
-    void supabase.auth.getUser().then(async ({ data }) => {
+    void supabase.auth.getUser().then(async (result: { data: { user: { id: string; user_metadata?: { full_name?: string; phone?: string } } | null } }) => {
+      const { data } = result;
       const user = data.user;
       setSignedIn(!!user);
       if (!user) return;

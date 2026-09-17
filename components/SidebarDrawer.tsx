@@ -287,7 +287,7 @@ export default function SidebarDrawer({ isOpen, onClose, variant = "drawer" }: S
 
         const {
           data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+        } = supabase.auth.onAuthStateChange(async (_event: string, currentSession: { user?: User | null } | null) => {
           if (cancelled) return;
           await syncAuth(!!currentSession, currentSession?.user ?? null);
         });

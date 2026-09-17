@@ -336,7 +336,7 @@ export function subscribeToOrderUpdates(
           table: "orders",
           filter: `id=eq.${orderId}`,
         },
-        (payload) => {
+        (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
           const newRecord = payload.new as Record<string, unknown>;
           const oldRecord = payload.old as Record<string, unknown>;
 
@@ -389,7 +389,7 @@ export function subscribeToOrderUpdates(
           }
         },
       )
-      .subscribe((status) => {
+      .subscribe((status: string) => {
         if (status === "SUBSCRIBED") {
           console.log(
             `[Notification] ✅ Realtime channel active for order: ${orderId}`,
@@ -451,7 +451,7 @@ export function subscribeToShopOrderUpdates(
         table: "orders",
         filter: `shop_id=eq.${shopId}`,
       },
-      (payload) => {
+      (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
         const newRecord = payload.new as Record<string, unknown>;
         const oldRecord = payload.old as Record<string, unknown>;
 
@@ -493,7 +493,7 @@ export function subscribeToShopOrderUpdates(
         table: "orders",
         filter: `shop_id=eq.${shopId}`,
       },
-      (payload) => {
+      (payload: { new?: Record<string, unknown> }) => {
         const newRecord = payload.new as Record<string, unknown>;
         if (!newRecord) return;
 
@@ -533,7 +533,7 @@ export function subscribeToShopOrderUpdates(
         }
       },
     )
-    .subscribe((status) => {
+    .subscribe((status: string) => {
       if (status === "SUBSCRIBED") {
         console.log(
           `[Notification] ✅ Shop order monitoring active for: ${shopId}`,
@@ -581,7 +581,7 @@ export function subscribeToPlatformTransactions(
         schema: "public",
         table: "orders",
       },
-      (payload) => {
+      (payload: { new?: Record<string, unknown> }) => {
         const newRecord = payload.new as Record<string, unknown>;
         if (!newRecord) return;
 
@@ -615,7 +615,7 @@ export function subscribeToPlatformTransactions(
         schema: "public",
         table: "orders",
       },
-      (payload) => {
+      (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
         const newRecord = payload.new as Record<string, unknown>;
         const oldRecord = payload.old as Record<string, unknown>;
         if (!newRecord || !oldRecord) return;
@@ -643,7 +643,7 @@ export function subscribeToPlatformTransactions(
         }
       },
     )
-    .subscribe((status) => {
+    .subscribe((status: string) => {
       if (status === "SUBSCRIBED") {
         console.log(
           "[Notification] ✅ Platform-wide transaction monitoring active",

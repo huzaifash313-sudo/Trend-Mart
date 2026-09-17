@@ -148,7 +148,7 @@ export async function fetchShopStoryQuota(
     if (storiesErr) throw storiesErr;
 
     const now = Date.now();
-    const activeCount = (stories ?? []).filter((s) => {
+    const activeCount = (stories ?? []).filter((s: { expires_at?: string | null; created_at?: string | null }) => {
       if (s.expires_at) return new Date(s.expires_at).getTime() > now;
       return s.created_at
         ? now - new Date(s.created_at).getTime() < 24 * 60 * 60 * 1000

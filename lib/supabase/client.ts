@@ -16,14 +16,27 @@ import { createBrowserClient } from "@supabase/ssr";
 const SUPABASE_URL = process.env["NEXT_PUBLIC_SUPABASE_URL"];
 const SUPABASE_ANON_KEY = process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
 
+let browserClient: ReturnType<typeof createBrowserClient> | null = null;
+
+/**
+ * Returns a shared browser Supabase client instance.
+ *
+ * Memoized at module scope (not per-call) because many client components
+ * call `createClient()` directly in their render body and then put the
+ * result in a `useEffect`/`useCallback` dependency array. A fresh client
+ * object on every call would give that dependency a new reference on every
+ * render, re-triggering the effect/callback in a loop.
+ */
 export function createClient() {
+  if (browserClient) return browserClient;
+
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(
       "TrendsMart is not fully configured yet. Please try again shortly.",
     );
   }
 
-  const client = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  browserClient = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     // Global fetch configuration for the Supabase browser client.
     // The `realtime` subsystem is not needed on the homepage and can
     // cause hanging WebSocket connections if the project is paused.
@@ -34,5 +47,5 @@ export function createClient() {
     },
   });
 
-  return client;
+  return browserClient;
 }

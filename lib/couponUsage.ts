@@ -2,9 +2,17 @@
 /*  Coupon usage increment/decrement helpers (service-role admin client)       */
 /* -------------------------------------------------------------------------- */
 
+type QueryResult = Promise<{ data: unknown; error: unknown }>;
+type SupabaseQueryBuilder = QueryResult & {
+  select: (columns: string) => SupabaseQueryBuilder;
+  update: (values: Record<string, unknown>) => SupabaseQueryBuilder;
+  eq: (column: string, value: unknown) => SupabaseQueryBuilder;
+  maybeSingle: () => QueryResult;
+};
+
 type AdminLike = {
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-  from: (table: string) => any;
+  from: (table: string) => SupabaseQueryBuilder;
 };
 
 /** Best-effort refund of one coupon use (failed insert, duplicate race, cancel). */
@@ -27,8 +35,9 @@ export async function refundCouponUsage(
       p_code: coupon,
     });
     if (!error) return;
-  } catch {
-    /* fall through to RMW */
+    console.error("[refundCouponUsage] decrement_coupon_usage RPC failed, falling back", error);
+  } catch (err) {
+    console.error("[refundCouponUsage] decrement_coupon_usage RPC threw, falling back", err);
   }
 
   try {
@@ -46,7 +55,8 @@ export async function refundCouponUsage(
       .eq("shop_id", shopId)
       .eq("code", coupon)
       .eq("usage_count", current);
-  } catch {
-    /* soft-launch: merchant can honour manually */
+  } catch (err) {
+    // soft-launch: merchant can honour manually, but log so it isn't invisible.
+    console.error("[refundCouponUsage] read-modify-write fallback failed", err);
   }
 }

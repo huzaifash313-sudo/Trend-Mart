@@ -125,7 +125,11 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
   // ── Form helpers ──────────────────────────────────────────────────────────
 
   const resetForm = useCallback(() => {
-    setForm({ ...emptyForm, project_date: new Date().toISOString().split("T")[0] });
+    setForm((prev) => {
+      if (prev.beforeImagePreview.startsWith("blob:")) URL.revokeObjectURL(prev.beforeImagePreview);
+      if (prev.afterImagePreview.startsWith("blob:")) URL.revokeObjectURL(prev.afterImagePreview);
+      return { ...emptyForm, project_date: new Date().toISOString().split("T")[0] };
+    });
     setEditingId(null);
     setShowForm(false);
   }, [emptyForm]);
@@ -142,19 +146,27 @@ export default function ServicePortfolioManager({ shopId }: ServicePortfolioMana
 
     const preview = URL.createObjectURL(file);
 
-    setForm(prev => ({
-      ...prev,
-      [`${type}ImageFile`]: file,
-      [`${type}ImagePreview`]: preview,
-    }));
+    setForm(prev => {
+      const prevPreview = prev[`${type}ImagePreview`];
+      if (prevPreview.startsWith("blob:")) URL.revokeObjectURL(prevPreview);
+      return {
+        ...prev,
+        [`${type}ImageFile`]: file,
+        [`${type}ImagePreview`]: preview,
+      };
+    });
   }, [addToast]);
 
   const removeImage = useCallback((type: "before" | "after") => {
-    setForm(prev => ({
-      ...prev,
-      [`${type}ImageFile`]: null,
-      [`${type}ImagePreview`]: "",
-    }));
+    setForm(prev => {
+      const prevPreview = prev[`${type}ImagePreview`];
+      if (prevPreview.startsWith("blob:")) URL.revokeObjectURL(prevPreview);
+      return {
+        ...prev,
+        [`${type}ImageFile`]: null,
+        [`${type}ImagePreview`]: "",
+      };
+    });
   }, []);
 
   const openEditForm = useCallback((item: PortfolioItem) => {

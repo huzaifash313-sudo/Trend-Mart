@@ -235,7 +235,7 @@ export default function PosApp() {
   const excelRef = useRef<PosExcelCounterHandle>(null);
   const discountRef = useRef<HTMLInputElement>(null);
   const cashRef = useRef<HTMLInputElement>(null);
-  const checkoutRef = useRef<() => void>(() => {});
+  const checkoutRef = useRef<(() => void) | null>(null);
   const productsMap = useMemo(() => {
     const m = new Map<string, Product>();
     for (const p of products) m.set(p.id, p);
@@ -1070,7 +1070,7 @@ export default function PosApp() {
     checkoutRef.current = () => {
       void checkout();
     };
-  });
+  }, [checkout]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -1097,7 +1097,7 @@ export default function PosApp() {
         window.setTimeout(() => excelRef.current?.focusSearch(), 30);
       } else if (key === "s") {
         setTab("counter");
-        checkoutRef.current();
+        checkoutRef.current?.();
       } else if (key === "c") {
         if (cart.length === 0 || window.confirm("Clear current bill?")) clearBill();
       } else if (key === "z") {

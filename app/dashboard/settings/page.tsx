@@ -533,7 +533,7 @@ export default function DashboardSettingsPage() {
         accent_color: THEME_ACCENT,
         store_bio: form.store_bio,
         announcement: form.announcement,
-        announcement_expires_at: shop.announcement_expires_at ?? "",
+        announcement_expires_at: form.announcement_expires_at,
         service_area: form.service_area,
         hourly_rate: form.hourly_rate,
         call_out_charge: form.call_out_charge,

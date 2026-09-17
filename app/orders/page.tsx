@@ -297,7 +297,8 @@ function OrdersInner() {
 
   useEffect(() => {
     const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }) => {
+    void supabase.auth.getUser().then((result: { data: { user: { id: string } | null } }) => {
+      const { data } = result;
       setUserId(data.user?.id ?? null);
     });
   }, []);

@@ -119,10 +119,7 @@ export default function DealDetailClient({
   const [linkedAvg, setLinkedAvg] = useState<number | null>(null);
   const [linkedCount, setLinkedCount] = useState(0);
 
-  const reviewProductId = useMemo(
-    () => (deal ? dealCommerceId(deal) : ""),
-    [deal],
-  );
+  const reviewProductId = deal ? dealCommerceId(deal) : "";
 
   useEffect(() => {
     let cancelled = false;

@@ -50,6 +50,7 @@ export default function PwaInstallTip({ onDismiss }: { onDismiss?: () => void })
     };
     syncPrompt();
     window.addEventListener("tm-pwa-install-available", syncPrompt);
+
     const onInstalled = () => {
       setVisible(false);
       setCanPrompt(false);

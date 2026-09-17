@@ -577,14 +577,17 @@ function OrderTrackingInner() {
 
   useEffect(() => {
     const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }) => {
+    void supabase.auth.getUser().then((result: { data: { user: { id: string } | null } }) => {
+      const { data } = result;
       setUserId(data.user?.id ?? null);
       setAuthReady(true);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
-      setAuthReady(true);
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_event: string, session: { user?: { id?: string } } | null) => {
+        setUserId(session?.user?.id ?? null);
+        setAuthReady(true);
+      },
+    );
     return () => sub.subscription.unsubscribe();
   }, []);
 

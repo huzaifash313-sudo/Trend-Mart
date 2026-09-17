@@ -37,16 +37,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/dashboard/billing?paid=0`);
     }
 
-    if (fields.pp_SecureHash && !verifyJazzCashCallback(fields)) {
+    if (!verifyJazzCashCallback(fields)) {
       return NextResponse.redirect(`${appUrl}/dashboard/billing?paid=0&err=hash`);
     }
 
     const responseCode = fields.pp_ResponseCode || fields.responseCode || "";
-    const ok =
-      !fields.pp_SecureHash ||
-      responseCode === "000" ||
-      responseCode === "00" ||
-      fields.status === "paid";
+    const ok = responseCode === "000" || responseCode === "00";
 
     if (!ok) {
       await admin
@@ -66,11 +62,19 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const orderId = request.nextUrl.searchParams.get("orderId") || "";
   const appUrl = getPublicAppUrl().replace(/\/$/, "");
+  const fields: Record<string, string> = {};
+  request.nextUrl.searchParams.forEach((v, k) => {
+    fields[k] = v;
+  });
+  const orderId = fields.pp_BillReference || fields.orderId || fields.billReference || "";
+
   if (!orderId) {
     return NextResponse.redirect(`${appUrl}/dashboard/billing`);
   }
-  const settled = await settlePaidOrder(orderId, null);
-  return NextResponse.redirect(`${appUrl}/dashboard/billing?paid=${settled ? "1" : "0"}`);
+
+  // The gateway's browser return can be spoofed by any visitor, so it must
+  // never settle payment on its own — only a verified, signed callback (POST,
+  // above) or the admin-gated /api/billing/mark-paid route may do that.
+  return NextResponse.redirect(`${appUrl}/dashboard/billing?orderId=${encodeURIComponent(orderId)}`);
 }

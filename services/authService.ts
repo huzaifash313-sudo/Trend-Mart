@@ -809,10 +809,11 @@ async function resolveRoleFromDb(user: User): Promise<AuthRole | "admin"> {
           .eq("owner_id", user.id)
           .limit(1)
           .maybeSingle()
-          .then((r) => r),
+          .then((r: { data?: { id?: string } | null; error?: unknown } | null) => r),
         4000,
       );
-      const shop = result && "data" in result ? result.data : null;
+      const shop =
+        result && typeof result === "object" && "data" in result ? (result.data as { id?: string } | null) : null;
       return !!shop?.id;
     } catch {
       return false;
@@ -823,11 +824,14 @@ async function resolveRoleFromDb(user: User): Promise<AuthRole | "admin"> {
   let hasShop = false;
   try {
     const [rpcResult, shop] = await Promise.all([
-      raceWithTimeout(supabase.rpc("get_my_role").then((r) => r), 4000),
+      raceWithTimeout(
+        supabase.rpc("get_my_role").then((r: { data?: string | null; error?: unknown } | null) => r),
+        4000,
+      ),
       ownsShop(),
     ]);
     rpcRole =
-      rpcResult && "data" in rpcResult && typeof rpcResult.data === "string"
+      rpcResult && typeof rpcResult === "object" && "data" in rpcResult && typeof rpcResult.data === "string"
         ? rpcResult.data
         : null;
     hasShop = shop;

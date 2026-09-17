@@ -4,6 +4,7 @@
 /* -------------------------------------------------------------------------- */
 
 import { createClient } from "@/lib/supabase/client";
+import { pkStartOfDayISO } from "@/lib/dealSchedule";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export function logAuditEvent(payload: AuditLogPayload): void {
       severity: payload.severity ?? "info",
     })
     .then(
-      ({ error }) => {
+      ({ error }: { error: { message?: string } | null }) => {
         if (error) {
           // Silent fail — audit logs should never break UX
           console.error("[auditService] Failed to log audit event:", error);
@@ -213,7 +214,8 @@ export async function fetchDistinctEventTypes(): Promise<ServiceResult<string[]>
 
     if (error) throw error;
 
-    const types = [...new Set((data ?? []).map((r: { event_type: string }) => r.event_type))];
+    const rows = (data ?? []) as Array<{ event_type: string }>;
+    const types = [...new Set(rows.map((r) => r.event_type))] as string[];
     return { success: true, data: types.sort() };
   } catch (err) {
     return { success: false, error: toError(err) };
@@ -253,13 +255,10 @@ export async function fetchAuditStats(): Promise<
       .select("*", { count: "exact", head: true })
       .eq("severity", "critical");
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const { count: todayCount } = await supabase
       .from("admin_audit_logs")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", today.toISOString());
+      .gte("created_at", pkStartOfDayISO());
 
     return {
       success: true,

@@ -174,7 +174,7 @@ export default function DineInScanPage({ params }: { params: Promise<{ token: st
           .select("*")
           .eq("is_active", true)
           .order("sort_order", { ascending: true })
-          .then(({ data }) => data as SubCategory[] | null),
+          .then((result: { data: SubCategory[] | null }) => result.data as SubCategory[] | null),
         fetchDealsByShopId(res.data.shop_id),
       ]);
       if (cancelled) return;

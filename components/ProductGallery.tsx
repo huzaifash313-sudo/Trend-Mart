@@ -74,12 +74,14 @@ function LightboxModal({
   onClose,
   onPrev,
   onNext,
+  onJumpTo,
 }: {
   images: ProductGalleryImage[];
   currentIndex: number;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
+  onJumpTo: (index: number) => void;
 }) {
   // Keyboard navigation
   useEffect(() => {
@@ -159,7 +161,7 @@ function LightboxModal({
             <button
               key={img.id}
               type="button"
-              onClick={(e) => { e.stopPropagation(); /* set index via parent */ }}
+              onClick={(e) => { e.stopPropagation(); onJumpTo(idx); }}
               className={`h-2 w-2 rounded-full transition-all ${
                 idx === currentIndex
                   ? "bg-white w-6"
@@ -249,6 +251,7 @@ export default function ProductGallery({
             onClose={handleCloseLightbox}
             onPrev={handlePrevLightbox}
             onNext={handleNextLightbox}
+            onJumpTo={setLightboxIndex}
           />
         )}
       </>
@@ -335,6 +338,7 @@ export default function ProductGallery({
           onClose={handleCloseLightbox}
           onPrev={handlePrevLightbox}
           onNext={handleNextLightbox}
+          onJumpTo={setLightboxIndex}
         />
       )}
     </>

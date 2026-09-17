@@ -244,15 +244,15 @@ export function subscribeToOrders(
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "orders", filter: `shop_id=eq.${shopId}` },
-          (payload) =>
-            fanout((l) => l.onInsert(payload as RealtimePostgresChangesPayload<OrderPayload>)),
+          (payload: RealtimePostgresChangesPayload<OrderPayload>) =>
+            fanout((l) => l.onInsert(payload)),
         )
         .on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "orders", filter: `shop_id=eq.${shopId}` },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<OrderPayload>) =>
             fanout((l) =>
-              l.onUpdate?.(payload as RealtimePostgresChangesPayload<OrderPayload>),
+              l.onUpdate?.(payload),
             ),
         ),
       logicalKey,
@@ -284,8 +284,8 @@ export function subscribeToInquiries(
             table: "customer_inquiries",
             filter: `shop_id=eq.${shopId}`,
           },
-          (payload) =>
-            fanout((l) => l.onInsert(payload as RealtimePostgresChangesPayload<InquiryPayload>)),
+          (payload: RealtimePostgresChangesPayload<InquiryPayload>) =>
+            fanout((l) => l.onInsert(payload)),
         )
         .on(
           "postgres_changes",
@@ -295,9 +295,9 @@ export function subscribeToInquiries(
             table: "customer_inquiries",
             filter: `shop_id=eq.${shopId}`,
           },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<InquiryPayload>) =>
             fanout((l) =>
-              l.onUpdate?.(payload as RealtimePostgresChangesPayload<InquiryPayload>),
+              l.onUpdate?.(payload),
             ),
         ),
       logicalKey,
@@ -318,9 +318,9 @@ export function subscribeToShopConversations(
       supabase.channel(logicalKey).on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations", filter: `shop_id=eq.${shopId}` },
-        (payload) =>
+        (payload: RealtimePostgresChangesPayload<ConversationPayload>) =>
           fanout((l) =>
-            l.onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>),
+            l.onChange(payload),
           ),
       ),
       logicalKey,
@@ -346,9 +346,9 @@ export function subscribeToMyConversations(
           table: "conversations",
           filter: `customer_user_id=eq.${userId}`,
         },
-        (payload) =>
+        (payload: RealtimePostgresChangesPayload<ConversationPayload>) =>
           fanout((l) =>
-            l.onChange(payload as RealtimePostgresChangesPayload<ConversationPayload>),
+            l.onChange(payload),
           ),
       ),
       logicalKey,
@@ -380,9 +380,9 @@ export function subscribeToConversationMessages(
             table: "conversation_messages",
             filter: `conversation_id=eq.${conversationId}`,
           },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<ChatMessagePayload>) =>
             fanout((l) =>
-              l.onInsert(payload as RealtimePostgresChangesPayload<ChatMessagePayload>),
+              l.onInsert(payload),
             ),
         )
         .on(
@@ -393,9 +393,9 @@ export function subscribeToConversationMessages(
             table: "conversation_messages",
             filter: `conversation_id=eq.${conversationId}`,
           },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<ChatMessagePayload>) =>
             fanout((l) =>
-              l.onUpdate?.(payload as RealtimePostgresChangesPayload<ChatMessagePayload>),
+              l.onUpdate?.(payload),
             ),
         ),
       logicalKey,
@@ -421,9 +421,9 @@ export function subscribeToMyInquiries(
           table: "customer_inquiries",
           filter: `customer_user_id=eq.${userId}`,
         },
-        (payload) =>
+        (payload: RealtimePostgresChangesPayload<InquiryPayload>) =>
           fanout((l) =>
-            l.onUpdate(payload as RealtimePostgresChangesPayload<InquiryPayload>),
+            l.onUpdate(payload),
           ),
       ),
       logicalKey,
@@ -450,8 +450,8 @@ export function subscribeToCustomerOrders(
           table: "orders",
           filter: `customer_user_id=eq.${userId}`,
         },
-        (payload) =>
-          fanout((l) => l.onUpdate(payload as RealtimePostgresChangesPayload<OrderPayload>)),
+        (payload: RealtimePostgresChangesPayload<OrderPayload>) =>
+          fanout((l) => l.onUpdate(payload)),
       ),
       logicalKey,
       `customer-orders:${userId}`,
@@ -476,9 +476,9 @@ export function subscribeToNotifications(
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        (payload) =>
+        (payload: RealtimePostgresChangesPayload<NotificationPayload>) =>
           fanout((l) =>
-            l.onInsert(payload as RealtimePostgresChangesPayload<NotificationPayload>),
+            l.onInsert(payload),
           ),
       ),
       logicalKey,
@@ -498,9 +498,9 @@ export function subscribeToSupportTickets(
       supabase.channel(logicalKey).on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "support_tickets" },
-        (payload) =>
+        (payload: RealtimePostgresChangesPayload<SupportTicketPayload>) =>
           fanout((l) =>
-            l.onInsert(payload as RealtimePostgresChangesPayload<SupportTicketPayload>),
+            l.onInsert(payload),
           ),
       ),
       logicalKey,
@@ -530,25 +530,25 @@ export function subscribeToProducts(
         .on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "products", filter: `shop_id=eq.${shopId}` },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<ProductPayload>) =>
             fanout((l) =>
-              l.onUpdate(payload as RealtimePostgresChangesPayload<ProductPayload>),
+              l.onUpdate(payload),
             ),
         )
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "products", filter: `shop_id=eq.${shopId}` },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<ProductPayload>) =>
             fanout((l) =>
-              l.onInsert?.(payload as RealtimePostgresChangesPayload<ProductPayload>),
+              l.onInsert?.(payload),
             ),
         )
         .on(
           "postgres_changes",
           { event: "DELETE", schema: "public", table: "products", filter: `shop_id=eq.${shopId}` },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<ProductPayload>) =>
             fanout((l) =>
-              l.onDelete?.(payload as RealtimePostgresChangesPayload<ProductPayload>),
+              l.onDelete?.(payload),
             ),
         ),
       logicalKey,
@@ -569,8 +569,8 @@ export function subscribeToReviews(
       supabase.channel(logicalKey).on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "reviews", filter: `shop_id=eq.${shopId}` },
-        (payload) =>
-          fanout((l) => l.onInsert(payload as RealtimePostgresChangesPayload<ReviewPayload>)),
+        (payload: RealtimePostgresChangesPayload<ReviewPayload>) =>
+          fanout((l) => l.onInsert(payload)),
       ),
       logicalKey,
       `reviews:${shopId}`,
@@ -603,9 +603,9 @@ export function subscribeToInventory(
             table: "inventory_variants",
             filter: `shop_id=eq.${shopId}`,
           },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<InventoryVariantPayload>) =>
             fanout((l) =>
-              l.onUpdate(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>),
+              l.onUpdate(payload),
             ),
         )
         .on(
@@ -616,9 +616,9 @@ export function subscribeToInventory(
             table: "inventory_variants",
             filter: `shop_id=eq.${shopId}`,
           },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<InventoryVariantPayload>) =>
             fanout((l) =>
-              l.onInsert?.(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>),
+              l.onInsert?.(payload),
             ),
         )
         .on(
@@ -629,9 +629,9 @@ export function subscribeToInventory(
             table: "inventory_variants",
             filter: `shop_id=eq.${shopId}`,
           },
-          (payload) =>
+          (payload: RealtimePostgresChangesPayload<InventoryVariantPayload>) =>
             fanout((l) =>
-              l.onDelete?.(payload as RealtimePostgresChangesPayload<InventoryVariantPayload>),
+              l.onDelete?.(payload),
             ),
         ),
       logicalKey,
@@ -658,9 +658,9 @@ export function subscribeToAnalytics(
           table: "analytics_logs",
           filter: `shop_id=eq.${shopId}`,
         },
-        (payload) =>
+        (payload: RealtimePostgresChangesPayload<AnalyticsPayload>) =>
           fanout((l) =>
-            l.onInsert(payload as RealtimePostgresChangesPayload<AnalyticsPayload>),
+            l.onInsert(payload),
           ),
       ),
       logicalKey,
@@ -686,9 +686,9 @@ export function subscribeToShopAds(
           table: "promotional_ads",
           filter: `shop_id=eq.${shopId}`,
         },
-        (payload) =>
+        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) =>
           fanout((l) =>
-            l.onChange(payload as RealtimePostgresChangesPayload<Record<string, unknown>>),
+            l.onChange(payload),
           ),
       ),
       logicalKey,

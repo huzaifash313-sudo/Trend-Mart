@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   type ReactNode,
 } from "react";
@@ -20,6 +21,7 @@ interface Toast {
   id: string;
   message: string;
   variant: ToastVariant;
+  durationMs: number;
 }
 
 interface ToastContextValue {
@@ -52,7 +54,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const addToast = useCallback(
     (message: string, variant: ToastVariant = "info", durationMs = 4000) => {
       const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      setToasts((prev) => [...prev, { id, message, variant }]);
+      setToasts((prev) => [...prev, { id, message, variant, durationMs }]);
       // Auto-dismiss
       setTimeout(() => removeToast(id), durationMs);
     },
@@ -78,8 +80,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("trendsmart:toast", handler);
   }, [addToast]);
 
+  const contextValue = useMemo(() => ({ addToast }), [addToast]);
+
   return (
-    <ToastContext.Provider value={{ addToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
 
       {/* Toast container — fixed above bottom nav on mobile, bottom-right on desktop */}
@@ -145,9 +149,9 @@ function ToastItem({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!manualCloseRef.current) onDismiss();
-    }, 4000);
+    }, toast.durationMs);
     return () => clearTimeout(timer);
-  }, [onDismiss]);
+  }, [onDismiss, toast.durationMs]);
 
   return (
     <div

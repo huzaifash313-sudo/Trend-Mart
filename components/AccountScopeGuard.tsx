@@ -113,9 +113,11 @@ export default function AccountScopeGuard() {
 
     // `onAuthStateChange` fires an INITIAL_SESSION event immediately, which
     // seeds the current identity for us (no separate getUser() call needed).
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      reconcile(session?.user?.id ?? null);
-    });
+    const { data } = supabase.auth.onAuthStateChange(
+      (_event: string, session: { user?: { id?: string } } | null) => {
+        reconcile(session?.user?.id ?? null);
+      },
+    );
 
     return () => {
       data.subscription.unsubscribe();

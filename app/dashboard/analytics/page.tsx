@@ -10,6 +10,7 @@ import {
 import { formatRupees } from "@/lib/formatters";
 import { downloadOrdersCSV, downloadProductsCSV } from "@/services/exportService";
 import { fetchAnalyticsSummary } from "@/services/analyticsService";
+import { fetchLeadStats } from "@/services/leadsService";
 import type { Order, Product, AnalyticsSummary } from "@/types";
 
 /* -------------------------------------------------------------------------- */
@@ -184,7 +185,10 @@ export default function AnalyticsDashboard() {
         setAllProducts(productList);
 
         // Analytics Overview summary (views + clicks) — fetched in parallel.
-        const summaryRes = await fetchAnalyticsSummary(shopData.id);
+        const [summaryRes, leadStatsRes] = await Promise.all([
+          fetchAnalyticsSummary(shopData.id),
+          fetchLeadStats(shopData.id),
+        ]);
         if (!cancelled && summaryRes.success) setSummary(summaryRes.data);
 
         const dailyMap = new Map<string, { revenue: number; orders: number; customers: Set<string> }>();
@@ -257,8 +261,15 @@ export default function AnalyticsDashboard() {
         const sources = ["whatsapp", "catalog", "chatbot", "direct", "other"];
         for (const s of sources) leadSources.set(s, { count: 0, converted: 0 });
         const whatsappEntry = leadSources.get("whatsapp")!;
-        whatsappEntry.count += orderList.length;
-        whatsappEntry.converted += orderList.length;
+        if (leadStatsRes.success && leadStatsRes.data.total > 0) {
+          whatsappEntry.count += leadStatsRes.data.total;
+          whatsappEntry.converted += leadStatsRes.data.converted;
+        } else {
+          // No lead-tracking rows yet for this shop — fall back to orders as
+          // a rough proxy rather than showing a false 100% conversion rate.
+          whatsappEntry.count += orderList.length;
+          whatsappEntry.converted += orderList.length;
+        }
         const shopViewCount = summaryRes.success
           ? summaryRes.data.total_views
           : 0;

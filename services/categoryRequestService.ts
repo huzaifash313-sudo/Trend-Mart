@@ -164,7 +164,7 @@ export async function fetchPendingCategoryRequests(): Promise<
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw error;
-    const rows = (data ?? []).map((row) => {
+    const rows = ((data ?? []) as Array<CategoryRequest & { shops?: { name?: string } | null }>).map((row) => {
       const r = row as CategoryRequest & { shops?: { name?: string } | null };
       return {
         ...r,

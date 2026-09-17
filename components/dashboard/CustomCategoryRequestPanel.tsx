@@ -168,12 +168,14 @@ export default function CustomCategoryRequestPanel({
                 ? "e.g. Paint & Chemicals"
                 : "e.g. Brass Valves"
             }
+            aria-label={mode === "category" ? "Category name" : "Sub-category name"}
             className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
           />
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Short description (optional)"
+            aria-label="Description (optional)"
             className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
           />
         </div>

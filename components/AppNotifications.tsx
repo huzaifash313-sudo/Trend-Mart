@@ -156,15 +156,17 @@ function AutoRegisterUserNotifications() {
       registerForUser(user.id);
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        registerForUser(session.user.id);
-      } else {
-        cleanup?.();
-        cleanup = undefined;
-        lastRegisteredUserId = null;
-      }
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_event: string, session: { user?: { id?: string } } | null) => {
+        if (session?.user?.id) {
+          registerForUser(session.user.id);
+        } else {
+          cleanup?.();
+          cleanup = undefined;
+          lastRegisteredUserId = null;
+        }
+      },
+    );
 
     return () => {
       cancelled = true;
@@ -207,12 +209,14 @@ function AutoSubscribeWebPush() {
 
     void trySync();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      // Skip noisy TOKEN_REFRESHED / INITIAL_SESSION churn.
-      if (!session?.user) return;
-      if (event !== "SIGNED_IN" && event !== "USER_UPDATED") return;
-      void trySync();
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (event: string, session: { user?: { id?: string } } | null) => {
+        // Skip noisy TOKEN_REFRESHED / INITIAL_SESSION churn.
+        if (!session?.user) return;
+        if (event !== "SIGNED_IN" && event !== "USER_UPDATED") return;
+        void trySync();
+      },
+    );
 
     const onVisible = () => {
       if (document.visibilityState === "visible") void trySync();

@@ -43,6 +43,7 @@ function MerchantBillingInner() {
       </div>
     );
   }
+
   return <MerchantBillingContent />;
 }
 
@@ -113,6 +114,14 @@ function MerchantBillingContent() {
   const trialDaysLeft = sub?.trial_ends_at
     ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / 86_400_000))
     : null;
+
+  if (!isPaidFeaturesEnabled()) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center px-4 text-center text-sm text-zinc-500">
+        Billing is paused during soft launch.
+      </div>
+    );
+  }
 
   const buyPack = async (packId: string) => {
     if (!shopId) return;

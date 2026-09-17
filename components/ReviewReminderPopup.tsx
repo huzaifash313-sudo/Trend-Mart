@@ -231,21 +231,24 @@ export default function ReviewReminderPopup() {
     let cancelled = false;
     const supabase = createClient();
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
+    void supabase.auth.getSession().then((result: { data: { session: { user?: { id: string } } | null } }) => {
+      const { session } = result.data;
       if (cancelled || !session?.user) return;
       currentUserIdRef.current = session.user.id;
       void checkForReviewable();
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return;
-      if (event === "SIGNED_IN" && session?.user) {
-        currentUserIdRef.current = session.user.id;
-        void checkForReviewable();
-      } else if (event === "SIGNED_OUT") {
-        currentUserIdRef.current = "";
-      }
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event: string, session: { user?: { id?: string } } | null) => {
+        if (cancelled) return;
+        if (event === "SIGNED_IN" && session?.user?.id) {
+          currentUserIdRef.current = session.user.id;
+          void checkForReviewable();
+        } else if (event === "SIGNED_OUT") {
+          currentUserIdRef.current = "";
+        }
+      },
+    );
 
     return () => {
       cancelled = true;

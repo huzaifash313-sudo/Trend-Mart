@@ -260,7 +260,7 @@ export default function BottomNav() {
 
         const {
           data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_e, s) => {
+        } = supabase.auth.onAuthStateChange(async (_e: string, s: { user?: User | null } | null) => {
           if (cancelled) return;
           await syncAuth(!!s, s?.user ?? null);
         });

@@ -205,6 +205,17 @@ export function toPkDateKey(date = new Date()): string {
   }
 }
 
+/**
+ * ISO timestamp (UTC) for the start of "today" in Asia/Karachi (fixed UTC+5,
+ * no DST). Use this instead of `new Date(); d.setHours(0,0,0,0)` for any
+ * "today's stats" query — the naive version uses the server/device's local
+ * timezone, which is wrong when the server runs in UTC (most hosts) or a
+ * merchant's device isn't set to Pakistan time.
+ */
+export function pkStartOfDayISO(date = new Date()): string {
+  return new Date(`${toPkDateKey(date)}T00:00:00+05:00`).toISOString();
+}
+
 export function weekdayFromDateKey(dateKey: string): number {
   const [y, m, d] = dateKey.split("-").map(Number);
   return new Date(y, (m || 1) - 1, d || 1).getDay();
