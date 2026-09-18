@@ -82,7 +82,7 @@ function toDatetimeLocalValue(iso: string): string {
 }
 
 const fieldClass =
-  "w-full min-w-0 rounded-lg border border-teal-200/70 bg-white px-2.5 py-2 text-sm text-zinc-900 placeholder:text-zinc-300/50 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-teal-900/50 dark:bg-zinc-900 dark:text-zinc-100";
+  "w-full min-w-0 rounded-md border border-teal-200/70 bg-white px-2 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-300/50 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-teal-900/50 dark:bg-zinc-900 dark:text-zinc-100";
 
 const labelClass =
   "mb-1 block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400";
@@ -100,6 +100,7 @@ export default function BulkProductCreator({
   const [defaultSubId, setDefaultSubId] = useState("");
   const [expandedVariants, setExpandedVariants] = useState<Record<string, boolean>>({});
   const [showImport, setShowImport] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -358,8 +359,8 @@ export default function BulkProductCreator({
   ];
 
   return (
-    <div className="space-y-3 rounded-2xl border border-teal-200/70 bg-white p-3 shadow-sm dark:border-teal-900/40 dark:bg-[color:var(--tm-surface)] sm:p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className="tm-bulk-editor space-y-3 rounded-2xl border border-teal-200/70 bg-white p-3 shadow-sm dark:border-teal-900/40 dark:bg-[color:var(--tm-surface)] sm:p-4">
+      <div className="tm-bulk-toolbar flex flex-wrap items-start justify-between gap-2 border-b border-teal-100 pb-3 dark:border-teal-900/40">
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
             Add Multiple Products
@@ -432,11 +433,28 @@ export default function BulkProductCreator({
 
       {/* Category option packs — simple first, same as Add / Edit product */}
       {shopCategory && (simplePacks.length > 0 || mixPacks.length > 0) ? (
-        <div className="rounded-xl border border-teal-200/80 bg-gradient-to-r from-teal-50/90 to-emerald-50/50 p-3 dark:border-teal-900/50 dark:from-teal-950/40 dark:to-emerald-950/20">
-          <p className="text-xs font-bold text-teal-900 dark:text-teal-200">
-            Product options — {shopCategory}
-          </p>
-          <p className="mt-0.5 text-[11px] text-teal-800/80 dark:text-teal-300/80">
+        <div className="tm-bulk-options rounded-xl border border-teal-200/80 bg-gradient-to-r from-teal-50/90 to-emerald-50/50 dark:border-teal-900/50 dark:from-teal-950/40 dark:to-emerald-950/20">
+          <button
+            type="button"
+            onClick={() => setShowOptions((open) => !open)}
+            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+            aria-expanded={showOptions}
+          >
+            <span>
+              <span className="block text-xs font-bold text-teal-900 dark:text-teal-200">
+                Product options — {shopCategory}
+              </span>
+              <span className="mt-0.5 block text-[11px] text-teal-800/80 dark:text-teal-300/80">
+                Optional presets for variants and service details
+              </span>
+            </span>
+            <span className="shrink-0 rounded-full border border-teal-300 px-2 py-1 text-[10px] font-bold text-teal-800 dark:border-teal-700 dark:text-teal-300">
+              {showOptions ? "Hide" : "Open"}
+            </span>
+          </button>
+
+          {showOptions ? <div className="border-t border-teal-200/70 p-3 dark:border-teal-900/40">
+          <p className="text-[11px] text-teal-800/80 dark:text-teal-300/80">
             Add ke waqt hi set karo. {optionsHint}
           </p>
 
@@ -476,6 +494,7 @@ export default function BulkProductCreator({
               </div>
             </div>
           ) : null}
+          </div> : null}
         </div>
       ) : null}
 
@@ -484,14 +503,17 @@ export default function BulkProductCreator({
       )}
 
       {/* Desktop / laptop — wide single-line table */}
-      <div className="hidden overflow-x-auto rounded-lg border border-teal-200/70 lg:block dark:border-teal-900/40">
-        <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
-          <thead>
+      <div className="tm-bulk-sheet hidden overflow-x-auto rounded-lg border border-teal-200/70 lg:block dark:border-teal-900/40">
+        <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+          <thead className="sticky top-0 z-10">
             <tr className="divide-x divide-teal-100 border-b border-teal-200/70 bg-teal-50/80 text-[0.65rem] uppercase tracking-wider text-teal-800 dark:divide-teal-900/40 dark:border-teal-900/40 dark:bg-teal-950/30 dark:text-teal-300">
+              <th className="w-9 px-1 py-2 text-center font-semibold">#</th>
               <th className="min-w-[200px] px-2 py-2 font-semibold">Name *</th>
               <th className="min-w-[160px] px-2 py-2 font-semibold">Sub-category *</th>
               <th className="w-[110px] min-w-[110px] px-2 py-2 font-semibold">Price *</th>
               <th className="w-[110px] min-w-[110px] px-2 py-2 font-semibold">Was</th>
+              <th className="w-[90px] px-1.5 py-2 font-semibold">Stock</th>
+              <th className="w-[100px] px-1.5 py-2 font-semibold">Online</th>
               <th className="w-[190px] min-w-[190px] px-2 py-2 font-semibold">Deal ends</th>
               <th className="min-w-[280px] px-2 py-2 font-semibold">Photos</th>
               <th className="w-10 px-2 py-2" />
@@ -512,6 +534,9 @@ export default function BulkProductCreator({
                       : "bg-white dark:bg-transparent"
                   }`}
                 >
+                  <td className="px-1 py-2 text-center text-[10px] font-bold tabular-nums text-teal-600 dark:text-teal-400">
+                    {idx + 1}
+                  </td>
                   <td className="px-2 py-2.5">
                     <input
                       type="text"
@@ -528,7 +553,7 @@ export default function BulkProductCreator({
                       }
                       maxLength={300}
                       placeholder="Description"
-                      className={`${fieldClass} mt-1.5`}
+                      className={`tm-bulk-description ${fieldClass} mt-1.5`}
                     />
                     <button
                       type="button"
@@ -577,12 +602,14 @@ export default function BulkProductCreator({
                       className={fieldClass}
                       title="Original / was price"
                     />
+                  </td>
+                  <td className="px-1.5 py-2.5">
                     <button
                       type="button"
                       onClick={() =>
                         updateRow(row.key, { is_available: !row.is_available })
                       }
-                      className={`mt-1.5 w-full rounded-md px-1.5 py-1 text-[10px] font-semibold transition-colors ${
+                      className={`tm-bulk-stock w-full rounded-md px-1.5 py-2 text-[10px] font-semibold transition-colors ${
                         row.is_available
                           ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
                           : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
@@ -591,12 +618,14 @@ export default function BulkProductCreator({
                     >
                       {row.is_available ? "In stock" : "Out of stock"}
                     </button>
+                  </td>
+                  <td className="px-1.5 py-2.5">
                     <button
                       type="button"
                       onClick={() =>
                         updateRow(row.key, { sell_online: !row.sell_online })
                       }
-                      className={`mt-1 w-full rounded-md px-1.5 py-1 text-[10px] font-semibold transition-colors ${
+                      className={`tm-bulk-visibility w-full rounded-md px-1.5 py-2 text-[10px] font-semibold transition-colors ${
                         row.sell_online
                           ? "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
                           : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
@@ -650,7 +679,7 @@ export default function BulkProductCreator({
                 </tr>
                 {expandedVariants[row.key] && (
                   <tr className={idx % 2 === 1 ? "bg-teal-50/30 dark:bg-teal-950/10" : "bg-white dark:bg-transparent"}>
-                    <td colSpan={7} className="space-y-2 px-2 pb-3 pt-1">
+                    <td colSpan={10} className="space-y-2 px-2 pb-3 pt-1">
                       <VariantEditor
                         variants={row.variants}
                         onChange={(v) => updateRow(row.key, { variants: v })}
@@ -683,7 +712,7 @@ export default function BulkProductCreator({
           return (
             <div
               key={row.key}
-              className="space-y-2.5 rounded-2xl border border-teal-200/70 bg-gradient-to-b from-white to-teal-50/30 p-3 dark:border-teal-900/40 dark:from-zinc-900 dark:to-teal-950/20"
+              className="tm-bulk-mobile-row space-y-2.5 rounded-xl border border-teal-200/70 bg-gradient-to-b from-white to-teal-50/30 p-3 dark:border-teal-900/40 dark:from-zinc-900 dark:to-teal-950/20"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-teal-800 dark:text-teal-300">

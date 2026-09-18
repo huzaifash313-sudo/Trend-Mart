@@ -760,21 +760,21 @@ export default function ProductsDashboardPage() {
 
   return (
     <div className="tm-dashboard-page min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]">
-      {/* Header — slim; store link lives in DashboardNavbar */}
-      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <Link href="/dashboard" className="shrink-0 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+      {/* Page subheader — separated from the dashboard navbar for clear hierarchy. */}
+      <header className="sticky top-[var(--tm-navbar-sticky-offset)] z-30 min-h-[4.5rem] border-y border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95">
+        <div className="mx-auto flex min-h-[4.5rem] max-w-5xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
+          <div className="flex min-w-0 items-end gap-3">
+            <Link href="/dashboard" className="shrink-0 pb-1 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
               ← Back
             </Link>
-            <h1 className="tm-font-display truncate text-base font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
+            <h1 className="tm-font-display truncate text-lg font-extrabold leading-tight tracking-tight text-emerald-600 dark:text-emerald-400 sm:text-xl">
               Products
             </h1>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-2">
             <Link
               href="/dashboard/products/new"
-              className="inline-flex items-center rounded-lg border border-emerald-600 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+              className="inline-flex h-12 items-center rounded-lg border border-emerald-600 px-3 text-[11px] font-bold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
             >
               Bulk add
             </Link>
@@ -786,7 +786,7 @@ export default function ProductsDashboardPage() {
                 setShowAdvanced(false);
                 setShowProductForm(true);
               }}
-              className="inline-flex items-center rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+              className="inline-flex h-12 items-center rounded-lg bg-emerald-600 px-3 text-[11px] font-bold text-white hover:bg-emerald-700"
             >
               + Add
             </button>

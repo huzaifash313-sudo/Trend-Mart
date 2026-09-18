@@ -183,11 +183,11 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]"
+      className="tm-dashboard-shell min-h-screen bg-zinc-50 dark:bg-[color:var(--tm-surface)]"
       style={
         {
-          ["--tm-navbar-content-height" as string]: "3rem",
-          ["--tm-navbar-sticky-offset" as string]: "3rem",
+          ["--tm-navbar-content-height" as string]: "3.5rem",
+          ["--tm-navbar-sticky-offset" as string]: "3.5rem",
         } as CSSProperties
       }
     >

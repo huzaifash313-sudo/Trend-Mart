@@ -97,7 +97,7 @@ export default function DashboardNavbar({
 
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95">
-      <div className="flex h-12 items-center gap-2 px-3 sm:gap-3 sm:px-4">
+      <div className="flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4">
         <button
           type="button"
           onClick={onOpenMenu}

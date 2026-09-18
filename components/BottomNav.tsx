@@ -423,10 +423,10 @@ export default function BottomNav() {
 
   return (
     <nav
-      className={`bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden${keyboardOpen ? " hidden" : ""}`}
+      className={`bottom-nav tm-bottom-nav fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200/80 bg-white/90 backdrop-blur-xl dark:border-[color:var(--tm-border)] dark:bg-[color:var(--tm-surface)]/92 md:hidden${keyboardOpen ? " hidden" : ""}`}
       aria-label={t("nav.mainNav")}
     >
-      <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-end px-1 pb-1">
+      <div className="tm-bottom-nav-inner mx-auto grid h-full min-w-0 max-w-lg grid-cols-5 items-end px-1 pb-1">
         <Link href="/" className={sideTabClass(isHomeActive)} aria-label={t("nav.home")} aria-current={isHomeActive ? "page" : undefined}>
           <HomeIcon active={isHomeActive} />
           <span>{t("nav.home")}</span>

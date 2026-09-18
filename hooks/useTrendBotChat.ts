@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import type { AssistantRole } from "@/lib/ai/assistantEngine";
 import type { ProductSearchHit } from "@/lib/ai/productSearch";
 import { TREND_BOT_NAME } from "@/lib/ai/trendBotBrand";
-import { speakTrendBotReply } from "@/lib/ai/trendBotVoice";
 import {
   getMemoryHint,
   getSessionLabel,
@@ -224,16 +223,6 @@ export function useTrendBotChat({
         }
         setThinkingStep(null);
         commitReply(reply);
-        // Soft spoken summary (respects mute); skip if user is typing next message soon
-        try {
-          const top = data.products?.[0];
-          speakTrendBotReply(reply, {
-            productName: top?.name,
-            productCount: data.products?.length,
-          });
-        } catch {
-          /* voice optional */
-        }
       } catch (err) {
         const superseded = abortRef.current !== null && abortRef.current !== controller;
         if (superseded) return;

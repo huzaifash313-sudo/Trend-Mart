@@ -1284,7 +1284,7 @@ export default function PosApp() {
   };
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-950 lg:flex-row">
+    <div className="tm-pos-shell flex h-[100dvh] max-h-[100dvh] min-w-0 flex-col overflow-x-hidden overflow-y-hidden bg-zinc-50 dark:bg-zinc-950 lg:flex-row">
       {/* Desktop left nav — TrendsMart light chrome; own scroll only */}
       <aside className="hidden h-full w-56 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-zinc-200 bg-white text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 lg:flex">
         <div className="sticky top-0 z-10 shrink-0 border-b border-zinc-100 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-950">
@@ -1391,7 +1391,7 @@ export default function PosApp() {
           {enabledTabs.map(navBtn)}
         </nav>
 
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 sm:p-3">
+        <main className="tm-pos-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-2 sm:p-3">
           {/* SETUP */}
           {tab === "setup" && (
             <section className="mx-auto max-w-2xl space-y-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5">
@@ -1893,8 +1893,8 @@ export default function PosApp() {
 
           {/* COUNTER */}
           {tab === "counter" && settings.enabled && (
-            <section className="grid gap-3 lg:grid-cols-[1.35fr_minmax(17rem,22rem)] lg:items-start">
-              <div className={`${mobileBillView ? "hidden lg:block" : ""} space-y-1.5`}>
+            <section className="tm-pos-counter grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,22rem)] lg:items-start">
+              <div className={`${mobileBillView ? "hidden lg:block" : ""} min-w-0 space-y-1.5`}>
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                   <p className="shrink-0 text-[11px] text-zinc-500 dark:text-zinc-400">
                     {products.length} product{products.length === 1 ? "" : "s"} ready
@@ -2203,7 +2203,7 @@ export default function PosApp() {
                 )}
               </div>
 
-              <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 sm:p-2.5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden">
+              <div className="tm-pos-bill flex min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 sm:p-2.5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-4.5rem)] lg:overflow-hidden">
                 <div className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-100 pb-1 dark:border-zinc-800">
                   <div className="min-w-0">
                     {mobileBillView ? (

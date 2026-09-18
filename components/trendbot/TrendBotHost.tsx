@@ -10,12 +10,6 @@ import {
   resolveTrendBotPageContext,
 } from "@/lib/ai/trendBotContext";
 import {
-  cancelTrendBotVoice,
-  isTrendBotVoiceMuted,
-  setTrendBotVoiceMuted,
-  speakTrendBotLine,
-} from "@/lib/ai/trendBotVoice";
-import {
   shouldHideGlobalTrendBot,
   TREND_BOT_NAME,
   TREND_BOT_WELCOME_CUSTOMER,
@@ -77,14 +71,12 @@ export default function TrendBotHost() {
   const [wiggle, setWiggle] = useState(false);
   const [pose, setPose] = useState<TrendBotPose>("idle");
   const [strolling, setStrolling] = useState(false);
-  const [voiceMuted, setVoiceMuted] = useState(false);
   const [teasersMuted, setTeasersMuted] = useState(true);
 
   const teaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const poseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setVoiceMuted(isTrendBotVoiceMuted());
     setTeasersMuted(isTeaserDismissed());
   }, []);
 
@@ -118,7 +110,6 @@ export default function TrendBotHost() {
   useEffect(() => {
     if (hidden || open || teasersMuted || suppressTeaser) return;
     const tip = pack.teasers[0];
-    const voice = pack.voiceLines[0];
     const t = setTimeout(() => {
       if (isTeaserDismissed()) {
         setTeasersMuted(true);
@@ -129,9 +120,6 @@ export default function TrendBotHost() {
           tip,
           pageCtx === "deals" ? "jump" : pageCtx === "home" ? "happy" : "wave",
         );
-      }
-      if (voice) {
-        speakTrendBotLine(voice, { routeKey: `route:${pageCtx}`, cute: true });
       }
     }, ROUTE_TIP_DELAY_MS);
     return () => clearTimeout(t);
@@ -195,7 +183,6 @@ export default function TrendBotHost() {
 
   useEffect(() => {
     if (open) {
-      cancelTrendBotVoice();
       setTeaser(null);
       setStrolling(false);
       setPose("idle");
@@ -227,18 +214,6 @@ export default function TrendBotHost() {
               <span className="flex-1 text-[0.52rem] font-bold uppercase tracking-wide text-emerald-600">
                 {TREND_BOT_NAME}
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !voiceMuted;
-                  setTrendBotVoiceMuted(next);
-                  setVoiceMuted(next);
-                }}
-                className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[0.5rem] text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                aria-label={voiceMuted ? "Unmute TrendBot voice" : "Mute TrendBot voice"}
-              >
-                {voiceMuted ? "🔇" : "🔊"}
-              </button>
               <button
                 type="button"
                 onClick={dismissTeaser}
@@ -280,10 +255,6 @@ export default function TrendBotHost() {
             setTeaser(null);
             setOpen(true);
             flashPose("happy", 780);
-            speakTrendBotLine(
-              "Salam! TrendBot yahan hai. Products, deals, ya koi bhi sawaal — batao.",
-              { routeKey: "open:panel", cute: true },
-            );
           }}
         />
       ) : null}
