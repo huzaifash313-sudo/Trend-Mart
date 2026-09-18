@@ -379,7 +379,7 @@ function ShopDetailInner({
           void loadMoreProducts();
         }
       },
-      { rootMargin: "900px 0px" },
+      { rootMargin: "240px 0px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -1657,7 +1657,7 @@ function ShopDetailInner({
                 {(hasMoreProducts || loadingMoreProducts) && (
                   <div
                     ref={productLoadMoreRef}
-                    className="mt-4 flex min-h-[3rem] flex-col items-center justify-center gap-3"
+                    className="mt-4 flex min-h-[18rem] flex-col items-center justify-center gap-3"
                   >
                     {loadingMoreProducts ? (
                       <div className="w-full" aria-busy="true" aria-label="Loading more products">

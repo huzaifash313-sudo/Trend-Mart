@@ -609,7 +609,7 @@ export default function ServiceBookingModal({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
+            <div className="flex min-w-0 gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={handleBack}
@@ -703,7 +703,7 @@ export default function ServiceBookingModal({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
+            <div className="flex min-w-0 gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={handleBack}
@@ -716,12 +716,12 @@ export default function ServiceBookingModal({
                 type="button"
                 onClick={handlePlaceBooking}
                 disabled={isSubmitting || !phone}
-                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-orange-600 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden rounded-full bg-orange-600 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-600/25 transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <><SpinnerIcon /> Sending...</>
                 ) : (
-                  <><WhatsAppIcon /> Send via WhatsApp</>
+                  <><WhatsAppIcon /><span className="truncate">Send via WhatsApp</span></>
                 )}
               </button>
             </div>
