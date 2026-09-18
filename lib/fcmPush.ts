@@ -68,7 +68,8 @@ export async function sendFcmToUser(
   let sent = 0;
   let failed = 0;
   try {
-    const result = await messaging.sendEachForMulticast({
+    const result: import("firebase-admin/messaging").BatchResponse =
+      await messaging.sendEachForMulticast({
       tokens,
       notification: { title: payload.title, body: payload.body },
       data: {
