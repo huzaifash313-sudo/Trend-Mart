@@ -49,9 +49,21 @@ export async function sendFcmToUser(
 
   if (error || !data || data.length === 0) return { sent: 0, failed: 0 };
 
-  const { getMessaging } = await import("firebase-admin/messaging");
-  const messaging = getMessaging(app);
   const tokens = (data as DeviceTokenRow[]).map((r) => r.token);
+
+  let firebaseAdmin: any = null;
+  try {
+    firebaseAdmin = await Function("return import('firebase-admin')")();
+  } catch {
+    return { sent: 0, failed: tokens.length };
+  }
+
+  const messagingFactory = firebaseAdmin?.messaging;
+  if (!messagingFactory || typeof messagingFactory !== "function") {
+    return { sent: 0, failed: tokens.length };
+  }
+
+  const messaging = messagingFactory(app);
 
   let sent = 0;
   let failed = 0;

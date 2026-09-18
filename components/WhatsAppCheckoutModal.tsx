@@ -2601,30 +2601,49 @@ export default function WhatsAppCheckoutModal({
             </div>
 
             {/* Actions */}
-            <div className="sticky bottom-0 flex gap-2 border-t border-zinc-100 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <button
-                type="button"
-                onClick={() => setStep("shipping")}
-                disabled={isSubmitting}
-                className="rounded-full px-6 py-3 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed dark:text-zinc-400 dark:hover:bg-zinc-800"
-              >
-                ← Edit
-              </button>
-              <div className="mb-3 w-full">
-                <BuyerProtectionStrip compact />
+            <div className="sticky bottom-0 border-t border-zinc-100 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="flex items-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep("shipping")}
+                  disabled={isSubmitting}
+                  className="shrink-0 rounded-full px-3 py-2 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  ← Edit
+                </button>
+
+                <div className="min-w-0 flex-1">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3 py-3 text-center shadow-inner shadow-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:shadow-none">
+                    <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-semibold text-emerald-900 dark:text-emerald-200 sm:text-[11px]">
+                      <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Shop with confidence</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[10px] font-semibold text-emerald-900 dark:text-emerald-200 sm:text-[11px]">
+                      <a href="/legal/refund-policy" className="underline underline-offset-2">Refund &amp; order help</a>
+                      <span className="text-zinc-400">|</span>
+                      <a href="/support" className="underline underline-offset-2">Contact support</a>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePlaceOrder}
+                  disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment || hasUnavailableItems}
+                  className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full ${accentBg} text-[10px] font-bold leading-[1.1] text-white shadow-lg shadow-emerald-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50 sm:h-24 sm:w-24`}
+                >
+                  {isSubmitting ? (
+                    <span className="flex flex-col items-center gap-1"><SpinnerIcon /> <span>Placing...</span></span>
+                  ) : (
+                    <span className="flex flex-col items-center gap-1">
+                      <WhatsAppIcon />
+                      <span className="text-center">
+                        <span className="block">Send vi</span>
+                        <span className="block">WhatsApp</span>
+                      </span>
+                    </span>
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handlePlaceOrder}
-                disabled={isSubmitting || !phone || belowMinimumOrder || shopClosed || outsideServiceRadius || deliveryFeeNotReady || noFulfillment || hasUnavailableItems}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-full ${accentBg} py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all ${accentBgHover} disabled:cursor-not-allowed disabled:opacity-50`}
-              >
-                {isSubmitting ? (
-                  <><SpinnerIcon /> Placing Order...</>
-                ) : (
-                  <><WhatsAppIcon /> Send via WhatsApp</>
-                )}
-              </button>
             </div>
           </div>
         )}
