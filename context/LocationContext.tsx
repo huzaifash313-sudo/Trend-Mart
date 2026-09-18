@@ -45,8 +45,12 @@ const AUTO_DETECT_KEY = "trendsmart_location_autodetect_attempted_v2";
  */
 const DRIFT_REFRESH_KM = 0.4;
 
-/** Poll interval for the background "has the customer moved?" check. */
-const DRIFT_CHECK_INTERVAL_MS = 90_000;
+/**
+ * Poll interval for the background "has the customer moved?" check.
+ * 5 minutes instead of 90s — every tick runs a fresh high-accuracy GPS session
+ * plus a reverse-geocode ping, which on a laptop (no GPS chip) is pure churn.
+ */
+const DRIFT_CHECK_INTERVAL_MS = 300_000;
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -137,11 +141,18 @@ export function LocationProvider({ children }: { children: ReactNode }) {
    * location untouched.
    */
   const syncFromDevice = useCallback(
-    async (options?: { timeout?: number; targetAccuracyMeters?: number }) => {
+    async (options?: {
+      timeout?: number;
+      targetAccuracyMeters?: number;
+      maximumAge?: number;
+    }) => {
       try {
         const { coordinates } = await requestUserLocationDetailed({
           timeout: options?.timeout ?? 12_000,
           targetAccuracyMeters: options?.targetAccuracyMeters,
+          // Allow a recent cached fix (up to a minute old) for the silent drift
+          // check so we don't force a brand-new GPS acquisition on every tick.
+          maximumAge: options?.maximumAge ?? 60_000,
         });
         if (!coordinates) return null; // denied / unavailable / timeout → keep saved
 
@@ -258,16 +269,30 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    let lastSyncAt = 0;
+    // Don't re-run GPS just because the user alt-tabbed back — that was the
+    // "geo bar bar calculate + bar bar ping" trigger. Allow at most one sync
+    // per minute regardless of how many visibility/focus events fire.
+    const SYNC_COOLDOWN_MS = 60_000;
+
     const tick = async () => {
       if (cancelled) return;
       if (document.visibilityState !== "visible") return;
+
+      const now = Date.now();
+      if (now - lastSyncAt < SYNC_COOLDOWN_MS) return;
+      lastSyncAt = now;
 
       const saved = getValidSavedLocation();
       // `manual` (city/area) and `pin` are user decisions — leave them alone.
       if (saved && saved.source !== "gps" && saved.source !== "cached") return;
       if (!(await canFollow())) return;
 
-      await syncFromDevice({ timeout: 8_000, targetAccuracyMeters: 80 });
+      await syncFromDevice({
+        timeout: 8_000,
+        targetAccuracyMeters: 80,
+        maximumAge: 60_000,
+      });
     };
 
     void (async () => {

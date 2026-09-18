@@ -85,6 +85,10 @@ export function isPushClientSupported(): boolean {
 async function ensureServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
   if (!isSecureContextForPush()) return null;
+  // Push is a production feature (HTTPS + VAPID). Never register/update the
+  // service worker under `next dev` — a dev-time SW serving stale chunks is
+  // exactly what makes the app freeze until a hard refresh.
+  if (process.env.NODE_ENV !== "production") return null;
 
   try {
     let registration = await navigator.serviceWorker.getRegistration();

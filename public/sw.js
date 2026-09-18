@@ -1,4 +1,4 @@
-/* TrendsMart SW v56 — offline-first app shell.
+/* TrendsMart SW v57 — offline-first app shell.
    Goals:
    - Repeat PWA opens feel native: successful visits to PUBLIC pages are
      cached, and cached copies are served INSTANTLY on the next navigation
@@ -14,12 +14,12 @@
      SW tells visible clients {type:"tm-conn", state:"offline"} so the app can
      show a subtle "You're offline" pill instead of looking broken.
    Push / notifications logic unchanged from v52.
-   v56: bump shell cache after shopHours module graph change so stale Turbopack
+   v57: network-first HTML + shell cache bump so stale Turbopack
    chunks cannot serve "module factory is not available". */
 
-const PAGE_CACHE = "tm-pages-v56"; /* rendered HTML of visited public pages */
-const SHELL_CACHE = "tm-shell-v56"; /* /_next/static, fonts, icons, /offline */
-const IMAGE_CACHE = "tm-images-v56"; /* Cloudinary / Next image proxy */
+const PAGE_CACHE = "tm-pages-v57"; /* rendered HTML of visited public pages */
+const SHELL_CACHE = "tm-shell-v57"; /* /_next/static, fonts, icons, /offline */
+const IMAGE_CACHE = "tm-images-v57"; /* Cloudinary / Next image proxy */
 const KEEP = new Set([PAGE_CACHE, SHELL_CACHE, IMAGE_CACHE]);
 
 /** Keep these bounded — evict oldest entries past the cap on every write. */
@@ -211,37 +211,15 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         const pageCache = cacheable ? await openPageCache() : null;
-        const cached = cacheable ? await pageCache.match(pageUrl) : undefined;
 
-        if (cached) {
-          // Stale-while-revalidate for PUBLIC pages: return the cached copy
-          // immediately (repeat PWA opens are near-instant — no network wait),
-          // then refresh the cache in the background for next time.
-          event.waitUntil(
-            (async () => {
-              try {
-                const res = await fetch(req);
-                if (res && res.ok && cacheable) {
-                  await pageCache.put(pageUrl, res.clone());
-                  await trimCache(PAGE_CACHE, PAGE_CACHE_LIMIT);
-                  broadcastConnection("online");
-                } else if (res) {
-                  // Fresh but non-ok (e.g. 500) — serve the server's state next
-                  // time too, but keep the current view working right now.
-                  broadcastConnection("online");
-                }
-              } catch {
-                broadcastConnection("offline");
-              }
-            })(),
-          );
-          return cached;
-        }
-
-        // No cached copy yet — try the network (don't give up early).
+        // Network-first for document navigations. Serving a cached HTML page
+        // first is what caused the "app stuck / hilti nahi" freezes: the cached
+        // HTML referenced JS chunks that had already been replaced (deploy or
+        // dev HMR), so hydration failed until a hard refresh bypassed the cache.
+        // The cache is now only a fallback for when we are truly offline.
         try {
           const res = await fetch(req);
-          if (res && res.ok && cacheable) {
+          if (res.ok && cacheable) {
             event.waitUntil(
               pageCache
                 .put(pageUrl, res.clone())
@@ -252,11 +230,18 @@ self.addEventListener("fetch", (event) => {
           broadcastConnection("online");
           return res;
         } catch {
-          /* offline below */
+          /* network failed — fall back to cache below */
         }
 
-        // Truly offline and nothing cached for this page.
         broadcastConnection("offline");
+        if (cacheable) {
+          try {
+            const cached = await pageCache.match(pageUrl);
+            if (cached) return cached;
+          } catch {
+            /* fall through */
+          }
+        }
         try {
           const shell = await caches.open(SHELL_CACHE);
           const offline = await shell.match("/offline");

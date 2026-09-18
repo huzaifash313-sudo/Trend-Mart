@@ -14,7 +14,7 @@ declare global {
 }
 
 /** Bump together with public/sw.js so the one-time reload guard stays unique. */
-const SW_RELOAD_KEY = "tm_sw_reload_v56";
+const SW_RELOAD_KEY = "tm_sw_reload_v57";
 
 /**
  * Install prompt capture + safe SW update.
@@ -29,6 +29,39 @@ export default function PwaRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
+
+    // Dev mode: a service worker registered by a previous session keeps serving
+    // stale chunks and causes the "stuck until hard refresh" freeze. Evict any
+    // leftover worker + caches, then reload once so this page detaches from it
+    // — after that the dev server talks to the browser directly, forever.
+    if (process.env.NODE_ENV !== "production") {
+      void (async () => {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          if (regs.length > 0) {
+            await Promise.all(regs.map((r) => r.unregister().catch(() => false)));
+          }
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k).catch(() => false)));
+          }
+          if (regs.length > 0) {
+            try {
+              if (!sessionStorage.getItem("tm_dev_sw_cleanup_v57")) {
+                sessionStorage.setItem("tm_dev_sw_cleanup_v57", "1");
+                window.location.reload();
+              }
+            } catch {
+              /* reload guard is best-effort */
+            }
+          }
+        } catch {
+          /* never block the app */
+        }
+      })();
+      return;
+    }
+
     if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
       return;
     }
